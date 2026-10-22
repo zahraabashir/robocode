@@ -1,0 +1,29 @@
+diff --git a/approach.py b/approach.py
+index fceccb2..81dc975 100644
+--- a/approach.py
++++ b/approach.py
+@@ -120,8 +120,10 @@ class GeneratedApproach:
+         cy = np.arctan2(M[1, 0], M[0, 0])
+         steps = 4 if aligned_only else 24
+         cands = []
+-        for k in range(steps):
++        for k in range(steps // 2):
+             yaw = oyaw + k * (2 * np.pi / steps)
++            if abs(_wrap(yaw + np.pi - cy)) < abs(_wrap(yaw - cy)):
++                yaw = yaw + np.pi  # parallel gripper: yaw and yaw+pi are equivalent
+             rel = yaw - oyaw
+             span = abs(np.cos(rel)) * h[0] + abs(np.sin(rel)) * h[1]
+             if span > 0.041:
+diff --git a/res4.txt b/res4.txt
+new file mode 100644
+index 0000000..70a3051
+--- /dev/null
++++ b/res4.txt
+@@ -0,0 +1,7 @@
++(58, 1, True, 55, 15.7)
++(59, 2, True, 147, 22.2)
++success 60 / 60 mean steps 84.76666666666667
++(13, 4, False, 1000, 8.3)
++count 4 success 15 / 16 mean steps 250.625 max compute 8.3
++(11, 5, False, 1000, 36.5)
++count 5 success 15 / 16 mean steps 349.875 max compute 36.5

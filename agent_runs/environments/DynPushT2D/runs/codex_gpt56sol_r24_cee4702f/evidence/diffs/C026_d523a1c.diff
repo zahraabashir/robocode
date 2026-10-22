@@ -1,0 +1,37 @@
+diff --git a/approach.py b/approach.py
+index a4329c8..e71cbd1 100644
+--- a/approach.py
++++ b/approach.py
+@@ -39,7 +39,7 @@ class GeneratedApproach:
+         lo, hi, res = 0.11, 4.89, 0.12
+         n = int((hi-lo)/res) + 1
+         c, sn = math.cos(theta), math.sin(theta)
+-        margin = 0.105
++        margin = 0.145
+         def blocked(ix, iy):
+             p = np.array([lo + ix*res, lo + iy*res]) - obj
+             x, y = c*p[0] + sn*p[1], -sn*p[0] + c*p[1]
+@@ -126,6 +126,11 @@ class GeneratedApproach:
+             contact = obj + self._world(contact_local, theta)
+             force = self._world(np.array([self.turn_sign, 0.0]), theta)
+             if self.mode == "rot_far":
++                disturbed = (np.linalg.norm(obj-self.start_pose[:2]) > 0.012 or
++                             abs(self._angle(theta-self.start_pose[2])) > 0.018)
++                if disturbed:
++                    self.mode, self.nav = "choose", []
++                    return self._safe(robot-obj, 0.035)
+                 while self.nav and np.linalg.norm(robot-self.nav[0]) < 0.05:
+                     self.nav.pop(0)
+                 if self.nav:
+@@ -155,6 +160,11 @@ class GeneratedApproach:
+         com = obj + self._world(np.array([0.0, -0.36 * lv]), theta)
+         far = np.clip(com - self.push_dir * 0.82, 0.105, 4.895)
+         if self.mode == "move_far":
++            disturbed = (np.linalg.norm(obj-self.start_pose[:2]) > 0.012 or
++                         abs(self._angle(theta-self.start_pose[2])) > 0.018)
++            if disturbed:
++                self.mode, self.nav = "choose", []
++                return self._safe(robot-obj, 0.035)
+             while self.nav and np.linalg.norm(robot - self.nav[0]) < 0.045:
+                 self.nav.pop(0)
+             if self.nav:

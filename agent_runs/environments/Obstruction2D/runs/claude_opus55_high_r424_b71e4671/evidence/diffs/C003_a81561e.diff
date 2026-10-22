@@ -1,0 +1,127 @@
+diff --git a/approach.py b/approach.py
+index dfda7f1..3808e73 100644
+--- a/approach.py
++++ b/approach.py
+@@ -103,7 +103,7 @@ class GeneratedApproach:
+             tr = rects[self.target]
+             carry_h = tr[3] - tr[2]
+         travel_y = max_top + 0.05 + carry_h + arm_max + gw
+-        travel_y = min(max(travel_y, 0.6), 1.0 - base_r - 0.01)
++        travel_y = min(max(travel_y, 0.6), 0.89)
+ 
+         dx = dy = dth = darm = 0.0
+         vcmd = 1.0 if vac > 0.5 else 0.0
+@@ -132,7 +132,7 @@ class GeneratedApproach:
+             return self._act(0, 0, dth, darm, 0.0)
+ 
+         tr = rects[self.target]
+-        tcx = (tr[0] + tr[1]) / 2
++        tcx = self._grasp_x(tr, rects[block.name], (sx0, sx1), self.target == block.name)
+ 
+         if self.phase == "rise":
+             # go up to travel height without vacuum
+@@ -210,6 +210,28 @@ class GeneratedApproach:
+         self.last_cmd = (dx, dy)
+         return self._act(dx, dy, dth, darm, vcmd)
+ 
++    XMIN, XMAX = 0.102, 1.516
++
++    def _grasp_x(self, tr, br, surf, is_block):
++        """Robot x at which to grasp object with x-range tr."""
++        cx = (tr[0] + tr[1]) / 2
++        hw = (tr[1] - tr[0]) / 2
++        dmax = max(hw + 0.035 - 0.012, 0.0)  # gripper overlap allowance
++        lo, hi = -dmax, dmax
++        # pick reachability
++        lo = max(lo, self.XMIN - cx)
++        hi = min(hi, self.XMAX - cx)
++        if is_block:
++            scx = (surf[0] + surf[1]) / 2
++            lo2 = max(lo, self.XMIN - scx)
++            hi2 = min(hi, self.XMAX - scx)
++            if lo2 <= hi2:
++                lo, hi = lo2, hi2
++        if lo > hi:
++            return float(np.clip(cx, self.XMIN, self.XMAX))
++        d = float(np.clip(0.0, lo, hi))
++        return cx + d
++
+     def _plan_drop(self, state, rects, block, surf, rx):
+         tr = rects[self.target]
+         w = tr[1] - tr[0]
+@@ -217,7 +239,7 @@ class GeneratedApproach:
+         if self.target == block.name:
+             sx0, sx1 = surf
+             want_left = (sx0 + sx1) / 2 - w / 2
+-            self.drop_x = want_left - off
++            self.drop_x = float(np.clip(want_left - off, self.XMIN, self.XMAX))
+             return
+         # choose free floor location maximizing clearance
+         sx0, sx1 = surf
+@@ -228,8 +250,10 @@ class GeneratedApproach:
+                 continue
+             forb.append((r[0], r[1]))
+         best = None
+-        for left in np.arange(0.12, WORLD_MAX_X - 0.12 - w, 0.01):
++        for left in np.arange(0.005, WORLD_MAX_X - 0.005 - w, 0.005):
+             a, b = left, left + w
++            if not (self.XMIN <= left - off <= self.XMAX):
++                continue
+             clr = min(min(abs(a - f1) if a >= f1 else (abs(f0 - b) if b <= f0 else -1.0)
+                           for f0, f1 in forb), 0.3)
+             if clr < 0:
+@@ -238,4 +262,4 @@ class GeneratedApproach:
+             if best is None or score > best[0]:
+                 best = (score, left)
+         left = best[1] if best else 0.15
+-        self.drop_x = left - off
++        self.drop_x = float(np.clip(left - off, self.XMIN, self.XMAX))
+diff --git a/dbg.py b/dbg.py
+new file mode 100644
+index 0000000..06ef7d7
+--- /dev/null
++++ b/dbg.py
+@@ -0,0 +1,17 @@
++import sys
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++seed=int(sys.argv[1]); every=int(sys.argv[2]) if len(sys.argv)>2 else 10
++env = make_env()
++ap = GeneratedApproach(env.action_space, env.observation_space, {})
++obs, info = env.reset(seed=seed); ap.reset(obs, info)
++r = obs.get_object_from_name('robot')
++for t in range(env.max_steps):
++    a = ap.get_action(obs)
++    ph=ap.phase
++    obs, rew, te, tr, _ = env.step(a)
++    if t%every==0 or te:
++        print(t, ph, ap.target, np.round(a,3), [round(float(obs.get(r,f)),3) for f in ['x','y','theta','arm_joint','vacuum']])
++    if te: print("DONE", t+1); break
++env.close()
+diff --git a/probe3.py b/probe3.py
+new file mode 100644
+index 0000000..39676a3
+--- /dev/null
++++ b/probe3.py
+@@ -0,0 +1,20 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=21)
++r = obs.get_object_from_name('robot')
++for d in [0.001,-0.001]:
++    prev=None
++    for i in range(2000):
++        obs,*_=env.step(np.array([d*50 if i<1 else d,0,0,0,0],dtype=np.float32)) if False else env.step(np.array([d,0,0,0,0],dtype=np.float32))
++        x=float(obs.get(r,'x'))
++        if prev is not None and x==prev: break
++        prev=x
++    print("limit",d,x)
++prev=None
++for i in range(2000):
++    obs,*_=env.step(np.array([0,0.002,0,0,0],dtype=np.float32)); y=float(obs.get(r,'y'))
++    if prev is not None and y==prev: break
++    prev=y
++print("ymax",y)
++env.close()

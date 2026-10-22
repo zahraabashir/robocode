@@ -1,0 +1,25 @@
+diff --git a/approach.py b/approach.py
+index 1b84da8..ed46c43 100644
+--- a/approach.py
++++ b/approach.py
+@@ -14,7 +14,7 @@ class GeneratedApproach:
+         self.homes=[self.xy(state,r) for r in self.rovers]
+         self.objs=self.objects(state,'objective'); self.samples=self.objects(state,'sample')
+         self.lander=self.xy(state,self.objects(state,'lander')[0])
+-        self.boxes=np.array([[state.get(o,k) for k in ['x','y','half_x','half_y']] for o in self.objects(state,'obstacle')]+[[0,0,0.05,1.5]])
++        self.boxes=np.array([[state.get(o,k) for k in ['x','y','half_x','half_y']] for o in self.objects(state,'obstacle')]+[[0,0,0.05,2.5]])
+         self.axis=np.arange(-2.3,2.301,0.1)
+         self.n=len(self.axis)
+         self.points=np.array([(x,y) for x in self.axis for y in self.axis])
+@@ -42,7 +42,7 @@ class GeneratedApproach:
+         p=np.atleast_2d(p); target=np.asarray(target)
+         ok=np.linalg.norm(p-target,axis=1)<limit-.025
+         # Low mounds do not occlude the camera, but pillars and wall do.
+-        boxes=self.boxes[(self.boxes[:,2]<.2)]
++        boxes=self.boxes[:-1][(self.boxes[:-1,2]<.2)]
+         delta=target-p
+         for b in boxes:
+             lo=b[:2]-b[2:];hi=b[:2]+b[2:]
+diff --git a/test_results.jsonl b/test_results.jsonl
+new file mode 100644
+index 0000000..e69de29

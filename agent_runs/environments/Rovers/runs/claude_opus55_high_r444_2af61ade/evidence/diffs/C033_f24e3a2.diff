@@ -1,0 +1,798 @@
+diff --git a/NOTES.md b/NOTES.md
+index 6049a68..bfaae9e 100644
+--- a/NOTES.md
++++ b/NOTES.md
+@@ -39,3 +39,5 @@
+ - Model: each sample is a box (half 0.045) occluding the ray cam->lander, with the ray trimmed at the lander box (half 0.06). This fixed 549 but did not predict 706.
+ - Robustness: failed send/img/cal positions are added to self.bad as (x,y,op,arg). The planner then excludes land/vis/any_vis within 0.08 of them, so a replan won't retry the same spot. 706 is now solved in 32 steps, with 2 replans.
+ - Results: seeds 400-600 200/200 (mean 20.185); 600-800 200/200 (mean 20.57). Single-thread worst plan time ~7s.
++- Experiment: less conservative pillars (PILLAR_R 0.238, INFL_LAND 0.02, INFL_OBJ 0.005) on 400-600 gave 200/200 and mean 20.16 vs 20.185. The gain is marginal and adds collision risk, so it was not adopted.
++- 4-objective seeds 100-200: 100/100, mean 21.95. Single-thread plan time ~5s (up to ~56s under 8-thread contention).
+diff --git a/approach_lc.py b/approach_lc.py
+new file mode 100644
+index 0000000..7d7659d
+--- /dev/null
++++ b/approach_lc.py
+@@ -0,0 +1,758 @@
++"""Rovers approach: staged grid BFS planner per rover + joint task assignment."""
++import itertools
++import math
++
++import numpy as np
++from scipy.ndimage import minimum_filter
++
++INF = 10 ** 6
++RES = 0.05            # grid resolution
++WIN = 4               # max cells per step per axis (0.2 / RES)
++SEL = {"sample": -0.8333, "cal": -0.5, "img": -0.1667, "noop": 0.1667,
++       "send": 0.5, "drop": 0.8333}
++
++# geometry constants (empirically probed)
++WALL_IN = 0.2271 + 0.004
++ARENA = 2.2729 - 0.004
++PILLAR_R = 0.238
++MOUND_R = 0.185
++LANDER_XMIN = -1.15
++LANDER_YMIN = -1.42
++OBJ_RANGE = 1.993
++LANDER_RANGE = 3.995
++SAMPLE_R = 0.246
++HOME_R = 0.235
++IMG_TH = -math.pi / 2
++ROT_IMG = 4.0
++FINE_RES = 0.025
++PILLAR_INFL_OBJ = 0.005
++PILLAR_INFL_LAND = 0.02
++LANDER_HALF = 0.06
++SAMPLE_OCC_H = 0.045
++ROVER_OCC_R = 0.26
++CAM_OFF = (-0.087, -0.0125)
++OBJ_BACK_DEG = 108.0     # if |rel bearing| > this, pillars don't occlude objectives
++LAND_BACK_DEG = 110.0    # same quirk for lander (sending)
++USE_BACK_OBJ = True
++USE_BACK_LAND = True
++
++
++def _wrap(a):
++    return (a + np.pi) % (2 * np.pi) - np.pi
++
++
++RELAX = [False]
++
++
++def rot_steps(a, b):
++    d = abs(float(_wrap(b - a)))
++    return int(math.ceil(d / 0.4 - 1e-6))
++
++
++def approach_angle(a, b, dmax):
++    d = float(_wrap(b - a))
++    if abs(d) <= dmax:
++        return float(_wrap(b))
++    return float(_wrap(a + math.copysign(dmax, d)))
++
++
++def seg_hits_box(px, py, qx, qy, cx, cy, hx, hy):
++    """Vectorised: does segment p->q (p arrays, q scalar) intersect AABB?"""
++    if RELAX[0]:
++        return np.zeros(np.shape(px), dtype=bool)
++    dx = qx - px
++    dy = qy - py
++    t0 = np.zeros_like(px)
++    t1 = np.ones_like(px)
++    ok = np.ones(px.shape, dtype=bool)
++    for d, p, lo, hi in ((dx, px, cx - hx, cx + hx), (dy, py, cy - hy, cy + hy)):
++        small = np.abs(d) < 1e-12
++        ok &= ~(small & ((p < lo) | (p > hi)))
++        with np.errstate(divide="ignore", invalid="ignore"):
++            ta = (lo - p) / d
++            tb = (hi - p) / d
++        tmin = np.where(small, -np.inf, np.minimum(ta, tb))
++        tmax = np.where(small, np.inf, np.maximum(ta, tb))
++        t0 = np.maximum(t0, tmin)
++        t1 = np.minimum(t1, tmax)
++    return ok & (t0 <= t1)
++
++
++def seg_hits_disk(px, py, qx, qy, cx, cy, r):
++    dx = qx - px
++    dy = qy - py
++    L2 = dx * dx + dy * dy + 1e-12
++    t = np.clip(((cx - px) * dx + (cy - py) * dy) / L2, 0, 1)
++    ex = px + t * dx - cx
++    ey = py + t * dy - cy
++    return ex * ex + ey * ey < r * r
++
++
++def box_dist(px, py, cx, cy, hx, hy):
++    ddx = np.maximum(np.abs(px - cx) - hx, 0)
++    ddy = np.maximum(np.abs(py - cy) - hy, 0)
++    return np.hypot(ddx, ddy)
++
++
++def propagate(f, free, win=WIN):
++    f = np.where(free, f, INF)
++    while True:
++        m = minimum_filter(f, size=2 * win + 1, mode="constant", cval=INF) + 1
++        nf = np.where(free, np.minimum(f, m), INF)
++        if np.array_equal(nf, f):
++            return f
++        f = nf
++
++
++def op_stage(fprev, region, win=WIN):
++    m = minimum_filter(fprev, size=2 * win + 1, mode="constant", cval=INF) + 1
++    return np.where(region, np.minimum(m, INF), INF)
++
++
++class Scene:
++    def __init__(self, state):
++        self.rovers = {}
++        self.objectives = []
++        self.samples = []
++        self.pillars = []
++        self.mounds = []
++        self.lander = (-1.9, -2.0)
++        objs = [state.get_object_from_name(nm) for nm in sorted(state.get_object_names())]
++        for o in objs:
++            t = o.type.name
++            g = lambda f: state.get(o, f)
++            if t == "rover":
++                self.rovers[o.name] = dict(x=g("x"), y=g("y"), th=g("theta"),
++                                           full=g("store_full") > 0.5,
++                                           cal=g("calibrated") > 0.5)
++            elif t == "lander":
++                self.lander = (g("x"), g("y"))
++            elif t == "objective":
++                self.objectives.append(dict(name=o.name, x=g("x"), y=g("y"),
++                                            img=(g("have_image_rover0") > 0.5,
++                                                 g("have_image_rover1") > 0.5),
++                                            recv=g("received_image") > 0.5))
++            elif t == "sample":
++                self.samples.append(dict(name=o.name, x=g("x"), y=g("y"),
++                                         soil=g("is_soil") > 0.5,
++                                         an=(g("analyzed_rover0") > 0.5,
++                                             g("analyzed_rover1") > 0.5),
++                                         recv=g("received_analysis") > 0.5))
++            elif t == "obstacle":
++                d = (g("x"), g("y"), g("half_x"), g("half_y"))
++                if g("half_x") > 0.15:
++                    self.mounds.append(d)
++                else:
++                    self.pillars.append(d)
++
++
++class RoverPlanner:
++    """Grid + regions for one rover."""
++
++    def __init__(self, idx, home, scene, other_pos_list, cur_th=None, bad=(), img_th=None,
++                 res=RES):
++        self.ctor = (idx, home, scene, other_pos_list, cur_th, bad, img_th)
++        self.res = res
++        self.win = int(round(0.2 / res))
++        self.idx = idx
++        self.home = home  # (x, y, th)
++        hx, hy, th = home
++        self.th = th
++        side = 1 if hx > 0 else -1
++        lo_x, hi_x = (WALL_IN, ARENA) if side > 0 else (-ARENA, -WALL_IN)
++        i0 = math.ceil((lo_x - hx) / res - 1e-9)
++        i1 = math.floor((hi_x - hx) / res + 1e-9)
++        j0 = math.ceil((-ARENA - hy) / res - 1e-9)
++        j1 = math.floor((ARENA - hy) / res + 1e-9)
++        self.xs = hx + res * np.arange(i0, i1 + 1)
++        self.ys = hy + res * np.arange(j0, j1 + 1)
++        self.hi = -i0
++        self.hj = -j0
++        X, Y = np.meshgrid(self.xs, self.ys, indexing="ij")
++        self.X, self.Y = X, Y
++        free = np.ones(X.shape, dtype=bool)
++        for (cx, cy, ax, ay) in scene.pillars:
++            free &= box_dist(X, Y, cx, cy, ax, ay) > (0.236 if RELAX[0] else PILLAR_R)
++        for (cx, cy, ax, ay) in scene.mounds:
++            free &= box_dist(X, Y, cx, cy, ax, ay) > MOUND_R
++        free &= (X >= LANDER_XMIN) | (Y >= LANDER_YMIN)
++        for b in bad:
++            if len(b) == 2:
++                free &= np.hypot(X - b[0], Y - b[1]) > 0.03
++        free[self.hi, self.hj] = True
++        self.free = free
++        self.home_reg = (np.hypot(X - hx, Y - hy) <= HOME_R) & free
++        self.home_reg[self.hi, self.hj] = True
++        c, s = math.cos(th), math.sin(th)
++        self.camx = X + c * CAM_OFF[0] - s * CAM_OFF[1]
++        self.camy = Y + s * CAM_OFF[0] + c * CAM_OFF[1]
++        self.scene = scene
++        ith = th if img_th is None else img_th
++        self.img_th = ith
++        cur = th if cur_th is None else cur_th
++        self.cur_th = cur
++        self.nrot_in = rot_steps(cur, ith)
++        self.nrot_out = rot_steps(ith, th)
++        hs = [cur, ith, th]
++        for k in range(1, 9):
++            hs.append(approach_angle(cur, ith, 0.4 * k))
++            hs.append(approach_angle(ith, th, 0.4 * k))
++            hs.append(approach_angle(cur, th, 0.4 * k))
++        self.headings = hs
++        ci, si = math.cos(ith), math.sin(ith)
++        camx_i = X + ci * CAM_OFF[0] - si * CAM_OFF[1]
++        camy_i = Y + si * CAM_OFF[0] + ci * CAM_OFF[1]
++        # objective visibility
++        self.vis = []
++        self.objd = []
++        for ob in scene.objectives:
++            ox, oy = ob["x"], ob["y"]
++            d = np.hypot(ox - camx_i, oy - camy_i)
++            v = (d <= OBJ_RANGE)
++            occ = np.zeros(X.shape, dtype=bool)
++            for (cx, cy, ax, ay) in scene.pillars:
++                e = PILLAR_INFL_OBJ
++                occ |= seg_hits_box(camx_i, camy_i, ox, oy, cx, cy, ax + e, ay + e)
++                occ |= seg_hits_box(X, Y, ox, oy, cx, cy, ax + e, ay + e)
++            if USE_BACK_OBJ:
++                rel = np.abs(_wrap(np.arctan2(oy - Y, ox - X) - ith))
++                back = rel > math.radians(OBJ_BACK_DEG)
++            else:
++                back = np.zeros(X.shape, dtype=bool)
++            occ2 = np.zeros(X.shape, dtype=bool)
++            for (px, py) in other_pos_list:
++                occ2 |= seg_hits_disk(camx_i, camy_i, ox, oy, px, py, ROVER_OCC_R)
++            self.vis.append(v & ((~occ) | back) & ~occ2 & free)
++            self.objd.append(d)
++        self.any_vis = np.zeros(X.shape, dtype=bool)
++        for v in self.vis:
++            self.any_vis |= v
++        # lander visibility (must hold for every heading along the rotation path)
++        lx, ly = scene.lander
++        land = free.copy()
++        land_free = free.copy()
++        for hh in self.headings:
++            ch, sh = math.cos(hh), math.sin(hh)
++            cx_ = X + ch * CAM_OFF[0] - sh * CAM_OFF[1]
++            cy_ = Y + sh * CAM_OFF[0] + ch * CAM_OFF[1]
++            v = (np.hypot(lx - X, ly - Y) <= LANDER_RANGE) & \
++                (np.hypot(lx - cx_, ly - cy_) <= LANDER_RANGE)
++            occ = np.zeros(X.shape, dtype=bool)
++            for (cx, cy, ax, ay) in scene.pillars:
++                e = PILLAR_INFL_LAND
++                occ |= seg_hits_box(X, Y, lx, ly, cx, cy, ax + e, ay + e)
++                occ |= seg_hits_box(cx_, cy_, lx, ly, cx, cy, ax + e, ay + e)
++            # sample markers occlude the lander (ray ends at lander box boundary)
++            for sm in scene.samples:
++                if abs(sm["x"] - lx) > 4.2 or abs(sm["y"] - ly) > 4.2:
++                    continue
++                for (ppx, ppy) in ((X, Y), (cx_, cy_)):
++                    ddx = ppx - lx
++                    ddy = ppy - ly
++                    tt = LANDER_HALF / np.maximum(np.maximum(np.abs(ddx), np.abs(ddy)), 1e-9)
++                    ex = lx + tt * ddx
++                    ey = ly + tt * ddy
++                    occ |= seg_hits_box(ppx, ppy, ex, ey, sm["x"], sm["y"],
++                                        SAMPLE_OCC_H, SAMPLE_OCC_H)
++            if USE_BACK_LAND:
++                rel = np.abs(_wrap(np.arctan2(ly - Y, lx - X) - hh))
++                back = rel > math.radians(LAND_BACK_DEG)
++            else:
++                back = np.zeros(X.shape, dtype=bool)
++            occ2 = np.zeros(X.shape, dtype=bool)
++            for (px, py) in other_pos_list:
++                occ2 |= seg_hits_disk(X, Y, lx, ly, px, py, ROVER_OCC_R)
++                occ2 |= seg_hits_disk(cx_, cy_, lx, ly, px, py, ROVER_OCC_R)
++            land &= v & ((~occ) | back) & ~occ2
++            land_free &= v & ((~occ) | back)
++        for b in bad:
++            if len(b) == 4:
++                near = np.hypot(X - b[0], Y - b[1]) <= 0.08
++                if b[2] == "send":
++                    land &= ~near
++                    land_free &= ~near
++                elif b[2] == "img" and b[3] is not None and b[3] < len(self.vis):
++                    self.vis[b[3]] = self.vis[b[3]] & ~near
++                elif b[2] == "cal":
++                    self.any_vis &= ~near
++        self.land = land
++        self.land_free = land_free
++        self.camx_i, self.camy_i = camx_i, camy_i
++        # samples
++        self.sreg = {}
++        dk = {}
++        for kind in ("stone", "soil"):
++            d = np.full(X.shape, 1e9)
++            for sm in scene.samples:
++                if sm["soil"] == (kind == "soil"):
++                    d = np.minimum(d, np.hypot(sm["x"] - X, sm["y"] - Y))
++            dk[kind] = d
++        for kind, oth in (("stone", "soil"), ("soil", "stone")):
++            r = (dk[kind] <= SAMPLE_R) & ((dk[oth] > 0.26) | (dk[oth] > dk[kind] + 0.03))
++            self.sreg[kind] = r & free
++
++    def cell_of(self, x, y):
++        i = int(round((x - self.xs[0]) / self.res))
++        j = int(round((y - self.ys[0]) / self.res))
++        i = min(max(i, 0), len(self.xs) - 1)
++        j = min(max(j, 0), len(self.ys) - 1)
++        return i, j
++
++    def img_region(self, k, imaged):
++        """cells where image would photograph objective k given set imaged."""
++        reg = self.vis[k].copy()
++        if not reg.any():
++            return reg
++        dk = self.objd[k]
++        for m in range(len(self.vis)):
++            if m == k or m in imaged:
++                continue
++            reg &= ~((self.objd[m] <= 2.03) & (self.objd[m] < dk + 0.03))
++        return reg
++
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.action_space = action_space
++        self.homes = None
++
++    # ------------------------------------------------------------------
++    def reset(self, state, info):
++        sc = Scene(state)
++        self.homes = {n: (r["x"], r["y"], r["th"]) for n, r in sc.rovers.items()}
++        self.replans = 0
++        self.fail_count = 0
++        self.expect = [None, None]
++        self.prev_sc = sc
++        self.log = []
++        self.bad = [[], []]
++        import time as _t
++        self.t_start = _t.time()
++        self._plan(state)
++
++    # ------------------------------------------------------------------
++    def _rover_tables(self, ri, sc, need_objs, need_stone, need_soil, pending):
++        name = "rover%d" % ri
++        r = sc.rovers[name]
++        other = sc.rovers["rover%d" % (1 - ri)]
++        ohome = self.homes["rover%d" % (1 - ri)]
++        occl = [(ohome[0], ohome[1])]
++        if math.hypot(other["x"] - ohome[0], other["y"] - ohome[1]) > 0.05:
++            occl.append((other["x"], other["y"]))
++        merged = {}
++        hth = self.homes[name][2]
++        if IMG_TH is None:
++            ths = [hth]
++        else:
++            d = float(_wrap(IMG_TH - hth))
++            ths = [float(_wrap(hth + math.copysign(min(abs(d), ROT_IMG), d)))]
++        for ith in ths:
++            P, table = self._rover_tables_h(ri, sc, need_objs, need_stone, need_soil,
++                                            pending, occl, ith)
++            for k, (c, st) in table.items():
++                if k not in merged or c < merged[k][0]:
++                    merged[k] = (c, st, P)
++        return None, merged
++
++    def _rover_tables_h(self, ri, sc, need_objs, need_stone, need_soil, pending, occl, ith):
++        name = "rover%d" % ri
++        r = sc.rovers[name]
++        P = RoverPlanner(ri, self.homes[name], sc, occl, r["th"], self.bad[ri], ith)
++        self_planner = P
++        start = P.cell_of(r["x"], r["y"])
++        P.free[start] = True
++        f0 = np.full(P.free.shape, INF, dtype=np.int64)
++        f0[start] = 0
++        stages0 = []
++        F = propagate(f0, P.free, P.win)
++        stages0.append(("start", None, f0, F))
++        if r["full"]:
++            G = op_stage(F, P.free, P.win)
++            F = propagate(G, P.free, P.win)
++            stages0.append(("drop", None, G, F))
++        imaged0 = set(k for k, ob in enumerate(sc.objectives) if ob["img"][ri])
++        tasks = []
++        for k in need_objs:
++            if P.vis[k].any():
++                tasks.append(("obj", k))
++        if need_stone and P.sreg["stone"].any():
++            tasks.append(("stone", None))
++        if need_soil and P.sreg["soil"].any():
++            tasks.append(("soil", None))
++        hcell = (P.hi, P.hj)
++        table = {}  # frozenset(task keys) -> (cost, stages)
++
++        def finish(F, stages, done_keys):
++            if not done_keys and not pending:
++                cost = F[P.home_reg].min()
++                st = stages
++            else:
++                G = op_stage(F, P.land, P.win)
++                F2 = propagate(G, P.free, P.win)
++                cost = F2[P.home_reg].min()
++                st = stages + [("send", None, G, F2)]
++            if cost >= INF:
++                return
++            key = frozenset(done_keys)
++            if key not in table or cost < table[key][0]:
++                table[key] = (int(cost), st)
++
++        def dfs(F, stages, done_keys, imaged, cal):
++            finish(F, stages, done_keys)
++            if F.min() >= INF:
++                return
++            for t in tasks:
++                key = t if t[0] != "obj" else ("obj", t[1])
++                if key in done_keys:
++                    continue
++                if t[0] == "obj":
++                    k = t[1]
++                    st = list(stages)
++                    Fc = F
++                    if not cal:
++                        G = op_stage(F, P.any_vis, P.win)
++                        G = np.where(G < INF, np.maximum(G, P.nrot_in), INF)
++                        Fc = propagate(G, P.free, P.win)
++                        st.append(("cal", None, G, Fc))
++                    reg = P.img_region(k, imaged)
++                    G = op_stage(Fc, reg, P.win)
++                    G = np.where(G < INF, np.maximum(G, P.nrot_in), INF)
++                    Fi = propagate(G, P.free, P.win)
++                    st.append(("img", k, G, Fi))
++                    dfs(Fi, st, done_keys | {key}, imaged | {k}, False)
++                else:
++                    G = op_stage(F, P.sreg[t[0]], P.win)
++                    Fs = propagate(G, P.free, P.win)
++                    G2 = op_stage(Fs, P.free, P.win)
++                    Fd = propagate(G2, P.free, P.win)
++                    st = stages + [("sample", t[0], G, Fs), ("drop", None, G2, Fd)]
++                    dfs(Fd, st, done_keys | {key}, imaged, cal)
++
++        dfs(F, stages0, frozenset(), imaged0, r["cal"])
++        return P, table
++
++    def _plan(self, state):
++        import time as _t
++        self._fine_cache = {}
++        self._fast = (_t.time() - self.t_start) > 20.0
++        sc = Scene(state)
++        self.scene = sc
++        # what is needed
++        need_objs = [k for k, ob in enumerate(sc.objectives)
++                     if not ob["recv"] and not ob["img"][0] and not ob["img"][1]]
++        pending = [False, False]
++        for k, ob in enumerate(sc.objectives):
++            if not ob["recv"]:
++                for ri in range(2):
++                    if ob["img"][ri]:
++                        pending[ri] = True
++        need = {}
++        for kind in ("stone", "soil"):
++            recv = any(s["recv"] for s in sc.samples if s["soil"] == (kind == "soil"))
++            holders = [ri for ri in range(2)
++                       if any(s["an"][ri] for s in sc.samples if s["soil"] == (kind == "soil"))]
++            if recv:
++                need[kind] = False
++            elif holders:
++                need[kind] = False
++                pending[holders[0]] = True
++            else:
++                need[kind] = True
++        tabs = []
++        for ri in range(2):
++            tabs.append(self._rover_tables(ri, sc, need_objs, need["stone"], need["soil"],
++                                           pending[ri]))
++        # joint assignment
++        best = None
++        cands = []
++        n = len(need_objs)
++        stone_opts = [0, 1] if need["stone"] else [None]
++        soil_opts = [0, 1] if need["soil"] else [None]
++        for assign in itertools.product([0, 1], repeat=n):
++            for so in stone_opts:
++                for sl in soil_opts:
++                    sets = [set(), set()]
++                    for k, a in zip(need_objs, assign):
++                        sets[a].add(("obj", k))
++                    if so is not None:
++                        sets[so].add(("stone", None))
++                    if sl is not None:
++                        sets[sl].add(("soil", None))
++                    costs = []
++                    for ri in range(2):
++                        e = tabs[ri][1].get(frozenset(sets[ri]))
++                        costs.append(e)
++                    if costs[0] is None or costs[1] is None:
++                        continue
++                    key = (max(costs[0][0], costs[1][0]), costs[0][0] + costs[1][0])
++                    cands.append((key, costs))
++                    if best is None or key < best[0]:
++                        self.pred = key
++                        best = (key, costs)
++        self.actions = [[], []]
++        if best is None:
++            if not RELAX[0]:
++                RELAX[0] = True
++                try:
++                    self._plan(state)
++                finally:
++                    RELAX[0] = False
++            return
++        cands.sort(key=lambda c: c[0])
++        seen = set()
++        bestreal = None
++        for key, costs in cands:
++            sig = (id(costs[0][1]), id(costs[1][1]))
++            if sig in seen:
++                continue
++            seen.add(sig)
++            if len(seen) > 6 or (bestreal is not None and key[0] >= bestreal[0][0]):
++                break
++            acts = self._realize(sc, tabs, costs)
++            real = (max(len(acts[0]), len(acts[1])), len(acts[0]) + len(acts[1]))
++            if bestreal is None or real < bestreal[0]:
++                bestreal = (real, acts)
++        self.actions = bestreal[1]
++
++    def _refine(self, entry):
++        """Replay a coarse stage sequence on a fine grid."""
++        cost, stages, Pc = entry
++        if FINE_RES is None or FINE_RES >= Pc.res or self._fast:
++            return entry
++        ri = Pc.ctor[0]
++        ck = (ri, Pc.img_th)
++        if ck in self._fine_cache:
++            P = self._fine_cache[ck]
++            P.free = P.free0.copy()
++        else:
++            P = RoverPlanner(*Pc.ctor, res=FINE_RES)
++            P.free0 = P.free.copy()
++            self._fine_cache[ck] = P
++        sc = self.scene
++        r = sc.rovers["rover%d" % ri]
++        imaged = set(k for k, ob in enumerate(sc.objectives) if ob["img"][ri])
++        start = P.cell_of(r["x"], r["y"])
++        P.free[start] = True
++        out = []
++        F = None
++        for name, arg, _, _ in stages:
++            if name == "start":
++                G = np.full(P.free.shape, INF, dtype=np.int64)
++                G[start] = 0
++            elif name == "drop":
++                G = op_stage(F, P.free, P.win)
++            elif name == "cal":
++                G = op_stage(F, P.any_vis, P.win)
++                G = np.where(G < INF, np.maximum(G, P.nrot_in), INF)
++            elif name == "img":
++                G = op_stage(F, P.img_region(arg, imaged), P.win)
++                G = np.where(G < INF, np.maximum(G, P.nrot_in), INF)
++                imaged = imaged | {arg}
++            elif name == "sample":
++                G = op_stage(F, P.sreg[arg], P.win)
++            elif name == "send":
++                G = op_stage(F, P.land, P.win)
++            else:
++                return entry
++            F = propagate(G, P.free, P.win)
++            out.append((name, arg, G, F))
++        c = F[P.home_reg].min()
++        if c >= INF:
++            return entry
++        return (int(c), out, P)
++
++    def _realize(self, sc, tabs, costs):
++        costs = [self._refine(costs[0]), self._refine(costs[1])]
++        best = (None, costs)
++        actions = [[], []]
++        sc = self.scene
++        for ri in range(2):
++            P = costs[ri][2]
++            actions[ri] = self._extract(P, best[1][ri][1])
++        # time-aware re-plan of final send against other rover's trajectory
++        trajs = []
++        for ri in range(2):
++            r = sc.rovers["rover%d" % ri]
++            trajs.append([(r["x"], r["y"])] + [(a[0], a[1]) for a in actions[ri]])
++        new_actions = list(actions)
++        for ri in range(2):
++            stages = best[1][ri][1]
++            if stages[-1][0] != "send":
++                continue
++            P = costs[ri][2]
++            Fprev = stages[-2][3]
++            G0 = op_stage(Fprev, P.land_free, P.win)
++            other = trajs[1 - ri]
++            G = np.full(G0.shape, INF, dtype=G0.dtype)
++            pending_mask = G0 < INF
++            tmin = int(G0[pending_mask].min()) if pending_mask.any() else INF
++            lx, ly = sc.lander
++            t = tmin
++            while pending_mask.any() and t < tmin + 200:
++                blk = np.zeros(P.X.shape, dtype=bool)
++                for tt in (t - 1, t):
++                    ox, oy = other[max(0, min(tt, len(other) - 1))]
++                    blk |= seg_hits_disk(P.camx, P.camy, lx, ly, ox, oy, ROVER_OCC_R)
++                    blk |= seg_hits_disk(P.camx_i, P.camy_i, lx, ly, ox, oy, ROVER_OCC_R)
++                ok = pending_mask & (G0 <= t) & ~blk
++                G[ok] = t
++                pending_mask &= ~ok
++                if t >= len(other) - 1 and not ok.any() and (G0 <= t).all():
++                    break
++                t += 1
++            F2 = propagate(G, P.free, P.win)
++            if F2[P.home_reg].min() >= INF:
++                continue
++            st = stages[:-1] + [("send_t", None, G, F2)]
++            new_actions[ri] = self._extract(P, st)
++        return [self._schedule(costs[ri][2], new_actions[ri]) for ri in range(2)]
++
++    def _schedule(self, P, seq):
++        """Attach headings; append waits so the rover can rotate back home."""
++        home_th = P.th
++        t_img = [t for t, a in enumerate(seq, 1) if a[2] and a[2][0] in ("cal", "img")]
++        seq = list(seq)
++        out = []
++        if t_img:
++            last = max(t_img)
++            while len(seq) < last + P.nrot_out:
++                x, y = (seq[-1][0], seq[-1][1])
++                seq.append((x, y, None))
++            T = len(seq)
++            for t, (x, y, op) in enumerate(seq, 1):
++                if t <= T - P.nrot_out:
++                    h = approach_angle(P.cur_th, P.img_th, 0.4 * t)
++                else:
++                    h = approach_angle(P.img_th, home_th, 0.4 * (t - (T - P.nrot_out)))
++                out.append((x, y, op, h))
++        else:
++            while len(seq) < rot_steps(P.cur_th, home_th):
++                x, y = (seq[-1][0], seq[-1][1]) if seq else (float(P.xs[P.hi]), float(P.ys[P.hj]))
++                seq.append((x, y, None))
++            for t, (x, y, op) in enumerate(seq, 1):
++                out.append((x, y, op, approach_angle(P.cur_th, home_th, 0.4 * t)))
++        return out
++
++    def _extract(self, P, stages):
++        """Backtrack through stage fields (waiting allowed); list of (x,y,op)."""
++        k = len(stages) - 1
++        Ff = np.where(P.home_reg, stages[k][3], INF)
++        cell = np.unravel_index(int(np.argmin(Ff)), Ff.shape)
++        cell = (int(cell[0]), int(cell[1]))
++        v = int(stages[k][3][cell])
++        seq = []
++        W = P.win
++        nx, ny = P.free.shape
++
++        def nb(Fsrc, i, j, cond):
++            best = None
++            for di in range(-W, W + 1):
++                for dj in range(-W, W + 1):
++                    a, b = i + di, j + dj
++                    if 0 <= a < nx and 0 <= b < ny and cond(Fsrc[a, b]):
++                        c = abs(di) + abs(dj)
++                        if best is None or c < best[1]:
++                            best = ((a, b), c)
++            return best[0] if best else None
++
++        guard = 0
++        while not (k == 0 and v == 0) and guard < 5000:
++            guard += 1
++            name, arg, G, F = stages[k]
++            i, j = cell
++            timed = name == "send_t"
++            choice = None
++            for mode in (0, 1):
++                if k > 0:
++                    okop = (G[cell] == v) if (mode == 0 or timed) else (G[cell] <= v)
++                    if okop:
++                        Fp = stages[k - 1][3]
++                        c = nb(Fp, i, j, (lambda x: x == v - 1) if mode == 0 else (lambda x: x <= v - 1))
++                        if c is not None:
++                            choice = (c, (name.replace("_t", ""), arg), k - 1)
++                            break
++                c = nb(F, i, j, (lambda x: x == v - 1) if mode == 0 else (lambda x: x <= v - 1))
++                if c is not None:
++                    choice = (c, None, k)
++                    break
++            if choice is None:
++                break
++            seq.append((float(P.xs[cell[0]]), float(P.ys[cell[1]]), choice[1]))
++            cell, k = choice[0], choice[2]
++            v -= 1
++        seq.reverse()
++        return seq
++
++    # ------------------------------------------------------------------
++    def get_action(self, state):
++        act = np.zeros(8, dtype=np.float32)
++        sc = Scene(state)
++        if self._deviated(sc) or (not self.actions[0] and not self.actions[1]):
++            self.replans += 1
++            import time as _t
++            if self.replans < 60 and (_t.time() - self.t_start) < 45.0:
++                self._plan(state)
++        for ri in range(2):
++            r = sc.rovers["rover%d" % ri]
++            if self.actions[ri]:
++                x, y, op, h = self.actions[ri].pop(0)
++                dx = float(np.clip(x - r["x"], -0.2, 0.2))
++                dy = float(np.clip(y - r["y"], -0.2, 0.2))
++                act[4 * ri] = dx
++                act[4 * ri + 1] = dy
++                act[4 * ri + 3] = SEL[op[0]] if op else 0.0
++                act[4 * ri + 2] = float(np.clip(_wrap(h - r["th"]), -0.4, 0.4))
++                self.expect[ri] = (x, y, op, h)
++            else:
++                # at end: if at home do nothing
++                self.expect[ri] = None
++        return act
++
++    def _deviated(self, sc):
++        dev = False
++        for ri in range(2):
++            e = self.expect[ri]
++            if e is None:
++                continue
++            d0 = dev
++            dev = False
++            r = sc.rovers["rover%d" % ri]
++            if abs(r["x"] - e[0]) > 1e-3 or abs(r["y"] - e[1]) > 1e-3 or \
++                    abs(float(_wrap(r["th"] - e[3]))) > 1e-3:
++                dev = True
++                self.log.append(("move", ri, e, r["x"], r["y"]))
++                self.bad[ri].append((e[0], e[1]))
++            op, arg = e[2] if e[2] else (None, None)
++            pr = self.prev_sc.rovers["rover%d" % ri]
++            if op == "img":
++                ob = sc.objectives[arg]
++                if not ob["img"][ri]:
++                    dev = True
++            if op == "sample":
++                if not any(s["an"][ri] for s in sc.samples if s["soil"] == (arg == "soil")):
++                    dev = True
++            if op == "cal" and not r["cal"]:
++                dev = True
++            elif op == "img" and (r["cal"] or not pr["cal"]):
++                dev = True
++            elif op == "sample" and not r["full"]:
++                dev = True
++            elif op == "drop" and r["full"]:
++                dev = True
++            elif op == "send":
++                for ob in sc.objectives:
++                    if ob["img"][ri] and not ob["recv"]:
++                        dev = True
++                for s in sc.samples:
++                    if s["an"][ri] and not s["recv"]:
++                        dev = True
++            if dev and op in ("send", "img", "cal") and \
++                    abs(r["x"] - e[0]) <= 1e-3 and abs(r["y"] - e[1]) <= 1e-3:
++                self.bad[ri].append((e[0], e[1], op, arg))
++            if dev:
++                self.log.append(("dev", ri, e, round(r["x"], 3), round(r["y"], 3), r["cal"], pr["cal"],
++                                 [ob["img"][ri] for ob in sc.objectives]))
++            dev = dev or d0
++        self.prev_sc = sc
++        self.expect = [None, None]
++        return dev
+diff --git a/res_lc.json b/res_lc.json
+new file mode 100644
+index 0000000..1029882
+--- /dev/null
++++ b/res_lc.json
+@@ -0,0 +1 @@
++[[400, 3, true, 20, 0, 37.88, 38.0], [401, 2, true, 20, 0, 31.68, 31.9], [402, 3, true, 24, 0, 20.78, 21.0], [403, 2, true, 19, 0, 27.5, 28.4], [404, 3, true, 21, 0, 43.58, 43.8], [405, 2, true, 22, 0, 26.7, 27.1], [406, 3, true, 21, 0, 36.62, 36.8], [407, 1, true, 19, 0, 25.24, 26.6], [408, 2, true, 21, 0, 25.82, 26.9], [409, 1, true, 16, 0, 29.66, 30.7], [410, 2, true, 20, 0, 26.93, 28.1], [411, 1, true, 21, 0, 25.76, 26.0], [412, 3, true, 21, 0, 35.38, 35.6], [413, 1, true, 18, 0, 22.64, 22.8], [414, 3, true, 20, 0, 35.64, 35.8], [415, 2, true, 19, 0, 22.87, 23.2], [416, 2, true, 20, 0, 31.25, 32.6], [417, 1, true, 18, 0, 21.45, 21.7], [418, 2, true, 18, 0, 27.08, 27.3], [419, 3, true, 21, 0, 36.06, 36.3], [420, 2, true, 18, 0, 21.95, 22.1], [421, 1, true, 18, 0, 22.26, 22.9], [422, 1, true, 17, 0, 18.97, 19.2], [423, 2, true, 18, 0, 27.53, 27.8], [424, 1, true, 16, 0, 27.82, 28.5], [425, 1, true, 20, 0, 26.99, 28.7], [426, 1, true, 18, 0, 23.92, 24.1], [427, 3, true, 23, 0, 37.12, 37.5], [428, 1, true, 20, 0, 19.29, 20.0], [429, 1, true, 20, 0, 24.59, 24.9], [430, 1, true, 18, 0, 20.21, 21.4], [431, 3, true, 21, 0, 33.0, 33.5], [432, 3, true, 20, 0, 30.42, 31.9], [433, 1, true, 19, 0, 23.84, 24.2], [434, 3, true, 20, 0, 27.75, 28.2], [435, 2, true, 20, 0, 19.53, 20.0], [436, 3, true, 22, 0, 26.62, 27.5], [437, 2, true, 18, 0, 23.97, 24.3], [438, 3, true, 27, 0, 27.52, 28.1], [439, 2, true, 19, 0, 15.94, 16.3], [440, 1, true, 18, 0, 26.1, 26.5], [441, 2, true, 19, 0, 25.4, 25.8], [442, 2, true, 19, 0, 30.97, 31.4], [443, 1, true, 18, 0, 23.12, 23.5], [444, 3, true, 25, 0, 35.37, 35.8], [445, 1, true, 16, 0, 24.81, 26.1], [446, 1, true, 19, 0, 16.39, 16.7], [447, 2, true, 20, 0, 29.76, 30.2], [448, 3, true, 20, 0, 30.5, 32.4], [449, 3, true, 20, 0, 26.96, 28.8], [450, 1, true, 25, 0, 23.87, 24.4], [451, 3, true, 25, 0, 31.17, 32.9], [452, 2, true, 20, 0, 26.95, 27.4], [453, 3, true, 20, 0, 33.43, 33.8], [454, 2, true, 25, 0, 26.53, 27.0], [455, 3, true, 23, 0, 35.08, 35.6], [456, 2, true, 17, 0, 22.56, 22.9], [457, 1, true, 23, 0, 22.42, 22.9], [458, 1, true, 28, 0, 16.84, 17.3], [459, 2, true, 17, 0, 22.66, 22.9], [460, 1, true, 18, 0, 16.81, 18.0], [461, 3, true, 19, 0, 27.59, 28.1], [462, 2, true, 19, 0, 20.37, 20.6], [463, 3, true, 20, 0, 33.79, 34.2], [464, 1, true, 20, 0, 20.75, 22.7], [465, 1, true, 16, 0, 22.39, 22.6], [466, 2, true, 20, 0, 29.38, 30.4], [467, 1, true, 18, 0, 13.83, 14.3], [468, 1, true, 20, 0, 25.44, 25.9], [469, 1, true, 18, 0, 23.47, 23.9], [470, 3, true, 20, 0, 24.68, 25.0], [471, 1, true, 19, 0, 17.24, 19.9], [472, 1, true, 16, 0, 14.44, 14.8], [473, 1, true, 22, 0, 21.17, 21.5], [474, 1, true, 18, 0, 18.48, 18.8], [475, 2, true, 21, 0, 23.92, 24.3], [476, 3, true, 19, 0, 27.03, 27.6], [477, 2, true, 18, 0, 25.0, 25.3], [478, 1, true, 20, 0, 26.0, 26.6], [479, 3, true, 20, 0, 30.76, 32.6], [480, 3, true, 19, 0, 31.66, 32.7], [481, 2, true, 21, 0, 24.23, 24.7], [482, 1, true, 19, 0, 19.43, 22.0], [483, 1, true, 21, 0, 26.56, 27.0], [484, 3, true, 20, 0, 36.0, 36.4], [485, 3, true, 20, 0, 35.11, 37.4], [486, 2, true, 20, 0, 27.98, 28.3], [487, 2, true, 27, 0, 27.24, 27.7], [488, 3, true, 20, 0, 26.72, 29.7], [489, 3, true, 19, 0, 30.27, 33.1], [490, 2, true, 19, 0, 23.95, 26.3], [491, 2, true, 18, 0, 25.2, 25.5], [492, 3, true, 22, 0, 22.18, 22.5], [493, 3, true, 20, 0, 28.04, 28.8], [494, 2, true, 23, 0, 21.54, 22.0], [495, 1, true, 20, 0, 21.14, 22.4], [496, 1, true, 18, 0, 22.96, 23.2], [497, 1, true, 22, 0, 16.7, 17.8], [498, 2, true, 18, 0, 24.9, 25.2], [499, 3, true, 23, 0, 29.5, 30.5], [500, 2, true, 23, 0, 25.46, 26.9], [501, 3, true, 20, 0, 30.3, 30.7], [502, 1, true, 18, 0, 16.07, 16.3], [503, 1, true, 17, 0, 16.84, 18.6], [504, 3, true, 20, 0, 39.87, 42.4], [505, 3, true, 22, 0, 36.92, 37.7], [506, 2, true, 20, 0, 29.77, 30.1], [507, 3, true, 21, 0, 22.73, 24.7], [508, 2, true, 23, 0, 21.73, 22.6], [509, 3, true, 19, 0, 29.93, 32.0], [510, 1, true, 23, 0, 27.64, 28.2], [511, 3, true, 25, 0, 31.83, 32.2], [512, 2, true, 23, 0, 27.35, 27.7], [513, 3, true, 21, 0, 28.03, 28.4], [514, 3, true, 21, 0, 28.65, 30.6], [515, 1, true, 18, 0, 27.44, 29.2], [516, 1, true, 18, 0, 16.28, 16.9], [517, 2, true, 24, 0, 23.4, 25.1], [518, 1, true, 26, 0, 26.55, 27.0], [519, 3, true, 23, 0, 28.49, 29.5], [520, 1, true, 16, 0, 25.74, 26.0], [521, 1, true, 25, 0, 17.35, 18.0], [522, 2, true, 21, 0, 28.94, 29.7], [523, 1, true, 20, 0, 25.81, 28.3], [524, 1, true, 18, 0, 23.42, 23.8], [525, 3, true, 22, 0, 27.61, 28.1], [526, 2, true, 23, 0, 29.3, 30.7], [527, 3, true, 20, 0, 27.36, 27.9], [528, 1, true, 18, 0, 19.95, 20.3], [529, 1, true, 17, 0, 20.62, 21.1], [530, 1, true, 21, 0, 16.27, 16.6], [531, 2, true, 23, 0, 22.83, 23.2], [532, 3, true, 22, 0, 30.11, 31.2], [533, 2, true, 21, 0, 16.75, 17.1], [534, 3, true, 22, 0, 35.53, 38.4], [535, 1, true, 18, 0, 16.68, 17.1], [536, 3, true, 22, 0, 32.41, 34.4], [537, 1, true, 16, 0, 17.15, 17.4], [538, 1, true, 18, 0, 22.96, 23.3], [539, 1, true, 18, 0, 13.59, 13.9], [540, 1, true, 17, 0, 16.54, 16.8], [541, 2, true, 17, 0, 18.44, 21.1], [542, 3, true, 25, 0, 26.44, 27.0], [543, 3, true, 20, 0, 29.21, 30.0], [544, 1, true, 18, 0, 11.67, 14.3], [545, 2, true, 18, 0, 23.91, 24.3], [546, 1, true, 22, 0, 15.9, 16.3], [547, 1, true, 18, 0, 21.85, 22.2], [548, 2, true, 20, 0, 26.94, 28.1], [549, 2, true, 21, 0, 22.25, 24.2], [550, 3, true, 27, 0, 20.95, 21.4], [551, 1, true, 27, 0, 16.89, 19.4], [552, 1, true, 16, 0, 21.48, 21.7], [553, 2, true, 19, 0, 20.81, 21.2], [554, 2, true, 20, 0, 28.3, 28.9], [555, 2, true, 20, 0, 23.78, 25.7], [556, 2, true, 19, 0, 24.13, 25.3], [557, 2, true, 19, 0, 22.42, 23.9], [558, 2, true, 18, 0, 27.72, 28.1], [559, 1, true, 19, 0, 15.41, 18.0], [560, 3, true, 21, 0, 28.5, 29.1], [561, 1, true, 21, 0, 21.19, 22.4], [562, 1, true, 16, 0, 25.38, 25.7], [563, 1, true, 18, 0, 27.6, 27.9], [564, 1, true, 19, 0, 20.04, 20.4], [565, 3, true, 20, 0, 38.78, 40.3], [566, 2, true, 18, 0, 31.97, 32.2], [567, 1, true, 20, 0, 30.55, 31.6], [568, 3, true, 20, 0, 34.17, 34.5], [569, 1, true, 27, 0, 21.17, 21.7], [570, 1, true, 20, 0, 16.98, 17.3], [571, 3, true, 20, 0, 30.41, 30.7], [572, 2, true, 16, 0, 29.31, 29.5], [573, 3, true, 22, 0, 37.07, 37.4], [574, 1, true, 29, 0, 21.45, 21.8], [575, 3, true, 20, 0, 28.15, 28.5], [576, 1, true, 27, 0, 23.77, 24.1], [577, 2, true, 19, 0, 26.03, 26.6], [578, 3, true, 21, 0, 30.51, 30.7], [579, 3, true, 22, 0, 32.09, 32.5], [580, 1, true, 18, 0, 32.63, 33.0], [581, 1, true, 23, 0, 22.8, 23.2], [582, 3, true, 21, 0, 34.72, 35.6], [583, 1, true, 16, 0, 21.01, 21.1], [584, 1, true, 18, 0, 29.92, 30.6], [585, 1, true, 16, 0, 26.34, 26.5], [586, 3, true, 20, 0, 28.25, 28.4], [587, 3, true, 21, 0, 27.73, 27.8], [588, 1, true, 18, 0, 18.74, 18.8], [589, 2, true, 20, 0, 18.97, 19.1], [590, 2, true, 21, 0, 22.14, 22.2], [591, 1, true, 19, 0, 16.62, 16.7], [592, 2, true, 16, 0, 16.97, 17.1], [593, 3, true, 20, 0, 20.31, 20.4], [594, 2, true, 26, 0, 15.4, 15.6], [595, 3, true, 19, 0, 16.07, 16.2], [596, 3, true, 20, 0, 14.53, 14.7], [597, 3, true, 20, 0, 13.59, 13.7], [598, 1, true, 19, 0, 10.56, 10.7], [599, 3, true, 21, 0, 8.22, 8.4]]
+\ No newline at end of file
+diff --git a/test_cnt.py b/test_cnt.py
+index ce0c010..abf4ab6 100644
+--- a/test_cnt.py
++++ b/test_cnt.py
+@@ -19,8 +19,10 @@ def run(seed):
+     env.close()
+     return seed, n, term, steps, ap.replans, round(tp,2), round(time.time()-t0,1)
+ from concurrent.futures import ThreadPoolExecutor
+-with ThreadPoolExecutor(8) as ex: res=list(ex.map(run, range(int(sys.argv[2]), int(sys.argv[3]))))
++NT=int(sys.argv[4]) if len(sys.argv)>4 else 8
++with ThreadPoolExecutor(NT) as ex: res=list(ex.map(run, range(int(sys.argv[2]), int(sys.argv[3]))))
+ for r in res:
+     if len(r)<5 or not r[2] or r[4]: print(r)
+ ok=[r for r in res if r[2] is True]
++print(sorted(ok,key=lambda r:-r[5])[:4])
+ print('solved',len(ok),len(res),'mean',np.mean([r[3] for r in ok]),'maxplan',max(r[5] for r in ok))

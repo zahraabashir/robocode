@@ -1,0 +1,54 @@
+diff --git a/approach.py b/approach.py
+index ef9df33..fceccb2 100644
+--- a/approach.py
++++ b/approach.py
+@@ -137,7 +137,7 @@ class GeneratedApproach:
+             yaw = oyaw if h[0] <= h[1] else oyaw + np.pi / 2
+             return _wrap(yaw)
+         cands.sort(reverse=True)
+-        idx = self.grasp_fail % len(cands)
++        idx = self.fail_count.get(obj.name, 0) % len(cands)
+         return cands[idx][1]
+ 
+     def _plan_pick_place(self, s, obj, place_xy, support_top, others, place_yaw=None):
+@@ -269,6 +269,13 @@ class GeneratedApproach:
+                 self.grasp_fail = 0
+                 return None
+             self.retries += 1
++            if len(cmd) > 4 and cmd[4]:
++                M = fk(base, q, TOOL)
++                if M[2, 3] > cmd[2][2] + 0.035 + 0.025:
++                    # descent was blocked well above the object: depth retries pointless
++                    cmd = cmd[:4] + ([],)
++                    self.queue[0] = cmd
++                    self.retries = 3
+             if self.retries > 2 and len(cmd) > 4 and cmd[4]:
+                 # failed grasp: open, try another depth in place
+                 self.retries = 0
+diff --git a/clr.py b/clr.py
+new file mode 100644
+index 0000000..7e5543b
+--- /dev/null
++++ b/clr.py
+@@ -0,0 +1,10 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++env=make_env(); obs,info=env.reset(seed=int(sys.argv[1]), options={"object_count":int(sys.argv[2])})
++ap=GeneratedApproach(env.action_space, env.observation_space, None); ap.reset(obs,info)
++cubes=[obs.get_object_from_name(n) for n in sorted(obs.get_object_names()) if n.startswith('obs')]
++tb=obs.get_object_from_name('target_block')
++for c in cubes:
++    oth=[d for d in cubes if d.name!=c.name]+[tb]
++    print(c.name, [round(ap._finger_clearance(obs,c,k*np.pi/2,oth),4) for k in range(4)])
+diff --git a/res3.txt b/res3.txt
+index 2c3ab26..5026897 100644
+--- a/res3.txt
++++ b/res3.txt
+@@ -3,3 +3,6 @@
+ count 6 success 14 / 16 mean steps 410.8125 max compute 10.7
+ (11, 5, False, 1000, 8.4)
+ count 5 success 15 / 16 mean steps 353.625 max compute 8.4
++(58, 1, True, 55, 16.6)
++(59, 2, True, 153, 21.3)
++success 60 / 60 mean steps 80.05

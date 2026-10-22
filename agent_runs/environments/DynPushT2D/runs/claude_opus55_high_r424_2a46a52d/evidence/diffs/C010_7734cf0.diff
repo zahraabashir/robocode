@@ -1,0 +1,62 @@
+diff --git a/approach.py b/approach.py
+index 245b3ab..f027227 100644
+--- a/approach.py
++++ b/approach.py
+@@ -7,6 +7,7 @@ points on the T boundary x push directions x step sizes, roll out, choose best
+ """
+ import heapq
+ import math
++import time
+ 
+ import numpy as np
+ 
+@@ -146,6 +147,13 @@ class GeneratedApproach:
+         self.plan = []  # list of actions
+         self.expect_block = None
+         self.nsteps = 0
++        self.t_used = 0.0
++        self.last_move_step = 0
++        self.prev_block = np.array(state[0:3], float)
++        self.cls = type(self)
++        self.LOOK = self.cls.LOOK
++        self.CURVS = self.cls.CURVS
++        self.CURVS2 = self.cls.CURVS2
+         self._build_candidates(state)
+ 
+     def _build_candidates(self, obs):
+@@ -465,8 +473,35 @@ class GeneratedApproach:
+ 
+     # ------------------------------------------------------------------
+     def get_action(self, state):
++        t0 = time.time()
++        try:
++            return self._get_action(state)
++        finally:
++            self.t_used += time.time() - t0
++
++    def _get_action(self, state):
+         obs = np.asarray(state, float)
+         self.nsteps += 1
++        if np.abs(obs[0:3] - self.prev_block).max() > 1e-6:
++            self.last_move_step = self.nsteps
++        self.prev_block = obs[0:3].copy()
++        # time guard: degrade planner if running slow
++        if self.t_used > 30.0:
++            self.LOOK = 0
++            self.CURVS = (0.0,)
++        elif self.t_used > 20.0:
++            self.LOOK = 4
++            self.CURVS = (0.0, 0.04, -0.04)
++        if self.t_used > 50.0:
++            return np.clip(self.plan.pop(0), -AMAX, AMAX) if self.plan else np.zeros(2)
++        # stagnation fallback: random push if block hasn't moved for a while
++        if self.nsteps - self.last_move_step > 80 and not self.plan:
++            self.last_move_step = self.nsteps
++            ang = self.rng.uniform(-np.pi, np.pi)
++            d = np.array([math.cos(ang), math.sin(ang)]) * AMAX
++            self.plan = [d] * 10
++            self.nav_len = 0
++            self.expect_block = None
+         pos = obs[0:3]
+         if self.plan and self.expect_block is not None:
+             # replan if block moved unexpectedly during navigation

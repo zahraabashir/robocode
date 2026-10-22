@@ -1,0 +1,12 @@
+diff --git a/approach.py b/approach.py
+index 846f21e..67aa406 100644
+--- a/approach.py
++++ b/approach.py
+@@ -258,6 +258,7 @@ class GeneratedApproach:
+                     self.line_offset = float(np.clip(self.line_offset + 0.7*dtheta, -0.24, 0.24))
+                 self.mode = "move_retreat"
+                 self.retreat_count = 0
++                return self._safe(-self.push_dir, 0.018)
+             speed = 0.016 if pd < 0.12 else (0.032 if pd > 0.55 else 0.024)
+             return self._safe((com + self.push_dir * 0.20) - robot, speed)
+         # Break contact along the exact reverse push direction. Recomputing a

@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 88884f2..75f15d1 100644
+--- a/approach.py
++++ b/approach.py
+@@ -59,7 +59,7 @@ class GeneratedApproach:
+                        else self._v(state, s, "x") <= -0.18)]
+             away = [s for s in result if self._dist(
+                 self._xy(state, s), self.lander_xy) > 0.62]
+-            return away or result
++            return away
+         self.sample_queues = [[], []]
+         # Assign each required type independently. Some layouts put both types
+         # on one side, in which case one rover collects two samples sequentially.

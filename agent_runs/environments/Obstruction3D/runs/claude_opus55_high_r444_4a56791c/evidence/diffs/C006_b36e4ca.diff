@@ -1,0 +1,40 @@
+diff --git a/approach.py b/approach.py
+index c2738f2..3a56f8f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -360,9 +360,34 @@ class GeneratedApproach:
+         maxtop = max([b.top for n, b in objs.items() if n != name] + [TABLE_TOP])
+         obj_bottom = (T @ G)[2, 3] - o.h[2]
+         lift_z = max(Z_SAFE, p0[2] + (maxtop + 0.025 - obj_bottom))
++        plan = []
++        # escape laterally from touching neighbours before lifting
++        e = np.zeros(2)
++        Ho = o.footprint()
++        for n, b in objs.items():
++            if n == name or b.top <= o.bottom + 2e-3 or b.bottom >= o.top - 2e-3:
++                continue
++            fb = b.footprint()
++            dxy = o.p[:2] - b.p[:2]
++            gaps = np.abs(dxy) - (Ho + fb)
++            if max(gaps) < 0.006:
++                ax = int(np.argmax(gaps))
++                v = np.zeros(2)
++                v[ax] = np.sign(dxy[ax]) if dxy[ax] != 0 else 1.0
++                e += v
++        nf = self.fail_count.get(name, 0)
++        if nf > 0 and np.linalg.norm(e) > 0:
++            ang = [0, 0.6, -0.6, 1.2, -1.2][nf % 5]
++            c_, s_ = np.cos(ang), np.sin(ang)
++            e = np.array([c_ * e[0] - s_ * e[1], s_ * e[0] + c_ * e[1]])
++        if np.linalg.norm(e) > 0:
++            e = e / np.linalg.norm(e)
++            p1 = p0 + np.array([e[0] * 0.008, e[1] * 0.008, 0.002])
++            qs, q, _ = self._cart_path(q, p0, p1, T[:3, :3], step=0.01)
++            plan += [('move', x) for x in qs]
++            p0 = p1
+         up = np.array([p0[0], p0[1], lift_z])
+         above = np.array([Tt[0, 3], Tt[1, 3], lift_z])
+-        plan = []
+         qs, q, _ = self._cart_path(q, p0, up, T[:3, :3], step=0.05)
+         plan += [('move', x) for x in qs]
+         qs, q, _ = self._cart_path(q, up, above, R, step=0.08)

@@ -1,0 +1,12 @@
+diff --git a/probe_dispose.py b/probe_dispose.py
+index a238396..cf5fb56 100644
+--- a/probe_dispose.py
++++ b/probe_dispose.py
+@@ -9,6 +9,7 @@ for dest in ['blocktop','table','offtable075','offtablezero']:
+   q=ik(.42,z);bx=x-.12-.42;by=y-.001
+   for k in range(16):
+    a=np.zeros(11,dtype=np.float32);a[3:10]=np.clip(q-vec(s),-.12,.12);a[0]=np.clip(bx-s.get(r,'pos_base_x'),-.12,.12);a[1]=np.clip(by-s.get(r,'pos_base_y'),-.12,.12);a[10]=-1 if close else 0;s,*_=E.step(a)
++   if np.max(np.abs(q-vec(s)))<1e-5 and abs(bx-s.get(r,'pos_base_x'))<1e-5 and abs(by-s.get(r,'pos_base_y'))<1e-5:break
+  x,y,z=[s.get(b,'pose_'+f) for f in 'xyz'];h=s.get(b,'half_extent_z');goto(x,y,.3)
+  for zt in np.arange(.3,.1,-.005):
+   goto(x,y,zt,True)

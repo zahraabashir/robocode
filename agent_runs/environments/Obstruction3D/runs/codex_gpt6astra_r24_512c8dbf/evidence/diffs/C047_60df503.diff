@@ -1,0 +1,36 @@
+diff --git a/approach.py b/approach.py
+index 5e85c01..c81f023 100644
+--- a/approach.py
++++ b/approach.py
+@@ -19,8 +19,9 @@ class GeneratedApproach:
+         obs=[o for o in self.objects if o not in [self.block,self.region] and np.all(np.abs(self.pos(state,o)[:2]-rp[:2]) < self.size(state,o)[:2]+rs[:2]+.012)]
+         obs.sort(key=lambda o:-self.pos(state,o)[2])
+         self.todo=obs+[self.block];self.index=0;self.phase='above';self.t=0;self.stall=0;self.last=None
+-        self.last_released=None;self.attempts={};self.attempt=0;self.wrist=np.pi/2;self.failed_places=[];self.obj=self.todo[0];self.destination=self.choose_destination(state)
++        self.bad_places={};self.last_released=None;self.attempts={};self.attempt=0;self.wrist=np.pi/2;self.failed_places=[];self.obj=self.todo[0];self.destination=self.choose_destination(state)
+     def choose_destination(self,state):
++        self.failed_places=self.bad_places.setdefault(self.obj,[])
+         self.placing_goal=self.obj==self.block and not any(o!=self.block for o in self.todo[self.index+1:])
+         if self.placing_goal:
+             p=self.pos(state,self.region).copy();p[2]+=self.size(state,self.region)[2]+self.size(state,self.obj)[2]+.001
+@@ -98,6 +99,7 @@ class GeneratedApproach:
+             oldpos=self.pos(state,released)
+             if np.linalg.norm(oldpos[:2]-model[:2])<.04:
+                 self.todo.insert(self.index,released);self.obj=released
++                self.failed_places=self.bad_places.setdefault(released,[])
+                 self.failed_places.append(oldpos[:2].copy());self.destination=self.choose_destination(state)
+                 self.phase='grasp';self.attempt=0;self.wrist=qnow[6];self.stall=0
+                 a=np.zeros(11,dtype=np.float32);a[10]=-1
+diff --git a/stress50_recovery.txt b/stress50_recovery.txt
+new file mode 100644
+index 0000000..a39f97b
+--- /dev/null
++++ b/stress50_recovery.txt
+@@ -0,0 +1,7 @@
++progress 0 above obstruction7:Kinematic3DCuboid 0 7 0 0 0.09
++progress 50 above obstruction4:Kinematic3DCuboid 2 7 0 0 2.75
++progress 100 grasp obstruction1:Kinematic3DCuboid 3 7 0 1 5.13
++progress 150 lift obstruction3:Kinematic3DCuboid 5 8 0 0 7.56
++progress 200 grasp obstruction0:Kinematic3DCuboid 6 8 0 0 10.31
++progress 250 align target_block:Kinematic3DCuboid 7 8 0 0 12.54
++{"seed": 0, "count": 50, "success": true, "steps": 270, "seconds": 13.36, "compute": 0.664, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}

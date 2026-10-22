@@ -1,0 +1,37 @@
+diff --git a/approach.py b/approach.py
+index e812c56..b749f66 100644
+--- a/approach.py
++++ b/approach.py
+@@ -305,7 +305,22 @@ class GeneratedApproach:
+                 return path
+         return [(x0, ROBOT_Y_MAX), (x1, ROBOT_Y_MAX), (x1, y1)]
+ 
+-    def _path_cost(self, p0, p1, obstacles, crel):
++    COST3 = False
++
++    def _path_cost(self, p0, p1, obstacles, crel, arm0=ARM):
++        if self.COST3:
++            ctip = None
++            if crel is not None:
++                ctip = (crel[0], crel[1] + arm0 + GW, crel[2], crel[3] + arm0 + GW)
++            path = self._dp_path3(p0[0], p0[1], arm0, p1[0], p1[1] - TIP, obstacles, ctip)
++            if path is not None:
++                c = 0.0
++                prev = (p0[0], p0[1], arm0)
++                for q in path:
++                    c += max(1, math.ceil(max(abs(q[0] - prev[0]) / 0.05, abs(q[1] - prev[1]) / 0.05,
++                                              abs(q[2] - prev[2]) / 0.1) - 1e-6)) if q != prev else 0
++                    prev = q
++                return c
+         path = self._plan_path(p1[0], p1[1], obstacles, crel, start=p0)
+         pts = [p0] + path
+         c = 0.0
+@@ -719,7 +734,7 @@ class GeneratedApproach:
+         best = None
+         for cost, lx, bottom, rx, ry, cand in cands[:self.K_RERANK]:
+             obs1 = others + [surf_bb]
+-            c1 = self._path_cost((x, y), (rx, ry), obs1, crel_o)
++            c1 = self._path_cost((x, y), (rx, ry), obs1, crel_o, arm0=self._rpos()[3])
+             obs2 = [bx for bx in others] + [cand, surf_bb]
+             if cols:
+                 nx, ny = min(((cx2, cy2) for cx2, cy2, _ in cols),

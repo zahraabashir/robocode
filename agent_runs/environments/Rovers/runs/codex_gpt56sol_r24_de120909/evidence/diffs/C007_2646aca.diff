@@ -1,0 +1,118 @@
+diff --git a/approach.py b/approach.py
+index cc6e81f..477f198 100644
+--- a/approach.py
++++ b/approach.py
+@@ -28,12 +28,25 @@ class GeneratedApproach:
+         self.targets = [None, None]
+         self.stalls = [0, 0]
+         self.lastpos = list(self.home)
++        # Pick one concrete sample of each required kind and give it to the rover
++        # already on that side of the wall.
++        self.sample_jobs = [set(), set()]
++        for soil in (False, True):
++            choices=[]
++            for o in self._get(state,"sample"):
++                if bool(state.get(o,"is_soil")>.5) != soil: continue
++                x,y=state.get(o,"x"),state.get(o,"y")
++                owner=0 if x>=0 else 1
++                choices.append((math.dist(self.home[owner],(x,y)),owner,o.name))
++            if choices:
++                _,owner,name=min(choices)
++                self.sample_jobs[owner].add(soil)
+ 
+     def _rects(self, s):
+         # The central wall is a fixed part of the arena but is intentionally not
+         # listed among observation objects.  Its narrow ends leave routes around
+         # it at the north and south edges.
+-        ans = [(0.0, 0.0, .20, 1.50)]
++        ans = [(0.0, -1.75, .03, .75)]
+         for o in self._get(s, "obstacle"):
+             ans.append((s.get(o,"x"), s.get(o,"y"), s.get(o,"half_x"), s.get(o,"half_y")))
+         # Lander is a physical obstacle; use a conservative footprint.
+@@ -130,10 +143,11 @@ class GeneratedApproach:
+             land=self._get(s,"lander")[0]; q=(s.get(land,"x"),s.get(land,"y"))
+             if math.dist(pos,q) <= 3.85 and self._los(pos,q,rects): return ("send",pos)
+             cs=self._candidates(s,q,3.8,True); return ("nav_send", min(cs,key=lambda p:math.dist(pos,p)) if cs else self.home[i])
+-        # Split objectives deterministically between the rovers.
++        # Each rover handles objectives on its own side of the short south wall.
+         need=[]
+         for j,o in enumerate(self._get(s,"objective")):
+-            if j%2==i and s.get(o,"received_image") < .5:
++            owner=0 if s.get(o,"x")>=0 else 1
++            if owner==i and s.get(o,"received_image") < .5:
+                 q=(s.get(o,"x"),s.get(o,"y")); need.append((o,q))
+         if need:
+             # If we have an unsent image and can see lander, send opportunistically.
+@@ -153,11 +167,14 @@ class GeneratedApproach:
+             if best: return ("nav_image",best[1])
+             # All local images taken: go radio.
+             cs=self._candidates(s,lq,3.8,True); return ("nav_send",min(cs,key=lambda p:math.dist(pos,p)) if cs else self.home[i])
+-        # One rover takes stone, the other soil, choosing nearest unreceived sample.
+-        soil=bool(i)
++        # Execute the preassigned one-stone/one-soil jobs (possibly both on one rover).
++        soil=None
++        for kind in sorted(self.sample_jobs[i]):
++            matching=[o for o in self._get(s,"sample") if bool(s.get(o,"is_soil")>.5)==kind]
++            if not any(s.get(o,"received_analysis")>.5 for o in matching):
++                soil=kind; break
++        if soil is None: return ("home",self.home[i])
+         matching=[o for o in self._get(s,"sample") if bool(s.get(o,"is_soil")>.5)==soil]
+-        if any(s.get(o,"received_analysis")>.5 for o in matching):
+-            return ("home",self.home[i])
+         samples=[o for o in matching if s.get(o,"received_analysis")<.5]
+         if samples:
+             candidates=[]
+diff --git a/probe_ops.py b/probe_ops.py
+index 5424503..4a60598 100644
+--- a/probe_ops.py
++++ b/probe_ops.py
+@@ -56,19 +56,20 @@ def move_to(env, s, xy, rover=0, selector=0.0):
+     return s
+ 
+ 
+-def sample_trial(selector, pre_offset=0.20, motion=0.0):
++def sample_trial(selector, pre_offset=0.20, motion=0.0, rover=1, side=-1):
+     env = make_env()
+     s, _ = env.reset(seed=0)
+     sample = s.get_object_from_name("sample4")
+     sx, sy = float(s.get(sample, "x")), float(s.get(sample, "y"))
+     # Approach from east through clear southern region.
+-    s = move_to(env, s, (sx + pre_offset, sy))
+-    before = rover_values(s)
++    s = move_to(env, s, (sx + side * pre_offset, sy), rover=rover)
++    before = rover_values(s, rover)
+     a = np.zeros(8, np.float32)
+-    a[:4] = (-motion, 0, 0, selector)
++    off = rover * 4
++    a[off:off + 4] = (-side * motion, 0, 0, selector)
+     s, rew, term, trunc, _ = env.step(a)
+-    after = rover_values(s)
+-    analyzed = float(s.get(sample, "analyzed_rover0"))
++    after = rover_values(s, rover)
++    analyzed = float(s.get(sample, "analyzed_rover%d" % rover))
+     env.close()
+     return before, after, analyzed, rew, term, trunc
+ 
+diff --git a/probe_side_stats.py b/probe_side_stats.py
+new file mode 100644
+index 0000000..35a3bcc
+--- /dev/null
++++ b/probe_side_stats.py
+@@ -0,0 +1,17 @@
++from collections import Counter
++from env_client import make_env
++
++c=Counter(); minabs=9
++for seed in range(40):
++ e=make_env(); s,_=e.reset(seed=seed)
++ typ=next(t for t in e.observation_space.types if getattr(t,"name",str(t))=="sample")
++ nums=[]
++ for soil in (0,1):
++  sides=[]
++  for o in s.get_objects(typ):
++   if round(float(s.get(o,"is_soil")))==soil:
++    x=float(s.get(o,"x")); sides.append(x>0); minabs=min(minabs,abs(x))
++  nums.append(sum(sides))
++ c[tuple(nums)]+=1
++ e.close()
++print(c, "min_abs_x", minabs)

@@ -1,0 +1,48 @@
+diff --git a/probe_grasp.py b/probe_grasp.py
+index bc59631..df5e6f9 100644
+--- a/probe_grasp.py
++++ b/probe_grasp.py
+@@ -257,6 +257,33 @@ def perturb_grasp(seed=0):
+             env.close()
+ 
+ 
++def grasp_named(seed=0, name="obstruction0"):
++    """Try the calibrated table-height grasp on an arbitrary cuboid."""
++    env = make_env()
++    state, _ = env.reset(seed=seed)
++    ss = snapshot(state)
++    xyz = tuple(ss[name]["pose_" + c] for c in "xyz")
++    desired_bx = xyz[0] - 0.45598166435956955
++    for k in range(3):
++        now = snapshot(state)["robot"]
++        a = np.zeros(11, dtype=np.float32)
++        a[0] = np.clip(desired_bx - now["pos_base_x"], -0.2, 0.0)
++        a[1] = np.clip(xyz[1] - now["pos_base_y"], -0.2, 0.2)
++        a[4] = 0.2
++        a[6] = 0.2 if k == 0 else 0.0
++        a[8] = 0.2 if k < 2 else 0.0
++        a[10] = 1.0
++        state, *_ = env.step(a)
++    a = np.zeros(11, dtype=np.float32)
++    a[10] = -1.0
++    state, reward, term, trunc, _ = env.step(a)
++    ss = snapshot(state)
++    print("NAMED", seed, name, "xyz", xyz, "robot", ss["robot"],
++          "held", [n for n, d in ss.items() if n != "robot" and d.get("grasp_active", 0) > .5],
++          "done", reward, term, trunc)
++    env.close()
++
++
+ if __name__ == "__main__":
+     import argparse
+     parser = argparse.ArgumentParser()
+@@ -265,6 +292,8 @@ if __name__ == "__main__":
+     parser.add_argument("--triple", action="store_true")
+     parser.add_argument("--exact", action="store_true")
+     parser.add_argument("--perturb", action="store_true")
++    parser.add_argument("--object", default="obstruction0")
++    parser.add_argument("--named", action="store_true")
+     parser.add_argument("--seed", type=int, default=0)
+     args = parser.parse_args()
+-    perturb_grasp(args.seed) if args.perturb else (exact_sequence(args.seed) if args.exact else (triple_grid(args.seed) if args.triple else (joint_grid(args.seed) if args.grid else (random_search(args.seed) if args.random else main()))))
++    grasp_named(args.seed, args.object) if args.named else (perturb_grasp(args.seed) if args.perturb else (exact_sequence(args.seed) if args.exact else (triple_grid(args.seed) if args.triple else (joint_grid(args.seed) if args.grid else (random_search(args.seed) if args.random else main())))))

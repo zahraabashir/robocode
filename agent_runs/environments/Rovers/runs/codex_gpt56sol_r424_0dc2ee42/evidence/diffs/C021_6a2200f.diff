@@ -1,0 +1,18 @@
+diff --git a/approach.py b/approach.py
+index 3e4e36d..352ef5a 100644
+--- a/approach.py
++++ b/approach.py
+@@ -173,8 +173,11 @@ class GeneratedApproach:
+         while self.paths[idx] and self._dist(pos, self.paths[idx][0]) < 0.075:
+             self.paths[idx].pop(0)
+         waypoint = self.paths[idx][0] if self.paths[idx] else goal
+-        dx = max(-0.2, min(0.2, waypoint[0] - pos[0]))
+-        dy = max(-0.2, min(0.2, waypoint[1] - pos[1]))
++        vx = waypoint[0] - pos[0]
++        vy = waypoint[1] - pos[1]
++        scale = min(1.0, 0.2 / max(abs(vx), abs(vy), 1e-9))
++        dx = vx * scale
++        dy = vy * scale
+         return dx, dy
+ 
+     def _objective_sites(self, state, idx):

@@ -1,0 +1,16 @@
+diff --git a/approach.py b/approach.py
+index 9528c35..bff4c46 100644
+--- a/approach.py
++++ b/approach.py
+@@ -49,8 +49,9 @@ class GeneratedApproach:
+                 qq=q.copy(); qq[5]+=d; self.pick_poses.append((qq,.196424,bx))
+         if name=="target_block": self.dest=self.region[:2].copy(); self.rest_z=.110
+         else:
+-            k=self.task_i; self.dest=np.array([.16+.07*(k%4), -.36 if k%2==0 else .36])
+-            self.rest_z=.075+self._v(state,name,"half_extent_z")
++            # The target block is a raised, guaranteed-clear temporary shelf.
++            self.dest=self._xyz(state,"target_block")[:2]
++            self.rest_z=.125+self._v(state,name,"half_extent_z")
+     def _held(self,s): return self._v(s,self.object_name,"grasp_active")>.5
+     def _feat(self,s):
+         o=self.object_name

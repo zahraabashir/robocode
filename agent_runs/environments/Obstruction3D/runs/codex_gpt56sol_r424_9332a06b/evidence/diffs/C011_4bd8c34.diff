@@ -1,0 +1,22 @@
+diff --git a/approach.py b/approach.py
+index 971f8c3..e397a4d 100644
+--- a/approach.py
++++ b/approach.py
+@@ -67,13 +67,15 @@ class GeneratedApproach:
+         goal=goals[self.waypoint]; err=goal-pos; tol=.012 if self.waypoint<2 else .004
+         if np.linalg.norm(err)<tol:
+             self.waypoint+=1
+-            if self.waypoint>=2: self.mode="lower"; self.lower_t=0
++            # Dropping from the clear waypoint avoids wedging the fingers against
++            # the tabletop; gravity preserves the accurately controlled x/y.
++            if self.waypoint>=2: self.mode="release"; self.release_t=0
+             else: self._start_calibration(state)
+             a[10]=-1.; return a
+         if self.mode=="release":
+             # Open, then retract the hand so contact cannot keep the grasp latched.
+             a[10]=1.
+-            if self.release_t<6: a[4]=-.08
++            if 2 <= self.release_t < 8: a[4]=-.08
+             self.release_t+=1
+             return a
+         JJ=self.J@self.J.T+1e-5*np.eye(3)

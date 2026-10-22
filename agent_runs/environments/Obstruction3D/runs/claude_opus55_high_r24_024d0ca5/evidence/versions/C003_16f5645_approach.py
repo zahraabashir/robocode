@@ -1,0 +1,310 @@
+"""Obstruction3D approach: clear obstructions off the target region, then place
+the target block on it.  Uses a calibrated Kinova Gen3 FK/IK model (kin.py)."""
+import numpy as np
+from kin import tool_fk, tool_ik, down_R
+
+JN = [f'joint_{i}' for i in range(1, 8)]
+Z_SAFE = 0.30          # tool height for transit
+STEP = 0.2             # max joint delta per step
+SEG = 0.03             # cartesian interpolation segment length
+
+
+def _q2R(x, y, z, w):
+    return np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                     [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                     [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+
+
+def _T(p, q):
+    M = np.eye(4); M[:3, :3] = _q2R(*q); M[:3, 3] = p
+    return M
+
+
+def _yaw_of_quat(q):
+    x, y, z, w = q
+    return np.arctan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
+
+
+class GeneratedApproach:
+    def __init__(self, action_space, observation_space, primitives):
+        self.action_space = action_space
+        self.observation_space = observation_space
+
+    # ------------------------------------------------------------ helpers
+    def _obj(self, state, name):
+        return state.get_object_from_name(name)
+
+    def _pose(self, state, name):
+        o = self._obj(state, name)
+        return (np.array([state.get(o, f) for f in ('pose_x', 'pose_y', 'pose_z')]),
+                np.array([state.get(o, f) for f in ('pose_qx', 'pose_qy', 'pose_qz', 'pose_qw')]),
+                np.array([state.get(o, f) for f in ('half_extent_x', 'half_extent_y', 'half_extent_z')]))
+
+    def _q(self, state):
+        return np.array([state.get(self.robot, f) for f in JN])
+
+    def _base(self, state):
+        return (state.get(self.robot, 'pos_base_x'), state.get(self.robot, 'pos_base_y'),
+                state.get(self.robot, 'pos_base_rot'))
+
+    def _tool(self, state):
+        return tool_fk(self._q(state), self._base(state))
+
+    def _grasped_name(self, state):
+        for n in self.names:
+            if state.get(self._obj(state, n), 'grasp_active') > 0.5:
+                return n
+        return None
+
+    # ------------------------------------------------------------ planning
+    def reset(self, state, info):
+        self.robot = state.get_object_from_name('robot')
+        self.names = sorted(n for n in state.get_object_names() if n != 'robot')
+        self.obstructions = sorted(n for n in self.names if n.startswith('obstruction'))
+        rp, _, rh = self._pose(state, 'target_region')
+        self.table_z = rp[2] - rh[2]
+        self.region = (rp, rh)
+        self.tasks = []  # list of (obj_name, kind)
+        for n in self._blocking_obstructions(state):
+            self.tasks.append((n, 'clear'))
+        self.tasks.append(('target_block', 'goal'))
+        self.phase = None
+        self.waypoints = []
+        self.wp_yaw = 0.0
+        self.last_q = None
+        self.stuck = 0
+        self.release_tries = 0
+        self.grasp_tries = 0
+        self.placed_spots = []
+        self.prev_was_motion = False
+        self.descent_len = 0
+        self._start_task(state)
+
+    def _blocking_obstructions(self, state, margin=0.005):
+        rp, rh = self.region
+        out = []
+        for n in self.obstructions:
+            p, _, h = self._pose(state, n)
+            if (abs(p[0] - rp[0]) < rh[0] + h[0] + margin and
+                    abs(p[1] - rp[1]) < rh[1] + h[1] + margin):
+                out.append(n)
+        return out
+
+    def _free_spot(self, state, name):
+        """Pick a spot on the table far from region, target block, other objects."""
+        _, _, h = self._pose(state, name)
+        others = []
+        for n in self.names:
+            if n == name:
+                continue
+            p, _, hh = self._pose(state, n)
+            others.append((p[:2], hh[:2]))
+        rp, rh = self.region
+        best, best_score = None, -1e9
+        for x in np.linspace(0.12, 0.48, 13):
+            for y in np.linspace(-0.32, 0.32, 17):
+                c = np.array([x, y])
+                score = 1e9
+                for p, hh in others:
+                    d = np.max(np.abs(c - p) - hh - h[:2])
+                    score = min(score, d)
+                d = np.max(np.abs(c - rp[:2]) - rh[:2] - h[:2]) - 0.03
+                score = min(score, d)
+                # prefer closer to robot-ish center for reachability
+                score -= 0.02 * np.hypot(x - 0.3, y)
+                if score > best_score:
+                    best, best_score = c, score
+        return best
+
+    def _start_task(self, state):
+        if not self.tasks:
+            self.phase = 'done'
+            return
+        name, kind = self.tasks[0]
+        p, q, h = self._pose(state, name)
+        self.cur_obj = name
+        self.grasp_yaw = self._pick_yaw(q)
+        top = p[2] + h[2]
+        tool = self._tool(state)[:3, 3]
+        wps = []
+        if tool[2] < Z_SAFE - 0.01:
+            wps.append(np.array([tool[0], tool[1], Z_SAFE]))
+        wps.append(np.array([p[0], p[1], Z_SAFE]))
+        wps.append(np.array([p[0], p[1], top + 0.005]))
+        self._set_path(state, wps, self.grasp_yaw)
+        self.phase = 'to_grasp'
+
+    def _pick_yaw(self, q):
+        y = _yaw_of_quat(q)
+        # choose equivalent yaw (mod pi/2) closest to 0
+        y = (y + np.pi / 4) % (np.pi / 2) - np.pi / 4
+        return y
+
+    def _set_path(self, state, wps, yaw):
+        cur = self._tool(state)[:3, 3]
+        pts = []
+        for w in wps:
+            d = np.linalg.norm(w - cur)
+            n = max(1, int(np.ceil(d / SEG)))
+            for k in range(1, n + 1):
+                pts.append(cur + (w - cur) * k / n)
+            cur = w
+        self.waypoints = pts
+        self.wp_yaw = yaw
+        self.stuck = 0
+
+    # ------------------------------------------------------------ control
+    def _track(self, state, grip=0.0):
+        """Return action moving toward current waypoint; None if path complete."""
+        q = self._q(state)
+        base = self._base(state)
+        while self.waypoints:
+            wp = self.waypoints[0]
+            qt, ok = tool_ik(q, wp, down_R(self.wp_yaw), base, iters=100)
+            d = (qt - q + np.pi) % (2 * np.pi) - np.pi
+            if np.max(np.abs(d)) < 1e-4:
+                self.waypoints.pop(0)
+                continue
+            a = np.zeros(11, dtype=np.float32)
+            a[3:10] = np.clip(d, -STEP, STEP)
+            a[10] = grip
+            return a
+        return None
+
+    def _noop(self, grip=0.0):
+        a = np.zeros(11, dtype=np.float32); a[10] = grip
+        return a
+
+    def get_action(self, state):
+        q = self._q(state)
+        moved = self.last_q is None or not np.allclose(q, self.last_q, atol=1e-7)
+        self.last_q = q.copy()
+        a = self._policy(state, moved)
+        return np.asarray(a, dtype=np.float32)
+
+    def _policy(self, state, moved):
+        ph = self.phase
+        if ph == 'done':
+            return self._noop()
+
+        if ph == 'to_grasp':
+            if not moved and self.prev_was_motion:
+                self.stuck += 1
+            if self.stuck >= 2:
+                self.waypoints = []  # blocked: try grasping here
+            a = self._track(state)
+            if a is not None:
+                self.prev_was_motion = True
+                return a
+            self.phase = 'close'
+            self.prev_was_motion = False
+            return self._noop(-1.0)
+
+        if ph == 'close':
+            g = self._grasped_name(state)
+            if g is None:
+                # descend a bit more and retry
+                self.grasp_tries += 1
+                p, _, h = self._pose(state, self.cur_obj)
+                tool = self._tool(state)[:3, 3]
+                self._set_path(state, [np.array([p[0], p[1], tool[2] - 0.01])], self.grasp_yaw)
+                self.phase = 'to_grasp'
+                self.prev_was_motion = False
+                if self.grasp_tries > 6:
+                    self.grasp_tries = 0
+                    self._start_task(state)
+                return self._noop()
+            self.grasp_tries = 0
+            self.held = g
+            if g != self.cur_obj:
+                # grabbed wrong object: treat it as an obstruction to clear
+                self.tasks.insert(0, (g, 'clear'))
+                self.cur_obj = g
+            self._plan_place(state)
+            return self._noop()
+
+        if ph == 'to_place':
+            if not moved and self.prev_was_motion:
+                self.stuck += 1
+                if len(self.waypoints) <= self.descent_len and self.stuck >= 1:
+                    self.waypoints = []
+            a = self._track(state)
+            if a is not None:
+                self.prev_was_motion = True
+                return a
+            self.phase = 'open'
+            self.prev_was_motion = False
+            return self._noop(1.0)
+
+        if ph == 'open':
+            if self._grasped_name(state) is None and state.get(self.robot, 'grasp_active') < 0.5:
+                self.release_tries = 0
+                self.tasks.pop(0)
+                tool = self._tool(state)[:3, 3]
+                self._set_path(state, [np.array([tool[0], tool[1], Z_SAFE])], self.wp_yaw)
+                self.phase = 'retreat'
+                self.prev_was_motion = False
+                return self._noop(1.0)
+            self.release_tries += 1
+            tool = self._tool(state)[:3, 3]
+            self._set_path(state, [tool - np.array([0, 0, 0.002])], self.wp_yaw)
+            self.descent_len = 1
+            self.phase = 'to_place'
+            self.prev_was_motion = False
+            if self.release_tries > 20:
+                self.release_tries = 0
+                self._plan_place(state)
+            return self._noop(1.0)
+
+        if ph == 'retreat':
+            a = self._track(state)
+            if a is not None:
+                return a
+            if self.tasks and self.tasks[0][1] == 'goal':
+                # re-check obstructions (in case something moved)
+                for n in self._blocking_obstructions(state):
+                    if all(t[0] != n for t in self.tasks):
+                        self.tasks.insert(0, (n, 'clear'))
+            self._start_task(state)
+            return self._noop()
+
+        return self._noop()
+
+    def _plan_place(self, state):
+        name = self.cur_obj
+        p, qo, h = self._pose(state, name)
+        r = self.robot
+        tf = _T([state.get(r, 'grasp_tf_x'), state.get(r, 'grasp_tf_y'), state.get(r, 'grasp_tf_z')],
+                [state.get(r, 'grasp_tf_qx'), state.get(r, 'grasp_tf_qy'), state.get(r, 'grasp_tf_qz'),
+                 state.get(r, 'grasp_tf_qw')])
+        kind = self.tasks[0][1] if self.tasks and self.tasks[0][0] == name else 'clear'
+        if kind == 'goal':
+            rp, rh = self.region
+            xy = rp[:2]
+            surf = rp[2] + rh[2]
+        else:
+            xy = self._free_spot(state, name)
+            surf = self.table_z
+        # desired object pose: same orientation as now, at xy, resting on surface
+        Tobj = _T([xy[0], xy[1], surf + h[2] + 0.001], qo)
+        Ttool = Tobj @ np.linalg.inv(tf)
+        tgt = Ttool[:3, 3]
+        yaw = np.arctan2(Ttool[1, 0], Ttool[0, 0])
+        # tool orientation is down_R(yaw); keep current yaw (grasp yaw)
+        yaw = self.grasp_yaw
+        tool = self._tool(state)[:3, 3]
+        wps = [np.array([tool[0], tool[1], Z_SAFE]),
+               np.array([tgt[0], tgt[1], Z_SAFE]),
+               np.array([tgt[0], tgt[1], tgt[2] + 0.03])]
+        self._set_path(state, wps, yaw)
+        n_before = len(self.waypoints)
+        # fine descent in 5mm steps
+        cur = wps[-1]
+        k = 0
+        while cur[2] > tgt[2] - 0.004:
+            cur = cur - np.array([0, 0, 0.005])
+            self.waypoints.append(cur.copy())
+            k += 1
+        self.descent_len = k + 6
+        self.phase = 'to_place'
+        self.prev_was_motion = False

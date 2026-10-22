@@ -1,0 +1,259 @@
+diff --git a/approach.py b/approach.py
+index 3b4ba34..1604ae1 100644
+--- a/approach.py
++++ b/approach.py
+@@ -126,6 +126,10 @@ BASE_ASSIST = True
+ STEP_TRAVEL = 0.25
+ ASSIST_MINX = 0.2
+ JOINT_TRAVEL = True
++ROT_ASSIST = True
++ROT_MAX = 0.8
++BASE_TRAVEL = True
++BASE_XMAX = -0.08
+ SAFE_CLR = 0.02
+ MOUNT_OFF = 0.12            # arm mount = base_xy + MOUNT_OFF * (cos rot, sin rot)
+ TABLE_X = (0.10, 0.50)
+@@ -563,13 +567,17 @@ class GeneratedApproach:
+                 if rejected:
+                     self.jplan = False
+                 else:
+-                    dq = self.jplan - q
+-                    m = np.max(np.abs(dq))
++                    qg, bg = self.jplan
++                    dq = qg - q
++                    dq[0] = wrap(dq[0])
++                    dbs = bg - base
++                    dbs[2] = wrap(dbs[2])
++                    m = max(np.max(np.abs(dq)), np.max(np.abs(dbs)))
+                     if m > 1e-4:
+                         lim = 0.2 * max(self.scale, 0.05)
+-                        if m > lim:
+-                            dq *= lim / m
+-                        act[3:10] = dq.astype(np.float32)
++                        n = max(1.0, np.ceil(m / lim - 1e-9))
++                        act[0:3] = (dbs / n).astype(np.float32)
++                        act[3:10] = (dq / n).astype(np.float32)
+                         self.last_cmd = True
+                         return act
+                     self.jplan = False
+@@ -686,25 +694,63 @@ class GeneratedApproach:
+         if held is not None:
+             b = boxes[held]
+             hb = max(0.0, (Tw[2, 3] - FINGER) - (b["z"] - b["hz"]))
++        # pose that must also be reachable afterwards (next descend)
++        nxt = None
++        if self.segs and self.segs[0][0] == "move":
++            nxt = self.segs[0][1]
++        p = Tw[:3, 3]
++        dxy = goal[:2] - p[:2]
++        cands = [base.copy()]
++        if BASE_TRAVEL:
++            for fx, fy in ((1.0, 1.0), (0.0, 1.0), (0.5, 0.5), (0.0, 0.5)):
++                bb = base.copy()
++                bb[0] = min(base[0] + fx * dxy[0], max(base[0], BASE_XMAX))
++                bb[1] = base[1] + fy * dxy[1]
++                cands.append(bb)
++        if ROT_ASSIST:
++            Mw = self._mount(base)[:3, 3]
++            a0 = np.arctan2(p[1] - Mw[1], p[0] - Mw[0])
++            a1 = np.arctan2(goal[1] - Mw[1], goal[0] - Mw[0])
++            th2 = float(np.clip(base[2] + wrap(a1 - a0), -ROT_MAX, ROT_MAX))
++            bb = np.array([Mw[0] - MOUNT_OFF * np.cos(th2), Mw[1] - MOUNT_OFF * np.sin(th2), th2])
++            if bb[0] <= max(base[0], BASE_XMAX):
++                cands.append(bb)
+         best = None
+-        for sd in (q, self.q_nom, self.q_home):
+-            qg, err = self._ik_world(sd, goal, Rt, base, iters=150)
+-            if err > 1e-4:
++        for bb in cands:
++            costb = max(abs(bb[0] - base[0]), abs(bb[1] - base[1]), abs(wrap(bb[2] - base[2])))
++            if best is not None and costb >= best[0]:
+                 continue
+-            dqm = np.max(np.abs(qg - q))
+-            if best is None or dqm < best[0]:
+-                best = (dqm, qg)
++            for sd in (q, self.q_nom):
++                qg, err = self._ik_world(sd, goal, Rt, bb, iters=150)
++                if err > 1e-4:
++                    continue
++                dq = qg - q
++                dq[0] = wrap(dq[0])
++                c = max(np.max(np.abs(dq)), costb)
++                if best is not None and c >= best[0] - 1e-3:
++                    continue
++                if nxt is not None:
++                    qn, en = self._ik_world(qg, nxt, Rt, bb, iters=100)
++                    if en > 1e-4:
++                        continue
++                if not self._path_ok(q, base, q + dq, bb, boxes, held, hb):
++                    continue
++                best = (c, q + dq, bb)
+         if best is None:
+             return False
+-        qg = best[1]
++        return (best[1], best[2])
++
++    def _path_ok(self, q, base, qg, bg, boxes, held, hb):
++        db = bg - base
++        db[2] = wrap(db[2])
+         for sv in np.linspace(0.0, 1.0, 13)[1:-1]:
+             qs = q + sv * (qg - q)
+-            T = self._ee_world(qs, base)
++            T = self._ee_world(qs, base + sv * db)
+             if T[2, 2] > -0.9:
+                 return False
+             if T[2, 3] < self._req_z(boxes, T[:2, 3], held, hb) - 0.005:
+                 return False
+-        return qg
++        return True
+ 
+     def _handle_reject(self, state):
+         seg = self.cur
+diff --git a/dbg_steps.py b/dbg_steps.py
+new file mode 100644
+index 0000000..db08fe1
+--- /dev/null
++++ b/dbg_steps.py
+@@ -0,0 +1,13 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++seed=int(sys.argv[1]); t0=int(sys.argv[2]); t1=int(sys.argv[3]); OC=int(sys.argv[4]) if len(sys.argv)>4 else None
++env = make_env(); obs, info = env.reset(seed=seed, options=({"object_count":OC} if OC else None))
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++for t in range(t1):
++    a = ap.get_action(obs)
++    obs, r, term, trunc, info = env.step(a)
++    if t>=t0:
++        q=ap._q(obs); b=ap._base(obs); T=ap._ee_world(q,b)
++        print(t, ap.cur[0], ap.cur[3] if ap.cur[0]=="move" else "", "jp", None if ap.jplan is None else (ap.jplan is not False), "a", np.round(a,3), "base", np.round(b,3), "ee", np.round(T[:3,3],3))
++    if term: break
+diff --git a/probe_rot.py b/probe_rot.py
+new file mode 100644
+index 0000000..f6efc6c
+--- /dev/null
++++ b/probe_rot.py
+@@ -0,0 +1,14 @@
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++env = make_env(); obs, info = env.reset(seed=2)
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++def show(tag):
++    q=ap._q(obs); b=ap._base(obs); T=ap._ee_world(q,b)
++    print(tag, "base", np.round(b,4), "ee", np.round(T[:3,3],4), "q0", round(q[0],4))
++show("init")
++for a3 in ([0,0,0.1],[0,0,0.2],[0.0,0.05,0],[0.0,0,-0.3]):
++    a=np.zeros(11,dtype=np.float32); a[0:3]=a3
++    obs,*_=env.step(a); show(str(a3))
++a=np.zeros(11,dtype=np.float32); a[0:3]=[0.012,-0.02,0.15]; a[3]=0.1
++obs,*_=env.step(a); show("combo")
+diff --git a/res_t.txt b/res_t.txt
+index e7c0295..cad5540 100644
+--- a/res_t.txt
++++ b/res_t.txt
+@@ -1,41 +1,41 @@
+-(0, 2, True, 39, 28.7, 0.23, 0.037)
+-(1, 1, True, 35, 23.6, 0.21, 0.05)
+-(2, 2, True, 58, 49.5, 0.34, 0.038)
+-(3, 2, True, 35, 30.5, 0.2, 0.041)
+-(4, 2, True, 44, 33.8, 0.29, 0.055)
+-(5, 2, True, 53, 48.0, 0.27, 0.04)
+-(6, 1, True, 33, 20.6, 0.13, 0.026)
+-(7, 2, True, 45, 34.5, 0.23, 0.054)
+-(8, 2, True, 42, 48.3, 0.24, 0.045)
+-(9, 1, True, 25, 24.4, 0.14, 0.034)
+-(10, 2, True, 32, 35.1, 0.12, 0.019)
+-(11, 0, True, 19, 16.0, 0.09, 0.028)
+-(12, 1, True, 37, 38.6, 0.17, 0.035)
+-(13, 2, True, 57, 53.7, 0.29, 0.051)
+-(14, 0, True, 12, 9.2, 0.08, 0.04)
+-(15, 2, True, 38, 35.9, 0.18, 0.041)
+-(16, 1, True, 27, 24.1, 0.15, 0.031)
+-(17, 2, True, 44, 38.5, 0.28, 0.056)
+-(18, 2, True, 28, 22.0, 0.13, 0.032)
+-(19, 1, True, 41, 33.3, 0.25, 0.037)
+-(20, 2, True, 49, 52.8, 0.2, 0.019)
+-(21, 0, True, 25, 22.7, 0.11, 0.021)
+-(22, 2, True, 28, 29.7, 0.14, 0.03)
+-(23, 0, True, 26, 26.8, 0.09, 0.039)
+-(24, 1, True, 20, 23.7, 0.05, 0.018)
+-(25, 1, True, 41, 45.6, 0.19, 0.029)
+-(26, 2, True, 31, 34.5, 0.14, 0.026)
+-(27, 0, True, 26, 22.9, 0.09, 0.039)
+-(28, 1, True, 41, 37.8, 0.16, 0.027)
+-(29, 2, True, 18, 18.7, 0.08, 0.037)
+-(30, 0, True, 26, 23.8, 0.07, 0.025)
+-(31, 1, True, 44, 39.8, 0.16, 0.022)
+-(32, 2, True, 36, 35.0, 0.18, 0.046)
+-(33, 2, True, 41, 33.7, 0.23, 0.031)
+-(34, 0, True, 16, 12.6, 0.05, 0.015)
+-(35, 0, True, 17, 19.0, 0.05, 0.016)
+-(36, 1, True, 25, 14.6, 0.09, 0.017)
+-(37, 0, True, 20, 9.7, 0.08, 0.028)
+-(38, 0, True, 17, 5.0, 0.06, 0.017)
+-(39, 2, True, 53, 7.4, 0.18, 0.03)
+-success 40 / 40 mean steps 33.6
++(0, 2, True, 30, 37.4, 4.43, 3.152)
++(1, 1, True, 24, 22.6, 6.66, 5.921)
++(2, 2, True, 36, 34.7, 2.18, 0.83)
++(3, 2, True, 25, 16.8, 1.92, 0.627)
++(4, 2, True, 33, 18.6, 2.14, 0.509)
++(5, 2, True, 41, 40.9, 2.05, 0.633)
++(6, 1, True, 25, 30.0, 4.5, 3.882)
++(7, 2, True, 33, 36.0, 2.85, 2.06)
++(8, 2, True, 30, 43.3, 0.75, 0.169)
++(9, 1, True, 20, 25.5, 0.34, 0.12)
++(10, 2, True, 23, 35.0, 0.51, 0.18)
++(11, 0, True, 14, 20.4, 0.21, 0.106)
++(12, 1, True, 29, 36.1, 0.62, 0.176)
++(13, 2, True, 45, 52.0, 0.92, 0.154)
++(14, 0, True, 12, 12.9, 0.29, 0.183)
++(15, 2, True, 32, 36.7, 0.46, 0.161)
++(16, 1, True, 21, 16.4, 0.48, 0.124)
++(17, 2, True, 37, 43.3, 0.71, 0.229)
++(18, 2, True, 25, 22.1, 0.47, 0.106)
++(19, 1, True, 31, 34.2, 0.66, 0.366)
++(20, 2, True, 34, 39.7, 0.58, 0.161)
++(21, 0, True, 15, 15.9, 0.31, 0.156)
++(22, 2, True, 22, 29.8, 0.43, 0.109)
++(23, 0, True, 19, 34.7, 0.41, 0.237)
++(24, 1, True, 14, 24.3, 0.17, 0.11)
++(25, 1, True, 28, 37.3, 0.46, 0.172)
++(26, 2, True, 23, 31.7, 0.38, 0.087)
++(27, 0, True, 27, 40.0, 0.43, 0.245)
++(28, 1, True, 53, 55.6, 1.46, 0.222)
++(29, 2, True, 14, 16.9, 0.22, 0.145)
++(30, 0, True, 18, 21.7, 0.27, 0.105)
++(31, 1, True, 30, 34.2, 0.52, 0.174)
++(32, 2, True, 30, 35.1, 0.54, 0.067)
++(33, 2, True, 30, 32.9, 0.7, 0.13)
++(34, 0, True, 13, 16.6, 0.13, 0.04)
++(35, 0, True, 13, 16.7, 0.26, 0.169)
++(36, 1, True, 20, 16.9, 0.5, 0.181)
++(37, 0, True, 13, 10.8, 0.18, 0.127)
++(38, 0, True, 14, 6.4, 0.32, 0.172)
++(39, 2, True, 39, 6.7, 0.47, 0.055)
++success 40 / 40 mean steps 25.875
+diff --git a/tally.py b/tally.py
+new file mode 100644
+index 0000000..a1cad40
+--- /dev/null
++++ b/tally.py
+@@ -0,0 +1,16 @@
++import sys, numpy as np, collections
++from env_client import make_env
++from approach import GeneratedApproach
++cnt=collections.Counter(); env=make_env(); tot=0
++for seed in range(int(sys.argv[1]), int(sys.argv[2])):
++    obs, info = env.reset(seed=seed)
++    ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++    for t in range(1000):
++        a = ap.get_action(obs)
++        c = ap.cur
++        tag = "grip" if c is None else (c[0] if c[0]!="move" else c[3])
++        if tag=="travel": tag += "-J" if (ap.jplan is not None and ap.jplan is not False) else "-C"
++        cnt[tag]+=1; tot+=1
++        obs, r, term, trunc, info = env.step(a)
++        if term: break
++print(tot, cnt.most_common())

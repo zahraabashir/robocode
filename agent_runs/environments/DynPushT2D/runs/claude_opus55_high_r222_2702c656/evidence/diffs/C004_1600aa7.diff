@@ -1,0 +1,48 @@
+diff --git a/approach.py b/approach.py
+index 70adc3b..60ad461 100644
+--- a/approach.py
++++ b/approach.py
+@@ -97,6 +97,13 @@ class GeneratedApproach:
+         prims.append(('T+y', (0.0, -(w + Lv)), (0.0, 1.0), 't'))
+         prims.append(('T+x', (-w / 2, yc), (1.0, 0.0), 't'))
+         prims.append(('T-x', (w / 2, yc), (-1.0, 0.0), 't'))
++        xo = w / 2 + R_ROBOT + 0.03
++        prims.append(('F+y_a', (xo, -w), (0.0, 1.0), 'f'))
++        prims.append(('F+y_b', (-xo, -w), (0.0, 1.0), 'f'))
++        prims.append(('F-y_a', (0.25, 0.0), (0.0, -1.0), 'f'))
++        prims.append(('F-y_b', (-0.25, 0.0), (0.0, -1.0), 'f'))
++        prims.append(('F-x', (Lh / 2, -w / 2), (-1.0, 0.0), 'f'))
++        prims.append(('F+x', (-Lh / 2, -w / 2), (1.0, 0.0), 'f'))
+         prims.append(('Rtop+', (a, 0.0), (0.0, -1.0), 'r'))
+         prims.append(('Rtop-', (-a, 0.0), (0.0, -1.0), 'r'))
+         prims.append(('Rbot+', (a, -w), (0.0, 1.0), 'r'))
+@@ -147,12 +154,14 @@ class GeneratedApproach:
+         best, bs = None, -1e9
+         for pr in prims:
+             name, p, n, k, tq = pr
+-            if k != 't':
++            if k not in ('t', 'f'):
+                 continue
+             if not self.reachable(B, p, n):
+                 continue
+             nw = B.dir_world(n)
+             s = float(nw @ err)
++            if k == 'f':
++                s = s * 0.6 - 0.01
+             if s > bs:
+                 bs, best = s, pr
+         return best, dth
+@@ -265,11 +274,11 @@ class GeneratedApproach:
+             dth = wrap(obs[31] - B.th)
+             nw = B.dir_world(n)
+             done = False
+-            if k == 't':
++            if k in ('t', 'f'):
+                 rem = float(nw @ err)
+                 if rem < 0.004:
+                     done = True
+-                speed = min(MAXS, max(rem, 0.003))
++                speed = min(MAXS, max(0.6 * rem, 0.002))
+                 # stop to re-evaluate if angle drifts
+                 if abs(dth) > math.radians(6):
+                     done = True

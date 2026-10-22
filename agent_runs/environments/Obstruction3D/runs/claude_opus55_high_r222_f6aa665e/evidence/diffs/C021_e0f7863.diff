@@ -1,0 +1,70 @@
+diff --git a/approach.py b/approach.py
+index 454b01f..4cf693c 100644
+--- a/approach.py
++++ b/approach.py
+@@ -143,7 +143,9 @@ ROT_MAX = 0.8
+ BASE_TRAVEL = True
+ BASE_XMAX = -0.08
+ MERGE = True
+-SAFE_CLR = 0.02
++FLOOR_CLR = 0.005
++LIFT_MIN = False
++SAFE_CLR = 0.012
+ MOUNT_OFF = 0.12            # arm mount = base_xy + MOUNT_OFF * (cos rot, sin rot)
+ TABLE_X = (0.10, 0.50)
+ TABLE_Y = (-0.40, 0.40)
+@@ -330,7 +332,7 @@ class GeneratedApproach:
+         return cands
+ 
+     def _safe_z(self, boxes, exclude=None, held_below=0.0, path=None, rad=0.08):
+-        top = TABLE_TOP + 0.03
++        top = TABLE_TOP + FLOOR_CLR
+         for n, b in boxes.items():
+             if b["g"] > 0.5 or n == exclude:
+                 continue
+@@ -583,6 +585,9 @@ class GeneratedApproach:
+                 else:
+                     self.cur = tr
+                     self.segs.insert(0, de)
++                    if seg[3] is not None:
++                        self.segs.insert(0, tr)
++                        self.cur = seg[3]
+                 self.jplan = None
+                 self.best_d = None
+                 self.stall = 0
+@@ -708,7 +713,7 @@ class GeneratedApproach:
+         return act
+ 
+     def _req_z(self, boxes, xy, held, hb):
+-        top = TABLE_TOP + 0.03
++        top = TABLE_TOP + FLOOR_CLR
+         rad = 0.08
+         if held is not None:
+             ex, ey = self._extent_xy(boxes[held])
+@@ -807,7 +812,25 @@ class GeneratedApproach:
+         it = kinds.index("travel")
+         if it + 1 >= len(segs) or kinds[it + 1] not in ("grasp_descend", "place_descend"):
+             return segs
+-        return segs[:it] + [("lazy", segs[it], segs[it + 1])] + segs[it + 2:]
++        pre = segs[:it]
++        full_lift = None
++        if LIFT_MIN and len(pre) == 1 and pre[0][0] == "move" and pre[0][3] == "lift":
++            q = self._q(state)
++            base = self._base(state)
++            Tw = self._ee_world(q, base)
++            boxes = self._boxes(state)
++            held = self._held(boxes)
++            hb = 0.0
++            if held is not None:
++                b = boxes[held]
++                hb = max(0.0, (Tw[2, 3] - FINGER) - (b["z"] - b["hz"]))
++            loc = self._req_z(boxes, Tw[:2, 3], held, hb)
++            lg = pre[0][1]
++            if loc < lg[2] - 0.01:
++                full_lift = pre[0]
++                nz = max(Tw[2, 3], loc)
++                pre = [("move", np.array([lg[0], lg[1], nz]), pre[0][2], "lift")]
++        return pre + [("lazy", segs[it], segs[it + 1], full_lift)] + segs[it + 2:]
+ 
+     def _handle_reject(self, state):
+         seg = self.cur

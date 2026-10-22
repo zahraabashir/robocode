@@ -1,0 +1,18 @@
+diff --git a/approach.py b/approach.py
+index 1be8c16..245b3ab 100644
+--- a/approach.py
++++ b/approach.py
+@@ -125,10 +125,10 @@ class GeneratedApproach:
+     STEP_PEN = 0.0015
+     KMAX = 30
+     NAV_OVER = 3.0
+-    LOOK = 10
++    LOOK = 15
+     GRIDNAV = True
+-    CURVS = (0.0,)
+-    CURVS2 = (0.0,)
++    CURVS = (0.0, 0.02, -0.02, 0.06, -0.06)
++    CURVS2 = (0.0, 0.04, -0.04)
+     def __init__(self, action_space, observation_space, primitives):
+         self.action_space = action_space
+         self.rng = np.random.default_rng(0)

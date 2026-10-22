@@ -1,0 +1,17 @@
+diff --git a/approach.py b/approach.py
+index 796dfcd..b29244e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -37,10 +37,8 @@ class GeneratedApproach:
+             used.append((self.target_park, tw))
+         for o in obstacles:
+             ow = state.get(o, "width")
+-            origin = state.get(o, "x")
+-            same_side = [x for x in candidates if (x - sx) * (origin - sx) >= 0]
+-            valid = [x for x in same_side if all(abs(x - px) > (ow + pw) / 2 + 0.04
+-                                                 for px, pw in used)]
++            valid = [x for x in candidates if all(abs(x - px) > (ow + pw) / 2 + 0.04
++                                                  for px, pw in used)]
+             px = valid[0] if valid else candidates[len(used) % len(candidates)]
+             self.parking[o.name] = px
+             used.append((px, ow))

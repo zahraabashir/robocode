@@ -1,0 +1,50 @@
+diff --git a/probe_ops.py b/probe_ops.py
+index f3d4c79..3355fef 100644
+--- a/probe_ops.py
++++ b/probe_ops.py
+@@ -132,9 +132,33 @@ def scenario(seed):
+     env.close()
+ 
+ 
++def home_probe(seed):
++    env = make_env()
++    state, _ = env.reset(seed=seed)
++    # Walk rover0 away in 0.1m increments, then back, displaying at_home.
++    for dx in (0.1, 0.1, 0.1, -0.1, -0.1, -0.1):
++        before = state
++        state, _, term, trunc, _ = env.step(action((dx, 0, 0, CENTERS[3]), (0, 0, 0, CENTERS[3])))
++        r = state.get_object_from_name("rover0")
++        print("dx", dx, "xy", state.get(r, "x"), state.get(r, "y"), "home", state.get(r, "at_home"), "done", term, trunc,
++              "delta", changed(before, state))
++    env.close()
++
++
++def simultaneous_probe(seed):
++    env = make_env()
++    state, _ = env.reset(seed=seed)
++    # Initial rovers are two metres apart. Drive both toward x=0 concurrently.
++    for n in range(6):
++        before = state
++        state, _, _, _, _ = env.step(action((-.2, 0, 0, CENTERS[3]), (.2, 0, 0, CENTERS[3])))
++        print("step", n, changed(before, state))
++    env.close()
++
++
+ if __name__ == "__main__":
+     p = argparse.ArgumentParser()
+-    p.add_argument("mode", choices=["dump", "selector", "operate", "scenario"])
++    p.add_argument("mode", choices=["dump", "selector", "operate", "scenario", "home", "simultaneous"])
+     p.add_argument("--seed", type=int, default=0)
+     p.add_argument("--rover", type=int, default=0)
+     p.add_argument("--target", default="sample0")
+@@ -146,5 +170,9 @@ if __name__ == "__main__":
+         selector(args.seed)
+     elif args.mode == "operate":
+         drive_and_operate(args.seed, args.rover, args.target, args.op)
+-    else:
++    elif args.mode == "scenario":
+         scenario(args.seed)
++    elif args.mode == "home":
++        home_probe(args.seed)
++    else:
++        simultaneous_probe(args.seed)

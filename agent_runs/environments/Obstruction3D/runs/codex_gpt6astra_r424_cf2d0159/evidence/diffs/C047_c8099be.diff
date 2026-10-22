@@ -1,0 +1,34 @@
+diff --git a/approach.py b/approach.py
+index 5ac4ca5..d292f93 100644
+--- a/approach.py
++++ b/approach.py
+@@ -138,7 +138,7 @@ class GeneratedApproach:
+                 if held is not None:self.accept_grasp(held,ee);continue
+                 a[10]=1
+                 self.height=max(p[2]+.005,self.height-.005)
+-                self.phase='descend'
++                self.phase='retry_raise' if self.retries%8==0 else 'descend'
+             elif self.phase=='lift':
+                 a[3:10]=self.config(min(.35,self.height))-q
+                 if np.max(abs(a[3:10]))<1e-4:
+diff --git a/sweep_final_default.log b/sweep_final_default.log
+index 39a80d7..cfe1195 100644
+--- a/sweep_final_default.log
++++ b/sweep_final_default.log
+@@ -1,3 +1,9 @@
+ {"seed": 30, "count": null, "success": true, "steps": 43, "phase": "release", "goal": "target_block", "seconds": 0.85, "grasp": 0.0}
+ {"seed": 31, "count": null, "success": true, "steps": 81, "phase": "release", "goal": "target_block", "seconds": 1.34, "grasp": 0.0}
+ {"seed": 32, "count": null, "success": true, "steps": 123, "phase": "release", "goal": "target_block", "seconds": 2.86, "grasp": 0.0}
++{"seed": 33, "count": null, "success": true, "steps": 123, "phase": "release", "goal": "target_block", "seconds": 11.97, "grasp": 0.0}
++{"seed": 34, "count": null, "success": true, "steps": 42, "phase": "release", "goal": "target_block", "seconds": 2.89, "grasp": 0.0}
++{"seed": 35, "count": null, "success": true, "steps": 44, "phase": "release", "goal": "target_block", "seconds": 1.7, "grasp": 0.0}
++{"seed": 36, "count": null, "success": true, "steps": 82, "phase": "release", "goal": "target_block", "seconds": 1.44, "grasp": 0.0}
++{"seed": 37, "count": null, "success": true, "steps": 42, "phase": "release", "goal": "target_block", "seconds": 0.79, "grasp": 0.0}
++{"seed": 38, "count": null, "success": true, "steps": 41, "phase": "release", "goal": "target_block", "seconds": 0.92, "grasp": 0.0}
+diff --git a/sweep_lift_fixed.log b/sweep_lift_fixed.log
+new file mode 100644
+index 0000000..5e4ffd3
+--- /dev/null
++++ b/sweep_lift_fixed.log
+@@ -0,0 +1 @@
++{"seed": 10, "count": 5, "success": false, "steps": 196, "phase": "lift", "goal": "target_block", "seconds": 18.81, "grasp": 1.0}

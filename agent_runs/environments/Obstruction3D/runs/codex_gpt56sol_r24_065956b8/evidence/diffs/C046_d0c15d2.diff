@@ -1,0 +1,32 @@
+diff --git a/approach.py b/approach.py
+index 92b2e69..73169d5 100644
+--- a/approach.py
++++ b/approach.py
+@@ -152,9 +152,14 @@ class GeneratedApproach:
+             # collision-robust than interpolating through a low joint-space IK
+             # path. It works for both target-sized and small obstruction blocks.
+             u = np.clip((self.pick_xyz[0]-.3359817)/(.4644086-.3359817), 0, 1)
++            center_z = self._xyz(state, self.object)[2]
++            height_q = (.1-center_z)/.3445
+             self.anchor_q = np.array((0, .25+.2*u, -np.pi, -2.30+.2*u,
+                                       0, -.47+.2*u, np.pi/2))
++            self.anchor_q[1] += height_q
+             self.anchor_bx = self.pick_xyz[0]-.4559817 if self.pick_xyz[0] <= .3359817 else -.12
++            if self.pick_xyz[0] <= .3359817:
++                self.anchor_bx += .1625*height_q
+             self.anchor_by = self.pick_xyz[1]
+             self.goal_q = _HOME.copy()
+             self.phase, self.phase_steps = "target_home", 0
+@@ -235,8 +240,10 @@ class GeneratedApproach:
+                     self.pick_xyz[2] += .3*self._get(state, self.object, "half_extent_z")
+                 if self.object != "target_block":
+                     self.deferred.add(self.object)
+-                self.goal_q = _HOME.copy()
+-                self.phase, self.phase_steps = "target_home", 0
++                    self.phase, self.phase_steps = "retract", 0
++                else:
++                    self.goal_q = _HOME.copy()
++                    self.phase, self.phase_steps = "target_home", 0
+                 return self._act_to(q, self.goal_q, 1.0)
+             else:
+                 return self._act_to(q, q, -1.0)

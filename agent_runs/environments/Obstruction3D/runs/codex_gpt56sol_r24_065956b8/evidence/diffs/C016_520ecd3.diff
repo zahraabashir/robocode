@@ -1,0 +1,62 @@
+diff --git a/probe_grasp.py b/probe_grasp.py
+index eafaf57..d36c5aa 100644
+--- a/probe_grasp.py
++++ b/probe_grasp.py
+@@ -160,12 +160,56 @@ def triple_grid(seed=0):
+     env.close()
+ 
+ 
++def exact_sequence(seed=0):
++    """Reproduce the discovered grasp, translate it, and test release."""
++    env = make_env()
++    state, _ = env.reset(seed=seed)
++    ss = snapshot(state)
++    block0 = tuple(ss["target_block"]["pose_" + c] for c in "xyz")
++    region = tuple(ss["target_region"]["pose_" + c] for c in "xyz")
++    print("INITIAL block", block0, "region", region)
++    # Exact relative sequence from home: y-align and open while moving to the
++    # successful q2/q4/q6 configuration, respecting +/-0.2 action limits.
++    actions = []
++    for k in range(3):
++        a = np.zeros(11, dtype=np.float32)
++        if k == 0:
++            a[1] = np.clip(block0[1] - ss["robot"]["pos_base_y"], -0.2, 0.2)
++        a[4] = 0.2
++        a[6] = 0.2 if k == 0 else 0.0
++        a[8] = 0.2 if k < 2 else 0.0
++        a[10] = 1.0
++        actions.append(("pose_open", a))
++    close = np.zeros(11, dtype=np.float32)
++    close[10] = -1.0
++    actions.append(("close", close))
++    carry = np.zeros(11, dtype=np.float32)
++    carry[0] = np.clip(region[0] - block0[0], -0.2, 0.2)
++    carry[1] = np.clip(region[1] - block0[1], -0.2, 0.2)
++    actions.append(("carry", carry))
++    release = np.zeros(11, dtype=np.float32)
++    release[10] = 1.0
++    actions.append(("release", release))
++    for k, (label, action) in enumerate(actions, 1):
++        state, reward, term, trunc, _ = env.step(action)
++        ss = snapshot(state)
++        held = [name for name, data in ss.items()
++                if name != "robot" and data.get("grasp_active", 0) > 0.5]
++        print(k, label, "a", action.tolist(), "robot", ss["robot"],
++              "block", ss["target_block"], "held", held,
++              "reward/done", reward, term, trunc)
++        if term or trunc:
++            break
++    env.close()
++
++
+ if __name__ == "__main__":
+     import argparse
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--random", action="store_true")
+     parser.add_argument("--grid", action="store_true")
+     parser.add_argument("--triple", action="store_true")
++    parser.add_argument("--exact", action="store_true")
+     parser.add_argument("--seed", type=int, default=0)
+     args = parser.parse_args()
+-    triple_grid(args.seed) if args.triple else (joint_grid(args.seed) if args.grid else (random_search(args.seed) if args.random else main()))
++    exact_sequence(args.seed) if args.exact else (triple_grid(args.seed) if args.triple else (joint_grid(args.seed) if args.grid else (random_search(args.seed) if args.random else main())))

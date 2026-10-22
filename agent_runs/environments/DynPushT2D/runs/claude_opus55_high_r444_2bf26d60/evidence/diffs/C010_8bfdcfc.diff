@@ -1,0 +1,168 @@
+diff --git a/approach.py b/approach.py
+index 9c1e42d..587cb0a 100644
+--- a/approach.py
++++ b/approach.py
+@@ -161,6 +161,8 @@ class GeneratedApproach:
+         self.goal_bonus = 0.05
+         self.overhead = 2.0
+         self.wa = 0.6
++        self.M = 8
++        self.H2 = 30
+         self.H = 40
+         self.replan_every = 8
+         self.model = None
+@@ -169,6 +171,7 @@ class GeneratedApproach:
+     def reset(self, state, info):
+         s = np.asarray(state, dtype=float)
+         self.w, self.lh, self.lv = s[12], s[13], s[14]
++        self._cand_cache = {}
+         self.model = TModel(self.w, self.lh, self.lv)
+         self.sim = VModel(self.w, self.lh, self.lv)
+         self.goal = s[29:32].copy()
+@@ -192,8 +195,10 @@ class GeneratedApproach:
+                 and abs(wrap(pose[2] - self.goal[2])) < math.radians(8))
+ 
+     # ------------------------------------------------------------------
+-    def candidates(self, pose):
+-        """Candidate pushes: list of (start_pt_world, dir_world)."""
++    def local_candidates(self, spacing, angs):
++        key = (spacing, tuple(angs))
++        if key in self._cand_cache:
++            return self._cand_cache[key]
+         poly = self.model.poly
+         n = len(poly)
+         starts, dirs = [], []
+@@ -204,29 +209,37 @@ class GeneratedApproach:
+             if L < 0.05:
+                 continue
+             nn = np.array([ab[1], -ab[0]]) / L
+-            m = max(2, int(L / 0.06))
+-            for t in np.linspace(0.04 / L, 1 - 0.04 / L, m) if L > 0.1 else [0.5]:
++            m = max(2, int(L / spacing))
++            for t in (np.linspace(0.04 / L, 1 - 0.04 / L, m) if L > 0.1 else [0.5]):
+                 q = a + t * ab
+-                for ang in (-0.5, -0.25, 0.0, 0.25, 0.5):
++                for ang in angs:
+                     ca, sa = math.cos(ang), math.sin(ang)
+                     d = -nn
+                     d = np.array([ca * d[0] - sa * d[1], sa * d[0] + ca * d[1]])
+                     starts.append(q + nn * (R_ROBOT + 0.02))
+                     dirs.append(d)
+-        starts = np.array(starts)
+-        dirs = np.array(dirs)
+-        return to_world(starts, pose), to_world(dirs, (0, 0, pose[2]))
++        res = (np.array(starts), np.array(dirs))
++        self._cand_cache[key] = res
++        return res
+ 
+-    def plan_push(self, pose, robot):
+-        sw, dw = self.candidates(pose)
+-        # extra candidates: push from current robot position if close to block
++    def candidates(self, pose, coarse=False):
++        if coarse:
++            st, dr = self.local_candidates(0.12, (-0.4, 0.0, 0.4))
++        else:
++            st, dr = self.local_candidates(0.06, (-0.5, -0.25, 0.0, 0.25, 0.5))
++        return to_world(st, pose), to_world(dr, (0, 0, pose[2]))
++
++    def eval_pushes(self, pose, robot, coarse=False, H=None):
++        """Simulate all candidate pushes; return dict of arrays."""
++        sw, dw = self.candidates(pose, coarse)
+         dr = dist_to_T_local(to_local(robot[None], pose), self.model.rects)[0]
++        nh = 12 if coarse else 24
+         if dr < R_ROBOT + 0.06:
+-            angs = np.linspace(0, 2 * np.pi, 24, endpoint=False)
+-            sw = np.vstack([sw, np.repeat(robot[None], 24, 0)])
++            angs = np.linspace(0, 2 * np.pi, nh, endpoint=False)
++            sw = np.vstack([sw, np.repeat(robot[None], nh, 0)])
+             dw = np.vstack([dw, np.stack([np.cos(angs), np.sin(angs)], 1)])
+             here = np.zeros(len(sw), bool)
+-            here[-24:] = True
++            here[-nh:] = True
+         else:
+             here = np.zeros(len(sw), bool)
+         ok = np.all((sw > WALL_LO + R_ROBOT + 0.01) & (sw < WALL_HI - R_ROBOT - 0.01), 1)
+@@ -237,24 +250,27 @@ class GeneratedApproach:
+         ok &= np.all((pre > WALL_LO + R_ROBOT + 0.02) & (pre < WALL_HI - R_ROBOT - 0.02), 1)
+         ok |= here
+         sw, dw, pre, here = sw[ok], dw[ok], pre[ok], here[ok]
+-        c0 = self.cost(pose)[0]
+-        # speeds
+-        speeds = [MAXD] if c0 > 0.35 else [MAXD, 0.02]
++        c0 = self.cost(pose[None])[0]
++        speeds = [MAXD] if (c0 > 0.35 or coarse) else [MAXD, 0.02]
++        ns = len(sw)
+         SW = np.vstack([sw] * len(speeds))
+         DW = np.vstack([dw] * len(speeds))
+         PRE = np.vstack([pre] * len(speeds))
+         HERE = np.concatenate([here] * len(speeds))
+-        SP = np.repeat(np.array(speeds), len(sw))
++        SP = np.repeat(np.array(speeds), ns)
+         N = len(SW)
+-        # travel estimate
+         travel = np.where(HERE, 0.0, self.travel_est(robot, PRE, pose) + 0.12 / MAXD)
+         cur = np.repeat(pose[None], N, 0)
+         rob = SW.copy()
+         bestscore = np.full(N, -np.inf)
+         bestk = np.zeros(N, int)
+-        H = self.H
++        bestpose = cur.copy()
++        bestrob = rob.copy()
++        bestc = np.full(N, c0)
++        H = H or self.H
++        act = DW * SP[:, None]
+         for k in range(1, H + 1):
+-            cur, rob = self.sim.step(cur, rob, DW * SP[:, None])
++            cur, rob = self.sim.step(cur, rob, act)
+             cst = self.cost(cur)
+             done = self.in_goal(cur, 0.75)
+             cst = np.where(done, -self.goal_bonus, cst)
+@@ -262,8 +278,36 @@ class GeneratedApproach:
+             m = score > bestscore
+             bestscore[m] = score[m]
+             bestk[m] = k
+-        i = int(np.argmax(bestscore))
+-        return SW[i], DW[i] * SP[i], bestk[i], bestscore[i], c0, HERE[i]
++            bestpose[m] = cur[m]
++            bestrob[m] = rob[m]
++            bestc[m] = cst[m]
++        return dict(start=SW, act=act, k=bestk, rate=bestscore, pose=bestpose, rob=bestrob,
++                    c=bestc, here=HERE, travel=travel, c0=c0)
++
++    def plan_push(self, pose, robot):
++        E = self.eval_pushes(pose, robot)
++        order = np.argsort(-E["rate"])
++        best_i = int(order[0])
++        if self.M > 0:
++            best_T = np.inf
++            for i in order[: self.M]:
++                if E["rate"][i] <= 0:
++                    break
++                T1 = E["travel"][i] + E["k"][i]
++                if E["c"][i] < 0:
++                    T = T1
++                else:
++                    E2 = self.eval_pushes(E["pose"][i], E["rob"][i], coarse=True, H=self.H2)
++                    j = int(np.argmax(E2["rate"]))
++                    r2 = E2["rate"][j]
++                    if r2 <= 0:
++                        continue
++                    T = T1 + (E2["c0"] + self.goal_bonus) / r2
++                if T < best_T:
++                    best_T = T
++                    best_i = int(i)
++        i = best_i
++        return E["start"][i], E["act"][i], E["k"][i], E["rate"][i], E["c0"], E["here"][i]
+ 
+     def in_goal(self, poses, frac=1.0):
+         dp = np.abs(poses[:, :2] - self.goal[:2])
+@@ -366,6 +410,9 @@ class GeneratedApproach:
+                 self.stall = 0
+                 self.mode = "plan"
+         self.last_robot = robot
++        if self.in_goal(pose[None])[0]:
++            self.last_cmd = None
++            return np.zeros(2)
+         a = self._act(pose, robot)
+         a = np.clip(np.asarray(a, float), -MAXD, MAXD)
+         self.last_cmd = a

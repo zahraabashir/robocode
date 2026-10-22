@@ -1,0 +1,25 @@
+diff --git a/approach.py b/approach.py
+index 167dd5f..fe7b7f8 100644
+--- a/approach.py
++++ b/approach.py
+@@ -17,4 +17,4 @@ class GeneratedApproach:
+         if np.linalg.norm(s[16:18]-target) < .15:
+             target = s[:2] + delta
+         a = target-s[16:18]
+-        return a * min(1., .05/max(np.max(np.abs(a)), 1e-9))
++        return a * min(1., .049/max(np.max(np.abs(a)), 1e-9))
+diff --git a/probe_dynamics.py b/probe_dynamics.py
+index 108d0c4..8060078 100644
+--- a/probe_dynamics.py
++++ b/probe_dynamics.py
+@@ -9,3 +9,10 @@ for seed in range(3):
+   old=s.copy();s,r,t,tr,i=e.step(np.array(a,dtype=np.float64))
+   print('FREE',seed,k,'robot',s[16:22],'block',s[:6],'robot_delta',s[16:18]-old[16:18],flush=True)
+ e.close()
++e=make_env();s,_=e.reset(seed=2)
++for k in range(55):
++ old=s.copy();a=np.array([0., .049]) if k<38 else np.zeros(2)
++ s,r,t,tr,i=e.step(a)
++ if np.linalg.norm(s[:3]-old[:3])>1e-8 or k in (0,20,54):
++  print('COLLIDE',k,'robot',s[16:22],'block',s[:6],'delta',s[:3]-old[:3],flush=True)
++e.close()

@@ -1,0 +1,93 @@
+diff --git a/approach.py b/approach.py
+index 0355bba..4ef9310 100644
+--- a/approach.py
++++ b/approach.py
+@@ -95,10 +95,21 @@ class GeneratedApproach:
+         c = b["x"] + b["w"] / 2
+         cands = sorted(np.linspace(lo, hi, 21), key=lambda x: abs(x - c))
+         R = self.robot["r"] + 0.005
++        btop = b["y"] + b["h"]
++        self.grasp_conflict = None
+         for x in cands:
+             if x < X_MIN or x > X_MAX:
+                 continue
+             ok = True
++            for o in others:
++                if o["y"] + o["h"] > btop - 0.005 and o["x"] < x + half + 0.004 \
++                        and o["x"] + o["w"] > x - half - 0.004:
++                    ok = False
++                    if self.grasp_conflict is None:
++                        self.grasp_conflict = o
++                    break
++            if not ok:
++                continue
+             for o in others:
+                 x0, x1 = o["x"], o["x"] + o["w"]
+                 d = 0.0 if x0 <= x <= x1 else min(abs(x - x0), abs(x - x1))
+@@ -109,7 +120,7 @@ class GeneratedApproach:
+                     break
+             if ok:
+                 return x
+-        return min(max(c, X_MIN), X_MAX)
++        return None
+ 
+     def _free_spot(self, b, others, forbid):
+         """Find x (left edge) on the floor for box b avoiding others and forbid intervals."""
+@@ -165,9 +176,22 @@ class GeneratedApproach:
+             others = [b for n, b in self.obst.items()]
+             dest_x = s0 + (s["w"] - tgt["w"]) / 2
+             dest_y = FLOOR
++        for _ in range(10):
++            others = [b for n, b in self._all_movable().items() if n != tgt["name"]]
++            gx = self._grasp_x(tgt, others)
++            if gx is not None or self.grasp_conflict is None:
++                break
++            tgt = self.grasp_conflict
++            others = [b for n, b in self._all_movable().items() if n != tgt["name"]]
++            forbid = [(s0 - 0.03, s1 + 0.03)]
++            spot = self._free_spot(tgt, others, forbid)
++            if spot is None:
++                spot = (0.0, FLOOR)
++            dest_x, dest_y = spot
++        if gx is None:
++            gx = min(max(tgt["x"] + tgt["w"] / 2, X_MIN), X_MAX)
+         self.target_name = tgt["name"]
+         others = [b for n, b in self._all_movable().items() if n != tgt["name"]]
+-        gx = self._grasp_x(tgt, others)
+         gy = tgt["y"] + tgt["h"] + self._grip_off() + GAP
+         ty_empty = max(self._travel_y(0.0), self.robot["y"] if False else 0)
+         ty_empty = max(ty_empty, gy)
+@@ -241,6 +265,8 @@ class GeneratedApproach:
+                 return self._act(0, 0.05, 0, wp["vac"])
+         dx = wp["x"] - r["x"]
+         dy = wp["y"] - r["y"]
++        if wp["kind"] in ("grasp", "release"):
++            dx = dy = 0.0
+         dth = -math.pi / 2 - r["theta"]
+         darm = r["arm_max"] - r["arm"]
+         return self._act(dx, dy, darm, wp["vac"], dth)
+diff --git a/dbg.py b/dbg.py
+new file mode 100644
+index 0000000..84d9cf1
+--- /dev/null
++++ b/dbg.py
+@@ -0,0 +1,19 @@
++import sys
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++seed, count = int(sys.argv[1]), int(sys.argv[2])
++env = make_env()
++obs, info = env.reset(seed=seed, options={'object_count': count})
++ap = GeneratedApproach(env.action_space, env.observation_space, {})
++ap.reset(obs, info)
++ap._parse(obs)
++print('surface', ap.surface); print('block', ap.block)
++for n,b in ap.obst.items(): print(n, b)
++lastkind=None
++for t in range(int(sys.argv[3]) if len(sys.argv)>3 else 1000):
++    a = ap.get_action(obs)
++    k = (ap.target_name, ap.plan[0]['kind'] if ap.plan else None)
++    if k!=lastkind: print(t, k, {kk:round(v,3) for kk,v in ap.robot.items() if kk in 'x y arm vac'.split()}, ap.plan[0] if ap.plan else None); lastkind=k
++    obs, r, term, trunc, info = env.step(a)
++    if term: print('done', t+1); break

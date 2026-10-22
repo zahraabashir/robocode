@@ -1,0 +1,168 @@
+diff --git a/approach.py b/approach.py
+index a458773..389a116 100644
+--- a/approach.py
++++ b/approach.py
+@@ -53,22 +53,41 @@ class GeneratedApproach:
+             if not collision:valid.append(cx)
+         return min(valid,key=lambda cx:abs(cx-preferred)) if valid else float(np.clip(preferred,.101,1.517))
+ 
++    def placement_collisions(self, s, obj, left, bottom, offsetx, offsety):
++        _,_,w,h=self.rect(s,obj)
++        cx=left-offsetx;cy=bottom-offsety
++        parts=[(left,bottom,left+w,bottom+h),
++               (cx-.037,cy-.207,cx+.037,cy-.193),
++               (cx-.008,cy-.2,cx+.008,cy)]
++        blocked=[]
++        for other in s.get_objects(self.ot):
++            if other==obj:continue
++            ox,oy,ow,oh=self.rect(s,other)
++            dx=max(ox-cx,0,cx-ox-ow);dy=max(oy-cy,0,cy-oy-oh)
++            collision=dx*dx+dy*dy<.101**2
++            for x0,y0,x1,y1 in parts:
++                if x0<ox+ow and x1>ox and y0<oy+oh and y1>oy:
++                    collision=True;break
++            if collision:blocked.append(other)
++        return blocked
++
+     def storage(self, s, x, w, h):
+         others=[(o,self.rect(s,o)) for o in s.get_objects(self.ot) if o!=self.obj]
++        bx,by,bw,bh=self.rect(s,self.block)
++        goalcx=self.destx-bx+self.target_grasp
++        reserve_left=min(self.destx,goalcx-.042)
++        reserve_right=max(self.destx+bw,goalcx+.042)
+         low=max(.005,.101+self.offsetx)
+         high=min(1.613-w,1.517+self.offsetx)
+         positions=[low,high,float(np.clip(x,low,high))]
+         for o,(ox,oy,ow,oh) in others:
+             positions.extend([ox+ow+.013,ox-w-.013])
+         def base_clear(left,bottom):
+-            cx=left-self.offsetx;cy=bottom-self.offsety
+-            for o,(ox,oy,ow,oh) in others:
+-                dx=max(ox-cx,0,cx-ox-ow);dy=max(oy-cy,0,cy-oy-oh)
+-                if dx*dx+dy*dy<.101**2:return False
+-            return True
++            return not self.placement_collisions(s,self.obj,left,bottom,self.offsetx,self.offsety)
+         floor=[]
+         for left in positions:
+             if left<low or left>high:continue
++            if left<reserve_right+.008 and left+w>reserve_left-.008:continue
+             if any(left<ox+ow+.012 and left+w>ox-.012 for o,(ox,oy,ow,oh) in others):continue
+             if base_clear(left,.101):floor.append(left)
+         if floor:return min(floor,key=lambda left:abs(left-x)),.101
+@@ -79,6 +98,7 @@ class GeneratedApproach:
+         ceiling=.89-.24-max_height
+         for left in positions:
+             if left<low or left>high:continue
++            if left<reserve_right+.02 and left+w>reserve_left-.02:continue
+             if any(o in (self.surface,self.block) and left<ox+ow+.04 and left+w>ox-.04 for o,(ox,oy,ow,oh) in others):continue
+             bottom=.101
+             for o,(ox,oy,ow,oh) in others:
+@@ -95,13 +115,16 @@ class GeneratedApproach:
+             if self.phase == 'select':
+                 bx,by,bw,bh=self.rect(s,self.block)
+                 sx,sy,sw,sh=self.rect(s,self.surface)
+-                obs=[o for o in s.get_objects(self.ot) if o not in (self.block,self.surface)]
+                 choices=np.linspace(sx+.001,sx+sw-bw-.001,21)
+-                def cost(left):
+-                    overlap=[o for o in obs if s.get(o,'x')<left+bw+.004 and s.get(o,'x')+s.get(o,'width')>left-.004 and s.get(o,'y')<sy+sh+bh+.04]
+-                    return (max(0,left+bw/2-1.516),len(overlap),abs(left-(sx+(sw-bw)/2)))
+-                self.destx=min(choices,key=cost)
+-                blocking=[o for o in obs if s.get(o,'x')<self.destx+bw+.004 and s.get(o,'x')+s.get(o,'width')>self.destx-.004 and s.get(o,'y')<sy+sh+bh+.04]
++                plans=[]
++                for left in choices:
++                    self.destx=left
++                    preferred=bx+bw/2+min(0,1.516-(left+bw/2))
++                    gx=self.grasp_position(s,self.block,preferred)
++                    blocked=[o for o in self.placement_collisions(s,self.block,left,sy+sh+.021,bx-gx,-bh-.206) if o!=self.surface]
++                    reach=max(0,left-bx+gx-1.517,.101-(left-bx+gx))
++                    plans.append(((reach,len(blocked),abs(left-(sx+(sw-bw)/2))),left,gx,blocked))
++                _,self.destx,self.target_grasp,blocking=min(plans,key=lambda p:p[0])
+                 self.obj=max(blocking,key=lambda o:s.get(o,'y')+s.get(o,'height')) if blocking else self.block
+                 self.emptyheight=min(.75,max(s.get(o,'y')+s.get(o,'height') for o in s.get_objects(self.ot))+.225)
+                 self.carryheight=min(.89,self.emptyheight+s.get(self.obj,'height')+.008)
+@@ -110,7 +133,7 @@ class GeneratedApproach:
+             if self.phase == 'above':
+                 if ry<self.emptyheight-.001: return self.action(s,y=self.emptyheight)
+                 grasp_shift=min(0,1.516-(self.destx+w/2)) if self.obj==self.block else 0
+-                grasp_x=self.grasp_position(s,self.obj,x+w/2+grasp_shift)
++                grasp_x=self.target_grasp if self.obj==self.block else self.grasp_position(s,self.obj,x+w/2)
+                 if abs(rx-grasp_x)>.001: return self.action(s,x=grasp_x,y=self.emptyheight)
+                 self.phase='down'; self.n=0; self.last_down=None
+             if self.phase == 'down':
+@@ -131,7 +154,7 @@ class GeneratedApproach:
+                     self.dropx=self.destx
+                 else:
+                     self.dropx,self.dropy=self.storage(s,x,w,h)
+-                if self.obj==self.block:self.dropy=s.get(self.surface,'y')+s.get(self.surface,'height')+.001
++                if self.obj==self.block:self.dropy=s.get(self.surface,'y')+s.get(self.surface,'height')+.021
+                 self.phase='carry'
+             if self.phase == 'carry':
+                 goal=self.dropx-self.offsetx
+diff --git a/probe_adjacent.log b/probe_adjacent.log
+new file mode 100644
+index 0000000..c7d8fdf
+--- /dev/null
++++ b/probe_adjacent.log
+@@ -0,0 +1,5 @@
++CASE 1002 target 0.07808276265859604 0.0679478570818901 dest 1.3068632706999779 neighbor obstruction0 [1.1935958862304688, 0.10000099986791611, 0.10489305853843689, 0.19846290349960327]
++CASE 1052 target 0.1265658289194107 0.05019199475646019 dest 0.37262771278619766 neighbor obstruction0 [0.2837442457675934, 0.10000099986791611, 0.08334893733263016, 0.18373318016529083]
++FOUND [1002, 1052]
++RESULT 1002 True 33 place
++RESULT 1052 True 54 place
+diff --git a/results_0_30_3.json b/results_0_30_3.json
+index 9e36a14..ca616b1 100644
+--- a/results_0_30_3.json
++++ b/results_0_30_3.json
+@@ -1 +1 @@
+-[{"seed": 0, "count": 3, "done": true, "steps": 28, "seconds": 6.726}, {"seed": 1, "count": 3, "done": true, "steps": 134, "seconds": 26.098}, {"seed": 2, "count": 3, "done": true, "steps": 142, "seconds": 29.787}, {"seed": 3, "count": 3, "done": true, "steps": 95, "seconds": 18.011}, {"seed": 4, "count": 3, "done": true, "steps": 89, "seconds": 16.508}, {"seed": 5, "count": 3, "done": true, "steps": 32, "seconds": 5.492}, {"seed": 6, "count": 3, "done": true, "steps": 109, "seconds": 19.7}, {"seed": 7, "count": 3, "done": true, "steps": 112, "seconds": 22.661}, {"seed": 8, "count": 3, "done": true, "steps": 99, "seconds": 20.135}, {"seed": 9, "count": 3, "done": true, "steps": 122, "seconds": 24.609}, {"seed": 10, "count": 3, "done": true, "steps": 88, "seconds": 18.811}, {"seed": 11, "count": 3, "done": true, "steps": 74, "seconds": 14.882}, {"seed": 12, "count": 3, "done": true, "steps": 129, "seconds": 22.898}, {"seed": 13, "count": 3, "done": true, "steps": 125, "seconds": 22.639}, {"seed": 14, "count": 3, "done": true, "steps": 133, "seconds": 23.32}, {"seed": 15, "count": 3, "done": true, "steps": 116, "seconds": 19.871}, {"seed": 16, "count": 3, "done": true, "steps": 81, "seconds": 14.044}, {"seed": 17, "count": 3, "done": true, "steps": 124, "seconds": 19.798}, {"seed": 18, "count": 3, "done": true, "steps": 91, "seconds": 14.896}, {"seed": 19, "count": 3, "done": true, "steps": 126, "seconds": 18.652}, {"seed": 20, "count": 3, "done": true, "steps": 121, "seconds": 16.089}, {"seed": 21, "count": 3, "done": true, "steps": 102, "seconds": 12.396}, {"seed": 22, "count": 3, "done": true, "steps": 82, "seconds": 9.542}, {"seed": 23, "count": 3, "done": true, "steps": 80, "seconds": 9.97}, {"seed": 24, "count": 3, "done": true, "steps": 94, "seconds": 12.042}, {"seed": 25, "count": 3, "done": true, "steps": 149, "seconds": 20.198}, {"seed": 26, "count": 3, "done": true, "steps": 96, "seconds": 13.77}, {"seed": 27, "count": 3, "done": true, "steps": 68, "seconds": 10.102}, {"seed": 28, "count": 3, "done": true, "steps": 126, "seconds": 15.054}, {"seed": 29, "count": 3, "done": true, "steps": 123, "seconds": 13.679}]
+\ No newline at end of file
++[{"seed": 0, "count": 3, "done": true, "steps": 23, "seconds": 3.756}, {"seed": 1, "count": 3, "done": true, "steps": 92, "seconds": 10.84}, {"seed": 2, "count": 3, "done": true, "steps": 93, "seconds": 10.756}, {"seed": 3, "count": 3, "done": true, "steps": 73, "seconds": 8.441}, {"seed": 4, "count": 3, "done": true, "steps": 61, "seconds": 5.952}, {"seed": 5, "count": 3, "done": true, "steps": 22, "seconds": 1.211}, {"seed": 6, "count": 3, "done": true, "steps": 75, "seconds": 6.619}, {"seed": 7, "count": 3, "done": true, "steps": 57, "seconds": 5.154}, {"seed": 8, "count": 3, "done": true, "steps": 67, "seconds": 5.665}, {"seed": 9, "count": 3, "done": true, "steps": 81, "seconds": 9.422}, {"seed": 10, "count": 3, "done": true, "steps": 61, "seconds": 7.676}, {"seed": 11, "count": 3, "done": true, "steps": 57, "seconds": 6.535}, {"seed": 12, "count": 3, "done": true, "steps": 91, "seconds": 11.845}, {"seed": 13, "count": 3, "done": true, "steps": 82, "seconds": 10.633}, {"seed": 14, "count": 3, "done": true, "steps": 84, "seconds": 12.136}, {"seed": 15, "count": 3, "done": true, "steps": 86, "seconds": 12.171}, {"seed": 16, "count": 3, "done": true, "steps": 57, "seconds": 8.114}, {"seed": 17, "count": 3, "done": true, "steps": 81, "seconds": 10.887}, {"seed": 18, "count": 3, "done": true, "steps": 73, "seconds": 9.806}, {"seed": 19, "count": 3, "done": true, "steps": 85, "seconds": 11.699}, {"seed": 20, "count": 3, "done": true, "steps": 80, "seconds": 10.68}, {"seed": 21, "count": 3, "done": true, "steps": 71, "seconds": 9.742}, {"seed": 22, "count": 3, "done": true, "steps": 59, "seconds": 7.447}, {"seed": 23, "count": 3, "done": true, "steps": 57, "seconds": 7.185}, {"seed": 24, "count": 3, "done": true, "steps": 80, "seconds": 11.299}, {"seed": 25, "count": 3, "done": true, "steps": 106, "seconds": 14.274}, {"seed": 26, "count": 3, "done": true, "steps": 69, "seconds": 9.154}, {"seed": 27, "count": 3, "done": true, "steps": 48, "seconds": 7.133}, {"seed": 28, "count": 3, "done": true, "steps": 91, "seconds": 10.564}, {"seed": 29, "count": 3, "done": true, "steps": 84, "seconds": 9.612}]
+\ No newline at end of file
+diff --git a/results_100_200_None.json b/results_100_200_None.json
+new file mode 100644
+index 0000000..8f7fe55
+--- /dev/null
++++ b/results_100_200_None.json
+@@ -0,0 +1 @@
++[{"seed": 100, "count": null, "done": true, "steps": 83, "seconds": 3.669}, {"seed": 101, "count": null, "done": true, "steps": 16, "seconds": 0.424}, {"seed": 102, "count": null, "done": true, "steps": 62, "seconds": 2.22}, {"seed": 103, "count": null, "done": true, "steps": 32, "seconds": 1.452}, {"seed": 104, "count": null, "done": true, "steps": 73, "seconds": 2.861}, {"seed": 105, "count": null, "done": true, "steps": 20, "seconds": 0.571}, {"seed": 106, "count": null, "done": true, "steps": 24, "seconds": 0.919}, {"seed": 107, "count": null, "done": true, "steps": 33, "seconds": 1.16}, {"seed": 108, "count": null, "done": true, "steps": 27, "seconds": 1.068}, {"seed": 109, "count": null, "done": true, "steps": 48, "seconds": 2.416}, {"seed": 110, "count": null, "done": true, "steps": 67, "seconds": 3.287}, {"seed": 111, "count": null, "done": true, "steps": 38, "seconds": 1.953}, {"seed": 112, "count": null, "done": true, "steps": 24, "seconds": 0.998}, {"seed": 113, "count": null, "done": true, "steps": 39, "seconds": 1.26}, {"seed": 114, "count": null, "done": true, "steps": 21, "seconds": 0.447}, {"seed": 115, "count": null, "done": true, "steps": 63, "seconds": 2.758}, {"seed": 116, "count": null, "done": true, "steps": 50, "seconds": 1.978}, {"seed": 117, "count": null, "done": true, "steps": 26, "seconds": 1.01}, {"seed": 118, "count": null, "done": true, "steps": 58, "seconds": 2.355}, {"seed": 119, "count": null, "done": true, "steps": 59, "seconds": 2.763}, {"seed": 120, "count": null, "done": true, "steps": 23, "seconds": 0.842}, {"seed": 121, "count": null, "done": true, "steps": 25, "seconds": 0.649}, {"seed": 122, "count": null, "done": true, "steps": 68, "seconds": 3.269}, {"seed": 123, "count": null, "done": true, "steps": 38, "seconds": 1.65}, {"seed": 124, "count": null, "done": true, "steps": 49, "seconds": 2.193}, {"seed": 125, "count": null, "done": true, "steps": 77, "seconds": 2.391}, {"seed": 126, "count": null, "done": true, "steps": 18, "seconds": 0.446}, {"seed": 127, "count": null, "done": true, "steps": 73, "seconds": 2.925}, {"seed": 128, "count": null, "done": true, "steps": 90, "seconds": 4.577}, {"seed": 129, "count": null, "done": true, "steps": 37, "seconds": 1.556}, {"seed": 130, "count": null, "done": true, "steps": 57, "seconds": 3.281}, {"seed": 131, "count": null, "done": true, "steps": 36, "seconds": 1.751}, {"seed": 132, "count": null, "done": true, "steps": 80, "seconds": 6.808}, {"seed": 133, "count": null, "done": true, "steps": 63, "seconds": 4.371}, {"seed": 134, "count": null, "done": true, "steps": 24, "seconds": 2.389}, {"seed": 135, "count": null, "done": true, "steps": 20, "seconds": 1.298}, {"seed": 136, "count": null, "done": true, "steps": 45, "seconds": 3.913}, {"seed": 137, "count": null, "done": true, "steps": 72, "seconds": 5.598}, {"seed": 138, "count": null, "done": true, "steps": 84, "seconds": 6.415}, {"seed": 139, "count": null, "done": true, "steps": 85, "seconds": 6.831}, {"seed": 140, "count": null, "done": true, "steps": 20, "seconds": 1.804}, {"seed": 141, "count": null, "done": true, "steps": 51, "seconds": 3.587}, {"seed": 142, "count": null, "done": true, "steps": 51, "seconds": 3.142}, {"seed": 143, "count": null, "done": true, "steps": 50, "seconds": 4.237}, {"seed": 144, "count": null, "done": true, "steps": 39, "seconds": 2.751}, {"seed": 145, "count": null, "done": true, "steps": 39, "seconds": 2.971}, {"seed": 146, "count": null, "done": true, "steps": 53, "seconds": 4.189}, {"seed": 147, "count": null, "done": true, "steps": 25, "seconds": 1.027}, {"seed": 148, "count": null, "done": true, "steps": 17, "seconds": 0.848}, {"seed": 149, "count": null, "done": true, "steps": 32, "seconds": 1.143}, {"seed": 150, "count": null, "done": true, "steps": 33, "seconds": 1.941}, {"seed": 151, "count": null, "done": false, "steps": 1000, "seconds": 103.878, "trace": [[840, "place", "target_block", 0.7788, 0.5182], [880, "place", "target_block", 0.7788, 0.5182], [920, "place", "target_block", 0.7788, 0.5182], [960, "place", "target_block", 0.7788, 0.5182]], "state": {"obstruction0": {"x": 0.8107884526252747, "y": 0.10000099986791611, "width": 0.1386185884475708, "height": 0.11362678557634354}, "obstruction1": {"x": 0.693976104259491, "y": 0.10000099986791611, "width": 0.05311352387070656, "height": 0.19954173266887665}, "target_block": {"x": 0.7532491087913513, "y": 0.12654274702072144, "width": 0.05102952942252159, "height": 0.18566597998142242}, "target_surface": {"x": 0.7150579690933228, "y": 0.0, "width": 0.09951850026845932, "height": 0.10000000149011612}}}, {"seed": 152, "count": null, "done": true, "steps": 39, "seconds": 3.248}, {"seed": 153, "count": null, "done": true, "steps": 65, "seconds": 6.169}, {"seed": 154, "count": null, "done": true, "steps": 41, "seconds": 2.63}, {"seed": 155, "count": null, "done": true, "steps": 29, "seconds": 1.787}, {"seed": 156, "count": null, "done": true, "steps": 71, "seconds": 6.784}, {"seed": 157, "count": null, "done": true, "steps": 37, "seconds": 2.639}, {"seed": 158, "count": null, "done": true, "steps": 84, "seconds": 5.325}, {"seed": 159, "count": null, "done": true, "steps": 51, "seconds": 4.743}, {"seed": 160, "count": null, "done": true, "steps": 20, "seconds": 1.322}, {"seed": 161, "count": null, "done": true, "steps": 44, "seconds": 4.037}, {"seed": 162, "count": null, "done": true, "steps": 59, "seconds": 5.063}, {"seed": 163, "count": null, "done": true, "steps": 38, "seconds": 3.401}, {"seed": 164, "count": null, "done": true, "steps": 52, "seconds": 4.734}, {"seed": 165, "count": null, "done": true, "steps": 66, "seconds": 6.429}, {"seed": 166, "count": null, "done": true, "steps": 47, "seconds": 5.833}, {"seed": 167, "count": null, "done": true, "steps": 70, "seconds": 6.838}, {"seed": 168, "count": null, "done": true, "steps": 43, "seconds": 3.039}, {"seed": 169, "count": null, "done": true, "steps": 75, "seconds": 7.314}, {"seed": 170, "count": null, "done": true, "steps": 48, "seconds": 5.681}, {"seed": 171, "count": null, "done": true, "steps": 63, "seconds": 6.923}, {"seed": 172, "count": null, "done": true, "steps": 42, "seconds": 3.571}, {"seed": 173, "count": null, "done": true, "steps": 70, "seconds": 7.286}, {"seed": 174, "count": null, "done": true, "steps": 61, "seconds": 6.039}, {"seed": 175, "count": null, "done": true, "steps": 46, "seconds": 5.631}, {"seed": 176, "count": null, "done": true, "steps": 33, "seconds": 2.629}, {"seed": 177, "count": null, "done": true, "steps": 52, "seconds": 5.26}, {"seed": 178, "count": null, "done": true, "steps": 83, "seconds": 6.561}, {"seed": 179, "count": null, "done": true, "steps": 58, "seconds": 5.683}, {"seed": 180, "count": null, "done": true, "steps": 39, "seconds": 2.489}, {"seed": 181, "count": null, "done": true, "steps": 59, "seconds": 5.814}, {"seed": 182, "count": null, "done": true, "steps": 101, "seconds": 11.229}, {"seed": 183, "count": null, "done": true, "steps": 63, "seconds": 6.44}, {"seed": 184, "count": null, "done": true, "steps": 53, "seconds": 5.376}, {"seed": 185, "count": null, "done": true, "steps": 25, "seconds": 2.233}, {"seed": 186, "count": null, "done": true, "steps": 23, "seconds": 1.188}, {"seed": 187, "count": null, "done": true, "steps": 55, "seconds": 4.541}, {"seed": 188, "count": null, "done": true, "steps": 22, "seconds": 1.779}, {"seed": 189, "count": null, "done": true, "steps": 35, "seconds": 2.658}, {"seed": 190, "count": null, "done": true, "steps": 17, "seconds": 0.805}, {"seed": 191, "count": null, "done": true, "steps": 33, "seconds": 2.053}, {"seed": 192, "count": null, "done": true, "steps": 49, "seconds": 4.106}, {"seed": 193, "count": null, "done": true, "steps": 59, "seconds": 3.925}, {"seed": 194, "count": null, "done": true, "steps": 74, "seconds": 6.377}, {"seed": 195, "count": null, "done": true, "steps": 26, "seconds": 1.638}, {"seed": 196, "count": null, "done": true, "steps": 39, "seconds": 2.337}, {"seed": 197, "count": null, "done": true, "steps": 90, "seconds": 6.173}, {"seed": 198, "count": null, "done": true, "steps": 61, "seconds": 2.884}, {"seed": 199, "count": null, "done": true, "steps": 49, "seconds": 2.48}, {"seed": 200, "count": null, "done": true, "steps": 23, "seconds": 1.018}, {"seed": 201, "count": null, "done": true, "steps": 28, "seconds": 1.056}, {"seed": 202, "count": null, "done": true, "steps": 36, "seconds": 1.224}, {"seed": 203, "count": null, "done": true, "steps": 36, "seconds": 1.367}, {"seed": 204, "count": null, "done": true, "steps": 48, "seconds": 2.859}, {"seed": 205, "count": null, "done": true, "steps": 38, "seconds": 1.579}, {"seed": 206, "count": null, "done": true, "steps": 62, "seconds": 3.172}, {"seed": 207, "count": null, "done": true, "steps": 20, "seconds": 0.814}, {"seed": 208, "count": null, "done": true, "steps": 28, "seconds": 2.062}, {"seed": 209, "count": null, "done": true, "steps": 42, "seconds": 2.807}, {"seed": 210, "count": null, "done": true, "steps": 21, "seconds": 1.418}, {"seed": 211, "count": null, "done": true, "steps": 31, "seconds": 1.514}, {"seed": 212, "count": null, "done": true, "steps": 33, "seconds": 1.618}, {"seed": 213, "count": null, "done": true, "steps": 19, "seconds": 0.908}, {"seed": 214, "count": null, "done": true, "steps": 43, "seconds": 2.059}, {"seed": 215, "count": null, "done": true, "steps": 70, "seconds": 4.696}, {"seed": 216, "count": null, "done": true, "steps": 31, "seconds": 2.063}, {"seed": 217, "count": null, "done": true, "steps": 53, "seconds": 3.447}, {"seed": 218, "count": null, "done": true, "steps": 44, "seconds": 2.352}, {"seed": 219, "count": null, "done": true, "steps": 23, "seconds": 1.256}, {"seed": 220, "count": null, "done": true, "steps": 48, "seconds": 3.109}, {"seed": 221, "count": null, "done": true, "steps": 57, "seconds": 3.668}, {"seed": 222, "count": null, "done": true, "steps": 47, "seconds": 2.951}, {"seed": 223, "count": null, "done": true, "steps": 33, "seconds": 1.855}, {"seed": 224, "count": null, "done": true, "steps": 52, "seconds": 3.143}, {"seed": 225, "count": null, "done": true, "steps": 92, "seconds": 5.74}, {"seed": 226, "count": null, "done": true, "steps": 76, "seconds": 4.641}, {"seed": 227, "count": null, "done": true, "steps": 57, "seconds": 3.049}, {"seed": 228, "count": null, "done": true, "steps": 59, "seconds": 3.061}, {"seed": 229, "count": null, "done": true, "steps": 30, "seconds": 1.813}, {"seed": 230, "count": null, "done": true, "steps": 40, "seconds": 1.961}, {"seed": 231, "count": null, "done": true, "steps": 31, "seconds": 1.324}, {"seed": 232, "count": null, "done": true, "steps": 25, "seconds": 1.635}, {"seed": 233, "count": null, "done": true, "steps": 25, "seconds": 1.346}, {"seed": 234, "count": null, "done": true, "steps": 46, "seconds": 2.795}, {"seed": 235, "count": null, "done": true, "steps": 65, "seconds": 4.046}, {"seed": 236, "count": null, "done": true, "steps": 75, "seconds": 3.809}, {"seed": 237, "count": null, "done": true, "steps": 90, "seconds": 7.009}, {"seed": 238, "count": null, "done": true, "steps": 19, "seconds": 0.962}, {"seed": 239, "count": null, "done": false, "steps": 1000, "seconds": 85.894, "trace": [[840, "place", "target_block", 0.1854, 0.4726], [880, "place", "target_block", 0.1854, 0.4726], [920, "place", "target_block", 0.1854, 0.4726], [960, "place", "target_block", 0.1854, 0.4726]], "state": {"obstruction0": {"x": 0.3029325008392334, "y": 0.10100004076957703, "width": 0.08481914550065994, "height": 0.11373668164014816}, "obstruction1": {"x": 0.2174888253211975, "y": 0.10000099986791611, "width": 0.07244367152452469, "height": 0.12870042026042938}, "target_block": {"x": 0.15883193910121918, "y": 0.20570142567157745, "width": 0.054496027529239655, "height": 0.06093798950314522}, "target_surface": {"x": 0.1535184234380722, "y": 0.0, "width": 0.09963131695985794, "height": 0.10000000149011612}}}, {"seed": 240, "count": null, "done": true, "steps": 83, "seconds": 7.283}, {"seed": 241, "count": null, "done": true, "steps": 18, "seconds": 0.998}, {"seed": 242, "count": null, "done": true, "steps": 74, "seconds": 7.018}, {"seed": 243, "count": null, "done": true, "steps": 34, "seconds": 3.187}, {"seed": 244, "count": null, "done": true, "steps": 49, "seconds": 4.66}, {"seed": 245, "count": null, "done": true, "steps": 42, "seconds": 3.582}, {"seed": 246, "count": null, "done": true, "steps": 71, "seconds": 6.489}, {"seed": 247, "count": null, "done": true, "steps": 33, "seconds": 2.103}, {"seed": 248, "count": null, "done": true, "steps": 53, "seconds": 3.826}, {"seed": 249, "count": null, "done": true, "steps": 48, "seconds": 4.005}, {"seed": 250, "count": null, "done": true, "steps": 78, "seconds": 5.597}, {"seed": 251, "count": null, "done": true, "steps": 18, "seconds": 1.11}, {"seed": 252, "count": null, "done": true, "steps": 95, "seconds": 9.471}, {"seed": 253, "count": null, "done": true, "steps": 56, "seconds": 4.683}, {"seed": 254, "count": null, "done": true, "steps": 31, "seconds": 2.293}, {"seed": 255, "count": null, "done": true, "steps": 27, "seconds": 1.775}, {"seed": 256, "count": null, "done": true, "steps": 33, "seconds": 2.589}, {"seed": 257, "count": null, "done": true, "steps": 40, "seconds": 4.227}, {"seed": 258, "count": null, "done": true, "steps": 45, "seconds": 4.295}, {"seed": 259, "count": null, "done": true, "steps": 20, "seconds": 1.562}, {"seed": 260, "count": null, "done": true, "steps": 48, "seconds": 3.92}, {"seed": 261, "count": null, "done": true, "steps": 81, "seconds": 5.021}, {"seed": 262, "count": null, "done": true, "steps": 61, "seconds": 5.02}, {"seed": 263, "count": null, "done": true, "steps": 58, "seconds": 4.778}, {"seed": 264, "count": null, "done": true, "steps": 44, "seconds": 2.382}, {"seed": 265, "count": null, "done": true, "steps": 64, "seconds": 5.46}, {"seed": 266, "count": null, "done": true, "steps": 53, "seconds": 3.771}, {"seed": 267, "count": null, "done": true, "steps": 52, "seconds": 3.5}, {"seed": 268, "count": null, "done": true, "steps": 98, "seconds": 7.981}, {"seed": 269, "count": null, "done": true, "steps": 54, "seconds": 4.941}, {"seed": 270, "count": null, "done": true, "steps": 43, "seconds": 2.812}, {"seed": 271, "count": null, "done": true, "steps": 54, "seconds": 4.286}, {"seed": 272, "count": null, "done": true, "steps": 20, "seconds": 1.04}, {"seed": 273, "count": null, "done": true, "steps": 31, "seconds": 1.739}, {"seed": 274, "count": null, "done": true, "steps": 38, "seconds": 2.366}, {"seed": 275, "count": null, "done": true, "steps": 34, "seconds": 1.543}, {"seed": 276, "count": null, "done": true, "steps": 24, "seconds": 1.51}, {"seed": 277, "count": null, "done": true, "steps": 31, "seconds": 1.743}, {"seed": 278, "count": null, "done": true, "steps": 26, "seconds": 1.107}, {"seed": 279, "count": null, "done": true, "steps": 47, "seconds": 2.979}, {"seed": 280, "count": null, "done": true, "steps": 30, "seconds": 2.076}, {"seed": 281, "count": null, "done": true, "steps": 43, "seconds": 2.544}, {"seed": 282, "count": null, "done": true, "steps": 46, "seconds": 3.17}, {"seed": 283, "count": null, "done": true, "steps": 52, "seconds": 2.771}, {"seed": 284, "count": null, "done": true, "steps": 23, "seconds": 1.073}, {"seed": 285, "count": null, "done": true, "steps": 77, "seconds": 4.874}, {"seed": 286, "count": null, "done": true, "steps": 29, "seconds": 1.407}, {"seed": 287, "count": null, "done": true, "steps": 87, "seconds": 5.782}, {"seed": 288, "count": null, "done": true, "steps": 21, "seconds": 0.792}, {"seed": 289, "count": null, "done": true, "steps": 33, "seconds": 2.063}, {"seed": 290, "count": null, "done": true, "steps": 36, "seconds": 2.243}, {"seed": 291, "count": null, "done": true, "steps": 31, "seconds": 1.907}, {"seed": 292, "count": null, "done": true, "steps": 90, "seconds": 6.855}, {"seed": 293, "count": null, "done": true, "steps": 33, "seconds": 1.683}, {"seed": 294, "count": null, "done": true, "steps": 29, "seconds": 1.943}, {"seed": 295, "count": null, "done": true, "steps": 51, "seconds": 3.142}, {"seed": 296, "count": null, "done": true, "steps": 27, "seconds": 1.245}, {"seed": 297, "count": null, "done": true, "steps": 35, "seconds": 1.737}, {"seed": 298, "count": null, "done": true, "steps": 46, "seconds": 1.031}, {"seed": 299, "count": null, "done": true, "steps": 71, "seconds": 1.256}]
+\ No newline at end of file
+diff --git a/results_1_1_4.json b/results_1_1_4.json
+new file mode 100644
+index 0000000..b019ad0
+--- /dev/null
++++ b/results_1_1_4.json
+@@ -0,0 +1 @@
++[{"seed": 1, "count": 4, "done": true, "steps": 79, "seconds": 13.503, "policy_seconds": 0.0168}]
+\ No newline at end of file
+diff --git a/results_2_1_4.json b/results_2_1_4.json
+new file mode 100644
+index 0000000..5351e56
+--- /dev/null
++++ b/results_2_1_4.json
+@@ -0,0 +1 @@
++[{"seed": 2, "count": 4, "done": false, "steps": 1000, "seconds": 102.677, "policy_seconds": 0.1575, "trace": [[840, "place", "target_block", 1.06, 0.439], [880, "place", "target_block", 1.06, 0.439], [920, "place", "target_block", 1.06, 0.439], [960, "place", "target_block", 1.06, 0.439]], "state": {"obstruction0": {"x": 0.41724511981010437, "y": 0.10000099986791611, "width": 0.16559429466724396, "height": 0.19393038749694824}, "obstruction1": {"x": 1.1710095405578613, "y": 0.10099999606609344, "width": 0.18252427875995636, "height": 0.16370268166065216}, "obstruction2": {"x": 0.6930773258209229, "y": 0.10000099986791611, "width": 0.19260691106319427, "height": 0.13893510401248932}, "obstruction3": {"x": 0.9658926725387573, "y": 0.10000099986791611, "width": 0.06577402353286743, "height": 0.09953121095895767}, "target_block": {"x": 1.0440634489059448, "y": 0.1701126992702484, "width": 0.0980890691280365, "height": 0.06211165711283684}, "target_surface": {"x": 1.0282063484191895, "y": 0.0, "width": 0.1298033446073532, "height": 0.10000000149011612}}}]
+\ No newline at end of file
+diff --git a/results_3_1_4.json b/results_3_1_4.json
+new file mode 100644
+index 0000000..1797ee9
+--- /dev/null
++++ b/results_3_1_4.json
+@@ -0,0 +1 @@
++[{"seed": 3, "count": 4, "done": false, "steps": 1000, "seconds": 5.522, "policy_seconds": 0.1028, "trace": [[840, "place", "target_block", 1.3354, 0.5069], [880, "place", "target_block", 1.3354, 0.5069], [920, "place", "target_block", 1.3354, 0.5069], [960, "place", "target_block", 1.3354, 0.5069]], "state": {"obstruction0": {"x": 1.152086615562439, "y": 0.10000099986791611, "width": 0.1514977365732193, "height": 0.15962274372577667}, "obstruction1": {"x": 1.3890105485916138, "y": 0.10099998116493225, "width": 0.08749981224536896, "height": 0.19032169878482819}, "obstruction2": {"x": 0.43964964151382446, "y": 0.10000099986791611, "width": 0.1306634545326233, "height": 0.1996031254529953}, "obstruction3": {"x": 0.7467350363731384, "y": 0.10000099986791611, "width": 0.1965513676404953, "height": 0.15759406983852386}, "target_block": {"x": 1.3082562685012817, "y": 0.22660410404205322, "width": 0.05419572442770004, "height": 0.07431439310312271}, "target_surface": {"x": 1.2884182929992676, "y": 0.0, "width": 0.08759234845638275, "height": 0.10000000149011612}}}]
+\ No newline at end of file
+diff --git a/results_4_1_4.json b/results_4_1_4.json
+new file mode 100644
+index 0000000..72ea1c4
+--- /dev/null
++++ b/results_4_1_4.json
+@@ -0,0 +1 @@
++[{"seed": 4, "count": 4, "done": false, "steps": 1000, "seconds": 5.497, "policy_seconds": 0.1098, "trace": [[840, "place", "obstruction2", 1.1379, 0.4016], [880, "place", "obstruction2", 1.1379, 0.4016], [920, "place", "obstruction2", 1.1379, 0.4016], [960, "place", "obstruction2", 1.1379, 0.4016]], "state": {"obstruction0": {"x": 1.1559269428253174, "y": 0.10100000351667404, "width": 0.06802277266979218, "height": 0.05388985574245453}, "obstruction1": {"x": 1.4920032024383545, "y": 0.10000099986791611, "width": 0.07113966345787048, "height": 0.12770894169807434}, "obstruction2": {"x": 1.0861551761627197, "y": 0.1451493799686432, "width": 0.05677169933915138, "height": 0.05042976886034012}, "obstruction3": {"x": 1.2369496822357178, "y": 0.10000099986791611, "width": 0.08748079836368561, "height": 0.16814841330051422}, "target_block": {"x": 0.27295616269111633, "y": 0.10000099986791611, "width": 0.14293360710144043, "height": 0.1114027351140976}, "target_surface": {"x": 1.3184852600097656, "y": 0.0, "width": 0.18072666227817535, "height": 0.10000000149011612}}}]
+\ No newline at end of file
+diff --git a/results_5_1_4.json b/results_5_1_4.json
+new file mode 100644
+index 0000000..04f9e8d
+--- /dev/null
++++ b/results_5_1_4.json
+@@ -0,0 +1 @@
++[{"seed": 5, "count": 4, "done": true, "steps": 83, "seconds": 0.419, "policy_seconds": 0.0117}]
+\ No newline at end of file

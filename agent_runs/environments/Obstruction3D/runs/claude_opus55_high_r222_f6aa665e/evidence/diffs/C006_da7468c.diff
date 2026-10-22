@@ -1,0 +1,299 @@
+diff --git a/dbg2.py b/dbg2.py
+new file mode 100644
+index 0000000..677db19
+--- /dev/null
++++ b/dbg2.py
+@@ -0,0 +1,11 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach, fk
++seed=int(sys.argv[1]); N=int(sys.argv[2]); t0=int(sys.argv[3])
++env = make_env(); obs, info = env.reset(seed=seed)
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++for t in range(N):
++    a = ap.get_action(obs)
++    obs, r, term, trunc, info = env.step(a)
++    q = ap._q(obs); T,_,_ = fk(q)
++    if t>=t0: print(t, np.round(T[:3,3],3), np.round(q,2), np.round(a[3:10],3))
+diff --git a/oc_check.py b/oc_check.py
+new file mode 100644
+index 0000000..79f87a1
+--- /dev/null
++++ b/oc_check.py
+@@ -0,0 +1,4 @@
++from env_client import make_env
++env=make_env()
++for n in [3,4,6,8]:
++    obs,info=env.reset(seed=1,options={'object_count':n}); print(n, info, sorted(obs.get_object_names()))
+diff --git a/probe_basefk.py b/probe_basefk.py
+new file mode 100644
+index 0000000..1ca81ff
+--- /dev/null
++++ b/probe_basefk.py
+@@ -0,0 +1,35 @@
++from env_client import make_env
++from approach import ik, fk, down_R
++import numpy as np, sys
++env = make_env()
++dbx, dby, drot = [float(v) for v in sys.argv[1:4]]; hyp = sys.argv[4]
++obs, info = env.reset(seed=0)
++R = obs.get_object_from_name("robot"); B = obs.get_object_from_name("target_block")
++def q_of(o): return np.array([o.get(R,f'joint_{i}') for i in range(1,8)])
++# move base away first: -x then y/rot
++for i in range(20):
++    rem = np.array([dbx - (obs.get(R,'pos_base_x')+0.12), dby - obs.get(R,'pos_base_y'), drot - obs.get(R,'pos_base_rot')])
++    if np.max(np.abs(rem))<1e-6: break
++    a=np.zeros(11,np.float32); a[0:3]=np.clip(rem,-.2,.2); obs,*_=env.step(a)
++bxw,byw,rot = obs.get(R,'pos_base_x'),obs.get(R,'pos_base_y'),obs.get(R,'pos_base_rot')
++print("base", bxw, byw, rot)
++if hyp=='A': mount=np.array([bxw+0.12*np.cos(rot), byw+0.12*np.sin(rot)])
++else: mount=np.array([bxw+0.12, byw])
++c,s=np.cos(rot),np.sin(rot); Rz=np.array([[c,-s,0],[s,c,0],[0,0,1]])
++def to_local(p): 
++    d=np.array(p)-np.array([mount[0],mount[1],0]); return Rz.T@d
++bx,by=obs.get(B,'pose_x'),obs.get(B,'pose_y')
++q=q_of(obs)
++def goto(obs, qt, maxn=40):
++    for _ in range(maxn):
++        q = q_of(obs); d = qt - q
++        if np.max(np.abs(d)) < 1e-4: break
++        a = np.zeros(11, np.float32); a[3:10] = np.clip(d,-.2,.2)
++        obs2, *_ = env.step(a)
++        if np.allclose(q_of(obs2), q): return obs2, False
++        obs = obs2
++    return obs, True
++for z in [0.36,0.30,0.265]:
++    p=to_local([bx,by,z]); Rl=Rz.T@down_R(np.pi/2)
++    qt,e=ik(q,p,Rl); obs,ok=goto(obs,qt); q=q_of(obs); print(z, ok, e)
++a=np.zeros(11,np.float32); a[10]=-1; obs,*_=env.step(a); print("grasp", obs.get(R,'grasp_active'))
+diff --git a/res_40_240.txt b/res_40_240.txt
+new file mode 100644
+index 0000000..a64f8e2
+--- /dev/null
++++ b/res_40_240.txt
+@@ -0,0 +1,201 @@
++(40, 1, False, 1000, 290.6)
++(41, 1, True, 44, 44.5)
++(42, 0, True, 21, 23.6)
++(43, 1, True, 40, 34.7)
++(44, 2, True, 44, 42.7)
++(45, 2, True, 55, 59.8)
++(46, 1, True, 41, 33.4)
++(47, 0, True, 20, 11.7)
++(48, 0, True, 19, 12.2)
++(49, 0, True, 23, 20.2)
++(50, 2, True, 61, 48.2)
++(51, 1, True, 40, 26.7)
++(52, 2, False, 1000, 286.0)
++(53, 2, True, 71, 49.9)
++(54, 0, True, 23, 13.0)
++(55, 2, True, 85, 57.4)
++(56, 1, True, 32, 17.1)
++(57, 0, True, 19, 10.6)
++(58, 1, True, 33, 26.7)
++(59, 2, True, 81, 58.1)
++(60, 0, True, 20, 9.3)
++(61, 1, True, 41, 21.8)
++(62, 1, True, 40, 23.4)
++(63, 1, True, 42, 24.1)
++(64, 1, True, 45, 25.9)
++(65, 0, True, 37, 26.0)
++(66, 2, True, 60, 37.6)
++(67, 2, True, 63, 38.4)
++(68, 1, True, 23, 17.2)
++(69, 0, True, 18, 10.8)
++(70, 1, True, 45, 26.1)
++(71, 2, True, 69, 49.5)
++(72, 2, True, 63, 40.3)
++(73, 2, True, 58, 32.3)
++(74, 0, True, 20, 12.5)
++(75, 1, True, 41, 25.1)
++(76, 1, True, 49, 35.5)
++(77, 0, True, 20, 6.0)
++(78, 2, True, 47, 31.5)
++(79, 0, True, 19, 12.3)
++(80, 2, True, 60, 42.5)
++(81, 0, True, 20, 10.0)
++(82, 2, True, 61, 35.6)
++(83, 2, True, 34, 18.8)
++(84, 1, True, 41, 17.3)
++(85, 2, True, 63, 37.2)
++(86, 2, True, 54, 34.6)
++(87, 1, True, 46, 31.5)
++(88, 1, True, 44, 31.4)
++(89, 2, True, 261, 149.1)
++(90, 1, True, 33, 19.9)
++(91, 2, True, 48, 32.1)
++(92, 1, True, 33, 18.0)
++(93, 2, True, 61, 42.5)
++(94, 0, True, 26, 12.6)
++(95, 1, True, 41, 22.7)
++(96, 2, True, 68, 60.3)
++(97, 0, True, 22, 14.8)
++(98, 1, True, 42, 28.8)
++(99, 2, True, 55, 33.7)
++(100, 2, True, 61, 56.2)
++(101, 0, True, 16, 8.4)
++(102, 1, True, 35, 30.1)
++(103, 1, True, 45, 46.5)
++(104, 2, False, 1000, 794.8)
++(105, 0, True, 22, 27.2)
++(106, 1, True, 24, 38.5)
++(107, 0, True, 22, 23.1)
++(108, 0, True, 24, 26.1)
++(109, 1, True, 38, 45.2)
++(110, 1, True, 54, 68.7)
++(111, 1, True, 36, 39.3)
++(112, 0, True, 26, 25.5)
++(113, 0, True, 26, 33.4)
++(114, 0, True, 15, 8.6)
++(115, 1, True, 37, 45.4)
++(116, 0, True, 23, 27.7)
++(117, 0, True, 16, 20.3)
++(118, 1, True, 41, 51.5)
++(119, 1, True, 44, 51.6)
++(120, 0, True, 15, 15.3)
++(121, 0, True, 17, 17.0)
++(122, 2, True, 72, 72.3)
++(123, 0, True, 18, 16.7)
++(124, 2, True, 39, 35.1)
++(125, 1, True, 57, 47.0)
++(126, 0, True, 27, 20.9)
++(127, 1, True, 24, 20.7)
++(128, 2, True, 72, 65.7)
++(129, 1, True, 37, 27.3)
++(130, 2, False, 1000, 251.9)
++(131, 1, True, 43, 38.0)
++(132, 2, True, 52, 42.9)
++(133, 1, True, 44, 41.0)
++(134, 2, True, 60, 53.3)
++(135, 1, True, 36, 27.8)
++(136, 2, True, 40, 35.8)
++(137, 1, True, 44, 42.0)
++(138, 1, True, 45, 36.3)
++(139, 1, True, 53, 47.4)
++(140, 1, True, 40, 31.2)
++(141, 1, True, 43, 37.7)
++(142, 0, True, 30, 20.7)
++(143, 2, True, 63, 71.7)
++(144, 0, True, 24, 24.3)
++(145, 1, True, 41, 48.6)
++(146, 2, True, 42, 50.7)
++(147, 0, True, 17, 22.2)
++(148, 0, True, 16, 25.1)
++(149, 0, True, 24, 30.0)
++(150, 1, True, 31, 29.2)
++(151, 2, True, 40, 32.4)
++(152, 2, True, 50, 43.2)
++(153, 2, True, 56, 44.5)
++(154, 0, True, 19, 11.5)
++(155, 0, True, 24, 20.0)
++(156, 2, True, 133, 74.5)
++(157, 0, True, 24, 15.0)
++(158, 1, True, 33, 19.3)
++(159, 2, True, 52, 37.5)
++(160, 0, True, 32, 21.7)
++(161, 2, True, 39, 24.9)
++(162, 1, True, 47, 32.0)
++(163, 1, True, 33, 22.3)
++(164, 1, True, 39, 29.8)
++(165, 1, True, 42, 28.9)
++(166, 2, True, 79, 51.8)
++(167, 2, True, 53, 35.8)
++(168, 1, True, 141, 52.4)
++(169, 2, True, 62, 42.0)
++(170, 2, True, 71, 53.4)
++(171, 2, True, 63, 43.3)
++(172, 1, True, 41, 22.8)
++(173, 2, True, 71, 51.3)
++(174, 1, True, 44, 33.9)
++(175, 2, True, 56, 42.8)
++(176, 0, True, 22, 14.9)
++(177, 2, True, 56, 45.4)
++(178, 1, True, 45, 27.4)
++(179, 2, True, 70, 47.9)
++(180, 0, True, 28, 20.8)
++(181, 2, True, 61, 56.1)
++(182, 2, True, 65, 56.5)
++(183, 2, True, 45, 40.5)
++(184, 1, True, 41, 32.4)
++(185, 0, True, 29, 15.3)
++(186, 0, True, 22, 7.6)
++(187, 1, True, 24, 29.0)
++(188, 1, True, 38, 40.1)
++(189, 1, True, 49, 52.8)
++(190, 0, True, 21, 22.8)
++(191, 0, True, 16, 15.2)
++(192, 2, True, 42, 45.5)
++(193, 1, True, 56, 54.1)
++(194, 2, True, 162, 83.6)
++(195, 0, True, 20, 14.1)
++(196, 0, True, 19, 14.4)
++(197, 2, True, 51, 46.4)
++(198, 1, True, 43, 42.8)
++(199, 1, True, 53, 51.7)
++(200, 0, True, 24, 16.4)
++(201, 0, True, 15, 6.7)
++(202, 0, True, 23, 24.8)
++(203, 0, True, 16, 11.8)
++(204, 2, True, 74, 72.9)
++(205, 1, True, 35, 29.9)
++(206, 1, True, 39, 33.1)
++(207, 0, True, 27, 18.0)
++(208, 2, True, 35, 33.0)
++(209, 2, False, 1000, 227.7)
++(210, 0, True, 18, 10.1)
++(211, 0, True, 17, 16.5)
++(212, 0, True, 19, 15.9)
++(213, 0, True, 28, 20.6)
++(214, 0, True, 30, 24.3)
++(215, 2, True, 58, 42.1)
++(216, 2, True, 40, 30.9)
++(217, 2, True, 58, 43.3)
++(218, 1, True, 43, 32.3)
++(219, 0, True, 20, 9.4)
++(220, 2, True, 62, 41.0)
++(221, 1, True, 33, 22.6)
++(222, 1, True, 38, 23.9)
++(223, 1, True, 42, 27.2)
++(224, 2, True, 54, 33.7)
++(225, 2, True, 64, 52.5)
++(226, 2, True, 57, 40.2)
++(227, 1, True, 40, 24.8)
++(228, 1, True, 39, 23.6)
++(229, 1, True, 38, 32.6)
++(230, 1, True, 38, 31.2)
++(231, 0, True, 28, 26.4)
++(232, 1, True, 54, 40.9)
++(233, 0, False, 1000, 84.6)
++(234, 1, True, 53, 35.0)
++(235, 2, True, 45, 32.1)
++(236, 1, True, 35, 20.3)
++(237, 2, True, 61, 25.8)
++(238, 1, True, 25, 11.3)
++(239, 2, True, 48, 13.1)
++success 194 / 200 mean steps 71.755
+diff --git a/test_approach.py b/test_approach.py
+index 33858d2..76f32da 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -1,9 +1,10 @@
+ import sys, time, numpy as np
+ from env_client import make_env
+ from approach import GeneratedApproach
++OC=None
+ def run(seed, verbose=False):
+     env = make_env()
+-    obs, info = env.reset(seed=seed)
++    obs, info = env.reset(seed=seed, options=({'object_count': OC} if OC else None))
+     ap = GeneratedApproach(env.action_space, env.observation_space, {})
+     t = time.time(); ap.reset(obs, info)
+     ret = 0; steps = 0; term = False
+@@ -18,6 +19,7 @@ def run(seed, verbose=False):
+ if __name__ == "__main__":
+     from concurrent.futures import ThreadPoolExecutor
+     seeds = list(range(int(sys.argv[1]), int(sys.argv[2])))
++    if len(sys.argv) > 3: OC = int(sys.argv[3])
+     with ThreadPoolExecutor(8) as ex:
+         res = list(ex.map(run, seeds))
+     for r in res: print(r)

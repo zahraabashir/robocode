@@ -1,0 +1,19 @@
+diff --git a/approach.py b/approach.py
+index df89217..9db0b87 100644
+--- a/approach.py
++++ b/approach.py
+@@ -336,10 +336,12 @@ class GeneratedApproach:
+ 
+     def pick_trans_la(self, B, cands, err, rp):
+         best, bc = None, 1e18
+-        if any(c[1][3] == 't' and c[0] > 0.004 for c in cands):
++        raw = [c[0] if c[1][3] == 't' else (c[0] + 0.01) / 0.6 for c in cands]
++        rmax = max(raw) if raw else 0.0
++        if any(c[1][3] == 't' and c[0] >= 0.5 * rmax for c in cands):
+             cands = [c for c in cands if c[1][3] == 't']
+         for s, pr, dm in cands:
+-            if s <= 0.004:
++            if s <= 0.01 and s < rmax:
+                 continue
+             name, p, n, k, tq = pr
+             nw = B.dir_world(n)

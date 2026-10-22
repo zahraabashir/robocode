@@ -1,0 +1,90 @@
+diff --git a/final_regression.txt b/final_regression.txt
+index 41092b1..b7362c4 100644
+--- a/final_regression.txt
++++ b/final_regression.txt
+@@ -1,5 +1,10 @@
+-{"seed": 2, "count": 2, "success": true, "steps": 98, "seconds": 2.09, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
+-{"seed": 8, "count": 2, "success": true, "steps": 68, "seconds": 14.65, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
+-{"seed": 9, "count": 1, "success": true, "steps": 46, "seconds": 4.15, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
+-{"seed": 10, "count": 2, "success": true, "steps": 46, "seconds": 5.23, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
+-{"seed": 11, "count": 0, "success": true, "steps": 24, "seconds": 2.1, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
++{"seed": 2, "count": 2, "success": true, "steps": 98, "seconds": 2.57, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
++{"seed": 8, "count": 2, "success": true, "steps": 68, "seconds": 1.7, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
++{"seed": 9, "count": 1, "success": true, "steps": 46, "seconds": 0.95, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
++{"seed": 10, "count": 2, "success": true, "steps": 46, "seconds": 1.16, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
++{"seed": 11, "count": 0, "success": true, "steps": 24, "seconds": 0.59, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
++{"seed": 12, "count": 1, "success": true, "steps": 43, "seconds": 1.05, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
++{"seed": 13, "count": 2, "success": true, "steps": 63, "seconds": 1.51, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
++{"seed": 14, "count": 0, "success": true, "steps": 24, "seconds": 0.48, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
++{"seed": 45, "count": 2, "success": true, "steps": 93, "seconds": 2.56, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
++{"seed": 67, "count": 2, "success": true, "steps": 101, "seconds": 2.63, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
+diff --git a/probe_lift.py b/probe_lift.py
+new file mode 100644
+index 0000000..348a815
+--- /dev/null
++++ b/probe_lift.py
+@@ -0,0 +1,19 @@
++from env_client import make_env
++from approach import GeneratedApproach
++from kin import ik,fk
++import numpy as np
++E=make_env();s,i=E.reset(seed=2,options={'object_count':50});p=GeneratedApproach(E.action_space,E.observation_space,{});p.reset(s,i);r=p.robot
++qs=lambda s:np.array([s.get(r,'joint_'+str(j)) for j in range(1,8)])
++for t in range(200):
++ s,_,te,_,_=E.step(p.get_action(s))
++ if p.stall>=3 and p.phase=='lift':break
++q=qs(s);m,_=fk(q);base=np.array([s.get(r,'pos_base_x'),s.get(r,'pos_base_y')]);print('STUCK',t,p.obj,p.pos(s,p.obj),'q',q,'model',m,'base',base,'wrist',p.wrist,flush=True)
++for dz,dx,dy in [(v,0,0) for v in [.005,.01,.08,.12,.2]]+[(.1,dx,dy) for dx,dy in [(-.02,0),(.02,0),(0,-.02),(0,.02),(-.05,0),(0,-.05),(0,.05)]]:
++ q=qs(s);m,_=fk(q);goal=ik(.5,m[2]+dz);goal[6]=q[6];d=goal-q;scale=max(1,np.max(abs(d))/.2);a=np.zeros(11);a[3:10]=d/scale;a[0]=dx;a[1]=dy
++ s,_,te,_,_=E.step(a);change=np.max(abs(qs(s)-q));print('TRY',dz,dx,dy,'CHANGE',change,flush=True)
++ if change>1e-6:
++  for k in range(500):
++   s,_,te,_,_=E.step(p.get_action(s))
++   if te:break
++  print('END',te,k,p.phase,p.obj,p.stall,flush=True);break
++E.close()
+diff --git a/stress50_seed1.txt b/stress50_seed1.txt
+new file mode 100644
+index 0000000..2178a7c
+--- /dev/null
++++ b/stress50_seed1.txt
+@@ -0,0 +1,12 @@
++progress 0 above obstruction13:Kinematic3DCuboid 0 9 0 0 0.07
++progress 50 carry obstruction3:Kinematic3DCuboid 0 9 0 0 3.08
++progress 100 above obstruction4:Kinematic3DCuboid 2 9 0 0 5.47
++progress 150 grasp obstruction18:Kinematic3DCuboid 3 9 0 1 7.97
++progress 200 grasp obstruction1:Kinematic3DCuboid 4 9 0 0 10.27
++progress 250 lift obstruction7:Kinematic3DCuboid 5 9 0 0 12.66
++progress 300 lift obstruction7:Kinematic3DCuboid 5 9 0 0 15.18
++progress 350 lift obstruction7:Kinematic3DCuboid 6 10 0 0 17.69
++progress 400 lower obstruction18:Kinematic3DCuboid 8 10 0 0 20.36
++progress 450 lower obstruction18:Kinematic3DCuboid 8 10 0 0 23.12
++progress 500 release target_block:Kinematic3DCuboid 9 10 0 0 25.35
++{"seed": 1, "count": 50, "success": true, "steps": 501, "seconds": 25.35, "compute": 1.876, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
+diff --git a/stress50_seed2.txt b/stress50_seed2.txt
+new file mode 100644
+index 0000000..6b349c2
+--- /dev/null
++++ b/stress50_seed2.txt
+@@ -0,0 +1,21 @@
++progress 0 above obstruction43:Kinematic3DCuboid 0 7 0 0 0.07
++progress 50 lift obstruction43:Kinematic3DCuboid 0 7 20 1 1.79
++progress 100 lift obstruction43:Kinematic3DCuboid 0 7 70 1 2.21
++progress 150 lift obstruction43:Kinematic3DCuboid 0 7 120 1 2.63
++progress 200 lift obstruction43:Kinematic3DCuboid 0 7 170 1 3.06
++progress 250 lift obstruction43:Kinematic3DCuboid 0 7 220 1 3.5
++progress 300 lift obstruction43:Kinematic3DCuboid 0 7 270 1 3.9
++progress 350 lift obstruction43:Kinematic3DCuboid 0 7 320 1 4.25
++progress 400 lift obstruction43:Kinematic3DCuboid 0 7 370 1 4.7
++progress 450 lift obstruction43:Kinematic3DCuboid 0 7 420 1 5.18
++progress 500 lift obstruction43:Kinematic3DCuboid 0 7 470 1 5.68
++progress 550 lift obstruction43:Kinematic3DCuboid 0 7 520 1 6.19
++progress 600 lift obstruction43:Kinematic3DCuboid 0 7 570 1 6.62
++progress 650 lift obstruction43:Kinematic3DCuboid 0 7 620 1 6.97
++progress 700 lift obstruction43:Kinematic3DCuboid 0 7 670 1 7.32
++progress 750 lift obstruction43:Kinematic3DCuboid 0 7 720 1 7.69
++progress 800 lift obstruction43:Kinematic3DCuboid 0 7 770 1 8.04
++progress 850 lift obstruction43:Kinematic3DCuboid 0 7 820 1 8.41
++progress 900 lift obstruction43:Kinematic3DCuboid 0 7 870 1 8.79
++progress 950 lift obstruction43:Kinematic3DCuboid 0 7 920 1 9.18
++{"seed": 2, "count": 50, "success": false, "steps": 1000, "seconds": 9.56, "compute": 0.471, "phase": "lift", "obj": "obstruction43:Kinematic3DCuboid", "stall": 969, "attempt": 1}

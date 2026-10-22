@@ -1,0 +1,87 @@
+diff --git a/approach.py b/approach.py
+index fe0b8aa..9fa83a8 100644
+--- a/approach.py
++++ b/approach.py
+@@ -137,7 +137,15 @@ class GeneratedApproach:
+         if not (XMIN <= px <= XMAX) or py > YMAX:
+             return False
+         req = float(self._safe(np.array([px]), self._assembly(), obstacles)[0])
+-        return req <= py + 1e-6
++        if req > py + 1e-6:
++            return False
++        # avoid vacuuming neighbours: no other object near the gripper face
++        face = py - self.arm - self.gw
++        g0, g1 = px - self.gh / 2 - 0.015, px + self.gh / 2 + 0.015
++        for ox0, ox1, otop in obstacles:
++            if ox1 > g0 and ox0 < g1 and otop > face - 0.04:
++                return False
++        return True
+ 
+     def _d_options(self, r):
+         lo, hi = self._grasp_d(r)
+diff --git a/dbg3.py b/dbg3.py
+new file mode 100644
+index 0000000..c1149fd
+--- /dev/null
++++ b/dbg3.py
+@@ -0,0 +1,20 @@
++import sys, numpy as np
++from env_client import make_env
++import approach as A
++seed=int(sys.argv[1]); upto=int(sys.argv[2])
++env=make_env(); obs,info=env.reset(seed=seed)
++ap=A.GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++for t in range(upto):
++    obs,*_=env.step(ap.get_action(obs))
++robot, block, surface, obst = ap._parse(obs)
++rx,ry=A._g(obs,robot,'x'),A._g(obs,robot,'y')
++print("robot",rx,ry,"leg",ap.leg, ap.legs[ap.leg])
++for o in obst+[block]: print(o.name, np.round(A._rect(obs,o),4))
++leg=ap.legs[ap.leg]; name=leg[1]
++allr={o.name:A._rect(obs,o) for o in obst+[block]}
++r=allr[name]; held=(r[0]-rx,r[1]-rx,r[2]-ry)
++obstacles=[(q[0],q[1],q[3]) for n,q in allr.items() if n!=name]
++boxes=ap._assembly(held)
++X=np.linspace(rx-0.2,rx+0.3,11)
++print("held",np.round(held,4)); print("S",np.round(ap._safe(X,boxes,obstacles),3), "X", np.round(X,3))
++tx,ty=leg[2]; print("control", ap._control(rx,ry,tx,ty,boxes,obstacles))
+diff --git a/legeff.py b/legeff.py
+new file mode 100644
+index 0000000..2600812
+--- /dev/null
++++ b/legeff.py
+@@ -0,0 +1,21 @@
++import sys, math
++from env_client import make_env
++from approach import GeneratedApproach
++env = make_env(); tot_a=tot_i=0
++for seed in range(int(sys.argv[1]), int(sys.argv[2])):
++    ap = GeneratedApproach(env.action_space, env.observation_space, {})
++    obs, info = env.reset(seed=seed); ap.reset(obs, info)
++    r=obs.get_object_from_name('robot')
++    pos=(float(obs.get(r,'x')),float(obs.get(r,'y')))
++    ideal=[]
++    for L in ap.legs:
++        t = L[3] if L[0]=='pick' else L[2]
++        ideal.append(math.ceil(max(abs(t[0]-pos[0]),abs(t[1]-pos[1]))/0.05-1e-6)); pos=t
++    counts=[0]*len(ap.legs)
++    for _ in range(1000):
++        li=min(ap.leg,len(counts)-1); a=ap.get_action(obs); counts[li]+=1
++        obs,rr,te,tr,_=env.step(a)
++        if te: break
++    tot_a+=sum(counts); tot_i+=sum(ideal)
++    print(seed, "actual", counts, "ideal", ideal, flush=True)
++print("total actual", tot_a, "ideal", tot_i)
+diff --git a/res_300_600.txt b/res_300_600.txt
+new file mode 100644
+index 0000000..689a662
+--- /dev/null
++++ b/res_300_600.txt
+@@ -0,0 +1,7 @@
++FAIL seed 319 n_obj 2 leg 3
++FAIL seed 358 n_obj 2 leg 3
++FAIL seed 402 n_obj 2 leg 5
++FAIL seed 507 n_obj 2 leg 5
++FAIL seed 577 n_obj 1 leg 3
++FAIL seed 590 n_obj 1 leg 3
++solved 294/300  mean steps 31.6 max time 120.3s

@@ -1,0 +1,34 @@
+diff --git a/approach.py b/approach.py
+index 17183db..1f76749 100644
+--- a/approach.py
++++ b/approach.py
+@@ -491,19 +491,25 @@ class GeneratedApproach:
+                     v = B.pos(c) - sc.opos[r]
+                     return np.arctan2(v[1], v[0])
+         hth = self.home_th[i]
+-        if holding:
++        fs = None
++        if not holding:
++            for idx in range(k, len(steps)):
++                if steps[idx][1] == SAMP:
++                    fs = idx
++                    break
++        if holding or fs is not None:
+             # will a send be possible facing home-ish heading later?
+             last = len(steps)
+             ok = False
+-            for idx in range(k, last):
++            for idx in range(k if fs is None else fs, last):
+                 q = self._other_pos_at(i, idx - k + 1, state)
+                 if self._los_clear(B.pos(steps[idx][0]), q):
+                     ok = True
+                     break
+-            if not ok and self._los_clear(p, self._other_pos_at(i, 0, state)):
++            if not ok and fs is None and self._los_clear(p, self._other_pos_at(i, 0, state)):
+                 ok = True
+             if not ok:
+-                v = p - sc.lpos
++                v = (p if fs is None else B.pos(steps[fs][0])) - sc.lpos
+                 away = np.arctan2(v[1], v[0])
+                 best, bc = None, None
+                 for c in np.linspace(-np.radians(60), np.radians(60), 25):

@@ -1,0 +1,394 @@
+[
+  {
+    "id": "C001",
+    "commit": "b1acbfddd4add04850dd25a3bdfb161ced3a04b6",
+    "parents": [],
+    "date": "2026-09-30T11:38:46+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".claude/settings.json",
+      ".claude/validate_sandbox.py",
+      ".gitignore",
+      "CLAUDE.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_b1acbfd.diff",
+    "diff_sha256": "6132ac5cfa61b5209a5867b2db323e7397b54b91b3403bd341e9d9cf27780168",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "832972742c7dcd83e426eaaf8620ff260cb911ab",
+    "parents": [
+      "b1acbfddd4add04850dd25a3bdfb161ced3a04b6"
+    ],
+    "date": "2026-09-30T11:41:08+02:00",
+    "title": "Initial state-machine approach: clear obstructions, place block",
+    "files": [
+      "approach.py",
+      "explore.py",
+      "probe.py",
+      "probe2.py",
+      "probe3.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C002_8329727.diff",
+    "diff_sha256": "f96b499e2ca971c176879ebeb116486b04138ec3c21be65172cd5e1641843015",
+    "events": [
+      {
+        "event": "E0054",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "640aa26e52be22074d7b6adb512fdf310fe2cd9ced1a790ab72c5c18e3f6bb7b",
+    "version": "evidence/versions/C002_8329727_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "ca413ab4ae17b2090bf33b956f44813a4bdccabe",
+    "parents": [
+      "832972742c7dcd83e426eaaf8620ff260cb911ab"
+    ],
+    "date": "2026-09-30T11:42:08+02:00",
+    "title": "Clamp grasp x to reachable range",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C003_ca413ab.diff",
+    "diff_sha256": "fc5838858f0c5e4172f6044c1d0946a00444679feddf4f6913ff301ba3fb2da4",
+    "events": [
+      {
+        "event": "E0071",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "eef1b29d169682f65287b0a9fee0c3ef02e57cb4aa88905c45d1def230ee498a",
+    "version": "evidence/versions/C003_ca413ab_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C004",
+    "commit": "e4c016a8afbda5eb20852a1787812d226e839d6f",
+    "parents": [
+      "ca413ab4ae17b2090bf33b956f44813a4bdccabe"
+    ],
+    "date": "2026-09-30T11:47:38+02:00",
+    "title": "Rewrite: clearance-profile motion, placement planning, reachable grasp offsets",
+    "files": [
+      "approach.py",
+      "dbg.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C004_e4c016a.diff",
+    "diff_sha256": "813c66d5795bd01046a4f36a44935b4c59a0a6b825e5b5ebce1cb0f901d21f89",
+    "events": [
+      {
+        "event": "E0094",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "97671c5e1af6b63dc98a1e2240ac8e54f12ecb155ccfbca3dd6171e32badfe3d",
+    "version": "evidence/versions/C004_e4c016a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "9bb174d296bfcd692fd761fd121883efe4f5fe29",
+    "parents": [
+      "e4c016a8afbda5eb20852a1787812d226e839d6f"
+    ],
+    "date": "2026-09-30T11:48:55+02:00",
+    "title": "Clearance planner approach: 100/100, 35.9 steps",
+    "files": [
+      "dbg.py"
+    ],
+    "file_roles": [
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C005_9bb174d.diff",
+    "diff_sha256": "6dd0a2c3515cca4d22d96b020f1d1ac8fbbea6210e22fe5c86aac7a7f5ada0c1",
+    "events": [
+      {
+        "event": "E0108",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C006",
+    "commit": "6715e9125d9abd81f42816e0fe7961e35a298ce3",
+    "parents": [
+      "9bb174d296bfcd692fd761fd121883efe4f5fe29"
+    ],
+    "date": "2026-09-30T11:58:42+02:00",
+    "title": "Feasibility-aware target ordering, drop-spot fallbacks",
+    "files": [
+      "approach.py",
+      "dbg.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C006_6715e91.diff",
+    "diff_sha256": "74bd349822fbf93bb1b781d3b094d5f1470db685d436b78fc03d667319b0bb28",
+    "events": [
+      {
+        "event": "E0155",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "73d94457f2dd118c7fe552d1e7e8a66538fbc5e32cc8916b1fbc993e489dd0b3",
+    "version": "evidence/versions/C006_6715e91_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "eefe6f42405db31c3ea394ca5cbbaec7cbc7767a",
+    "parents": [
+      "6715e9125d9abd81f42816e0fe7961e35a298ce3"
+    ],
+    "date": "2026-09-30T12:18:48+02:00",
+    "title": "Drop spots must not block remaining grasps",
+    "files": [
+      "approach.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C007_eefe6f4.diff",
+    "diff_sha256": "ef8668eb4f5f315ab7d4cbbfdc5690b98684689ccd224f8d96ab394e8add6df1",
+    "events": [
+      {
+        "event": "E0234",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "9a2242deb3a5c8a04a1957d5a13d2261d1a3a90213a49d1c2f4ba8a7c3449b0b",
+    "version": "evidence/versions/C007_eefe6f4_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C008",
+    "commit": "13cd3880c4d235f80f8ea943a39986856cfa83c6",
+    "parents": [
+      "eefe6f42405db31c3ea394ca5cbbaec7cbc7767a"
+    ],
+    "date": "2026-09-30T12:40:53+02:00",
+    "title": "Grasp on landing step, release on final carry step; 100/100 at 33.5 steps",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C008_13cd388.diff",
+    "diff_sha256": "23063869ccd24bcaab2ed5a3092260bd740d5de7caf5d0198fdddd730cb522f5",
+    "events": [
+      {
+        "event": "E0339",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "578d7906b5abb320b9d33aa2603381d8802881ec3f8ffba15a0f5522787d9bd7",
+    "version": "evidence/versions/C008_13cd388_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C009",
+    "commit": "2b642b7729eb1b028fda64de53090686da7f6a6b",
+    "parents": [
+      "13cd3880c4d235f80f8ea943a39986856cfa83c6"
+    ],
+    "date": "2026-09-30T12:47:18+02:00",
+    "title": "Cost-model drop spots incl. elevated drops",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C009_2b642b7.diff",
+    "diff_sha256": "2bef67be44d845c93c30bd52f48ac87870e1375a6fd91ce61a73be314f2fdb74",
+    "events": [
+      {
+        "event": "E0356",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "794dd0c02a07715dc8b2d3425fc14cc9e49f3d61d5893a1e9d5893605c67db04",
+    "version": "evidence/versions/C009_2b642b7_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C010",
+    "commit": "0b90e154b04212e9848f8d1bff0429fd9bce1982",
+    "parents": [
+      "2b642b7729eb1b028fda64de53090686da7f6a6b"
+    ],
+    "date": "2026-09-30T12:48:38+02:00",
+    "title": "Always include block carry cost in drop choice",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C010_0b90e15.diff",
+    "diff_sha256": "40afbc3d37f6b9515ef175e5eebb03b1805fce8697b4c3c4590fc0fce4bdfd55",
+    "events": [
+      {
+        "event": "E0367",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "7d38ba1252e1560d57c122699532b66af9719c42be0fb0b6cea13d48804a1111",
+    "version": "evidence/versions/C010_0b90e15_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C011",
+    "commit": "93444da744352b04623ac1724e5fbe3457f81c4a",
+    "parents": [
+      "0b90e154b04212e9848f8d1bff0429fd9bce1982"
+    ],
+    "date": "2026-09-30T12:51:48+02:00",
+    "title": "Plan search over removal orders and block staging with cost model",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C011_93444da.diff",
+    "diff_sha256": "1f5ec21ba46c5efab82f450803d89c64b6430ad6cab266d9e8cfc984f5116cdb",
+    "events": [
+      {
+        "event": "E0396",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a6f9d4d89381b7fd62c4c9676fbd6e82b7261eab965c86a565e6d2c98a0696c2",
+    "version": "evidence/versions/C011_93444da_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C012",
+    "commit": "576514bdee11d070ede0822d52548cc4025ddd34",
+    "parents": [
+      "93444da744352b04623ac1724e5fbe3457f81c4a"
+    ],
+    "date": "2026-09-30T13:00:52+02:00",
+    "title": "Keep pick target as obstacle with tiny margin (fix diagonal collisions)",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C012_576514b.diff",
+    "diff_sha256": "26c4d88922f2ab2a55552f769ac5798da509181dfc59d95825da691a6b145667",
+    "events": [
+      {
+        "event": "E0453",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6cd52dbe62e3c37d0b19341b84b9916501fc0a843e1c6641bed139159255086b",
+    "version": "evidence/versions/C012_576514b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C013",
+    "commit": "f86a47c281a710c2caf40d12354deb8bb1eb71b6",
+    "parents": [
+      "576514bdee11d070ede0822d52548cc4025ddd34"
+    ],
+    "date": "2026-09-30T13:12:36+02:00",
+    "title": "Tilted-arm grasps for objects beyond vertical reach near walls",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C013_f86a47c.diff",
+    "diff_sha256": "7ae79101b5f0db4d39e7505b4b057da73cd15bd3384649fbcc0975798bc9b688",
+    "events": [
+      {
+        "event": "E0501",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "12e3b21f76c9db8ecfa5949f9310642845861b0189548d84038fc0a6421fa4c6",
+    "version": "evidence/versions/C013_f86a47c_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C014",
+    "commit": "4f4bd2eae931a263272d051c158682fa46f330d8",
+    "parents": [
+      "f86a47c281a710c2caf40d12354deb8bb1eb71b6"
+    ],
+    "date": "2026-09-30T13:25:50+02:00",
+    "title": "Add debug/probe scripts; tilt support verified on regression sets",
+    "files": [
+      "counts.py",
+      "dbg2.py",
+      "dbg3.py",
+      "dbg4.py",
+      "lb.py",
+      "ping.py",
+      "probe4.py",
+      "probe5.py",
+      "timing.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C014_4f4bd2e.diff",
+    "diff_sha256": "7bdca12e478dc34f4aca90a9eb91516cbd5b2e7f85efea97945844d56dfc6354",
+    "events": [
+      {
+        "event": "E0553",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  }
+]

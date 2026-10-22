@@ -1,0 +1,35 @@
+diff --git a/approach.py b/approach.py
+index 66958e5..4cdd5d7 100644
+--- a/approach.py
++++ b/approach.py
+@@ -36,13 +36,18 @@ class GeneratedApproach:
+         self.sample_jobs = [set(), set()]
+         for soil in (False, True):
+             choices=[]
++            land=self._get(state,"lander")[0]
++            lq=(state.get(land,"x"),state.get(land,"y"))
+             for o in self._get(state,"sample"):
+                 if bool(state.get(o,"is_soil")>.5) != soil: continue
+                 x,y=state.get(o,"x"),state.get(o,"y")
+                 owner=0 if x>=0 else 1
+-                choices.append((math.dist(self.home[owner],(x,y)),owner,o.name))
++                # Samples squeezed between the large lander and southwest arena
++                # corner are not drive-reachable; prefer either of the other two.
++                trapped = owner==1 and math.dist((x,y),lq)<.60 and y<lq[1]+.05
++                choices.append((int(trapped),math.dist(self.home[owner],(x,y)),owner,o.name))
+             if choices:
+-                _,owner,name=min(choices)
++                _,_,owner,name=min(choices)
+                 self.sample_jobs[owner].add(soil)
+ 
+     def _radio_points(self,s,i):
+@@ -200,7 +205,8 @@ class GeneratedApproach:
+                 soil=kind; break
+         if soil is None: return ("home",self.home[i])
+         matching=[o for o in self._get(s,"sample") if bool(s.get(o,"is_soil")>.5)==soil]
+-        samples=[o for o in matching if s.get(o,"received_analysis")<.5]
++        samples=[o for o in matching if s.get(o,"received_analysis")<.5 and
++                 ((s.get(o,"x")>=0) == (i==0))]
+         if samples:
+             candidates=[]
+             for o in samples:

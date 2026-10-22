@@ -1,0 +1,149 @@
+diff --git a/approach.py b/approach.py
+index 9bb4685..779e341 100644
+--- a/approach.py
++++ b/approach.py
+@@ -50,6 +50,19 @@ class Geom:
+         self.cq = np.array([c[0] for c in cands], dtype=float)
+         self.cn = np.array([c[1] for c in cands], dtype=float)
+ 
++    def closest(self, p):
++        best = None
++        for (x0, x1, y0, y1) in self.rects:
++            q = np.array([min(max(p[0], x0), x1), min(max(p[1], y0), y1)])
++            d = np.linalg.norm(p - q)
++            if d < 1e-9:
++                continue
++            if best is None or d < best[0]:
++                best = (d, q, (p - q) / d)
++        if best is None:
++            return None, None
++        return best[1], best[2]
++
+     def dist_body(self, P):
+         """min distance from body-frame points P (N,2) to T (0 inside)."""
+         best = None
+@@ -72,11 +85,15 @@ class GeneratedApproach:
+         self.plan = []
+         self.last_pose = None
+         self.margin = (0.012, 0.03, 0.07)
++        self.push_count = 0
+ 
+     ANG_W = 2.2
+     ANGS = (-35, -18, 0, 18, 35)
+     STANDOFF = 0.04
+     FRIC = 0.85
++    NSTEPS = 150
++    USE_CONTACT = True
++    REPLAN_K = 0
+ 
+     # ---------------- helpers ----------------
+     def err(self, ref, th, goal):
+@@ -200,11 +217,23 @@ class GeneratedApproach:
+         E0 = float(self.err(pose[0:2], pose[2], goal))
+ 
+         angs = np.deg2rad(list(self.ANGS))
+-        Q = np.repeat(g.cq, len(angs), 0)
+-        Nn = np.repeat(g.cn, len(angs), 0)
+-        A = np.tile(angs, len(g.cq))
+-        K = len(Q)
+         R0 = rot(pose[2])
++        cq, cn = g.cq, g.cn
++        ncont = 0
++        rb0 = (robot - pose[0:2]) @ R0
++        if self.USE_CONTACT and g.dist_body(rb0[None])[0] < RAD + 0.012:
++            q, n = g.closest(rb0)
++            if q is not None:
++                cq = np.vstack([cq, q[None]])
++                cn = np.vstack([cn, n[None]])
++                ncont = 1
++        Q = np.repeat(cq, len(angs), 0)
++        Nn = np.repeat(cn, len(angs), 0)
++        A = np.tile(angs, len(cq))
++        K = len(Q)
++        is_cont = np.zeros(K, bool)
++        if ncont:
++            is_cont[-len(angs):] = True
+         # push direction in body frame (inward normal rotated), then world
+         inn = -Nn
+         ca, sa = np.cos(A), np.sin(A)
+@@ -223,11 +252,13 @@ class GeneratedApproach:
+         th = np.full(K, pose[2])
+         valid = np.ones(K, bool)
+         ds = 0.01
+-        nsteps = 150
++        nsteps = self.NSTEPS
+         best = (-np.inf, None)
+         # travel cost to each candidate start
+         standoff = self.STANDOFF
+-        pre = pose[0:2] + pb_body @ R0.T - uw * standoff
++        so = np.where(is_cont, 0.0, standoff)
++        pre = pose[0:2] + pb_body @ R0.T - uw * so[:, None]
++        pre[is_cont] = robot
+         travel = np.full(K, np.inf)
+         paths = [None] * K
+         self.build_nodes(pose)
+@@ -259,9 +290,10 @@ class GeneratedApproach:
+         pre_body = (pre - pose[0:2]) @ R0
+         pre_ok = g.dist_body(pre_body) > RAD + 0.015
+         pre_ok &= np.all((pre >= LO + 0.005) & (pre <= HI - 0.005), 1)
+-        valid &= pre_ok
++        valid &= pre_ok | is_cont
+         # lower bound travel (straight line) for pruning
+         lb = np.max(np.abs(pre - start), 1) / AMAX + len(prefix)
++        lb[is_cont] = 0.0
+ 
+         cw = pose[0:2] + g.corners @ R0.T
+         wlo = np.minimum(0.03, cw.min(0) - 0.01)
+@@ -289,7 +321,7 @@ class GeneratedApproach:
+             cx = ref[:, 0][:, None] + c[:, None] * g.corners[None, :, 0] - sn[:, None] * g.corners[None, :, 1]
+             cy = ref[:, 1][:, None] + sn[:, None] * g.corners[None, :, 0] + c[:, None] * g.corners[None, :, 1]
+             valid &= (cx.min(1) > wlo[0]) & (cx.max(1) < whi[0]) & (cy.min(1) > wlo[1]) & (cy.max(1) < whi[1])
+-            pw = pre + uw * (standoff + k * ds)
++            pw = pre + uw * (so[:, None] + k * ds)
+             valid &= np.all((pw >= LO + 0.005) & (pw <= HI - 0.005), 1)
+             if not valid.any():
+                 break
+@@ -308,7 +340,10 @@ class GeneratedApproach:
+                 break
+             if self.MODE != 'rate_old' and results_S[i] <= best_rate:
+                 break
+-            path, cost = self.nav_path(pose, start, pre[i])
++            if is_cont[i]:
++                path, cost = [], -len(prefix)
++            else:
++                path, cost = self.nav_path(pose, start, pre[i])
+             if path is None:
+                 continue
+             rate = self.score(E0, results_E[i], cost + len(prefix) + push_steps[i])
+@@ -317,7 +352,7 @@ class GeneratedApproach:
+         if best_i is None:
+             return None
+         i = best_i
+-        return dict(path=prefix + best_path, u=uw[i], L=results_len[i] + standoff,
++        return dict(path=(prefix + best_path) if not is_cont[i] else [], u=uw[i], L=results_len[i] + so[i],
+                     Epred=results_E[i], E0=E0)
+ 
+     # ---------------- execution ----------------
+@@ -347,7 +382,11 @@ class GeneratedApproach:
+ 
+     def get_action(self, state):
+         s = np.asarray(state, dtype=float)
++        if (self.plan and self.REPLAN_K > 0 and self.plan[0][0] == 'push'
++                and self.push_count >= self.REPLAN_K and len(self.plan) > 2):
++            self.plan = []
+         if not self.plan:
++            self.push_count = 0
+             p = self.plan_push(s)
+             if p is None and max(self.margin) > 0:
+                 # predicted success but env did not terminate: tighten margins
+@@ -363,7 +402,9 @@ class GeneratedApproach:
+                 _, a = self.plan.pop(0)
+                 return self._safe(s, a)
+             self.plan = self.build_actions(s[16:18], p)
+-        _, a = self.plan.pop(0)
++        kind, a = self.plan.pop(0)
++        if kind == 'push':
++            self.push_count += 1
+         return self._safe(s, a)
+ 
+     def _safe(self, s, a):

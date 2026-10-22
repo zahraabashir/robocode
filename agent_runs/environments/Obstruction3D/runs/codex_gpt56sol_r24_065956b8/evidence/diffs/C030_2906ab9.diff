@@ -1,0 +1,18 @@
+diff --git a/probe_grasp.py b/probe_grasp.py
+index 20ea575..12a0094 100644
+--- a/probe_grasp.py
++++ b/probe_grasp.py
+@@ -173,9 +173,12 @@ def exact_sequence(seed=0):
+     actions = []
+     for k in range(3):
+         a = np.zeros(11, dtype=np.float32)
++        # Predicted current values are enough while constructing this fixed
++        # sequence: x needs at most one move, y may need two bounded moves.
+         if k == 0:
+             a[0] = np.clip(block0[0] - 0.33598166704177856, -0.2, 0.0)
+-            a[1] = np.clip(block0[1] - ss["robot"]["pos_base_y"], -0.2, 0.2)
++        if k < 2:
++            a[1] = np.clip(block0[1] - (0.0 if k == 0 else np.clip(block0[1], -0.2, 0.2)), -0.2, 0.2)
+         a[4] = 0.2
+         a[6] = 0.2 if k == 0 else 0.0
+         a[8] = 0.2 if k < 2 else 0.0

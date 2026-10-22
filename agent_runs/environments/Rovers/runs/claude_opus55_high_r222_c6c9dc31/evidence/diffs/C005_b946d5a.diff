@@ -1,0 +1,131 @@
+diff --git a/approach.py b/approach.py
+index dc5c0ff..5ef40f3 100644
+--- a/approach.py
++++ b/approach.py
+@@ -23,6 +23,8 @@ LANDER_RANGE = 3.965
+ ROVER_BLOCK_R = 0.26
+ SAMPLE_R = 0.235
+ LOS_MARGIN = 0.012
++OBJ_RANGE_LIB = 2.02
++NEAR_MARGIN = 0.03
+ HOME_R = 0.235
+ HOME_THETA = {"rover0": math.pi, "rover1": 0.0}
+ 
+@@ -249,14 +251,23 @@ class GeneratedApproach:
+         badv = np.zeros(X.shape, bool)
+         for (bx, by) in self.bad_view[r]:
+             badv |= np.hypot(X - bx, Y - by) < 0.04
++        held0 = set(ob.name for ob in w.objectives if g(ob, "have_image_" + r) > 0.5)
++        odist = {}
++        ovis_lib = {}
++        img_obj = {}
+         for ob in w.objectives:
+             ox, oy = g(ob, "x"), g(ob, "y")
+             d = np.hypot(CX - ox, CY - oy)
+             vis = (d <= OBJ_RANGE) & free & ~badv
++            vlib = d <= OBJ_RANGE_LIB
+             for (px, py, phx, phy) in pillars:
+                 vis &= ~seg_hits_box(CX, CY, ox, oy, px, py, phx, phy)
++                vlib &= ~seg_hits_box(CX, CY, ox, oy, px, py, phx - LOS_MARGIN - 0.004, phy - LOS_MARGIN - 0.004)
++            odist[ob.name] = d
++            ovis_lib[ob.name] = vlib
+             vany |= vis
+             if ob in need_img and vis.any():
++                img_obj[len(regions)] = ob.name
+                 regions.append(("img", vis)); names.append(("img", ob.name))
+         for kind in need_kind:
+             soil = 1.0 if kind == "soil" else 0.0
+@@ -295,10 +306,31 @@ class GeneratedApproach:
+         seeds = {}
+         start_maps = self._propagate(s0U, s0C, free, vany)
+ 
+-        def op_maps(M, j):
++        reg_cache = {}
++
++        def img_region(j, S):
++            imask = 0
++            for i in img_obj:
++                if S >> i & 1:
++                    imask |= 1 << i
++            key = (j, imask)
++            if key in reg_cache:
++                return reg_cache[key]
++            held = set(held0) | set(img_obj[i] for i in img_obj if imask >> i & 1)
++            me = img_obj[j]
++            reg = regions[j][1].copy()
++            for ob in w.objectives:
++                if ob.name == me or ob.name in held:
++                    continue
++                reg &= ~(ovis_lib[ob.name] & (odist[ob.name] <= odist[me] + NEAR_MARGIN))
++            reg_cache[key] = reg
++            return reg
++
++        def op_maps(M, j, S=0):
+             TU, TC, AU, AC = M
+             kind, reg = regions[j]
+             if kind == "img":
++                reg = img_region(j, S)
+                 return np.where(reg, AC, INF), np.full(X.shape, INF, np.int32)
+             return np.where(reg, AU, INF), np.where(reg, AC, INF)
+ 
+@@ -322,7 +354,7 @@ class GeneratedApproach:
+                     for k in range(n):
+                         if S >> k & 1:
+                             continue
+-                        nU, nC = op_maps(M, k)
++                        nU, nC = op_maps(M, k, S)
+                         key = (S | 1 << k, k)
+                         if key in seeds:
+                             oU, oC = seeds[key]
+@@ -356,7 +388,7 @@ class GeneratedApproach:
+                 continue
+             if S not in final or v < final[S][0]:
+                 final[S] = (v, j, extra)
+-        res = dict(X=X, Y=Y, free=free, vany=vany, regions=regions, names=names,
++        res = dict(img_obj=img_obj, X=X, Y=Y, free=free, vany=vany, regions=regions, names=names,
+                    maps=maps, seeds=seeds, start_maps=start_maps, s0=(s0U, s0C),
+                    final=final, homereg=homereg, send=send, must_send=must_send, r=r)
+         res["final_any_empty"] = 0 if 0 in final else (min(final, key=lambda s: final[s][0]) if final else None)
+@@ -464,7 +496,7 @@ class GeneratedApproach:
+             if found is None:
+                 raise RuntimeError("pred not found")
+             pj, Mp, Lp = found
+-            c, t, L = self._arrive(Mp, c, t, Lp, "image" if kind == "img" else "sample", vany, free, steps)
++            c, t, L = self._arrive(Mp, c, t, Lp, ("image:" + res["img_obj"][curj]) if kind == "img" else "sample", vany, free, steps)
+             curS, curj = prevS, pj
+         # back to start
+         sU, sC = res["s0"]
+@@ -503,7 +535,7 @@ class GeneratedApproach:
+                 op = "drop"
+             dx = float(np.clip(tx - x, -0.2, 0.2)); dy = float(np.clip(ty - y, -0.2, 0.2))
+             dth = float(np.clip(wrap(self.home_theta[r] - th), -0.4, 0.4))
+-            act[4 * k:4 * k + 4] = [dx, dy, dth, SEL[op]]
++            act[4 * k:4 * k + 4] = [dx, dy, dth, SEL[op.split(":")[0]]]
+             self.expect[r] = (x + dx, y + dy, op, self._snapshot(state, r))
+         self.t += 1
+         return act
+@@ -529,6 +561,12 @@ class GeneratedApproach:
+             if op == "calibrate" and cal < 0.5:
+                 self.bad_view[r].append((x, y))
+                 return True
++            if op.startswith("image:"):
++                tgt = [ob for ob in self.w.objectives if ob.name == op[6:]][0]
++                if self._get(state, tgt, "have_image_" + r) < 0.5:
++                    if imgs <= snap[2]:
++                        self.bad_view[r].append((x, y))
++                    return True
+             if op == "image" and imgs <= snap[2]:
+                 self.bad_view[r].append((x, y))
+                 return True
+diff --git a/dbg.py b/dbg.py
+index 1a4a40e..271429a 100644
+--- a/dbg.py
++++ b/dbg.py
+@@ -20,3 +20,7 @@ steps=0; done=False
+ while not done and steps<int(sys.argv[2]) if len(sys.argv)>2 else 60:
+     a=ap.get_action(obs); obs,r,term,trunc,info=env.step(a); steps+=1; done=term
+ print('steps',steps,term)
++T=lambda n: env.observation_space.get_type(n)
++for t in ['rover','objective','sample']:
++    for o in obs.get_objects(T(t)):
++        print(o.name,[round(float(obs.get(o,f)),2) for f in env.observation_space.type_features[T(t)]])

@@ -1,0 +1,70 @@
+diff --git a/approach.py b/approach.py
+index a09d302..c49860e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -1,21 +1,38 @@
+ import numpy as np
+-from kin import ik, Q0
++from kin import ik
+ 
+ class GeneratedApproach:
+     def __init__(self, action_space, observation_space, primitives):
+         self.action_space=action_space
+         self.observation_space=observation_space
+     def reset(self,state,info):
+-        self.t=0
+         self.robot=state.get_objects(self.observation_space.get_type('Kinematic3DRobot'))[0]
+         self.block=state.get_object_from_name('target_block')
++        self.region=state.get_object_from_name('target_region')
++        self.phase='above';self.t=0;self.stall=0
++    def pos(self,state,obj):
++        return np.array([state.get(obj,'pose_'+f) for f in 'xyz'])
+     def get_action(self,state):
+-        self.t+=1;r=self.robot
+-        x=state.get(self.block,'pose_x');y=state.get(self.block,'pose_y')
+-        z=max(.112,.25-max(0,self.t-10)*.002)
+-        q=ik(x-state.get(r,'pos_base_x'),z)
+-        a=np.zeros(11,dtype=np.float32)
+-        a[1]=y-.001-state.get(r,'pos_base_y')
+-        a[3:10]=q-np.array([state.get(r,'joint_'+str(i)) for i in range(1,8)])
+-        a[10]=-1 if self.t>=10 else 0
++        self.t+=1;r=self.robot;b=self.block
++        bp=self.pos(state,b);rp=self.pos(state,self.region)
++        qnow=np.array([state.get(r,'joint_'+str(i)) for i in range(1,8)])
++        held=state.get(r,'grasp_active')>0
++        if held and self.phase in ['above','grasp']: self.phase='lift'
++        if self.phase=='above':dest=bp+[0,0,.18];grip=0
++        elif self.phase=='grasp':dest=bp+[0,0,.052];grip=-1
++        elif self.phase=='lift':dest=np.array([bp[0],bp[1],.30]);grip=0
++        elif self.phase=='carry':dest=np.array([rp[0],rp[1],.30]);grip=0
++        elif self.phase=='lower':dest=np.array([rp[0],rp[1],rp[2]+state.get(self.region,'half_extent_z')+state.get(b,'half_extent_z')+.002]);grip=0
++        else:dest=bp;grip=1
++        if held:
++            from kin import fk
++            model,_=fk(qnow)
++            model+=np.array([state.get(r,'pos_base_x')+.12,state.get(r,'pos_base_y'),0])
++            dest=dest+model-bp
++        q=ik(dest[0]-state.get(r,'pos_base_x')-.12,dest[2])
++        by=dest[1]-.001
++        err=max(np.max(np.abs(q-qnow)),abs(by-state.get(r,'pos_base_y')))
++        if err<.002:
++            self.phase={'above':'grasp','grasp':'grasp','lift':'carry','carry':'lower','lower':'release','release':'release'}[self.phase]
++        a=np.zeros(11,dtype=np.float32);a[1]=by-state.get(r,'pos_base_y');a[3:10]=q-qnow;a[10]=grip
+         return np.clip(a,self.action_space.low,self.action_space.high)
+diff --git a/test_approach.py b/test_approach.py
+new file mode 100644
+index 0000000..89889d9
+--- /dev/null
++++ b/test_approach.py
+@@ -0,0 +1,11 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import time,sys
++for seed in map(int,sys.argv[1:] or ['0','1','2']):
++ E=make_env();s,info=E.reset(seed=seed);p=GeneratedApproach(E.action_space,E.observation_space,{});p.reset(s,info);start=time.monotonic();last=None
++ for t in range(E.max_steps):
++  a=p.get_action(s);s,r,term,trunc,inf=E.step(a)
++  if p.phase!=last:
++   print(seed,t,p.phase,'block',p.pos(s,p.block).round(3),'held',s.get(p.robot,'grasp_active'),flush=True);last=p.phase
++  if term or trunc:break
++ print('RESULT',seed,info,t+1,term,round(time.monotonic()-start,2),'phase',p.phase,flush=True);E.close()

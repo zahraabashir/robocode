@@ -1,0 +1,134 @@
+diff --git a/approach.py b/approach.py
+index 8242f36..a6e92f9 100644
+--- a/approach.py
++++ b/approach.py
+@@ -111,9 +111,58 @@ class GeneratedApproach:
+                     compact[-1] = p
+                     continue
+             compact.append(p)
+-        compact.append(goal)
++        if not self._blocked(s, goal, margin=0.105):
++            compact.append(goal)
+         return compact
+ 
++    @staticmethod
++    def _ray_exit(origin, direction, rects):
++        intervals = []
++        for xmin, xmax, ymin, ymax in rects:
++            lo, hi = -1e30, 1e30
++            valid = True
++            for p, d, lower, upper in ((origin[0], direction[0], xmin, xmax),
++                                        (origin[1], direction[1], ymin, ymax)):
++                if abs(d) < 1e-10:
++                    if p < lower or p > upper:
++                        valid = False
++                        break
++                else:
++                    a, b = (lower - p) / d, (upper - p) / d
++                    lo, hi = max(lo, min(a, b)), min(hi, max(a, b))
++            if valid and hi >= max(0.0, lo):
++                intervals.append((max(0.0, lo), hi))
++        intervals.sort()
++        end = 0.0
++        for lo, hi in intervals:
++            if lo <= end + 1e-7:
++                end = max(end, hi)
++        return end
++
++    def _translation_setup(self, s, delta_world):
++        """Choose an accessible force ray through the exact polygon centroid."""
++        w, lh, lv = float(s[12]), float(s[13]), float(s[14])
++        com_y = -(lh * w / 2.0 + lv * w + lv * lv / 2.0) / (lh + lv)
++        com = np.array([0.0, com_y])
++        base_angle = math.atan2(delta_world[1], delta_world[0])
++        rects = [(-lh / 2, lh / 2, -w, 0.0),
++                 (-w / 2, w / 2, -w - lv, -w)]
++        best = None
++        # Angled alternatives are important when the ideal behind point is at a wall.
++        for off in (0.0, 0.30, -0.30, 0.60, -0.60, 0.90, -0.90):
++            dw = np.array([math.cos(base_angle + off), math.sin(base_angle + off)])
++            dl = self._rot(-float(s[2])).dot(dw)
++            q = -dl
++            contact = com + q * self._ray_exit(com, q, rects)
++            stage = contact + q * 0.19
++            sw = self._local_to_world(s, stage)
++            accessible = (0.11 <= sw[0] <= 4.89 and 0.11 <= sw[1] <= 4.89)
++            if accessible:
++                score = float(np.dot(dw, delta_world / max(1e-9, np.linalg.norm(delta_world))))
++                if best is None or score > best[0]:
++                    best = (score, stage, dl)
++        return best
++
+     def _start_nav(self, s, target_local, next_mode, force_local):
+         self.path = self._plan(s, target_local)
+         self.next_mode = next_mode
+@@ -126,32 +175,23 @@ class GeneratedApproach:
+         if abs(angle_error) > 0.065:
+             self.pair_sign = 1.0 if angle_error > 0 else -1.0
+             self.pair_start_theta = float(s[2])
+-            self.pair_amount = min(0.22, abs(angle_error))
++            self.pair_amount = min(0.45, abs(angle_error))
+             target = [self.pair_sign * 0.40 * lh, -w - 0.20]
+             self._start_nav(s, target, "rot1", [0.0, 0.049])
+             return
+ 
+-        delta_local = self._rot(-float(s[2])).dot(s[29:31] - s[0:2])
+-        axis = 0 if abs(delta_local[0]) >= abs(delta_local[1]) else 1
+-        component = float(delta_local[axis])
+-        if abs(component) < 0.016:
+-            axis = 1 - axis
+-            component = float(delta_local[axis])
+-        sign = 1.0 if component >= 0 else -1.0
+-        self.translate_amount = max(0.0, min(0.28, abs(component) - 0.010))
++        delta_world = s[29:31] - s[0:2]
++        distance = float(np.linalg.norm(delta_world))
++        self.translate_amount = max(0.0, min(0.50, distance - 0.012))
+         if self.translate_amount <= 0.002:
+             self.mode = "idle"
+             return
+-        com_y = -(lh * w / 2.0 + lv * w + lv * lv / 2.0) / (lh + lv)
+-        if axis == 0:
+-            target = [-sign * (w / 2.0 + 0.20), com_y]
+-            force = [sign * 0.049, 0.0]
+-        elif sign > 0:
+-            target = [0.0, -w - lv - 0.20]
+-            force = [0.0, 0.049]
+-        else:
+-            target = [0.0, 0.20]
+-            force = [0.0, -0.049]
++        setup = self._translation_setup(s, delta_world)
++        if setup is None:
++            self.mode = "idle"
++            return
++        _, target, direction_local = setup
++        force = direction_local * 0.049
+         self._start_nav(s, target, "translate", force)
+ 
+     def _finish_push(self, next_after_retreat):
+@@ -192,7 +232,7 @@ class GeneratedApproach:
+         if self.mode == "rot1":
+             signed = self.pair_sign * self._wrap(float(s[2] - self.pair_start_theta))
+             self.push_count += 1
+-            if signed >= 0.45 * self.pair_amount or self.push_count >= 14:
++            if signed >= 0.45 * self.pair_amount or self.push_count >= 22:
+                 self._finish_push("rot2nav")
+                 return np.zeros(2, dtype=float)
+             return self._action(self._rot(float(s[2])).dot(self.force_local))
+@@ -200,7 +240,7 @@ class GeneratedApproach:
+         if self.mode == "rot2":
+             signed = self.pair_sign * self._wrap(float(s[2] - self.pair_start_theta))
+             self.push_count += 1
+-            if signed >= 0.92 * self.pair_amount or self.push_count >= 14:
++            if signed >= 0.92 * self.pair_amount or self.push_count >= 22:
+                 self._finish_push("idle")
+                 return np.zeros(2, dtype=float)
+             return self._action(self._rot(float(s[2])).dot(self.force_local))
+@@ -210,7 +250,7 @@ class GeneratedApproach:
+             direction = force_world / max(1e-9, np.linalg.norm(force_world))
+             progress = float(np.dot(s[0:2] - self.push_start[0:2], direction))
+             self.push_count += 1
+-            if progress >= self.translate_amount or self.push_count >= 18:
++            if progress >= self.translate_amount or self.push_count >= 28:
+                 self._finish_push("idle")
+                 return np.zeros(2, dtype=float)
+             remaining = self.translate_amount - max(0.0, progress)

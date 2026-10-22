@@ -1,0 +1,30 @@
+diff --git a/approach.py b/approach.py
+index e71cbd1..42bb90e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -100,7 +100,7 @@ class GeneratedApproach:
+         pd = float(np.linalg.norm(dp))
+ 
+         if self.mode == "choose":
+-            if abs(ae) > 0.075:
++            if abs(ae) > 0.11:
+                 self.turn_sign = 1.0 if ae > 0.0 else -1.0
+                 self.mode = "rot_far"
+                 side = -self.turn_sign
+@@ -178,9 +178,13 @@ class GeneratedApproach:
+             self.count += 1
+             moved = float(np.linalg.norm(obj - self.start_pose[:2]))
+             now_ae = abs(self._angle(goal_theta - theta))
+-            # Much of the stroke is free travel from the guaranteed-clear
+-            # staging radius to the actual outline (especially at the stem).
+-            if moved > 0.14 or self.count >= 48 or now_ae > 0.13:
++            # Once contact is established, keep following through in short
++            # closed-loop segments instead of paying to reacquire every time.
++            if moved > 0.14 and now_ae < 0.11 and pd > 0.05:
++                self.start_pose = np.array([obj[0], obj[1], theta])
++                self.push_dir = dp / max(pd, 1e-9)
++                self.count = 0
++            elif self.count >= 60 or now_ae > 0.13:
+                 self.mode = "move_retreat"
+             speed = 0.012 if pd < 0.12 else 0.025
+             return self._safe((com + self.push_dir * 0.20) - robot, speed)

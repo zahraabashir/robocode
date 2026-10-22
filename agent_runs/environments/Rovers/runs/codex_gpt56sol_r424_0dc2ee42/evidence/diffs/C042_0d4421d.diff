@@ -1,0 +1,19 @@
+diff --git a/approach.py b/approach.py
+index 8ac05b7..693aebc 100644
+--- a/approach.py
++++ b/approach.py
+@@ -157,12 +157,11 @@ class GeneratedApproach:
+                 q = pos(nb)
+                 if self._blocked(q, extra, margin):
+                     continue
+-                # Diagonal and axial commands both consume one environment step.
+-                nc = cost[cur] + 1.0
++                nc = cost[cur] + (1.414 if dx and dy else 1.0)
+                 if nc < cost.get(nb, 1e30):
+                     cost[nb] = nc
+                     came[nb] = cur
+-                    h = max(abs(nb[0] - g[0]), abs(nb[1] - g[1]))
++                    h = math.hypot(nb[0] - g[0], nb[1] - g[1])
+                     heapq.heappush(frontier, (nc + h, nb))
+         if found is None:
+             return None

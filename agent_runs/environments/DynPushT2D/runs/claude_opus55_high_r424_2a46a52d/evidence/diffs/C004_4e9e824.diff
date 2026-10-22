@@ -1,0 +1,146 @@
+diff --git a/approach.py b/approach.py
+index dd66245..99272e5 100644
+--- a/approach.py
++++ b/approach.py
+@@ -131,6 +131,12 @@ class GeneratedApproach:
+     def reset(self, state, info):
+         self.model = Model(state)
+         self.goal = np.array(state[29:32], float)
++        # env compares theta WITHOUT wrapping: allowed raw interval clipped to [-pi, pi)
++        tol = np.deg2rad(8)
++        lo = max(self.goal[2] - tol, -np.pi + 0.005)
++        hi = min(self.goal[2] + tol, np.pi - 0.005)
++        self.goal[2] = 0.5 * (lo + hi)
++        self.th_tol = 0.5 * (hi - lo)
+         self.plan = []  # list of actions
+         self.expect_block = None
+         self.nsteps = 0
+@@ -177,12 +183,12 @@ class GeneratedApproach:
+ 
+     def _solved(self, pos, th):
+         return (abs(pos[0] - self.goal[0]) < 0.03 and abs(pos[1] - self.goal[1]) < 0.03
+-                and abs(_wrap(th - self.goal[2])) < np.deg2rad(8))
++                and abs(_wrap(th - self.goal[2])) < self.th_tol)
+ 
+     def _cost_tight(self, pos, th):
+         ex = np.abs(pos[..., 0] - self.goal[0]) / 0.03
+         ey = np.abs(pos[..., 1] - self.goal[1]) / 0.03
+-        et = np.abs(_wrap(th - self.goal[2])) / np.deg2rad(8)
++        et = np.abs(_wrap(th - self.goal[2])) / self.th_tol
+         return np.maximum(np.maximum(ex, ey), et)
+ 
+     def _plan_push(self, obs):
+diff --git a/collect_term.py b/collect_term.py
+new file mode 100644
+index 0000000..bd7ae06
+--- /dev/null
++++ b/collect_term.py
+@@ -0,0 +1,15 @@
++import sys, numpy as np
++from multiprocessing import Pool
++from env_client import make_env
++import approach
++def run(seed):
++    env=make_env(); obs,info=env.reset(seed=seed)
++    ap=approach.GeneratedApproach(None,None,{}); ap.reset(obs,info)
++    rows=[]
++    for t in range(400):
++        a=ap.get_action(obs); obs,r,term,trunc,_=env.step(a)
++        rows.append(np.concatenate([obs,[float(term)]]))
++        if term: break
++    env.close(); return np.array(rows)
++with Pool(10) as p: res=p.map(run, range(300,340))
++np.save("term_data.npy", np.concatenate(res))
+diff --git a/fit_term.py b/fit_term.py
+new file mode 100644
+index 0000000..1192e5b
+--- /dev/null
++++ b/fit_term.py
+@@ -0,0 +1,19 @@
++import numpy as np
++from approach import geometry, _wrap
++D=np.load("term_data.npy"); term=D[:,-1]>0.5
++def pt(o, local):
++    c,s=np.cos(o[2]),np.sin(o[2]); return o[0:2]+np.array([c*local[0]-s*local[1], s*local[0]+c*local[1]])
++for name in ["ref","com","barcenter","bbox"]:
++    ok=[]
++    for o in D:
++        rects,com,k2=geometry(o); w,L,V=o[12],o[13],o[14]
++        loc={"ref":(0,0),"com":tuple(com),"barcenter":(0,-w/2),"bbox":(0,-(w+V)/2)}[name]
++        p=pt(o[0:3],loc); g=pt(o[29:32],loc)
++        e=np.abs(p-g); et=abs(_wrap(o[2]-o[31]))
++        ok.append((e[0]<0.03)&(e[1]<0.03)&(et<np.deg2rad(8)))
++    ok=np.array(ok)
++    print(name, "agree", (ok==term).mean(), "pred_T_actual_F", (ok&~term).sum(), "pred_F_actual_T", (~ok&term).sum(), "nterm", term.sum())
++E=np.stack([np.abs(D[:,0]-D[:,29]),np.abs(D[:,1]-D[:,30]),np.abs(_wrap(D[:,2]-D[:,31]))],1)
++okref=(E[:,0]<0.03)&(E[:,1]<0.03)&(E[:,2]<np.deg2rad(8))
++print("terminated errs max", E[term].max(0), "\n", np.round(E[term][:10],4))
++print("ref-ok not term errs min", E[okref&~term].min(0)); print(np.round(E[okref&~term][::20],4))
+diff --git a/seq_term.py b/seq_term.py
+new file mode 100644
+index 0000000..949fc81
+--- /dev/null
++++ b/seq_term.py
+@@ -0,0 +1,25 @@
++import numpy as np
++from approach import Model, _wrap
++D=np.load("term_data.npy"); term=D[:,-1]>0.5
++E=np.stack([np.abs(D[:,0]-D[:,29]),np.abs(D[:,1]-D[:,30]),np.abs(_wrap(D[:,2]-D[:,31]))],1)
++okref=(E[:,0]<0.03)&(E[:,1]<0.03)&(E[:,2]<np.deg2rad(8))
++# episode boundaries: goal change
++ep=np.concatenate([[0],np.cumsum(np.any(np.abs(np.diff(D[:,29:32],axis=0))>1e-9,axis=1))])
++for e in range(8):
++    idx=np.where(ep==e)[0]
++    first=idx[okref[idx]]
++    if len(first)==0: continue
++    i0=first[0]
++    for i in range(max(idx[0],i0-2), min(idx[-1]+1, i0+6)):
++        m=Model(D[i]); d=m.world_dist(D[i][None,0:2],np.array([D[i][2]]),D[i][None,16:18])[0]
++        print(e,i-idx[0],np.round(E[i],4),okref[i],term[i],"robdist %.3f"%d, "blkmove", np.round(D[i,0:3]-D[i-1,0:3],4))
++    print()
++print("stuck candidates")
++for e in range(ep.max()+1):
++    idx=np.where(ep==e)[0]
++    if not term[idx].any():
++        i=idx[-1]; print(e, D[i,0:3], D[i,29:32])
++# raw theta check
++raw=np.abs(D[:,2]-D[:,31])
++prev_ok=np.concatenate([[False],okref[:-1]])
++print("term & raw>8deg:", (term & (np.concatenate([[9],raw[:-1]])>np.deg2rad(8))).sum())
+diff --git a/term_data.npy b/term_data.npy
+new file mode 100644
+index 0000000..2157de8
+Binary files /dev/null and b/term_data.npy differ
+diff --git a/trace.py b/trace.py
+new file mode 100644
+index 0000000..185f1b3
+--- /dev/null
++++ b/trace.py
+@@ -0,0 +1,17 @@
++import sys, numpy as np
++from env_client import make_env
++import approach
++seed=int(sys.argv[1])
++params = eval(sys.argv[2]) if len(sys.argv)>2 else {}
++for k,v in params.items(): setattr(approach.GeneratedApproach,k,v)
++env=make_env(); obs,info=env.reset(seed=seed)
++ap=approach.GeneratedApproach(None,None,{}); ap.reset(obs,info)
++orig=ap._plan_push
++def pp(o):
++    b,c0=orig(o)
++    g=ap.goal; print(f"t={ap.nsteps} blk=({o[0]-g[0]:+.3f},{o[1]-g[1]:+.3f},{approach._wrap(o[2]-g[2]):+.3f}) cost={c0:.3f} -> pred {b[4]:.3f} k={b[3]} step={np.linalg.norm(b[2]):.3f} navdist={np.linalg.norm(b[1]-o[16:18]):.2f}")
++    return b,c0
++ap._plan_push=pp
++for t in range(1000):
++    a=ap.get_action(obs); obs,r,term,trunc,_=env.step(a)
++    if term: print("done",t+1); break
+diff --git a/tune.py b/tune.py
+index db76e1d..6501e09 100644
+--- a/tune.py
++++ b/tune.py
+@@ -8,3 +8,5 @@ def run(seed):
+     return T.run(seed)
+ with Pool(10) as p: res = p.map(run, range(a,b))
+ print(params, "succ", sum(r[1] for r in res), "/", len(res), "mean steps", np.mean([r[2] for r in res]), "maxt %.1f"%max(r[3] for r in res))
++for r in res:
++    if not r[1] or r[3]>20 or r[2]>250: print("  bad", r[0], r[2], "%.1f"%r[3], np.round(r[4],3))

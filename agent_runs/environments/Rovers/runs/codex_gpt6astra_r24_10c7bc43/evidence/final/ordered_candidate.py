@@ -1,0 +1,219 @@
+import numpy as np
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import dijkstra
+
+class GeneratedApproach:
+    def __init__(self, action_space, observation_space, primitives):
+        self.space = observation_space
+    def objects(self, s, t):
+        return s.get_objects(self.space.get_type(t))
+    def xy(self,s,o):
+        return np.array([s.get(o,'x'),s.get(o,'y')])
+    def reset(self,state,info):
+        self.rovers=[state.get_object_from_name('rover'+str(i)) for i in range(2)]
+        self.homes=[self.xy(state,r) for r in self.rovers]
+        self.objs=self.objects(state,'objective'); self.samples=self.objects(state,'sample')
+        self.lander=self.xy(state,self.objects(state,'lander')[0])
+        self.boxes=np.array([[state.get(o,k) for k in ['x','y','half_x','half_y']] for o in self.objects(state,'obstacle')]+[[0,0,0.05,2.5]])
+        self.axis=np.arange(-2.3,2.301,0.1)
+        self.n=len(self.axis)
+        self.points=np.array([(x,y) for x in self.axis for y in self.axis])
+        self.valid=self.free(self.points)
+        self.bad=np.zeros((2,len(self.points),len(self.objs)),dtype=bool)
+        self.send_bad=np.zeros((2,len(self.points)),dtype=bool)
+        self.prev=None; self.step=0
+        self.make_graph()
+        self.image_masks=[self.visible(self.points,self.xy(state,o),2) for o in self.objs]
+        sample_dist=np.array([np.linalg.norm(self.points-self.xy(state,o),axis=1) for o in self.samples])
+        self.sample_masks=[(dd<.245)&(dd<=sample_dist.min(axis=0)+1e-8) for dd in sample_dist]
+        self.radio_mask=self.visible(self.points,self.lander,4)
+        self.home_dist=[dijkstra(self.graph,indices=self.nearest(h)) for h in self.homes]
+        self.allocate(state)
+    def allocate(self,s):
+        num=len(self.objs); size=1<<(num+2); allbits=size-1
+        masks=self.sample_masks+self.image_masks
+        costs=[]; traces=[]
+        for r in range(2):
+            hd=self.home_dist[r]; nodes={self.nearest(self.homes[r])}
+            for mask in self.sample_masks:
+                dd=np.where(mask,hd,np.inf);idx=int(dd.argmin())
+                if np.isfinite(dd[idx]):nodes.add(idx)
+            for subset in range(1,1<<num):
+                mask=self.valid.copy()
+                for j in range(num):
+                    if subset>>j&1:mask &= self.image_masks[j]
+                dd=np.where(mask,hd,np.inf);idx=int(dd.argmin())
+                if np.isfinite(dd[idx]):nodes.add(idx)
+            nodes=list(nodes); D=dijkstra(self.graph,indices=nodes)[:,nodes]
+            cover=[]
+            for node in nodes:
+                bits=0
+                for j,m in enumerate(self.sample_masks):
+                    if m[node]:bits|=1<<int(s.get(self.samples[j],'is_soil'))
+                for j,m in enumerate(self.image_masks):
+                    if m[node]:bits|=1<<(j+2)
+                cover.append(bits)
+            dp=np.full((size,len(nodes)),np.inf)
+            parents=np.full((size,len(nodes),2),-1,dtype=int)
+            home=nodes.index(self.nearest(self.homes[r]));dp[0,home]=0
+            for mask in range(size):
+                if not np.isfinite(dp[mask]).any():continue
+                arrivals=np.min(dp[mask,:,None]+D,axis=0)
+                for j,bits in enumerate(cover):
+                    gain=bits&~mask
+                    if not gain:continue
+                    extra=2*((gain&3).bit_count())+4*((gain>>2).bit_count())
+                    new=mask|bits
+                    if arrivals[j]+extra<dp[new,j]:
+                        dp[new,j]=arrivals[j]+extra
+                        parents[new,j]=[mask,int(np.argmin(dp[mask]+D[:,j]))]
+            val=np.min(dp+D[:,home],axis=1)
+            bestmask=np.arange(size)
+            for mask in range(size-1,-1,-1):
+                for j in range(num+2):
+                    if not mask>>j&1 and val[mask|(1<<j)]<val[mask]:
+                        val[mask]=val[mask|(1<<j)];bestmask[mask]=bestmask[mask|(1<<j)]
+            costs.append(val)
+            traces.append((dp,D[:,home],parents,bestmask,nodes))
+        best=min(range(size),key=lambda m:max(costs[0][m],costs[1][allbits^m])+.05*(costs[0][m]+costs[1][allbits^m]))
+        self.owner=[0 if best>>j&1 else 1 for j in range(num+2)]
+        self.stages=[]
+        for r,need in enumerate([best,allbits^best]):
+            dp,back,parents,bestmask,nodes=traces[r]
+            mask=int(bestmask[need]);node=int(np.argmin(dp[mask]+back));stages=[]
+            while mask:
+                previous,prevnode=parents[mask,node]
+                if previous<0:break
+                stages.append(int(mask^previous));mask=int(previous);node=int(prevnode)
+            self.stages.append(stages[::-1])
+    def free(self,p):
+        p=np.atleast_2d(p)
+        d=np.abs(p[:,None,:]-self.boxes[None,:,:2])-self.boxes[None,:,2:]
+        ok=np.all(np.sum(np.maximum(d,0)**2,axis=2) > 0.228**2,axis=1)
+        ld=np.maximum(np.abs(p-self.lander)-np.array([.45,.30]),0)
+        ok &= np.sum(ld**2,axis=1)>.228**2
+        ok &= np.max(np.abs(p),axis=1)<2.271
+        return ok
+    def make_graph(self):
+        rows=[]; cols=[]
+        for i in np.flatnonzero(self.valid):
+            x,y=divmod(i,self.n)
+            for dx,dy in [(dx,dy) for dx in range(-2,3) for dy in range(-2,3) if dx or dy]:
+                xx,yy=x+dx,y+dy
+                if 0<=xx<self.n and 0<=yy<self.n:
+                    j=xx*self.n+yy
+                    if self.valid[j]: rows.append(i);cols.append(j)
+        self.graph=csr_matrix((np.full(len(rows),2.),(rows,cols)),shape=(len(self.points),len(self.points)))
+    def visible(self,p,target,limit):
+        p=np.atleast_2d(p); target=np.asarray(target)
+        ok=np.linalg.norm(p-target,axis=1)<(3.91 if limit>3 else limit-.025)
+        # Low mounds and the central driving wall do not obstruct the camera.
+        boxes=self.boxes[:-1][(self.boxes[:-1,2]<.2)]
+        delta=target-p
+        for b in boxes:
+            padding=.05 if limit>3 else 0.
+            lo=b[:2]-b[2:]-padding;hi=b[:2]+b[2:]+padding
+            with np.errstate(divide='ignore',invalid='ignore'):
+                t1=(lo-p)/delta;t2=(hi-p)/delta
+            near=np.maximum(np.min(np.stack([t1,t2]),axis=0).max(axis=1),.001)
+            far=np.minimum(np.max(np.stack([t1,t2]),axis=0).min(axis=1),.999)
+            ok &= near>far
+        return ok
+    def nearest(self,p):
+        ds=np.sum((self.points-p)**2,axis=1);ds[~self.valid]=np.inf
+        return int(np.argmin(ds))
+    def pending_count(self,s,i):
+        return sum(s.get(o,'have_image_rover'+str(i)) and not s.get(o,'received_image') for o in self.objs)+sum(s.get(o,'analyzed_rover'+str(i)) and not s.get(o,'received_analysis') for o in self.samples)
+    def get_action(self,s):
+        self.step+=1
+        pos=[self.xy(s,r) for r in self.rovers]
+        if self.prev is not None:
+            for i in range(2):
+                old,move,op,idx,had,old_images=self.prev[i]
+                if np.linalg.norm(move)>.02 and np.linalg.norm(pos[i]-old)<.001:
+                    q=old+move
+                    ids=np.linalg.norm(self.points-q,axis=1)<.085
+                    self.valid[ids]=False
+                    self.make_graph()
+                if op==.5 and self.pending_count(s,i)>=had:
+                    self.send_bad[i,np.linalg.norm(self.points-pos[i],axis=1)<.23]=True
+                if op==-.5 and not s.get(self.rovers[i],'calibrated'):
+                    self.bad[i,np.linalg.norm(self.points-pos[i],axis=1)<.12,:]=True
+                if op==-1/6 and idx is not None and sum(s.get(oo,'have_image_rover'+str(i)) for oo in self.objs)<=old_images:
+                    self.bad[i,np.linalg.norm(self.points-pos[i],axis=1)<.12,idx]=True
+        action=np.zeros(8,np.float32); records=[]; assigned=set(); kinds=set()
+        received=[any(s.get(o,'is_soil')==k and s.get(o,'received_analysis') for o in self.samples) for k in [0,1]]
+        acquired=[any(s.get(o,'is_soil')==k and (s.get(o,'analyzed_rover0') or s.get(o,'analyzed_rover1')) for o in self.samples) for k in [0,1]]
+        complete=int(acquired[0])+2*int(acquired[1])
+        for j,o in enumerate(self.objs):
+            if s.get(o,'received_image') or any(s.get(o,'have_image_rover'+str(a)) for a in [0,1]):complete |=1<<(j+2)
+        for i,r in enumerate(self.rovers):
+            while self.stages[i] and not self.stages[i][0]&~complete:self.stages[i].pop(0)
+            stage=self.stages[i][0] if self.stages[i] else 0
+            p=pos[i]; start=self.nearest(p)
+            dist,pred=dijkstra(self.graph,indices=start,return_predecessors=True)
+            candidates=[]
+            for k in [0,1]:
+                if stage>>k&1 and not acquired[k] and k not in kinds and not s.get(r,'store_full'):
+                    for oi,o in enumerate(self.samples):
+                        if int(s.get(o,'is_soil'))==k:
+                            mask=self.sample_masks[oi]
+                            candidates.append((mask,'sample',o,k))
+            for j,o in enumerate(self.objs):
+                if stage>>(j+2)&1 and not s.get(o,'received_image') and not any(s.get(o,'have_image_rover'+str(a)) for a in [0,1]) and j not in assigned:
+                    mask=self.image_masks[j]&~self.bad[i,:,j]
+                    candidates.append((mask,'image',o,j))
+            pending=any(s.get(o,'have_image_rover'+str(i)) and not s.get(o,'received_image') for o in self.objs) or any(s.get(o,'analyzed_rover'+str(i)) and not received[int(s.get(o,'is_soil'))] for o in self.samples)
+            if pending: candidates.append((self.radio_mask&~self.send_bad[i],'send',None,None))
+            best=None; score=np.inf
+            for mask,task,o,j in candidates:
+                dd=dist+.001*np.minimum(self.home_dist[i],1e4);dd[~mask]=np.inf
+                target=int(np.argmin(dd)); cost=dd[target]
+                if task=='sample': cost-=6
+                if task=='send': cost+=5 if any(c[1]!='send' for c in candidates) else 0
+                if cost<score: score=cost;best=(target,task,o,j)
+            if best is None: best=(self.nearest(self.homes[i]),'home',None,None)
+            target,task,o,j=best
+            if task=='send' and self.visible(p,self.lander,4)[0] and not self.send_bad[i,start]:
+                navbest=None;navcost=np.inf
+                for mask,nt,no,nj in candidates:
+                    if nt=='send':continue
+                    dd=dist+.001*np.minimum(self.home_dist[i],1e4);dd[~mask]=np.inf
+                    ni=int(np.argmin(dd))
+                    if dd[ni]<navcost:navcost=dd[ni];navbest=(ni,nt,no,nj)
+                if navbest is not None:target,task,o,j=navbest
+                else:target=self.nearest(self.homes[i]);task='home'
+            if task=='sample': kinds.add(j)
+            if task=='image': assigned.add(j)
+            targetpos=self.points[target]
+            if task=='home': targetpos=self.homes[i]
+            path=[target];cur=target
+            for _ in range(len(self.points)):
+                if cur==start:break
+                cur=int(pred[cur])
+                if cur<0:break
+                path.append(cur)
+            path=path[::-1]
+            goal=targetpos
+            for node in path:
+                q=self.points[node]
+                if np.max(np.abs(q-p))<=.20001: goal=q
+                else: break
+            if np.max(np.abs(targetpos-p))<=.2:goal=targetpos
+            move=np.clip(goal-p,-.2,.2)
+            if np.linalg.norm(p+move-pos[1-i])<.43:move=np.zeros(2)
+            q=p+move; op=0.;idx=None
+            nearest_sample=min(self.samples,key=lambda oo:np.linalg.norm(q-self.xy(s,oo)))
+            if task=='sample' and np.linalg.norm(q-self.xy(s,o))<.249 and s.get(nearest_sample,'is_soil')==j:op=-5/6
+            else:
+                useful=[jj for jj,oo in enumerate(self.objs) if not s.get(oo,'received_image') and not any(s.get(oo,'have_image_rover'+str(a)) for a in [0,1]) and not self.bad[i,self.nearest(q),jj] and self.visible(q,self.xy(s,oo),2)[0]]
+                if useful:
+                    idx=min(useful,key=lambda jj:np.linalg.norm(q-self.xy(s,self.objs[jj])))
+                    op=-1/6 if s.get(r,'calibrated') else -.5
+            if op==0 and pending and self.visible(q,self.lander,4)[0] and not self.send_bad[i,self.nearest(q)]:op=.5
+            elif op==0 and s.get(r,'store_full'):op=5/6
+            elif op==0 and not s.get(r,'calibrated') and any(not s.get(oo,'received_image') for oo in self.objs) and any(self.visible(q,self.xy(s,oo),2)[0] for oo in self.objs):op=-.5
+            action[4*i:4*i+2]=move;action[4*i+3]=op
+            records.append((p,move,op,idx,self.pending_count(s,i),sum(s.get(oo,'have_image_rover'+str(i)) for oo in self.objs)))
+        self.prev=records
+        return action

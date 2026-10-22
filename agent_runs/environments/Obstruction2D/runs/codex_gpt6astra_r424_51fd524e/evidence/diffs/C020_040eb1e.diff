@@ -1,0 +1,26 @@
+diff --git a/approach.py b/approach.py
+index a4da837..a458773 100644
+--- a/approach.py
++++ b/approach.py
+@@ -36,11 +36,13 @@ class GeneratedApproach:
+         x,y,w,h=self.rect(s,obj)
+         others=[self.rect(s,o) for o in s.get_objects(self.ot) if o!=obj]
+         candidates=[preferred,x+w/2,x+.005,x+w-.005,.101,1.517]
++        if obj==self.block:candidates.extend([x+1.516-self.destx,x+.102-self.destx])
+         for ox,oy,ow,oh in others:
+             candidates.extend([ox-.041,ox+ow+.041])
+         valid=[]
+         for cx in candidates:
+             if not .101<=cx<=1.517 or cx+.035<x+.006 or cx-.035>x+w-.006:continue
++            if obj==self.block and not .101<=self.destx-x+cx<=1.517:continue
+             cy=y+h+.206
+             collision=False
+             for ox,oy,ow,oh in others:
+diff --git a/results_42_1_3.json b/results_42_1_3.json
+new file mode 100644
+index 0000000..7d1d202
+--- /dev/null
++++ b/results_42_1_3.json
+@@ -0,0 +1 @@
++[{"seed": 42, "count": 3, "done": true, "steps": 81, "seconds": 0.439}]
+\ No newline at end of file

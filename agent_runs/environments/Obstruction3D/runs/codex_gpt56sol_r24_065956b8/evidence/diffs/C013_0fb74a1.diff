@@ -1,0 +1,41 @@
+diff --git a/probe_mount_offset.py b/probe_mount_offset.py
+index 897ffb5..bb443ca 100644
+--- a/probe_mount_offset.py
++++ b/probe_mount_offset.py
+@@ -60,7 +60,11 @@ def main():
+                 state, _, _, _, _ = env.step(action)
+                 if get(state, "robot", "grasp_active"):
+                     print("SUCCESS", mount_x, height, offset, q,
+-                          [get(state, "robot", "grasp_tf_" + a) for a in "xyz"])
++                          "held", [name for name in state.get_object_names()
++                                   if name != "robot" and get(state, name, "grasp_active")],
++                          "tf", [get(state, "robot", "grasp_tf_" + a) for a in "xyz"],
++                          [get(state, "robot", "grasp_tf_q" + a) for a in "xyzw"],
++                          "finger", get(state, "robot", "finger_state"))
+                     env.close(); return
+                 print("miss", mount_x, height, offset)
+     env.close()
+diff --git a/test_approach.py b/test_approach.py
+new file mode 100644
+index 0000000..58e87b6
+--- /dev/null
++++ b/test_approach.py
+@@ -0,0 +1,18 @@
++from env_client import make_env
++from approach import GeneratedApproach
++
++def run(seed, count=None, limit=200):
++    env = make_env()
++    options = {} if count is None else {"object_count": count}
++    state, info = env.reset(seed=seed, options=options)
++    policy = GeneratedApproach(env.action_space, env.observation_space, env.make_primitives())
++    policy.reset(state, info)
++    for step in range(limit):
++        state, reward, terminated, truncated, info = env.step(policy.get_action(state))
++        if terminated or truncated:
++            env.close(); return terminated, step + 1
++    env.close(); return False, limit
++
++if __name__ == "__main__":
++    for seed in range(5):
++        print(seed, run(seed))

@@ -1,0 +1,139 @@
+diff --git a/approach.py b/approach.py
+index 40cd7e9..5774cb9 100644
+--- a/approach.py
++++ b/approach.py
+@@ -174,6 +174,7 @@ class GeneratedApproach:
+         # home & send-then-home fields
+         self.V_home = {}
+         self.V_send = {}
++        Vh0 = {}
+         for r in self.rovers:
+             hx, hy, _ = self.home[r]
+             init = np.full((N, N), INF)
+@@ -181,7 +182,34 @@ class GeneratedApproach:
+             hi, hj = to_cell(hx, hy)
+             hm[hi, hj] = True
+             init[hm] = 0.0
+-            Vh = bfs_field(self.free_r[r], init)
++            Vh0[r] = (bfs_field(self.free_r[r], init), hm)
++        for r in self.rovers:
++            q = [o for o in self.rovers if o != r][0]
++            Vh, hm = Vh0[r]
++            # choose home cells for r that do not occlude q's sends near q's home
++            Vq = Vh0[q][0]
++            near = self.send_reg[q] & (Vq <= 8)
++            if near.any():
++                ox, oy = self.sense[q]
++                ex = GX[near] + ox
++                ey = GY[near] + oy
++                w = 1.0 / (1.0 + Vq[near])
++                cells = np.argwhere(hm)
++                scores = []
++                hx, hy, _ = self.home[r]
++                for ci, cj in cells:
++                    blk = seg_dist_grid(ex, ey, self.lander[0], self.lander[1],
++                                        COORDS[ci], COORDS[cj]) <= LOS_ROVER
++                    scores.append(float((w * blk).sum()))
++                scores = np.array(scores)
++                good = scores <= scores.min() + 1e-9
++                hm2 = np.zeros_like(hm)
++                for (ci, cj), g in zip(cells, good):
++                    if g:
++                        hm2[ci, cj] = True
++                if scores.min() < scores.max():
++                    init = np.where(hm2, 0.0, INF)
++                    Vh = bfs_field(self.free_r[r], init)
+             self.V_home[r] = Vh
+             init2 = np.where(self.send_reg[r], Vh, INF)
+             self.V_send[r] = bfs_field(self.free_r[r], init2)
+diff --git a/batch.py b/batch.py
+new file mode 100644
+index 0000000..8f72baf
+--- /dev/null
++++ b/batch.py
+@@ -0,0 +1,11 @@
++import sys, json
++from concurrent.futures import ProcessPoolExecutor
++from test_approach import run
++seeds=list(range(int(sys.argv[1]), int(sys.argv[2])))
++with ProcessPoolExecutor(8) as ex:
++    res=list(ex.map(run, seeds))
++tot=0
++for r in res:
++    print(r['seed'], r['n'], r['steps'], r['term'], r['plan'], r['tplan'])
++    tot+=r['steps']
++print('TOTAL', tot, 'fails', sum(1 for r in res if not r['term']), 'maxplan', max(r['tplan'] for r in res))
+diff --git a/pC_t12.out b/pC_t12.out
+new file mode 100644
+index 0000000..a196b37
+--- /dev/null
++++ b/pC_t12.out
+@@ -0,0 +1,22 @@
++50 (-1.0, False, False) 0.15 14.1
++100 (-1.0, False, False) 0.07 24.1
++150 (-1.0, False, False) 0.11 26.1
++200 (-1.0, False, False) 0.01 26.4
++250 (-1.0, False, False) 0.01 26.7
++300 (-1.0, False, False) 0.01 27.0
++350 (-1.0, False, False) 0.01 27.4
++400 (-1.0, False, False) 0.01 27.7
++450 (-1.0, False, False) 0.01 28.0
++500 (-1.0, False, False) 0.01 28.3
++550 (-1.0, False, False) 0.01 28.6
++600 (-1.0, False, False) 0.01 28.9
++650 (-1.0, False, False) 0.01 29.2
++700 (-1.0, False, False) 0.0 29.5
++750 (-1.0, False, False) 0.01 29.8
++800 (-1.0, False, False) 0.01 30.1
++850 (-1.0, False, False) 0.0 30.4
++900 (-1.0, False, False) 0.01 30.7
++950 (-1.0, False, False) 0.01 31.0
++1000 (-1.0, False, False) 0.01 31.3
++1050 (-1.0, False, False) 0.0 31.6
++1100 (-1.0, False, False) 0.01 31.9
+diff --git a/pC_t12.py b/pC_t12.py
+new file mode 100644
+index 0000000..caf75c7
+--- /dev/null
++++ b/pC_t12.py
+@@ -0,0 +1,5 @@
++from pC_lib import *; import time; reset(11); t=time.time()
++while S.n<1100:
++    t1=time.time(); r=step(); dt=time.time()-t1
++    if S.n%50==0 or dt>3: print(S.n,r,round(dt,2),round(time.time()-t,1),flush=True)
++    if r[1] or r[2]: print('end',S.n,r,flush=True); break
+diff --git a/pD_t3.out b/pD_t3.out
+index 6c7f5ee..b482cb9 100644
+--- a/pD_t3.out
++++ b/pD_t3.out
+@@ -14,3 +14,19 @@ t=0.45 side=-1 th=1.57 (0.0156, 0.0176)
+ t=0.45 side=-1 th=1.96 (0.0664, 0.0684)
+ t=0.45 side=-1 th=2.36 (0.0078, 0.0098)
+ t=0.45 side=-1 th=2.75 (0.127, 0.1289)
++t=0.65 side=+1 th=0.00 (0.1758, 0.1777)
++t=0.65 side=+1 th=0.39 (0.1758, 0.1777)
++t=0.65 side=+1 th=0.79 (0.1758, 0.1777)
++t=0.65 side=+1 th=1.18 (0.1758, 0.1777)
++t=0.65 side=+1 th=1.57 (0.1758, 0.1777)
++t=0.65 side=+1 th=1.96 (0.1758, 0.1777)
++t=0.65 side=+1 th=2.36 (0.1758, 0.1777)
++t=0.65 side=+1 th=2.75 (0.1758, 0.1777)
++t=0.65 side=-1 th=0.00 (0.1758, 0.1777)
++t=0.65 side=-1 th=0.39 (0.1758, 0.1777)
++t=0.65 side=-1 th=0.79 (0.1758, 0.1777)
++t=0.65 side=-1 th=1.18 (0.1758, 0.1777)
++t=0.65 side=-1 th=1.57 (0.1758, 0.1777)
++t=0.65 side=-1 th=1.96 (0.1758, 0.1777)
++t=0.65 side=-1 th=2.36 (0.1758, 0.1777)
++t=0.65 side=-1 th=2.75 (0.1758, 0.1777)
+diff --git a/pD_t4.py b/pD_t4.py
+new file mode 100644
+index 0000000..eb1b463
+--- /dev/null
++++ b/pD_t4.py
+@@ -0,0 +1,5 @@
++from pD_lib import *
++S=(0.4,-0.6,np.pi)
++for t in [0.4,0.45,0.5,0.55]:
++    for th in [0,2.36]:
++        p=pos_on_line(S,t,0.0,th); print(t,th,np.round(p,3),trial((S,p)),flush=True)

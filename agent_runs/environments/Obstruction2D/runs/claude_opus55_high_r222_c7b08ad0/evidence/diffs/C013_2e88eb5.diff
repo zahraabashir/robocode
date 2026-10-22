@@ -1,0 +1,165 @@
+diff --git a/approach.py b/approach.py
+index 0c4809e..95168a4 100644
+--- a/approach.py
++++ b/approach.py
+@@ -5,7 +5,7 @@ WORLD_Y = (0.0, 1.0)
+ MAXD = 0.05
+ ARM_MAX = 0.2
+ EARLY = True
+-BOTTOM_OFF = 0.018
++BOTTOM_OFF = 0.021
+ GOFF = 0.022  # gripper centre may overhang object edge by this much
+ VM = 0.025  # keep gripper this far from non-held objects while vacuum is on
+ 
+@@ -271,9 +271,6 @@ class GeneratedApproach:
+     def _drop_spot(self, o, rects, surf, blk):
+         r = self.r
+         xs = self.xs
+-        gx = self._grasp_x(o, rects)
+-        gy = o['y1'] + ARM_MAX + r['gw'] + self.grasp_eps
+-        held = self._mk_held(o, gx, gy)
+         others = {k: v for k, v in rects.items() if k != o['name']}
+         # target plan assuming o removed
+         cands, held_b, gxb, gyb = self._place_candidates_target(blk, surf, others)
+@@ -287,42 +284,57 @@ class GeneratedApproach:
+             if q['type'] == 'target_surface':
+                 continue
+             grasps.append((self._grasp_x(q, others), q['y1'] + ARM_MAX + r['gw'] + self.grasp_eps))
+-        P1 = self._profile(xs, others, held)
++        P0 = self._profile(xs, rects, None)
+         P2 = self._profile(xs, others, None)
+         P3 = self._profile(xs, {k: v for k, v in others.items() if k != blk['name']}, held_b)
+         ymax = WORLD_Y[1] - r['R'] - 0.002
+-        best = None
++        gy = o['y1'] + ARM_MAX + r['gw'] + self.grasp_eps
++        gl = self._grasp_xs(o, rects)
++        gcands = []
++        for g in (gl[0], min(gl), max(gl)):
++            if all(abs(g - q) > 1e-4 for q in gcands):
++                gcands.append(g)
++        cache = {}
+         for margin in (0.03, 0.01):
+-            for rx in xs[::2]:
+-                if rx < WORLD_X[0] + r['R'] + 0.002 or rx > WORLD_X[1] - r['R'] - 0.002:
+-                    continue
+-                x0, x1 = rx + held['dx0'], rx + held['dx1']
+-                if x0 < WORLD_X[0] or x1 > WORLD_X[1]:
+-                    continue
+-                if x1 > surf['x0'] - margin and x0 < surf['x1'] + margin:
+-                    continue
+-                ok = True
+-                for k, v in others.items():
+-                    if x1 > v['x0'] - margin and x0 < v['x1'] + margin:
+-                        ok = False
+-                        break
+-                if not ok:
+-                    continue
+-                ry_low = max(gy + 0.003, P1[self._xi(rx)] + 0.004)
+-                for ry in np.arange(ry_low, ymax, 0.05)[:5]:
+-                    c1 = self._est(gx, gy, rx, ry, P1)
+-                    box = (x0, x1, ry + held['dy1'])
+-                    P2n = np.maximum(P2, self._colprof(xs, box, None))
+-                    c2 = self._est(rx, ry, gxb, gyb, P2n)
+-                    P3n = np.maximum(P3, self._colprof(xs, box, held_b))
+-                    c3 = self._est(gxb, gyb, rxt, ryt, P3n)
+-                    cost = c1 + c2 + c3 + 0.01 * (ry - ry_low)
+-                    if best is None or cost < best[0]:
+-                        bx = dict(x0=x0, x1=x1, y0=ry + held['dy0'], y1=ry + held['dy1'], name='_box', type='rectangle')
+-                        if self._box_ok(bx, grasps, tplace):
+-                            best = (cost, rx, ry)
++            best = None
++            for gx in gcands:
++                held = self._mk_held(o, gx, gy)
++                c0 = self._est(r['x'], r['y'], gx, gy, P0, margin=0.0)
++                P1 = self._profile(xs, others, held)
++                for rx in xs[::2]:
++                    if rx < WORLD_X[0] + r['R'] + 0.002 or rx > WORLD_X[1] - r['R'] - 0.002:
++                        continue
++                    x0, x1 = rx + held['dx0'], rx + held['dx1']
++                    if x0 < WORLD_X[0] or x1 > WORLD_X[1]:
++                        continue
++                    if x1 > surf['x0'] - margin and x0 < surf['x1'] + margin:
++                        continue
++                    ok = True
++                    for k, v in others.items():
++                        if x1 > v['x0'] - margin and x0 < v['x1'] + margin:
++                            ok = False
++                            break
++                    if not ok:
++                        continue
++                    ry_low = max(gy + 0.003, P1[self._xi(rx)] + 0.004)
++                    for ry in np.arange(ry_low, ymax, 0.05)[:5]:
++                        c1 = self._est(gx, gy, rx, ry, P1)
++                        box = (x0, x1, ry + held['dy1'])
++                        P2n = np.maximum(P2, self._colprof(xs, box, None))
++                        c2 = self._est(rx, ry, gxb, gyb, P2n)
++                        P3n = np.maximum(P3, self._colprof(xs, box, held_b))
++                        c3 = self._est(gxb, gyb, rxt, ryt, P3n)
++                        cost = c0 + c1 + c2 + c3 + 0.01 * (ry - ry_low) + 0.001 * abs(gx - gl[0])
++                        if best is None or cost < best[0]:
++                            bx = dict(x0=x0, x1=x1, y0=ry + held['dy0'], y1=ry + held['dy1'],
++                                      name='_box', type='rectangle')
++                            key = (round(x0, 4), round(bx['y1'], 4))
++                            if key not in cache:
++                                cache[key] = self._box_ok(bx, grasps, tplace)
++                            if cache[key]:
++                                best = (cost, rx, ry, gx)
+             if best is not None:
+-                return best[1], best[2], gx, gy
++                return best[1], best[2], best[3], gy
+         return None
+ 
+     def _grasp_blockers(self, o, rects):
+diff --git a/big_test2.txt b/big_test2.txt
+index bd2fa2d..9740bb6 100644
+--- a/big_test2.txt
++++ b/big_test2.txt
+@@ -1,5 +1,3 @@
+-(3038, 3, False, 1000, 73.0)
+-success 79 / 80 mean steps 60.3125
+-(3057, 4, False, 1000, 99.3)
+-success 79 / 80 mean steps 70.1
+-success 100 / 100 mean steps 32.53
++success 80 / 80 mean steps 47.25
++success 80 / 80 mean steps 57.3
++success 100 / 100 mean steps 32.14
+diff --git a/big_test3.txt b/big_test3.txt
+new file mode 100644
+index 0000000..a69dfdf
+--- /dev/null
++++ b/big_test3.txt
+@@ -0,0 +1,6 @@
++max compute 2.59
++success 200 / 200 mean steps 32.435
++max compute 1.15
++success 100 / 100 mean steps 52.73
++max compute 2.61
++success 100 / 100 mean steps 47.32
+diff --git a/test_approach.py b/test_approach.py
+index 5dd1163..9bb08e6 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -10,14 +10,14 @@ def run(seed):
+     ap = GeneratedApproach(env.action_space, env.observation_space, {})
+     obs, info = env.reset(seed=seed, options=({'object_count':OC} if OC is not None else None))
+     ap.reset(obs, info)
+-    tot = 0; t0 = time.time()
++    tot = 0; t0 = time.time(); ct = 0
+     for t in range(env.max_steps):
+-        a = ap.get_action(obs)
++        tc=time.time(); a = ap.get_action(obs); ct += time.time()-tc
+         obs, r, term, trunc, info2 = env.step(a)
+         tot += r
+         if term or trunc: break
+     env.close()
+-    return seed, info.get('object_count'), term, t+1, round(time.time()-t0,1)
++    return seed, info.get('object_count'), term, t+1, round(time.time()-t0,1), round(ct,2)
+ 
+ if __name__ == '__main__':
+     a, b = int(sys.argv[1]), int(sys.argv[2])
+@@ -26,4 +26,4 @@ if __name__ == '__main__':
+         res = list(ex.map(run, range(a, b)))
+     for r in res:
+         if not r[2] or len(res)<20: print(r)
+-    print('success', sum(r[2] for r in res), '/', len(res), 'mean steps', np.mean([r[3] for r in res]))
++    print('max compute', max(r[5] for r in res)); print('success', sum(r[2] for r in res), '/', len(res), 'mean steps', np.mean([r[3] for r in res]))

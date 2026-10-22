@@ -1,0 +1,15 @@
+diff --git a/approach.py b/approach.py
+index 616bc89..9c84cc6 100644
+--- a/approach.py
++++ b/approach.py
+@@ -377,9 +377,7 @@ class GeneratedApproach:
+ 
+         if self.phase == 'to_grasp':
+             # recompute grasp height from current object
+-            gy = o['y1'] + r['aj'] + r['gw'] + self.grasp_eps
+-            if r['aj'] < ARM_MAX - 1e-6:
+-                gy = max(gy, r['y'])  # wait for arm to extend before going down much
++            gy = o['y1'] + ARM_MAX + r['gw'] + self.grasp_eps
+             if abs(r['x'] - task['gx']) < 1e-4 and abs(r['y'] - gy) < 1e-4 and r['aj'] >= ARM_MAX - 1e-6:
+                 self.phase = 'grasp'
+                 self.grasp_pose = (r['x'], r['y'], o['x'], o['y'])

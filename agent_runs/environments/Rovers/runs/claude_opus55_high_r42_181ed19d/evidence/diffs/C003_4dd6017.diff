@@ -1,0 +1,106 @@
+diff --git a/approach.py b/approach.py
+index 945b3bf..5d6878a 100644
+--- a/approach.py
++++ b/approach.py
+@@ -211,6 +211,7 @@ class GeneratedApproach:
+         self.other = {self.rnames[0]: self.rnames[1], self.rnames[1]: self.rnames[0]}
+         # task regions per rover
+         self.regions = {}
++        self.ovis, self.odist = {}, {}
+         for rn in self.rnames:
+             S = self.sides[rn]
+             cx = S.CX[S.fi, S.fj]
+@@ -218,10 +219,17 @@ class GeneratedApproach:
+             px = S.X[S.fi, S.fj]
+             py = S.Y[S.fi, S.fj]
+             reg = {}
++            self.ovis.setdefault(rn, {})
++            self.odist.setdefault(rn, {})
+             for k, (ox, oy) in enumerate(self.obj_xy):
+-                m = np.hypot(cx - ox, cy - oy) <= OBJ_RANGE
++                dd = np.hypot(cx - ox, cy - oy)
++                m = dd <= OBJ_RANGE
+                 m &= self._los_clear(cx, cy, ox, oy, 0.03)
+                 reg[("O", k)] = m
++                # loose visibility (could steal the image)
++                ml = (dd <= OBJ_RANGE_EXEC + 0.03) & self._los_clear(cx, cy, ox, oy, -0.03)
++                self.ovis[rn][k] = ml
++                self.odist[rn][k] = dd
+             for k, (sx, sy) in enumerate(self.samp_xy):
+                 m = np.hypot(px - sx, py - sy) <= SAMPLE_RANGE
+                 if m.any():
+@@ -241,6 +249,15 @@ class GeneratedApproach:
+         self.last_pos = {}
+         self.step_count = 0
+ 
++    def _img_mask(self, rn, k, imaged):
++        m = self.regions[rn][("O", k)].copy()
++        dk = self.odist[rn][k]
++        for j in range(len(self.obj_xy)):
++            if j == k or j in imaged:
++                continue
++            m &= ~(self.ovis[rn][j] & (self.odist[rn][j] <= dk + 0.03))
++        return m
++
+     def _rover_costs(self, rn, deadline):
+         """Best cost & order for every feasible task set of rover rn."""
+         S = self.sides[rn]
+@@ -274,7 +291,10 @@ class GeneratedApproach:
+             for t in objs + ([] if has_s else stones) + ([] if has_t else soils):
+                 if t in seq:
+                     continue
+-                m = reg[t]
++                if t[0] == "O":
++                    m = self._img_mask(rn, t[1], set(u[1] for u in seq if u[0] == "O"))
++                else:
++                    m = reg[t]
+                 init = np.where(m, F, np.inf)
+                 if not np.isfinite(init).any():
+                     continue
+@@ -338,8 +358,9 @@ class GeneratedApproach:
+         for o in self.objectives:
+             if g(o, "have_image_%s" % rn) > 0.5 and g(o, "received_image") < 0.5:
+                 return True
+-        for o in self.samples:
+-            if g(o, "analyzed_%s" % rn) > 0.5 and g(o, "received_analysis") < 0.5:
++        for k, o in enumerate(self.samples):
++            if g(o, "analyzed_%s" % rn) > 0.5 and g(o, "received_analysis") < 0.5 \
++                    and not self._type_received(state, self.samp_soil[k]):
+                 return True
+         return False
+ 
+@@ -360,9 +381,15 @@ class GeneratedApproach:
+             return "send"
+         return "home"
+ 
+-    def _pick_target(self, rn, task, cur_node):
++    def _pick_target(self, rn, task, cur_node, state=None):
+         S = self.sides[rn]
+         m = self.regions[rn][task].copy() if task in self.regions[rn] else None
++        if m is not None and task[0] == "O" and state is not None:
++            imaged = set(k for k, o in enumerate(self.objectives)
++                         if state.get(o, "have_image_%s" % rn) > 0.5)
++            m2 = self._img_mask(rn, task[1], imaged)
++            if m2.any():
++                m = m2
+         if m is None:
+             return None
+         for n in self.blacklist[rn]:
+@@ -499,6 +526,8 @@ class GeneratedApproach:
+                       if g(self.objectives[k], "have_image_%s" % rn) < 0.5]
+             if needed and needed[0][1] in my_imgs:
+                 return "image"
++            if needed and any(k in my_imgs for (_, k) in needed) and self.stuck[rn] >= 2:
++                return "image"
+         if store_full:
+             return "drop"
+         if not calibrated and my_imgs and vis:
+@@ -542,7 +571,7 @@ class GeneratedApproach:
+                 self.targets[rn] = None
+                 self.stuck[rn] = 0
+             if self.targets[rn] is None:
+-                tgt = self._pick_target(rn, task, cur)
++                tgt = self._pick_target(rn, task, cur, state)
+                 self.targets[rn] = (task, tgt) if tgt is not None else None
+             if self.targets[rn] is None:
+                 nexts[rn] = (x, y)

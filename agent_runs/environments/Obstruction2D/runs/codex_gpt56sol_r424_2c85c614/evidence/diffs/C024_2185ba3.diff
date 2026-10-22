@@ -1,0 +1,14 @@
+diff --git a/approach.py b/approach.py
+index acb24ec..275c805 100644
+--- a/approach.py
++++ b/approach.py
+@@ -24,7 +24,8 @@ class GeneratedApproach:
+         sx, sw = state.get(surface, "x"), state.get(surface, "width")
+         # Greedily reserve floor-clear parking columns, preferring positions far
+         # from both the pickup and goal.  The grid is count-independent.
+-        candidates = [0.14 + 0.10 * k for k in range(14)]
++        # Keep parking poses one base radius away from both side walls.
++        candidates = [0.20 + 0.10 * k for k in range(12)]
+         candidates.sort(key=lambda x: min(abs(x - tx) - tw / 2,
+                                            abs(x - sx) - sw / 2), reverse=True)
+         self.parking = {}

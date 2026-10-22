@@ -1,0 +1,53 @@
+diff --git a/approach.py b/approach.py
+index 0fcf890..36fb54f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -44,6 +44,8 @@ class GeneratedApproach:
+         self.retries = 0
+         self.grasp_fail = 0
+         self.fail_count = {}
++        self.open_fail = 0
++        self.place_fail = 0
+         self.cur_obj = None
+         self.place_yaw = None
+         self.bad_spots = []
+@@ -190,13 +192,15 @@ class GeneratedApproach:
+             o = held[0]
+             others = [c for c in cubes if c.name != o.name] + [reg, tb]
+             others = [c for c in others if c.name != o.name]
+-            if o.name == 'target_block':
++            near = [c for c in cubes if c.name != o.name and self._overlaps(s, c, reg, 0.06)]
++            if o.name == 'target_block' and not (self.place_fail > 0 and near):
+                 rp = _pose(s, reg)
+                 return self._plan_place(s, o, rp[:2], rp[2] + _he(s, reg)[2], self._obj_yaw(s, reg))
+             spot = self._free_spot(s, o, others, cur)
+             self.cur_spot = spot
+             return self._plan_place(s, o, spot, TABLE_Z, None)
+-        blocking = [o for o in cubes if self._overlaps(s, o, reg)]
++        blocking = [o for o in cubes
++                    if self._overlaps(s, o, reg, 0.004 if self.place_fail == 0 else 0.06)]
+         if blocking:
+             # remove the tallest (top-most) first
+             o = max(blocking, key=lambda c: _pose(s, c)[2] + _he(s, c)[2]
+@@ -284,8 +288,21 @@ class GeneratedApproach:
+             if not grasping:
+                 self.queue.pop(0)
+                 self.retries = 0
++                self.open_fail = 0
+                 return None
+             self.retries += 1
++            if self.retries > 1:
++                self.open_fail += 1
++            if self.open_fail > 8:
++                # cannot release here: lift and replan
++                self.open_fail = 0
++                self.retries = 0
++                if self.place_yaw is not None:
++                    self.place_fail += 1
++                elif self.cur_spot is not None:
++                    self.bad_spots.append(tuple(self.cur_spot))
++                self.queue = [('move_rel_up', SAFE_Z, None, True)]
++                return None
+             if self.retries > 1:
+                 # lower a bit and try again
+                 self.retries = 0

@@ -1,0 +1,53 @@
+diff --git a/approach.py b/approach.py
+index 7d6dcc9..91805d0 100644
+--- a/approach.py
++++ b/approach.py
+@@ -77,19 +77,24 @@ class GeneratedApproach:
+     def err(self, ref, th, goal):
+         g = self.g
+         gref, gth = goal[0:2], goal[2]
++        m = self.margin
+         Rg = rot(gth)
+         gcom = gref + Rg @ g.C
+-        dth = wrap(th - gth)
++        # env checks |theta - theta_goal| WITHOUT wrapping; theta obs is in (-pi, pi]
++        alo = max(gth - m[2], -np.pi + 0.015)
++        ahi = min(gth + m[2], np.pi - 0.015)
++        if alo > ahi:
++            alo = ahi = gth
++        dth = np.maximum(np.abs(wrap(th - 0.5 * (alo + ahi))) - 0.5 * (ahi - alo), 0)
+         # com position
+         c, s = np.cos(th), np.sin(th)
+         comx = ref[..., 0] - s * g.C[1]
+         comy = ref[..., 1] + c * g.C[1]
+-        m = self.margin
+         e_ref = np.hypot(np.maximum(np.abs(ref[..., 0] - gref[0]) - m[0], 0),
+                          np.maximum(np.abs(ref[..., 1] - gref[1]) - m[0], 0))
+         e_com = np.hypot(np.maximum(np.abs(comx - gcom[0]) - m[1], 0),
+                          np.maximum(np.abs(comy - gcom[1]) - m[1], 0))
+-        return e_ref + e_com + 0.6 * np.maximum(np.abs(dth) - m[2], 0)
++        return e_ref + e_com + 0.6 * dth
+ 
+     def seg_free(self, pose, a, b, clear):
+         if a is self.start_pt:
+@@ -329,6 +334,10 @@ class GeneratedApproach:
+         s = np.asarray(state, dtype=float)
+         if not self.plan:
+             p = self.plan_push(s)
++            if p is None and max(self.margin) > 0:
++                # predicted success but env did not terminate: tighten margins
++                self.margin = tuple(0.5 * x for x in self.margin) if max(self.margin) > 0.01 else (0.0, 0.0, 0.0)
++                p = self.plan_push(s)
+             if p is None:
+                 # fallback: move away from the block, towards the arena centre
+                 com = s[0:2] + rot(s[2]) @ self.g.C
+diff --git a/stats.py b/stats.py
+index 6997914..1fcb6b7 100644
+--- a/stats.py
++++ b/stats.py
+@@ -15,4 +15,5 @@ def run(seed):
+     env.close()
+     return seed,t+1,npl
+ with ThreadPoolExecutor(8) as ex: res=list(ex.map(run, range(int(sys.argv[1]),int(sys.argv[2]))))
++for r in res: print(*r)
+ print(np.mean([r[1] for r in res]), np.mean([r[2] for r in res]))

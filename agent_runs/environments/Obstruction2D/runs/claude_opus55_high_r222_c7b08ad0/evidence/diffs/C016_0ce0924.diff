@@ -1,0 +1,112 @@
+diff --git a/approach.py b/approach.py
+index 07b756e..be42595 100644
+--- a/approach.py
++++ b/approach.py
+@@ -268,7 +268,7 @@ class GeneratedApproach:
+         return dict(name=o['name'], dx0=o['x0'] - gx, dx1=o['x1'] - gx,
+                     dy0=o['y0'] - gy, dy1=o['y1'] - gy)
+ 
+-    def _drop_spot(self, o, rects, surf, blk):
++    def _drop_spot(self, o, rects, surf, blk, nxt=None):
+         r = self.r
+         xs = self.xs
+         others = {k: v for k, v in rects.items() if k != o['name']}
+@@ -295,8 +295,8 @@ class GeneratedApproach:
+             if all(abs(g - q) > 1e-4 for q in gcands):
+                 gcands.append(g)
+         cache = {}
+-        for margin in (0.03, 0.01):
+-            best = None
++        best = None
++        for margin, pen in ((0.03, 0.0), (0.01, 1.0)):
+             for gx in gcands:
+                 held = self._mk_held(o, gx, gy)
+                 c0 = self._est(r['x'], r['y'], gx, gy, P0, margin=0.0)
+@@ -307,24 +307,22 @@ class GeneratedApproach:
+                     x0, x1 = rx + held['dx0'], rx + held['dx1']
+                     if x0 < WORLD_X[0] or x1 > WORLD_X[1]:
+                         continue
+-                    if x1 > surf['x0'] - margin and x0 < surf['x1'] + margin:
+-                        continue
+-                    ok = True
+-                    for k, v in others.items():
+-                        if x1 > v['x0'] - margin and x0 < v['x1'] + margin:
+-                            ok = False
+-                            break
+-                    if not ok:
++                    if not self._free(x0, x1, margin, surf, others):
+                         continue
++                    if pen > 0 and self._free(x0, x1, 0.03, surf, others):
++                        continue  # already evaluated with the larger margin
+                     ry_low = max(gy + 0.003, P1[self._xi(rx)] + 0.004)
+                     for ry in np.arange(ry_low, ymax, 0.05)[:5]:
+                         c1 = self._est(gx, gy, rx, ry, P1)
+                         box = (x0, x1, ry + held['dy1'])
+                         P2n = np.maximum(P2, self._colprof(xs, box, None))
+-                        c2 = self._est(rx, ry, gxb, gyb, P2n)
++                        if nxt is not None:
++                            c2 = self._est(rx, ry, nxt[0], nxt[1], P2n)
++                        else:
++                            c2 = self._est(rx, ry, gxb, gyb, P2n)
+                         P3n = np.maximum(P3, self._colprof(xs, box, held_b))
+                         c3 = self._est(gxb, gyb, rxt, ryt, P3n)
+-                        cost = c0 + c1 + c2 + c3 + 0.01 * (ry - ry_low) + 0.001 * abs(gx - gl[0])
++                        cost = c0 + c1 + c2 + c3 + pen + 0.01 * (ry - ry_low) + 0.001 * abs(gx - gl[0])
+                         if best is None or cost < best[0]:
+                             bx = dict(x0=x0, x1=x1, y0=ry + held['dy0'], y1=ry + held['dy1'],
+                                       name='_box', type='rectangle')
+@@ -333,10 +331,19 @@ class GeneratedApproach:
+                                 cache[key] = self._box_ok(bx, grasps, tplace)
+                             if cache[key]:
+                                 best = (cost, rx, ry, gx)
+-            if best is not None:
+-                return best[1], best[2], best[3], gy
++        if best is not None:
++            return best[1], best[2], best[3], gy
+         return None
+ 
++    @staticmethod
++    def _free(x0, x1, margin, surf, others):
++        if x1 > surf['x0'] - margin and x0 < surf['x1'] + margin:
++            return False
++        for v in others.values():
++            if x1 > v['x0'] - margin and x0 < v['x1'] + margin:
++                return False
++        return True
++
+     def _grasp_blockers(self, o, rects):
+         """Names of objects preventing a top-down grasp of o (best offset)."""
+         r = self.r
+@@ -373,6 +380,7 @@ class GeneratedApproach:
+             elif o['type'] == 'target_block':
+                 blk = o
+         cands, held, gx, gy = self._place_candidates_target(blk, surf, rects)
++        nxt = None
+         if not cands or cands[0][0] == 0:
+             name = self._resolve(blk['name'], rects)
+             if name == blk['name']:
+@@ -387,8 +395,12 @@ class GeneratedApproach:
+             # remove the blocker closest to robot
+             blockers = sorted(blockers, key=lambda n: abs((rects[n]['x0'] + rects[n]['x1']) / 2 - self.r['x']))
+             name = self._resolve(blockers[0], rects)
++            rest = [n for n in blockers if n != name]
++            if rest:
++                q = rects[rest[0]]
++                nxt = (self._grasp_x(q, rects), q['y1'] + ARM_MAX + self.r['gw'] + self.grasp_eps)
+         o = rects[name]
+-        spot = self._drop_spot(o, rects, surf, blk)
++        spot = self._drop_spot(o, rects, surf, blk, nxt)
+         if spot is None:
+             rx = WORLD_X[0] + 0.15 if (o['x0'] > 0.8) else WORLD_X[1] - 0.15
+             gxx = self._grasp_x(o, rects)
+diff --git a/test_approach.py b/test_approach.py
+index 5b3c1f1..c42539c 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -25,5 +25,5 @@ if __name__ == '__main__':
+     with ThreadPoolExecutor(8) as ex:
+         res = list(ex.map(run, range(a, b)))
+     for r in res:
+-        if not r[2] or len(res)<20 or r[5] > 3: print(r)
++        if not r[2] or len(res)<20 or r[3] > 90: print(r)
+     print('max compute', max(r[5] for r in res)); print('success', sum(r[2] for r in res), '/', len(res), 'mean steps', np.mean([r[3] for r in res]))

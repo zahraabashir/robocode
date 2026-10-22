@@ -1,0 +1,38 @@
+diff --git a/approach.py b/approach.py
+index d5dea37..28b482d 100644
+--- a/approach.py
++++ b/approach.py
+@@ -46,12 +46,14 @@ class GeneratedApproach:
+                 self.destx=min(choices,key=cost)
+                 blocking=[o for o in obs if s.get(o,'x')<self.destx+bw+.004 and s.get(o,'x')+s.get(o,'width')>self.destx-.004 and s.get(o,'y')<sy+sh+bh+.04]
+                 self.obj=max(blocking,key=lambda o:s.get(o,'y')+s.get(o,'height')) if blocking else self.block
++                self.emptyheight=min(.75,max(s.get(o,'y')+s.get(o,'height') for o in s.get_objects(self.ot))+.225)
++                self.carryheight=min(.89,self.emptyheight+s.get(self.obj,'height')+.008)
+                 self.phase='above'
+             x,y,w,h=self.rect(s,self.obj)
+             if self.phase == 'above':
+-                if ry<.72: return self.action(s,y=.75)
++                if ry<self.emptyheight-.001: return self.action(s,y=self.emptyheight)
+                 grasp_x=float(np.clip(x+w/2,.101,1.517))
+-                if abs(rx-grasp_x)>.001: return self.action(s,x=grasp_x,y=.75)
++                if abs(rx-grasp_x)>.001: return self.action(s,x=grasp_x,y=self.emptyheight)
+                 self.phase='down'; self.n=0; self.last_down=None
+             if self.phase == 'down':
+                 self.n+=1
+@@ -62,7 +64,7 @@ class GeneratedApproach:
+                 self.pick_y=y; self.phase='lift';self.n=0
+             if self.phase == 'lift':
+                 self.n+=1
+-                if ry<.749:return self.action(s,y=.75,vac=1)
++                if ry<self.carryheight-.001:return self.action(s,y=self.carryheight,vac=1)
+                 if y < self.pick_y+.02:
+                     self.phase='down'; self.last_down=None
+                     return self.action(s,y=y+h+.195,vac=1)
+@@ -95,6 +97,6 @@ class GeneratedApproach:
+                 self.stashed.append(self.obj);self.phase='retreat'
+                 return self.action(s,vac=0)
+             if self.phase=='retreat':
+-                if ry<.749:return self.action(s,y=.75,vac=0)
++                if ry<self.emptyheight-.001:return self.action(s,y=self.emptyheight,vac=0)
+                 self.phase='select'
+         return self.action(s)

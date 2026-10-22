@@ -1,0 +1,14 @@
+diff --git a/approach.py b/approach.py
+index c3c6fee..e812c56 100644
+--- a/approach.py
++++ b/approach.py
+@@ -361,7 +361,8 @@ class GeneratedApproach:
+                 F[a][ci_] |= self._free_pts3(XX[ci_], YY[ci_], obstacles, ctip, A[a], m=0.001)
+         F[a0][0, j0] = True
+         for a in range(NA):
+-            F[a][2 * N, jg[a]] = True
++            gok = self._free_pts3(np.array([x1]), np.array([tipy1 + A[a] + GW]), obstacles, ctip, A[a], m=0.001)[0]
++            F[a][2 * N, jg[a]] = bool(gok)
+         INF = 1e9
+         J = np.arange(nl)
+         vc = np.ceil(np.abs(J[:, None] - J[None, :]) / K)

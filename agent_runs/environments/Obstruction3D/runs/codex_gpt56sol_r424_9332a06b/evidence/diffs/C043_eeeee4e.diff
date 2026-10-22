@@ -1,0 +1,19 @@
+diff --git a/approach.py b/approach.py
+index 78120fd..eead167 100644
+--- a/approach.py
++++ b/approach.py
+@@ -106,12 +106,8 @@ class GeneratedApproach:
+                 d=.04*self.cal_sign; a += self.B[:,self.cal_i]*d; a[10]=-1.
+                 self.last_pos=feat; self.last_delta=d; return a
+         if self.mode=="release":
+-            limit=30 if self.object_name=="target_block" else 60
+-            if self.release_t<limit:
+-                if self.object_name=="target_block":
+-                    g=np.array([self.release_x,self.dest[1],max(.20,pos[2]+.025)])
+-                else:
+-                    g=np.array([self.release_x,self.dest[1],self.rest_z-.005])
++            if self.release_t<60:
++                g=np.array([self.release_x,self.dest[1],self.rest_z-.005])
+                 er=np.r_[g-pos,-feat[3:]]
+                 u=np.linalg.solve(self.J.T@self.J+1e-5*np.eye(5),self.J.T@np.clip(er,-.03,.03))
+                 a += self.B@np.clip(u,-.05,.05)

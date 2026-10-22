@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 2150053..bce4c7f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -237,7 +237,7 @@ class GeneratedApproach:
+             # Once contact is established, keep following through in short
+             # closed-loop segments instead of paying to reacquire every time.
+             near_boundary = min(obj) < 0.96 or max(obj) > 4.04
+-            if self.force_move and moved > 0.18:
++            if self.force_move and moved > 0.34:
+                 self.force_move = False
+                 self.mode = "move_retreat"
+                 self.retreat_count = 0

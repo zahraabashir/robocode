@@ -1,0 +1,15 @@
+diff --git a/probe_geometry.py b/probe_geometry.py
+index 7030633..5f55156 100644
+--- a/probe_geometry.py
++++ b/probe_geometry.py
+@@ -7,8 +7,8 @@ for seed in range(12):
+  print('SEED',seed,'block',s[:6],'dims',s[12:16],'robot',s[16:22],'r',s[28],'goal',s[29:32],flush=True)
+ s,_=e.reset(seed=0)
+ for a in [[.05,0],[0,.05],[0,0],[-.05,-.05]]:
+- old=s.copy();s,r,t,tr,info=e.step(a)
++ old=s.copy();s,r,t,tr,info=e.step(np.array(a))
+  print('KIN',a,'dr',s[16:22]-old[16:22],'state',s[16:22],flush=True)
+-for k in range(30):s,*_=e.step([-.05,-.05])
++for k in range(30):s,*_=e.step(np.array([-.05,-.05]))
+ print('CORNER',s[16:22],flush=True)
+ e.close()

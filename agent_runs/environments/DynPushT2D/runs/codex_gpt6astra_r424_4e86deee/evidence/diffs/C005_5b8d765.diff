@@ -1,0 +1,53 @@
+diff --git a/approach.py b/approach.py
+new file mode 100644
+index 0000000..a58fccf
+--- /dev/null
++++ b/approach.py
+@@ -0,0 +1,18 @@
++"""Feedback pushing policy for a rigid T block."""
++import numpy as np
++import math
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.reset(None, {})
++
++    def reset(self, state, info):
++        self.step = 0
++
++    def get_action(self, state):
++        s = np.asarray(state)
++        direction = s[29:31] - s[:2]
++        direction /= max(np.linalg.norm(direction), 1e-9)
++        target = s[:2] - .8 * direction
++        self.step += 1
++        return np.clip(target - s[16:18], -.049, .049)
+diff --git a/canonical_state.json b/canonical_state.json
+new file mode 100644
+index 0000000..356ffab
+--- /dev/null
++++ b/canonical_state.json
+@@ -0,0 +1 @@
++[2.5, 2.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 2.0, 0.130331788788359, 1.1823741402459995, 1.1359062478663557, 1.0, 1.6369616873214543, 1.2697867137638703, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.19607843137254902, 0.19607843137254902, 1.0, 100.0, 0.1, 2.5, 2.5, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.5, 1.0, 0.5, 1.0, 0.130331788788359, 1.1823741402459995, 1.1359062478663557, 1.0]
+\ No newline at end of file
+diff --git a/test_approach.py b/test_approach.py
+new file mode 100644
+index 0000000..a29f060
+--- /dev/null
++++ b/test_approach.py
+@@ -0,0 +1,15 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import numpy as np
++import sys, time, json
++seeds=[int(x) for x in sys.argv[1:]] or list(range(10))
++for seed in seeds:
++ e=make_env();s,info=e.reset(seed=seed);p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,info)
++ start=time.time();trace=[s.tolist()];ok=False
++ for t in range(e.max_steps):
++  a=p.get_action(s);s,r,done,trunc,info=e.step(a);trace.append(s.tolist())
++  if done or trunc:ok=done;break
++ err=s[29:32]-s[:3];err[2]=(err[2]+np.pi)%(2*np.pi)-np.pi
++ print(seed,ok,t+1,'err',np.round(err,4),'secs',round(time.time()-start,2),flush=True)
++ with open('trace_%s.json'%seed,'w') as f:json.dump(trace,f)
++ e.close()

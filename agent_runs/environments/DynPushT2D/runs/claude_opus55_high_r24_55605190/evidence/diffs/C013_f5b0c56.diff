@@ -1,0 +1,118 @@
+diff --git a/approach.py b/approach.py
+index 0671973..7fcf888 100644
+--- a/approach.py
++++ b/approach.py
+@@ -94,6 +94,7 @@ class GeneratedApproach:
+     NSTEPS = 150
+     USE_CONTACT = True
+     REPLAN_K = 10
++    LOOK = 8
+ 
+     # ---------------- helpers ----------------
+     def err(self, ref, th, goal):
+@@ -209,7 +210,7 @@ class GeneratedApproach:
+             return (E0 - E) / (steps + self.RC)
+         return -(steps + E / self.V)
+ 
+-    def plan_push(self, s):
++    def plan_push(self, s, lookahead=0):
+         g = self.g
+         pose = s[0:3].copy()
+         goal = s[29:32]
+@@ -301,6 +302,8 @@ class GeneratedApproach:
+         results_len = np.zeros(K)
+         results_E = np.full(K, np.inf)
+         results_S = np.full(K, -np.inf)
++        results_ref = np.zeros((K, 2))
++        results_th = np.zeros(K)
+         mcu = np.max(np.abs(uw), 1)
+         stepcnt = standoff / ds
+         for k in range(1, nsteps + 1):
+@@ -331,14 +334,17 @@ class GeneratedApproach:
+             results_S = np.where(better, sc, results_S)
+             results_E = np.where(better, E, results_E)
+             results_len = np.where(better, k * ds, results_len)
++            results_ref = np.where(better[:, None], ref, results_ref)
++            results_th = np.where(better, th, results_th)
+ 
+         push_steps = results_len * mcu / AMAX + 3
+         order = np.argsort(-results_S)
+-        best_i, best_rate, best_path = None, -np.inf, None
++        feas = []
++        best_rate = -np.inf
+         for i in order[:60]:
+             if not np.isfinite(results_S[i]):
+                 break
+-            if self.MODE != 'rate_old' and results_S[i] <= best_rate:
++            if not lookahead and self.MODE != 'rate_old' and results_S[i] <= best_rate:
+                 break
+             if is_cont[i]:
+                 path, cost = [], -len(prefix)
+@@ -346,14 +352,33 @@ class GeneratedApproach:
+                 path, cost = self.nav_path(pose, start, pre[i])
+             if path is None:
+                 continue
+-            rate = self.score(E0, results_E[i], cost + len(prefix) + push_steps[i])
+-            if rate > best_rate:
+-                best_rate, best_i, best_path = rate, i, path
+-        if best_i is None:
++            steps = cost + len(prefix) + push_steps[i]
++            rate = self.score(E0, results_E[i], steps)
++            feas.append((rate, i, path, steps))
++            best_rate = max(best_rate, rate)
++            if lookahead and len(feas) >= 3 * lookahead:
++                break
++        if not feas:
+             return None
+-        i = best_i
+-        return dict(path=(prefix + best_path) if not is_cont[i] else [], u=uw[i], L=results_len[i] + so[i],
+-                    Epred=results_E[i], E0=E0)
++        feas.sort(key=lambda x: -x[0])
++        best = feas[0]
++        if lookahead and results_E[best[1]] > 0:
++            best_c = -np.inf
++            for (rate, i, path, steps) in feas[:lookahead]:
++                s2 = s.copy()
++                s2[0:2] = results_ref[i]
++                s2[2] = wrap(results_th[i])
++                s2[16:18] = pre[i] + uw[i] * (so[i] + results_len[i])
++                p2 = self.plan_push(s2, 0)
++                if p2 is None or results_E[i] <= 0:
++                    c = self.score(E0, results_E[i], steps)
++                else:
++                    c = self.score(E0, p2['Epred'], steps + p2['steps'])
++                if c > best_c:
++                    best_c, best = c, (rate, i, path, steps)
++        rate, i, path, steps = best
++        return dict(path=(prefix + path) if not is_cont[i] else [], u=uw[i], L=results_len[i] + so[i],
++                    Epred=results_E[i], E0=E0, steps=steps)
+ 
+     # ---------------- execution ----------------
+     def build_actions(self, robot, plan):
+@@ -387,11 +412,11 @@ class GeneratedApproach:
+             self.plan = []
+         if not self.plan:
+             self.push_count = 0
+-            p = self.plan_push(s)
++            p = self.plan_push(s, self.LOOK)
+             if p is None and max(self.margin) > 0:
+                 # predicted success but env did not terminate: tighten margins
+                 self.margin = tuple(0.5 * x for x in self.margin) if max(self.margin) > 0.01 else (0.0, 0.0, 0.0)
+-                p = self.plan_push(s)
++                p = self.plan_push(s, self.LOOK)
+             if p is None:
+                 # fallback: move away from the block, towards the arena centre
+                 com = s[0:2] + rot(s[2]) @ self.g.C
+diff --git a/timeit_plan.py b/timeit_plan.py
+new file mode 100644
+index 0000000..b0275e6
+--- /dev/null
++++ b/timeit_plan.py
+@@ -0,0 +1,7 @@
++import time, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++env=make_env(); ap=GeneratedApproach(None,None,{})
++for seed in range(5):
++    obs,info=env.reset(seed=seed); ap.reset(obs,info)
++    t0=time.time(); ap.plan_push(obs); print(time.time()-t0)

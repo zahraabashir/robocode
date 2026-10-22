@@ -1,0 +1,178 @@
+diff --git a/approach.py b/approach.py
+index 9e92b1e..26c8a0a 100644
+--- a/approach.py
++++ b/approach.py
+@@ -124,6 +124,7 @@ SAFE_FLOOR = 0.2
+ BASE_ASSIST = True
+ STEP_TRAVEL = 0.25
+ ASSIST_MINX = 0.2
++JOINT_TRAVEL = True
+ SAFE_CLR = 0.02
+ MOUNT_OFF = 0.12            # arm mount = base_xy + MOUNT_OFF * (cos rot, sin rot)
+ TABLE_X = (0.10, 0.50)
+@@ -550,7 +551,24 @@ class GeneratedApproach:
+                 self.cur = self.segs.pop(0)
+                 self.best_d = None
+                 self.stall = 0
++                self.jplan = None
+             seg = self.cur
++            if JOINT_TRAVEL and seg[0] == "move" and seg[3] == "travel" and self.jplan is None:
++                self.jplan = self._joint_plan(state, seg)
++            if self.jplan is not None and self.jplan is not False and seg[0] == "move":
++                if rejected:
++                    self.jplan = False
++                else:
++                    dq = self.jplan - q
++                    m = np.max(np.abs(dq))
++                    if m > 1e-4:
++                        lim = 0.2 * max(self.scale, 0.05)
++                        if m > lim:
++                            dq *= lim / m
++                        act[3:10] = dq.astype(np.float32)
++                        self.last_cmd = True
++                        return act
++                    self.jplan = False
+             if seg[0] == "grip":
+                 act[10] = seg[1]
+                 self.cur = None
+@@ -637,6 +655,53 @@ class GeneratedApproach:
+             return act
+         return act
+ 
++    def _req_z(self, boxes, xy, held, hb):
++        top = TABLE_TOP + 0.03
++        rad = 0.08
++        if held is not None:
++            ex, ey = self._extent_xy(boxes[held])
++            rad = max(rad, np.hypot(ex, ey) + 0.02)
++        for n, b in boxes.items():
++            if b["g"] > 0.5 or n == held:
++                continue
++            ex, ey = self._extent_xy(b)
++            if np.hypot(xy[0] - b["x"], xy[1] - b["y"]) > rad + np.hypot(ex, ey):
++                continue
++            top = max(top, b["z"] + b["hz"])
++        return top + SAFE_CLR + hb + FINGER
++
++    def _joint_plan(self, state, seg):
++        q = self._q(state)
++        base = self._base(state)
++        goal, yaw = seg[1], seg[2]
++        Tw = self._ee_world(q, base)
++        Rt = down_R(yaw) if yaw is not None else down_R(_yaw_of(Tw[:3, :3]))
++        boxes = self._boxes(state)
++        held = self._held(boxes)
++        hb = 0.0
++        if held is not None:
++            b = boxes[held]
++            hb = max(0.0, (Tw[2, 3] - FINGER) - (b["z"] - b["hz"]))
++        best = None
++        for sd in (q, self.q_nom, self.q_home):
++            qg, err = self._ik_world(sd, goal, Rt, base, iters=150)
++            if err > 1e-4:
++                continue
++            dqm = np.max(np.abs(qg - q))
++            if best is None or dqm < best[0]:
++                best = (dqm, qg)
++        if best is None:
++            return False
++        qg = best[1]
++        for sv in np.linspace(0.0, 1.0, 13)[1:-1]:
++            qs = q + sv * (qg - q)
++            T = self._ee_world(qs, base)
++            if T[2, 2] > -0.9:
++                return False
++            if T[2, 3] < self._req_z(boxes, T[:2, 3], held, hb) - 0.005:
++                return False
++        return qg
++
+     def _handle_reject(self, state):
+         seg = self.cur
+         tag = seg[3] if (seg[0] == "move" and len(seg) > 3) else None
+diff --git a/res_t.txt b/res_t.txt
+index 1d07efc..acabd4d 100644
+--- a/res_t.txt
++++ b/res_t.txt
+@@ -1,41 +1,41 @@
+-(0, 2, True, 37, 25.1, 0.28, 0.061)
+-(1, 1, True, 38, 31.7, 0.24, 0.02)
+-(2, 2, True, 61, 59.5, 0.42, 0.042)
+-(3, 2, True, 70, 37.3, 2.23, 0.124)
+-(4, 2, True, 44, 31.3, 0.29, 0.023)
+-(5, 2, True, 53, 32.6, 0.41, 0.038)
+-(6, 1, True, 28, 11.0, 0.82, 0.638)
+-(7, 2, True, 47, 33.9, 0.33, 0.041)
+-(8, 2, True, 35, 37.2, 0.2, 0.022)
+-(9, 1, True, 29, 22.5, 0.2, 0.032)
+-(10, 2, True, 31, 29.3, 0.19, 0.048)
+-(11, 0, True, 20, 18.6, 0.09, 0.015)
+-(12, 1, True, 42, 32.1, 0.28, 0.044)
+-(13, 2, True, 55, 47.5, 0.38, 0.05)
+-(14, 0, True, 14, 11.9, 0.07, 0.027)
+-(15, 2, True, 37, 28.2, 0.17, 0.031)
+-(16, 1, True, 29, 19.8, 0.14, 0.02)
+-(17, 2, True, 42, 39.0, 0.21, 0.022)
+-(18, 2, True, 29, 23.7, 0.16, 0.025)
+-(19, 1, True, 40, 28.0, 0.27, 0.05)
+-(20, 2, True, 48, 36.8, 0.25, 0.036)
+-(21, 0, True, 27, 30.4, 0.15, 0.023)
+-(22, 2, True, 26, 34.6, 0.13, 0.02)
+-(23, 0, True, 29, 36.2, 0.23, 0.052)
+-(24, 1, True, 18, 17.3, 0.1, 0.015)
+-(25, 1, True, 37, 45.2, 1.6, 1.441)
+-(26, 2, True, 27, 28.1, 0.13, 0.019)
+-(27, 0, True, 35, 42.8, 0.27, 0.027)
+-(28, 1, True, 56, 54.6, 1.03, 0.51)
+-(29, 2, True, 18, 18.3, 0.08, 0.018)
+-(30, 0, True, 22, 20.2, 0.14, 0.023)
+-(31, 1, True, 47, 43.8, 0.31, 0.025)
+-(32, 2, True, 37, 38.7, 0.34, 0.06)
+-(33, 2, True, 37, 35.1, 0.22, 0.03)
+-(34, 0, True, 16, 17.8, 0.12, 0.021)
+-(35, 0, True, 16, 18.8, 0.14, 0.04)
+-(36, 1, True, 24, 19.5, 0.17, 0.037)
+-(37, 0, True, 17, 11.1, 0.13, 0.021)
+-(38, 0, True, 17, 8.9, 0.19, 0.102)
+-(39, 2, True, 48, 5.8, 0.38, 0.043)
+-success 40 / 40 mean steps 34.575
++(0, 2, True, 42, 31.8, 0.43, 0.089)
++(1, 1, True, 36, 26.3, 0.18, 0.04)
++(2, 2, True, 59, 59.1, 0.34, 0.052)
++(3, 2, True, 35, 27.4, 0.29, 0.068)
++(4, 2, True, 44, 39.5, 0.37, 0.051)
++(5, 2, True, 56, 48.3, 0.51, 0.072)
++(6, 1, True, 34, 18.0, 0.29, 0.069)
++(7, 2, True, 45, 37.4, 0.33, 0.066)
++(8, 2, True, 43, 52.1, 0.25, 0.032)
++(9, 1, True, 27, 23.3, 0.19, 0.046)
++(10, 2, True, 34, 36.5, 0.24, 0.051)
++(11, 0, True, 19, 19.5, 0.08, 0.02)
++(12, 1, True, 38, 38.7, 0.21, 0.049)
++(13, 2, True, 55, 57.8, 0.27, 0.045)
++(14, 0, True, 12, 12.9, 0.06, 0.014)
++(15, 2, True, 38, 37.2, 0.17, 0.027)
++(16, 1, True, 28, 22.2, 0.23, 0.045)
++(17, 2, True, 45, 39.9, 0.3, 0.053)
++(18, 2, True, 29, 25.7, 0.17, 0.051)
++(19, 1, True, 42, 39.9, 0.29, 0.04)
++(20, 2, True, 52, 54.1, 0.26, 0.039)
++(21, 0, True, 25, 22.3, 0.14, 0.063)
++(22, 2, True, 29, 24.9, 0.14, 0.024)
++(23, 0, True, 26, 29.2, 0.09, 0.035)
++(24, 1, True, 20, 21.1, 0.08, 0.021)
++(25, 1, True, 43, 49.5, 0.16, 0.035)
++(26, 2, True, 33, 36.0, 0.14, 0.03)
++(27, 0, True, 26, 23.8, 0.09, 0.023)
++(28, 1, True, 42, 40.9, 0.18, 0.032)
++(29, 2, True, 18, 19.3, 0.08, 0.023)
++(30, 0, True, 26, 23.7, 0.07, 0.021)
++(31, 1, True, 44, 39.2, 0.16, 0.018)
++(32, 2, True, 37, 35.2, 0.18, 0.024)
++(33, 2, True, 42, 30.8, 0.27, 0.048)
++(34, 0, True, 16, 16.7, 0.04, 0.015)
++(35, 0, True, 17, 19.1, 0.06, 0.022)
++(36, 1, True, 25, 16.9, 0.12, 0.022)
++(37, 0, True, 20, 11.3, 0.07, 0.023)
++(38, 0, True, 17, 7.1, 0.07, 0.024)
++(39, 2, True, 54, 7.0, 0.28, 0.032)
++success 40 / 40 mean steps 34.325

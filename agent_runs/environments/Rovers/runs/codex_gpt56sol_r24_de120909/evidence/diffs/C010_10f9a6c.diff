@@ -1,0 +1,56 @@
+diff --git a/approach.py b/approach.py
+index c19bb42..eb63c00 100644
+--- a/approach.py
++++ b/approach.py
+@@ -49,7 +49,7 @@ class GeneratedApproach:
+         # The central wall is a fixed part of the arena but is intentionally not
+         # listed among observation objects.  Its narrow ends leave routes around
+         # it at the north and south edges.
+-        ans = [(0.0, -1.75, .03, .75)]
++        ans = [(0.0, 0.0, .03, 2.50)]
+         for o in self._get(s, "obstacle"):
+             ans.append((s.get(o,"x"), s.get(o,"y"), s.get(o,"half_x"), s.get(o,"half_y")))
+         # Lander is a physical obstacle; use a conservative footprint.
+@@ -89,7 +89,7 @@ class GeneratedApproach:
+             if self._seg_rect(p, q, rect, .01): return False
+         return True
+ 
+-    def _astar(self, start, goals, rects):
++    def _astar(self, start, goals, rects, tolerance=.18):
+         if not goals: return []
+         step = .20
+         # Lattice anchored at current location, keeping actions exactly feasible.
+@@ -104,7 +104,7 @@ class GeneratedApproach:
+             _,g,k=heapq.heappop(openq)
+             if g != cost.get(k): continue
+             p=pos(k)
+-            if any((p[0]-q[0])**2+(p[1]-q[1])**2 <= .19**2 for q in goals):
++            if any((p[0]-q[0])**2+(p[1]-q[1])**2 <= tolerance**2 for q in goals):
+                 end=k; break
+             for dx,dy in ((1,0),(-1,0),(0,1),(0,-1),(1,1),(1,-1),(-1,1),(-1,-1)):
+                 nk=(k[0]+dx,k[1]+dy); np_=pos(nk)
+@@ -153,7 +153,8 @@ class GeneratedApproach:
+                 q=(s.get(o,"x"),s.get(o,"y")); need.append((o,q))
+         if need:
+             # If we have an unsent image and can see lander, send opportunistically.
+-            if any(s.get(o,"have_image_rover%d"%i)>.5 for o in self._get(s,"objective")):
++            if any(s.get(o,"have_image_rover%d"%i)>.5 and s.get(o,"received_image")<.5
++                   for o in self._get(s,"objective")):
+                 q=self.radio[i]
+                 return ("send",pos) if math.dist(pos,q)<.16 else ("nav_send",q)
+             best=None
+@@ -203,9 +204,11 @@ class GeneratedApproach:
+             if task.startswith("nav") or task=="home":
+                 key=(task,round(target[0],2),round(target[1],2))
+                 if self.targets[i]!=key or not self.paths[i] or self.stalls[i]>=2:
+-                    radius=.24 if task=="nav_sample" else .12
+-                    goals=[target] if radius<.2 else self._candidates(state,target,radius,False)+[target]
+-                    self.paths[i]=self._astar(pos,goals,rects)
++                    if task=="nav_sample":
++                        goals=[target]; tolerance=.24
++                    else:
++                        goals=[target]; tolerance=.15
++                    self.paths[i]=self._astar(pos,goals,rects,tolerance)
+                     self.targets[i]=key; self.stalls[i]=0
+                 while self.paths[i] and math.dist(pos,self.paths[i][0])<.05: self.paths[i].pop(0)
+                 if self.paths[i]:

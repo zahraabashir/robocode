@@ -1,0 +1,269 @@
+diff --git a/approach.py b/approach.py
+index e998528..b32ce48 100644
+--- a/approach.py
++++ b/approach.py
+@@ -419,43 +419,54 @@ class GeneratedApproach:
+             F2 = propagate(G, P.free)
+             if F2[(P.hi, P.hj)] >= INF:
+                 continue
+-            st = stages[:-1] + [("send", None, G, F2)]
++            st = stages[:-1] + [("send_t", None, G, F2)]
+             new_actions[ri] = self._extract(P, st)
+         self.actions = new_actions
+ 
+     def _extract(self, P, stages):
+-        """Backtrack through stage fields; returns list of (x,y,op) targets."""
+-        hcell = (P.hi, P.hj)
+-        cell = hcell
++        """Backtrack through stage fields (waiting allowed); list of (x,y,op)."""
++        cell = (P.hi, P.hj)
+         k = len(stages) - 1
+-        v = stages[k][3][cell]
++        v = int(stages[k][3][cell])
+         seq = []
+         W = WIN
+         nx, ny = P.free.shape
+-        while True:
+-            name, arg, G, F = stages[k]
+-            if k == 0 and v == 0:
+-                break
+-            if name != "start" and G[cell] == v:
+-                Fp = stages[k - 1][3]
+-                op = (name, arg)
+-                k -= 1
+-                Fsrc = Fp
+-            else:
+-                op = None
+-                Fsrc = F
+-            found = None
+-            i, j = cell
++
++        def nb(Fsrc, i, j, cond):
++            best = None
+             for di in range(-W, W + 1):
+                 for dj in range(-W, W + 1):
+                     a, b = i + di, j + dj
+-                    if 0 <= a < nx and 0 <= b < ny and Fsrc[a, b] == v - 1:
+-                        if found is None or abs(di) + abs(dj) < found[1]:
+-                            found = ((a, b), abs(di) + abs(dj))
+-            if found is None:
++                    if 0 <= a < nx and 0 <= b < ny and cond(Fsrc[a, b]):
++                        c = abs(di) + abs(dj)
++                        if best is None or c < best[1]:
++                            best = ((a, b), c)
++            return best[0] if best else None
++
++        guard = 0
++        while not (k == 0 and v == 0) and guard < 5000:
++            guard += 1
++            name, arg, G, F = stages[k]
++            i, j = cell
++            timed = name == "send_t"
++            choice = None
++            for mode in (0, 1):
++                if k > 0:
++                    okop = (G[cell] == v) if (mode == 0 or timed) else (G[cell] <= v)
++                    if okop:
++                        Fp = stages[k - 1][3]
++                        c = nb(Fp, i, j, (lambda x: x == v - 1) if mode == 0 else (lambda x: x <= v - 1))
++                        if c is not None:
++                            choice = (c, (name.replace("_t", ""), arg), k - 1)
++                            break
++                c = nb(F, i, j, (lambda x: x == v - 1) if mode == 0 else (lambda x: x <= v - 1))
++                if c is not None:
++                    choice = (c, None, k)
++                    break
++            if choice is None:
+                 break
+-            seq.append((float(P.xs[cell[0]]), float(P.ys[cell[1]]), op))
+-            cell = found[0]
++            seq.append((float(P.xs[cell[0]]), float(P.ys[cell[1]]), choice[1]))
++            cell, k = choice[0], choice[2]
+             v -= 1
+         seq.reverse()
+         return seq
+diff --git a/dbg5.py b/dbg5.py
+new file mode 100644
+index 0000000..17410aa
+--- /dev/null
++++ b/dbg5.py
+@@ -0,0 +1,8 @@
++import sys
++from test_approach import *
++seed=int(sys.argv[1])
++env = make_env(); obs, info = env.reset(seed=seed)
++for o in obs:
++    print(o.name, [round(float(v),2) for v in obs.data[o]])
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++print([len(a) for a in ap.actions], getattr(ap,'pred',None))
+diff --git a/probe_occ_fit.py b/probe_occ_fit.py
+new file mode 100644
+index 0000000..a0020fe
+--- /dev/null
++++ b/probe_occ_fit.py
+@@ -0,0 +1,18 @@
++import numpy as np, math, re, sys, ast
++recs=[]
++for line in open(sys.argv[1]):
++    if not line.startswith('((('): continue
++    j,r=ast.literal_eval(line.strip())
++    if r.get('i') in (None,0): continue
++    P0,Q,h,d=j; b=((r['p1'][0]+r['prev'][0])/2,(r['p1'][1]+r['prev'][1])/2)
++    recs.append((r['p0'],b,h,d))
++def segd(p,a,b):
++    a,b,p=map(np.array,(a,b,p)); t=np.clip(np.dot(p-a,b-a)/np.dot(b-a,b-a),0,1); 
++    v=p-(a+t*(b-a)); return np.linalg.norm(v), np.sign(np.cross(b-a,p-a))
++def cam(p0):
++    x,y,th=p0; c,s=math.cos(th),math.sin(th); return (x+c*-0.087-s*-0.0125, y+s*-0.087+c*-0.0125)
++L=(-1.9,-2.0)
++for name,src in [('centre',lambda p:p[:2]),('cam',cam)]:
++    print(name)
++    for p0,b,h,d in recs:
++        dist,sg=segd(b,src(p0),L); print('  ',p0[:2],b,h,d,round(dist*sg,4))
+diff --git a/probe_occ_lib.py b/probe_occ_lib.py
+new file mode 100644
+index 0000000..841a475
+--- /dev/null
++++ b/probe_occ_lib.py
+@@ -0,0 +1,28 @@
++from probe_send_lib import E, SEL
++import numpy as np, math, time
++def setup(seed, P0, th0, Q, h1, wp1=()):
++    e=E(seed)
++    # rover1 to Q via waypoints
++    for w in list(wp1)+[Q]:
++        if not e.goto(1,*w,tol=1e-4,maxit=100): return e,'r1 blocked at %s'%(e.pose(1),)
++    e.turn(1,h1)
++    # rover0 sample
++    if not e.goto(0,1.28,-0.95+0.0,tol=1e-3): return e,'r0 blocked to sample'
++    e.act(0,(0,0,0),SEL['sample'])
++    if e.g('rover0','store_full')<0.5: return e,'sample failed'
++    if not e.goto(0,*P0,tol=1e-4): return e,'r0 blocked to P0 %s'%(e.pose(0),)
++    e.turn(0,th0)
++    return e,None
++def sweep(seed,P0,th0,Q,h1,d,step=0.004,n=60,wp1=()):
++    e,err=setup(seed,P0,th0,Q,h1,wp1)
++    if err: return dict(err=err)
++    p0=e.pose(0); hist=[]
++    for i in range(n):
++        before=e.pose(1)
++        mv=(d[0]*step,d[1]*step,0) if i>0 else (0,0,0)
++        e.step((0,0,0,SEL['send']),mv+(0,))
++        p1=e.pose(1)
++        if i>0 and (d[0] or d[1]) and abs(p1[0]-before[0])+abs(p1[1]-before[1])<1e-7: return dict(err='r1 stuck',p0=p0,p1=p1)
++        if e.feats('sample5')[6]>0.5:
++            return dict(i=i,p0=p0,p1=p1,prev=before if i>0 else None)
++    return dict(i=None,p0=p0,p1=e.pose(1))
+diff --git a/probe_occ_run1.out b/probe_occ_run1.out
+new file mode 100644
+index 0000000..e69de29
+diff --git a/probe_occ_run1.py b/probe_occ_run1.py
+new file mode 100644
+index 0000000..609220b
+--- /dev/null
++++ b/probe_occ_run1.py
+@@ -0,0 +1,16 @@
++from probe_occ_lib import *
++from concurrent.futures import ThreadPoolExecutor
++import json,sys
++L=(-1.9,-2.0)
++def online(P0,x):
++    t=(x-P0[0])/(L[0]-P0[0]); return (x,round(P0[1]+t*(L[1]-P0[1]),4))
++G=[((0.6,-0.35),-1.0),((0.6,-1.9),-0.8),((1.2,0.0),-0.5),((0.6,-0.35),-1.2),((0.6,-0.35),-0.3)]
++jobs=[]
++for P0,x in G:
++    for dy in (1,-1):
++        jobs.append((P0,online(P0,x),0.0,(0,dy)))
++def f(j):
++    P0,Q,h,d=j
++    return j, sweep(44,P0,math.pi,Q,h,d,step=0.005,n=90)
++with ThreadPoolExecutor(10) as ex:
++    for r in ex.map(f,jobs): print(r,flush=True)
+diff --git a/probe_occ_scan.py b/probe_occ_scan.py
+new file mode 100644
+index 0000000..53c5f52
+--- /dev/null
++++ b/probe_occ_scan.py
+@@ -0,0 +1,13 @@
++from probe_send_lib import *
++import time
++t=time.time()
++for seed in range(6):
++    e=E(seed)
++    out=[]
++    for o in e.obs:
++        if o.type.name in('sample','obstacle'):
++            out.append((o.name[:6],round(e.g(o.name,'x'),2),round(e.g(o.name,'y'),2)))
++    print(seed,out)
++print(e.feats('rover0'), [o.name for o in e.obs][:3], time.time()-t)
++for o in e.obs:
++    if o.type.name=='sample': print(o.name, e.feats(o.name)); break
+diff --git a/probe_occ_scan2.py b/probe_occ_scan2.py
+new file mode 100644
+index 0000000..fdb008c
+--- /dev/null
++++ b/probe_occ_scan2.py
+@@ -0,0 +1,15 @@
++from probe_send_lib import *
++from concurrent.futures import ThreadPoolExecutor
++def f(seed):
++    e=E(seed); pil=[];sm=[]
++    for o in e.obs:
++        n=o.name
++        if o.type.name=='obstacle' and e.g(n,'half_x')<0.1: pil.append((round(e.g(n,'x'),2),round(e.g(n,'y'),2)))
++        if o.type.name=='sample': sm.append((round(e.g(n,'x'),2),round(e.g(n,'y'),2)))
++    e.env.close()
++    bad=[p for p in pil if p[0]<1.0 and p[1]<0.3]
++    rs=[s for s in sm if s[0]>0.1 and s[1]<0.5]
++    return seed,len(bad),rs,bad
++with ThreadPoolExecutor(12) as ex:
++    for r in ex.map(f,range(6,66)):
++        if r[1]<=1 and r[2]: print(r)
+diff --git a/probe_occ_scan3.py b/probe_occ_scan3.py
+new file mode 100644
+index 0000000..c841fca
+--- /dev/null
++++ b/probe_occ_scan3.py
+@@ -0,0 +1,6 @@
++from probe_send_lib import *
++for seed in (44,54,61):
++    e=E(seed)
++    print(seed,[(round(e.g(o.name,'x'),2),round(e.g(o.name,'y'),2)) for o in e.obs if o.type.name=='obstacle' and e.g(o.name,'half_x')<0.1])
++    o=e.obs.get_object_from_name('sample0'); print(e.obs.data[o].shape, [f for f in ['x','y','z']])
++    e.env.close()
+diff --git a/probe_occ_t1.py b/probe_occ_t1.py
+new file mode 100644
+index 0000000..e368d06
+--- /dev/null
++++ b/probe_occ_t1.py
+@@ -0,0 +1,5 @@
++from probe_occ_lib import *
++import time
++t=time.time()
++r=sweep(44,(0.6,-0.35),math.pi,(-1.0,-1.406),0.0,(0,1),step=0.01,n=40)
++print(r,time.time()-t)
+diff --git a/probe_occ_t2.py b/probe_occ_t2.py
+new file mode 100644
+index 0000000..a3aee48
+--- /dev/null
++++ b/probe_occ_t2.py
+@@ -0,0 +1,6 @@
++from probe_occ_lib import *
++from concurrent.futures import ThreadPoolExecutor
++jobs=[((0.6,-0.35),(-0.5,0.0)),((0.6,-1.9),(-0.5,0.0)),((1.2,0.0),(-0.5,0.0)),((0.6,-0.35),(-1.0,-1.75))]
++def f(j): return j, sweep(44,j[0],math.pi,j[1],0.0,(0,0),n=2)
++with ThreadPoolExecutor(4) as ex:
++    for r in ex.map(f,jobs): print(r)
+diff --git a/probe_occ_t3.py b/probe_occ_t3.py
+new file mode 100644
+index 0000000..ec01b53
+--- /dev/null
++++ b/probe_occ_t3.py
+@@ -0,0 +1,7 @@
++from probe_occ_lib import *
++from probe_send_lib import diff
++e,err=setup(44,(0.6,-0.35),math.pi,(-0.5,0.0),0.0)
++print(err,e.feats('rover0'))
++a=e.flags()
++e.step((0,0,0,SEL['send']),(0,0,0,0))
++print(diff(a,e.flags()), e.last[0], e.last[3])

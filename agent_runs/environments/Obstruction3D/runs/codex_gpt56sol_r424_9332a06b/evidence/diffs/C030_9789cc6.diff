@@ -1,0 +1,44 @@
+diff --git a/approach.py b/approach.py
+index c534514..fedc5c4 100644
+--- a/approach.py
++++ b/approach.py
+@@ -40,6 +40,8 @@ class GeneratedApproach:
+         self.pick_poses=[]
+         for q2,q4,q6 in triples:
+             self.pick_poses.append((np.array([0.,q2,-np.pi,q4,0.,q6,np.pi/2]),.00135,None))
++        if name=="target_block" and self.region_hx>.027:
++            for item in self.pick_poses: item[0][6]+=np.pi/2
+         if name!="target_block":
+             # A second, highly folded grasp family reaches the tiny obstructions.
+             q=np.array([-1.6368,2.41,-2.6184,2.66,-1.0464,2.23,-1.8828])
+@@ -74,9 +76,9 @@ class GeneratedApproach:
+             cur=np.array([state.get(rob,"joint_%d"%j) for j in range(1,8)])
+             a[1]=np.clip(y-yoff-self._v(state,"robot","pos_base_y"),-.2,.2)
+             if bx is not None: a[0]=np.clip(bx-self._v(state,"robot","pos_base_x"),-.2,.2)
+-            a[3:10]=np.clip(target-cur,-.2,.2); a[10]=1. if self.pick_t<7 else -1.
++            a[3:10]=np.clip(target-cur,-.2,.2); a[10]=1. if self.pick_t<14 else -1.
+             self.pick_t+=1
+-            if self.pick_t>=12:
++            if self.pick_t>=20:
+                 self.pick_t=0; self.pick_i=(self.pick_i+1)%len(self.pick_poses); a[10]=1.
+             return a
+         pos=self._xyz(state,self.object_name); feat=self._feat(state)
+diff --git a/scan_rotated_pick.py b/scan_rotated_pick.py
+new file mode 100644
+index 0000000..df963ae
+--- /dev/null
++++ b/scan_rotated_pick.py
+@@ -0,0 +1,13 @@
++import concurrent.futures,numpy as np
++from env_client import make_env
++def v(s,n,f):return s.get(s.get_object_from_name(n),f)
++def run(off):
++ e=make_env();s,_=e.reset(seed=0,options={'object_count':0});x=v(s,'target_block','pose_x');y=v(s,'target_block','pose_y')
++ tar=np.array([0,.25,-np.pi,-2.2,0,-.6,np.pi])
++ for t in range(15):
++  r=s.get_object_from_name('robot');cur=np.array([s.get(r,'joint_%d'%i) for i in range(1,8)]);a=np.zeros(11,np.float32)
++  a[1]=np.clip(y+off-v(s,'robot','pos_base_y'),-.2,.2);a[3:10]=np.clip(tar-cur,-.2,.2);a[10]=1 if t<9 else -1;s,*_=e.step(a)
++  if v(s,'target_block','grasp_active')>.5:e.close();return off,True
++ e.close();return off,False
++with concurrent.futures.ThreadPoolExecutor(max_workers=9) as ex:
++ print(list(ex.map(run,np.linspace(-.08,.08,9))))

@@ -1,0 +1,12 @@
+diff --git a/approach.py b/approach.py
+index 6fe2cf5..4266e22 100644
+--- a/approach.py
++++ b/approach.py
+@@ -208,6 +208,7 @@ class GeneratedApproach:
+             # Release immediately upon arrival or after crossing the goal;
+             # another inward step can overshoot substantially under contact.
+             if pd < 0.022 or np.dot(dp, self.push_dir) < 0.0:
++                self.force_move = False
+                 self.mode = "move_retreat"
+                 return self._safe(-self.push_dir, 0.018)
+             # Once contact is established, keep following through in short

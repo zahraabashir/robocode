@@ -1,0 +1,169 @@
+diff --git a/candidate_strategy.py b/candidate_strategy.py
+new file mode 100644
+index 0000000..cc1fffa
+--- /dev/null
++++ b/candidate_strategy.py
+@@ -0,0 +1,125 @@
++"""Experimental policy for DynPushT2D, kept separate from the submitted approach."""
++import math
++import numpy as np
++
++
++def wrap_angle(x):
++    return (x + math.pi) % (2.0 * math.pi) - math.pi
++
++
++class CandidateStrategy:
++    def __init__(self, action_space, observation_space, primitives):
++        self.low = np.asarray(action_space.low, dtype=float)
++        self.high = np.asarray(action_space.high, dtype=float)
++        self.phase = "select"
++        self.mode = None
++        self.side = 1.0
++        self.ticks = 0
++
++    def reset(self, state, info):
++        self.phase = "select"
++        self.mode = None
++        self.side = 1.0
++        self.ticks = 0
++
++    @staticmethod
++    def _unit(v):
++        n = float(np.linalg.norm(v))
++        return v / n if n > 1e-9 else np.zeros(2)
++
++    def _move(self, robot, target, gain=1.0):
++        return np.clip((target - robot) * gain, self.low, self.high)
++
++    def _select(self, s):
++        c = s[0:2]
++        goal = s[29:31]
++        ae = wrap_angle(float(s[31] - s[2]))
++        pe = float(np.linalg.norm(goal - c))
++        # Pose accuracy requires repeatedly correcting the orientation disturbed by
++        # translation.  Angle gets priority except very close to its tolerance.
++        if abs(ae) > 0.10:
++            self.mode = "rotate"
++            self.side = 1.0 if ae >= 0 else -1.0
++        elif pe > 0.022:
++            self.mode = "translate"
++        else:
++            self.mode = "rotate"
++            self.side = 1.0 if ae >= 0 else -1.0
++        self.phase = "retreat"
++        self.ticks = 0
++
++    def _geometry(self, s):
++        c = np.asarray(s[0:2], dtype=float)
++        robot = np.asarray(s[16:18], dtype=float)
++        if self.mode == "translate":
++            force = self._unit(np.asarray(s[29:31]) - c)
++            # Contact somewhere on the rear-facing support surface.
++            contact = c - force * 0.52
++            setup = c - force * 0.83
++        else:
++            th = float(s[2])
++            ex = np.array([math.cos(th), math.sin(th)])
++            ey = np.array([-math.sin(th), math.cos(th)])
++            # Push tangentially on the positive local-x end. side is torque sign.
++            contact = c + ex * (0.40 * float(s[13]))
++            force = ey * self.side
++            setup = contact - force * 0.30
++        return c, robot, contact, setup, force
++
++    def get_action(self, state):
++        s = np.asarray(state, dtype=float)
++        self.ticks += 1
++        if self.phase == "select":
++            self._select(s)
++        c, robot, contact, setup, force = self._geometry(s)
++
++        # Use a collision-free polar repositioning maneuver around the object.
++        ray = self._unit(setup - c)
++        radius = 0.88
++        rvec = robot - c
++        rdist = float(np.linalg.norm(rvec))
++        rang = math.atan2(rvec[1], rvec[0])
++        tang = math.atan2(ray[1], ray[0])
++        adiff = wrap_angle(tang - rang)
++
++        if self.phase == "retreat":
++            if rdist >= radius - 0.04:
++                self.phase = "orbit"
++            else:
++                outward = self._unit(rvec)
++                if np.linalg.norm(outward) < 0.5:
++                    outward = ray
++                return self._move(robot, c + outward * radius)
++
++        if self.phase == "orbit":
++            if abs(adiff) < 0.10:
++                self.phase = "approach"
++            else:
++                # A look-ahead point gives smooth travel around the clearance circle.
++                stepang = rang + max(-0.35, min(0.35, adiff))
++                waypoint = c + radius * np.array([math.cos(stepang), math.sin(stepang)])
++                return self._move(robot, waypoint)
++
++        if self.phase == "approach":
++            if np.linalg.norm(robot - setup) < 0.055:
++                self.phase = "push"
++                self.ticks = 0
++            else:
++                return self._move(robot, setup)
++
++        if self.phase == "push":
++            ae = wrap_angle(float(s[31] - s[2]))
++            pe = float(np.linalg.norm(s[29:31] - c))
++            done = ((self.mode == "rotate" and (abs(ae) < 0.065 or self.ticks > 55)) or
++                    (self.mode == "translate" and (pe < 0.020 or abs(ae) > 0.16 or self.ticks > 90)))
++            if done:
++                self.phase = "select"
++            # Aim through the selected contact, then continue in the desired force direction.
++            aim = contact + force * 0.35
++            return self._move(robot, aim)
++
++        return np.zeros(2)
++
++
++# Allows the same test harness shape as approach.py.
++GeneratedApproach = CandidateStrategy
+diff --git a/test_candidate_strategy.py b/test_candidate_strategy.py
+new file mode 100644
+index 0000000..458b497
+--- /dev/null
++++ b/test_candidate_strategy.py
+@@ -0,0 +1,32 @@
++from env_client import make_env
++from candidate_strategy import CandidateStrategy
++import numpy as np
++import sys
++
++
++def run(seed, verbose=False):
++    env = make_env()
++    obs, info = env.reset(seed=seed)
++    policy = CandidateStrategy(env.action_space, env.observation_space, env.make_primitives())
++    policy.reset(obs, info)
++    initial = obs.copy()
++    for step in range(env.max_steps):
++        obs, reward, term, trunc, info = env.step(policy.get_action(obs))
++        if verbose and (step % 100 == 99 or term or trunc):
++            ae = (obs[31] - obs[2] + np.pi) % (2*np.pi) - np.pi
++            print(seed, step + 1, policy.mode, policy.phase, "poserr", round(float(np.linalg.norm(obs[29:31]-obs[0:2])), 3), "angerr", round(float(ae), 3))
++        if term or trunc:
++            break
++    env.close()
++    ae = (obs[31] - obs[2] + np.pi) % (2*np.pi) - np.pi
++    return term, step + 1, float(np.linalg.norm(obs[29:31]-obs[0:2])), abs(float(ae)), initial, obs
++
++
++if __name__ == "__main__":
++    seeds = [int(x) for x in sys.argv[1:]] or list(range(10))
++    results = []
++    for seed in seeds:
++        result = run(seed, verbose=True)
++        results.append(result)
++        print("RESULT", seed, result[:4])
++    print("SUMMARY", sum(r[0] for r in results), "/", len(results), "mean_steps", np.mean([r[1] for r in results]))

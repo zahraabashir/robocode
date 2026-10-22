@@ -1,0 +1,33 @@
+diff --git a/approach_v2.py b/approach_v2.py
+index 47390c4..a55dc27 100644
+--- a/approach_v2.py
++++ b/approach_v2.py
+@@ -112,7 +112,7 @@ class GeneratedApproach:
+             qs = np.array(q0, dtype=float)
+             if attempt > 0:
+                 qs = qs + self.rng.uniform(-0.4, 0.4, 7)
+-            q, ok = kin.ik(self.base, qs, np.asarray(p, float), R, iters=100, tol=1e-5)
++            q, ok = kin.ik(self.base, qs, np.asarray(p, float), R, iters=100, tol=1e-5, lim=JLIM - 0.02)
+             if ok and np.all(np.abs(q) <= JLIM):
+                 return q, True
+             if best is None:
+diff --git a/kin.py b/kin.py
+index c2d8575..e62d77e 100644
+--- a/kin.py
++++ b/kin.py
+@@ -59,7 +59,7 @@ def topdown_R(yaw):
+     Rz = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+     return Rz @ np.array([[0, 1, 0], [1, 0, 0], [0, 0, -1.0]])
+ 
+-def ik(base, q0, p, R, iters=200, tol=1e-4, wrot=0.5, tool=None, base_z=None):
++def ik(base, q0, p, R, iters=200, tol=1e-4, wrot=0.5, tool=None, base_z=None, lim=None):
+     q = np.array(q0, dtype=float)
+     for it in range(iters):
+         T = fk(base, q, tool, base_z)
+@@ -77,4 +77,6 @@ def ik(base, q0, p, R, iters=200, tol=1e-4, wrot=0.5, tool=None, base_z=None):
+         n = np.linalg.norm(dq)
+         if n > 0.3: dq *= 0.3 / n
+         q += dq
++        if lim is not None:
++            q = np.clip(q, -lim, lim)
+     return q, False

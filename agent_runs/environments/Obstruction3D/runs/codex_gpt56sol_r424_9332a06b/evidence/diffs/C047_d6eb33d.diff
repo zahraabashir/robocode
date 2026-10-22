@@ -1,0 +1,14 @@
+diff --git a/approach.py b/approach.py
+index 40fb667..6affe18 100644
+--- a/approach.py
++++ b/approach.py
+@@ -112,7 +112,8 @@ class GeneratedApproach:
+                 u=np.linalg.solve(self.J.T@self.J+1e-5*np.eye(5),self.J.T@np.clip(er,-.03,.03))
+                 a += self.B@np.clip(u,-.05,.05)
+             a[10]=1.; self.release_t+=1; return a
+-        goals=[np.array([pos[0],pos[1],.24]),np.array([self.dest[0],self.dest[1],.24]),
++        clearance=.19
++        goals=[np.array([pos[0],pos[1],clearance]),np.array([self.dest[0],self.dest[1],clearance]),
+                np.array([self.dest[0],self.dest[1],self.rest_z+.005])]
+         goal=goals[self.waypoint]; poserr=goal-pos
+         err=np.r_[poserr, -feat[3:]]

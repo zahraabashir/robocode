@@ -1,0 +1,48 @@
+# Human pilot with Claude through the Claude Code CLI, billed to your claude.ai
+# subscription (no API key). The CLI must be logged in (`claude auth status`).
+# If `claude` is not on your PATH, point the repo at the VS Code extension's copy:
+#   export ROBOCODE_CLAUDE_CMD="$HOME/.vscode/extensions/anthropic.claude-code-2.1.301-darwin-arm64/resources/native-binary/claude"
+#   python experiments/explanations/serve_study.py --config experiments/explanations/conf/pilot_claude.yaml
+
+study_id: pilot_claude_v1
+study_seed: 0
+output_dir: outputs/explanations/${study_id}
+
+policy_root: agent_runs
+envs: [Obstruction2D] #, DynPushT2D, Rovers]
+
+test_bank_dir: outputs/explanations/test_banks/o2d_dpt_rovers_v1
+test_bank:
+  seeds: [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112]
+  object_counts: [null]
+  max_steps: 400
+  require_same_outcome: true
+  require_solved: false
+  min_divergence: 0.05
+  tests_per_pair: 2
+  frame_stride: 2
+  fps: 15
+
+num_rounds: 8
+num_eval_rounds: 3
+balance_difficulty: true
+conditions: [no_learning, understanding_only, understanding_preference]
+
+# provider: cli drives `claude -p` with tools and system prompt removed
+# (see src/robocode/utils/llm/cli_client.py).
+explainer_llm:
+  provider: cli
+  model: claude-opus-5-5
+  request_timeout_s: 600.0
+  max_thinking_tokens: 0
+updater_llm:
+  provider: cli
+  model: claude-opus-5-5
+  request_timeout_s: 600.0
+  max_thinking_tokens: 0
+
+ui:
+  host: 127.0.0.1
+  port: 8765
+  show_explanation_during_test: false
+  reveal_correctness: false

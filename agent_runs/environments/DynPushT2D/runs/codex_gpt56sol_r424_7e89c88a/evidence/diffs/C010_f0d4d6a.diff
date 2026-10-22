@@ -1,0 +1,81 @@
+diff --git a/probe_geometry.py b/probe_geometry.py
+index a8e06dc..2321799 100644
+--- a/probe_geometry.py
++++ b/probe_geometry.py
+@@ -24,7 +24,8 @@ def go(env, obs, target, speed=0.05, max_steps=100):
+         delta = np.asarray(target, float) - obs[16:18]
+         if np.linalg.norm(delta) < 1e-4:
+             break
+-        act = np.clip(delta, -speed, speed)
++        norm = np.linalg.norm(delta)
++        act = delta if norm <= speed else delta * (speed / norm)
+         before = obs.copy()
+         obs, _, term, trunc, _ = env.step(act)
+         out.append((before, act.copy(), obs.copy()))
+@@ -65,7 +66,10 @@ def ray(seed, angle, start_dist=0.45, end_dist=-0.05, speed=0.005):
+     target = c0 + d * end_dist
+     for k in range(160):
+         prev = obs.copy()
+-        obs, _, term, trunc, _ = env.step(np.clip(target - obs[16:18], -speed, speed))
++        delta = target - obs[16:18]
++        norm = np.linalg.norm(delta)
++        act = delta if norm <= speed else delta * (speed / norm)
++        obs, _, term, trunc, _ = env.step(act)
+         change = np.linalg.norm(obs[:2] - prev[:2]) + abs(obs[2] - prev[2])
+         if change > 1e-7 and first is None:
+             first = (k, prev.copy(), obs.copy())
+@@ -90,9 +94,41 @@ def ray(seed, angle, start_dist=0.45, end_dist=-0.05, speed=0.005):
+     env.close()
+ 
+ 
++def natural(seed, speed=0.005):
++    """Approach directly from the reset robot location (no placement artifacts)."""
++    env = make_env()
++    obs, _ = env.reset(seed=seed)
++    initial = obs.copy()
++    first = None
++    for k in range(1000):
++        prev = obs.copy()
++        delta = obs[:2] - obs[16:18]
++        norm = np.linalg.norm(delta)
++        act = delta if norm <= speed else delta * (speed / norm)
++        obs, _, term, trunc, _ = env.step(act)
++        change = np.linalg.norm(obs[:2] - prev[:2]) + abs(obs[2] - prev[2])
++        if change > 1e-7:
++            first = (k, prev.copy(), obs.copy())
++            break
++        if term or trunc:
++            break
++    if first is None:
++        print(seed, "NO CONTACT")
++    else:
++        k, before, after = first
++        rel = before[16:18] - before[:2]
++        ct, st = math.cos(-before[2]), math.sin(-before[2])
++        local = np.array([[ct, -st], [st, ct]]) @ rel
++        a = math.atan2(local[1], local[0])
++        print(seed, "theta", round(float(initial[2]), 4), "local_ray", round(a, 4),
++              "contact_local", np.round(local, 5), "dist", round(float(np.linalg.norm(local)), 5),
++              "dblock", np.round(after[:3] - before[:3], 7))
++    env.close()
++
++
+ if __name__ == "__main__":
+     ap = argparse.ArgumentParser()
+-    ap.add_argument("mode", choices=["brief", "free", "rays"])
++    ap.add_argument("mode", choices=["brief", "free", "rays", "natural"])
+     ap.add_argument("--seed", type=int, default=0)
+     args = ap.parse_args()
+     if args.mode == "brief":
+@@ -100,7 +136,10 @@ if __name__ == "__main__":
+             brief(s)
+     elif args.mode == "free":
+         free_motion(args.seed, [0.05, 0.0])
+-    else:
++    elif args.mode == "rays":
+         env = make_env(); o, _ = env.reset(seed=args.seed); th = float(o[2]); env.close()
+         for local_angle in np.linspace(0, 2 * math.pi, 12, endpoint=False):
+             ray(args.seed, th + local_angle)
++    else:
++        for s in range(40):
++            natural(s)

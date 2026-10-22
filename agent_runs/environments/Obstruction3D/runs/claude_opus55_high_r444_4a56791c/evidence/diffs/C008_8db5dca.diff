@@ -1,0 +1,104 @@
+diff --git a/approach.py b/approach.py
+index 3a56f8f..0a82704 100644
+--- a/approach.py
++++ b/approach.py
+@@ -129,7 +129,7 @@ class GeneratedApproach:
+     def _tool(self, q):
+         return kin.fk(self.base, q)
+ 
+-    def _finger_boxes(self, x, y, yaw, inner=0.041, outer=0.068, half_across=0.017):
++    def _finger_boxes(self, x, y, yaw, inner=0.042, outer=0.067, half_across=0.015):
+         d = np.array([-np.sin(yaw), np.cos(yaw)])
+         a = np.array([np.cos(yaw), np.sin(yaw)])
+         c = 0.5 * (inner + outer)
+@@ -137,7 +137,7 @@ class GeneratedApproach:
+         return [(np.array([x, y]) + sgn * c * d, d, a, hl, half_across) for sgn in (1, -1)]
+ 
+     @staticmethod
+-    def _box_hits_obj(box, b, infl=0.004):
++    def _box_hits_obj(box, b, infl=0.003):
+         """SAT test: oriented finger box vs object footprint (yawed rectangle)."""
+         cen, d, a, hd, ha = box
+         cy, sy = np.cos(b.yaw), np.sin(b.yaw)
+@@ -154,6 +154,8 @@ class GeneratedApproach:
+     def _grasp_candidates(self, o, objs):
+         """list of (score, yaw, x, y, blockers) grasp candidates for object o."""
+         out = []
++        near = [(n, b) for n, b in objs.items() if n != o.name and n != 'target_region'
++                and np.linalg.norm(b.p[:2] - o.p[:2]) < 0.16]
+         for k in range(2):
+             yaw = o.yaw + k * np.pi / 2
+             d = np.array([-np.sin(yaw), np.cos(yaw)])
+@@ -162,15 +164,15 @@ class GeneratedApproach:
+             wa = abs(a @ o.R[:2, 0]) * o.h[0] + abs(a @ o.R[:2, 1]) * o.h[1]
+             if wd > 0.041:
+                 continue
+-            smax = max(0.0, 0.037 - wd)
+-            amax = max(0.0, wa - 0.004)
+-            for sd in [0.0, 0.5 * smax, -0.5 * smax, smax, -smax]:
+-                for sa in [0.0, 0.5 * amax, -0.5 * amax, amax, -amax]:
++            smax = max(0.0, min(0.019, 0.040 - wd))
++            amax = wa + 0.003
++            sds = np.linspace(-smax, smax, 7) if smax > 0 else [0.0]
++            sas = np.linspace(-amax, amax, 7)
++            for sd in sds:
++                for sa in sas:
+                     x, y = o.p[:2] + sd * d + sa * a
+                     blockers = []
+-                    for n, b in objs.items():
+-                        if n == o.name or n == 'target_region':
+-                            continue
++                    for n, b in near:
+                         for box in self._finger_boxes(x, y, yaw):
+                             if self._box_hits_obj(box, b):
+                                 blockers.append(n)
+diff --git a/dbg3.py b/dbg3.py
+index d540f4e..5fa63d2 100644
+--- a/dbg3.py
++++ b/dbg3.py
+@@ -4,7 +4,7 @@ import numpy as np, kin
+ from approach import GeneratedApproach
+ seed=int(sys.argv[1]); N=int(sys.argv[2])
+ env = make_env()
+-obs, info = env.reset(seed=seed)
++obs, info = env.reset(seed=seed, options=({'object_count': int(sys.argv[3])} if len(sys.argv)>3 else None))
+ ap = GeneratedApproach(env.action_space, env.observation_space, {})
+ t0=time.time()
+ ap.reset(obs, info)
+@@ -15,9 +15,10 @@ def nt(state):
+ ap._next_task = nt
+ oa=ap._abort
+ def ab(state):
+-    T=kin.fk(ap.base, ap._q(state)); print('ABORT step', ap.steps, 'tool', np.round(T[:3,3],3)); oa(state)
++    T=kin.fk(ap.base, ap._q(state)); print('ABORT step', ap.steps, 'tool', np.round(T[:3,3],3), 'q', np.round(ap._q(state),3), 'target', np.round(ap.plan[0][1],3), 'tgt tool', np.round(kin.fk(ap.base, ap.plan[0][1])[:3,3],3)); oa(state)
+ ap._abort=ab
+ for t in range(N):
++    pass
+     a = ap.get_action(obs)
+     obs, r, term, trunc, info = env.step(a)
+     if term: print('SOLVED', t+1); break
+diff --git a/test_approach.py b/test_approach.py
+index f645e61..69b3499 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -2,9 +2,10 @@ import sys, time
+ from env_client import make_env
+ import numpy as np
+ from approach import GeneratedApproach
++OC=None
+ def run(seed, verbose=False):
+     env = make_env()
+-    obs, info = env.reset(seed=seed)
++    obs, info = env.reset(seed=seed, options=({'object_count': OC} if OC else None))
+     ap = GeneratedApproach(env.action_space, env.observation_space, {})
+     t0=time.time(); ap.reset(obs, info)
+     n = len(obs.get_object_names())-3
+@@ -16,6 +17,8 @@ def run(seed, verbose=False):
+     env.close(); return False, t+1, n, time.time()-t0
+ if __name__ == '__main__':
+     seeds = range(int(sys.argv[1]), int(sys.argv[2]))
++    if len(sys.argv) > 3:
++        OC = int(sys.argv[3])
+     from concurrent.futures import ProcessPoolExecutor as ThreadPoolExecutor
+     with ThreadPoolExecutor(8) as ex:
+         res = list(ex.map(run, seeds))

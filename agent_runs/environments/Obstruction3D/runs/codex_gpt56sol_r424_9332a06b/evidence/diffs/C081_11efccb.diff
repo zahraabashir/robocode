@@ -1,0 +1,16 @@
+diff --git a/approach.py b/approach.py
+index 4e3f492..1c56a38 100644
+--- a/approach.py
++++ b/approach.py
+@@ -72,7 +72,10 @@ class GeneratedApproach:
+         else:
+             # Keep edge drops inside the arm's well-conditioned x workspace;
+             # wider spacing can leave a short-arm grasp unable to descend.
+-            k=self.task_i; self.dest=np.array([.16+.03*(k%4),-.36 if k%2==0 else .36])
++            k=self.task_i
++            # Advance each side independently, keeping the early drops in the
++            # arm's reliable x band while still avoiding pile-up.
++            self.dest=np.array([.16+.03*((k+1)//2),-.36 if k%2==0 else .36])
+             self.rest_z=.075+self._v(state,name,"half_extent_z")
+     def _held(self,s): return self._v(s,self.object_name,"grasp_active")>.5
+     def _feat(self,s):

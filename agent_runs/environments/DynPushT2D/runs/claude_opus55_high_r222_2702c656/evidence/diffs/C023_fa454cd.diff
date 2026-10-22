@@ -1,0 +1,133 @@
+diff --git a/approach.py b/approach.py
+index 7ef7c0e..df89217 100644
+--- a/approach.py
++++ b/approach.py
+@@ -96,6 +96,7 @@ class GeneratedApproach:
+         self.lam = 0.3
+         self.kres = 1.2
+         self.lookahead = True
++        self.rot_la = True
+         self.goal_mode = False
+         self.wall_m = 0.3
+         self.rot_chunk = 1.2
+@@ -228,7 +229,12 @@ class GeneratedApproach:
+                 pf = cw + Rr @ (B.p - cw)
+                 resid = float(np.linalg.norm(g - pf))
+                 path = self.path_len(B, self.rp, B.to_world(p - n * (R_ROBOT + 0.04)))
+-                cost = (path + abs(dth) * arm + self.kres * resid) / 0.05 + (self.kpush if resid > 0.03 else 0.0)
++                if self.rot_la:
++                    B1 = B.moved(pf, B.th + dth)
++                    rob1 = B1.to_world(p - n * R_ROBOT)
++                    cost = (path + abs(dth) * arm) / 0.05 + self.trans_cost(B1, rob1, g - pf)
++                else:
++                    cost = (path + abs(dth) * arm + self.kres * resid) / 0.05 + (self.kpush if resid > 0.03 else 0.0)
+                 # wall check along the predicted rotation
+                 v = -1e9
+                 for f in (0.25, 0.5, 0.75, 1.0):
+@@ -281,6 +287,27 @@ class GeneratedApproach:
+         return np.array([c * nw[0] - s_ * nw[1], s_ * nw[0] + c * nw[1]])
+ 
+     def pick_trans(self, B, prims, err):
++        cands3 = self.trans_cands(B, prims, err)
++        for s_, pr_, dm_ in cands3:
++            self._dmax[pr_[0]] = dm_
++        cands = [(c[0], c[1]) for c in cands3]
++        if not cands:
++            return None
++        smax = max(c[0] for c in cands)
++        if self.lookahead and smax > 0.02 and self.goal_mode:
++            return self.pick_trans_la(B, cands3, err, self.rp)[0]
++        best, bs = None, -1e9
++        for s, pr in cands:
++            if s < smax * 0.6 and s < smax:
++                continue
++            if self.lam_t > 0 and smax > 0.02:
++                p, n = pr[1], pr[2]
++                s = s - self.lam_t * self.path_len(B, self.rp, B.to_world(p - n * (R_ROBOT + 0.04)))
++            if s > bs:
++                bs, best = s, pr
++        return best
++
++    def trans_cands(self, B, prims, err):
+         cands = []
+         for pr in prims:
+             name, p, n, k, tq = pr
+@@ -302,39 +329,24 @@ class GeneratedApproach:
+                     dmax = t
+                 if dmax < s:
+                     s = dmax - 0.02
+-            self._dmax[pr[0]] = dmax
+             if k == 'f':
+                 s = s * 0.6 - 0.01
+-            cands.append((s, pr))
+-        if not cands:
+-            return None
+-        smax = max(c[0] for c in cands)
+-        if self.lookahead and smax > 0.02 and self.goal_mode:
+-            return self.pick_trans_la(B, cands, err, smax)
+-        best, bs = None, -1e9
+-        for s, pr in cands:
+-            if s < smax * 0.6 and s < smax:
+-                continue
+-            if self.lam_t > 0 and smax > 0.02:
+-                p, n = pr[1], pr[2]
+-                s = s - self.lam_t * self.path_len(B, self.rp, B.to_world(p - n * (R_ROBOT + 0.04)))
+-            if s > bs:
+-                bs, best = s, pr
+-        return best
++            cands.append((s, pr, dmax))
++        return cands
+ 
+-    def pick_trans_la(self, B, cands, err, smax):
++    def pick_trans_la(self, B, cands, err, rp):
+         best, bc = None, 1e18
+         if any(c[1][3] == 't' and c[0] > 0.004 for c in cands):
+             cands = [c for c in cands if c[1][3] == 't']
+-        for s, pr in cands:
++        for s, pr, dm in cands:
+             if s <= 0.004:
+                 continue
+             name, p, n, k, tq = pr
+             nw = B.dir_world(n)
+-            d = min(self._dmax.get(name, s), float(nw @ err))
++            d = min(dm, float(nw @ err))
+             if d <= 0.004:
+                 continue
+-            path1 = self.path_len(B, self.rp, B.to_world(p - n * (R_ROBOT + 0.04)))
++            path1 = self.path_len(B, rp, B.to_world(p - n * (R_ROBOT + 0.04)))
+             c1 = (path1 + d + 0.04) / 0.05 + (6.0 if k == 'f' else 0.0) + 2.0
+             p1 = B.p + nw * d
+             B1 = B.moved(p1, B.th)
+@@ -344,7 +356,7 @@ class GeneratedApproach:
+                 c2 = 0.0
+             else:
+                 c2 = self.kres * np.linalg.norm(e1) / 0.05 + self.kpush
+-                for s2, pr2 in cands:
++                for s2, pr2, _dm in cands:
+                     name2, p2, n2, k2, _ = pr2
+                     nw2 = B1.dir_world(n2)
+                     d2 = float(nw2 @ e1)
+@@ -359,8 +371,21 @@ class GeneratedApproach:
+             if c1 + c2 < bc:
+                 bc, best = c1 + c2, pr
+         if best is None:
+-            return max(cands, key=lambda c: c[0])[1]
+-        return best
++            if not cands:
++                return None, 1e6
++            return max(cands, key=lambda c: c[0])[1], 1e6
++        return best, bc
++
++    def trans_cost(self, B1, rob1, err1):
++        if np.linalg.norm(err1) < 0.015:
++            return 0.0
++        prims1 = self.primitives_list(B1)
++        c3 = self.trans_cands(B1, prims1, err1)
++        fallback = self.kres * 2 * np.linalg.norm(err1) / 0.05 + 2 * self.kpush
++        if not c3:
++            return fallback
++        best, c = self.pick_trans_la(B1, c3, err1, rob1)
++        return min(c, fallback)
+ 
+     # ------------------------------------------------------------ navigation
+     def path_len(self, B, rp, target):

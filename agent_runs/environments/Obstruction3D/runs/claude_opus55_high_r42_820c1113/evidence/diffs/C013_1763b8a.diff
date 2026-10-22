@@ -1,0 +1,885 @@
+diff --git a/approach.py b/approach.py
+index 55290e5..4f7ed33 100644
+--- a/approach.py
++++ b/approach.py
+@@ -55,6 +55,7 @@ class GeneratedApproach:
+         self.last_cmd = None
+         self.blocked = 0
+         self.scale = 1.0
++        self.last_final = False
+         self.tilt = (0.0, 0.0)
+         self.fail = {}
+         self.t = 0
+@@ -309,6 +310,7 @@ class GeneratedApproach:
+ 
+     def _track(self):
+         """Return joint delta toward current path, or None when path done."""
++        self.last_final = False
+         while self.path:
+             pos, yaw = self.path[0]
+             M = fk(self.base, self.q)
+@@ -327,6 +329,7 @@ class GeneratedApproach:
+             qt, err = self._ik(pos, yaw)
+             dq = qt - self.q
+             m = np.max(np.abs(dq))
++            self.last_final = bool(final and m <= MAX_DQ and err < 1e-3 and self.scale >= 1.0)
+             if m > MAX_DQ:
+                 dq = dq * (MAX_DQ / m)
+             return dq
+@@ -384,7 +387,15 @@ class GeneratedApproach:
+             if dq is None:
+                 self.phase = 'grasp'
+                 return None
++            if self.last_final:
++                self.phase = 'grasp_c'
++                self.path = []
++                return self._act(dq, grip=-1.0)
+             return self._act(dq)
++        if ph == 'grasp_c':
++            self.phase = 'grasp'
++            self.wait = 0
++            return None
+         if ph == 'grasp':
+             if self.grasped:
+                 self.phase = 'to_place'
+@@ -423,10 +434,18 @@ class GeneratedApproach:
+             if dq is None:
+                 self.phase = 'release'
+                 return None
++            if self.last_final:
++                self.phase = 'release'
++                self.path = []
++                self.wait = 1
++                return self._act(dq, grip=1.0)
+             return self._act(dq)
+         if ph == 'release':
+             if not self.grasped:
+-                self.phase = 'retreat'
++                self.phase = 'plan'
++                self.wait = 0
++                return None
++            if False:
+                 tool = fk(self.base, self.q)[:3, 3]
+                 self.path = [(p_, self.task['yaw_place'] if self.task else 0.0)
+                              for p_ in self._line(tool, np.array([tool[0], tool[1], tool[2] + 0.06]), 0.05)]
+diff --git a/combo.py b/combo.py
+new file mode 100644
+index 0000000..f3ddfe8
+--- /dev/null
++++ b/combo.py
+@@ -0,0 +1,17 @@
++import numpy as np
++from th import H
++from kin import ik, down_R
++h=H(3)
++n='target_block'; p=h.pose(n)[:3]; he=h.he(n); top=p[2]+he[2]
++h.goto((p[0],p[1],top+0.06),0.0)
++# final step: move down to top+0.028 with close in same action
++q=h.q(); qt,e=ik(h.base(),q,np.array([p[0],p[1],top+0.028]),down_R(0.0))
++a=np.zeros(11); a[3:10]=np.clip(qt-q,-.2,.2); a[10]=-1; h.step(a)
++print('tool',h.tool()[:3,3].round(3),'grasped',h.grasped())
++h.grip(-1); print('after extra close', h.grasped())
++# move to release spot then combined open
++tgt=np.array([p[0]+0.1,p[1],top+0.028+0.0015])
++h.goto(tgt+np.array([0,0,0.03]),0.0)
++q=h.q(); qt,e=ik(h.base(),q,tgt,down_R(0.0))
++a=np.zeros(11); a[3:10]=np.clip(qt-q,-.2,.2); a[10]=1; h.step(a)
++print('tool',h.tool()[:3,3].round(3),'grasped after combined open',h.grasped(), h.pose(n)[:3].round(3))
+diff --git a/d3.txt b/d3.txt
+new file mode 100644
+index 0000000..75ddf66
+--- /dev/null
++++ b/d3.txt
+@@ -0,0 +1,35 @@
++obstruction1 [ 0.32  -0.279  0.114] [0.013 0.01  0.029]
++target_block [ 0.159 -0.082  0.1  ] [0.018 0.022 0.025]
++target_region [ 0.329 -0.303  0.08 ] [0.023 0.027 0.005]
++obstruction0 [0.22  0.114 0.1  ] [0.014 0.016 0.025]
++0 to_pic ction1 [0.154 0.001 0.217] sc 1.0 g 0 gr 0.0 np 5 dq 0.2
++1 to_pic ction1 [ 0.185 -0.043  0.221] sc 1.0 g 0 gr 0.0 np 4 dq 0.2
++2 to_pic ction1 [ 0.217 -0.088  0.223] sc 1.0 g 0 gr 0.0 np 4 dq 0.17
++3 to_pic ction1 [ 0.237 -0.139  0.221] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++4 to_pic ction1 [ 0.274 -0.201  0.223] sc 1.0 g 0 gr 0.0 np 2 dq 0.2
++5 to_pic ction1 [ 0.311 -0.261  0.225] sc 1.0 g 0 gr 0.0 np 1 dq 0.12
++6 grasp ction1 [ 0.32  -0.279  0.175] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++7 to_pla ction1 [ 0.32  -0.279  0.175] sc 1.0 g 1 gr 0.0 np 4 dq 0.2
++8 to_pla ction1 [ 0.32  -0.28   0.245] sc 1.0 g 1 gr 0.0 np 3 dq 0.13
++9 to_pla ction1 [ 0.256 -0.286  0.245] sc 1.0 g 1 gr 0.0 np 2 dq 0.12
++10 to_pla ction1 [ 0.193 -0.292  0.245] sc 1.0 g 1 gr 0.0 np 1 dq 0.2
++11 to_pla ction1 [ 0.195 -0.292  0.181] sc 1.0 g 1 gr 0.0 np 1 dq 0.05
++12 releas ction1 [ 0.193 -0.292  0.166] sc 1.0 g 1 gr 1.0 np 0 dq 0.0
++13 retrea ction1 [ 0.193 -0.292  0.166] sc 1.0 g 0 gr 0.0 np 2 dq 0.1
++14 retrea ction1 [ 0.193 -0.292  0.196] sc 1.0 g 0 gr 0.0 np 1 dq 0.1
++15 to_pic _block [ 0.193 -0.292  0.226] sc 1.0 g 0 gr 0.0 np 4 dq 0.2
++16 to_pic _block [ 0.182 -0.224  0.223] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++17 to_pic _block [ 0.176 -0.172  0.221] sc 1.0 g 0 gr 0.0 np 2 dq 0.2
++18 to_pic _block [ 0.173 -0.123  0.219] sc 1.0 g 0 gr 0.0 np 2 dq 0.19
++19 to_pic _block [ 0.159 -0.082  0.215] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++20 to_pic _block [ 0.162 -0.082  0.175] sc 1.0 g 0 gr 0.0 np 1 dq 0.1
++21 grasp _block [ 0.159 -0.082  0.156] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++22 to_pla _block [ 0.159 -0.082  0.156] sc 1.0 g 1 gr 0.0 np 6 dq 0.2
++23 to_pla _block [ 0.16  -0.082  0.194] sc 1.0 g 1 gr 0.0 np 5 dq 0.2
++24 to_pla _block [ 0.161 -0.082  0.237] sc 1.0 g 1 gr 0.0 np 4 dq 0.2
++25 to_pla _block [ 0.204 -0.134  0.245] sc 1.0 g 1 gr 0.0 np 3 dq 0.2
++26 to_pla _block [ 0.251 -0.192  0.248] sc 1.0 g 1 gr 0.0 np 3 dq 0.1
++27 to_pla _block [ 0.273 -0.229  0.246] sc 1.0 g 1 gr 0.0 np 2 dq 0.2
++28 to_pla _block [ 0.314 -0.281  0.248] sc 1.0 g 1 gr 0.0 np 1 dq 0.19
++29 releas _block [ 0.329 -0.303  0.168] sc 1.0 g 1 gr 1.0 np 0 dq 0.0
++DONE 30
+diff --git a/d431.txt b/d431.txt
+index 486c0b3..ecc08eb 100644
+--- a/d431.txt
++++ b/d431.txt
+@@ -1,13 +1,13 @@
+-target_block [ 0.269 -0.229  0.1  ] [0.017 0.036 0.025]
+-obstruction2 [ 0.301 -0.231  0.095] [0.012 0.015 0.01 ]
+-obstruction6 [0.388 0.338 0.091] [0.017 0.014 0.016]
+-obstruction7 [ 0.248 -0.055  0.104] [0.016 0.014 0.029]
+ obstruction0 [ 0.348 -0.286  0.099] [0.019 0.018 0.014]
+-obstruction3 [ 0.333 -0.241  0.111] [0.019 0.016 0.026]
+-obstruction4 [ 0.316 -0.274  0.096] [0.012 0.013 0.011]
+-obstruction1 [0.442 0.086 0.098] [0.01  0.017 0.023]
+ obstruction5 [ 0.302 -0.319  0.11 ] [0.014 0.01  0.025]
++target_block [ 0.269 -0.229  0.1  ] [0.017 0.036 0.025]
++obstruction1 [0.442 0.086 0.098] [0.01  0.017 0.023]
++obstruction4 [ 0.316 -0.274  0.096] [0.012 0.013 0.011]
+ target_region [ 0.322 -0.273  0.08 ] [0.022 0.045 0.005]
++obstruction7 [ 0.248 -0.055  0.104] [0.016 0.014 0.029]
++obstruction6 [0.388 0.338 0.091] [0.017 0.014 0.016]
++obstruction2 [ 0.301 -0.231  0.095] [0.012 0.015 0.01 ]
++obstruction3 [ 0.333 -0.241  0.111] [0.019 0.016 0.026]
+ 0 to_pic ction3 [0.154 0.001 0.217] sc 1.0 g 0 gr 0.0 np 5 dq 0.2
+ 1 to_pic ction3 [ 0.174 -0.018  0.22 ] sc 1.0 g 0 gr 0.0 np 5 dq 0.2
+ 2 to_pic ction3 [ 0.191 -0.044  0.219] sc 1.0 g 0 gr 0.0 np 4 dq 0.2
+@@ -66,245 +66,58 @@ target_region [ 0.322 -0.273  0.08 ] [0.022 0.045 0.005]
+ 55 releas ction4 [ 0.364 -0.088  0.129] sc 1.0 g 1 gr 1.0 np 0 dq 0.0
+ 56 retrea ction4 [ 0.364 -0.088  0.129] sc 1.0 g 0 gr 0.0 np 2 dq 0.09
+ 57 retrea ction4 [ 0.364 -0.087  0.159] sc 1.0 g 0 gr 0.0 np 1 dq 0.09
+-58 to_pic ction2 [ 0.364 -0.087  0.189] sc 1.0 g 0 gr 0.0 np 3 dq 0.18
+-59 to_pic ction2 [ 0.333 -0.159  0.212] sc 1.0 g 0 gr 0.0 np 2 dq 0.2
+-60 to_pic ction2 [ 0.306 -0.222  0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
+-61 to_pic ction2 [ 0.306 -0.222  0.212] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-62 to_pic ction2 [ 0.305 -0.224  0.193] sc 1.0 g 0 gr 0.0 np 1 dq 0.15
+-63 to_pic ction2 [ 0.305 -0.224  0.193] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-64 to_pic ction2 [ 0.303 -0.227  0.173] sc 1.0 g 0 gr 0.0 np 1 dq 0.1
+-65 to_pic ction2 [ 0.303 -0.227  0.173] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-66 to_pic ction2 [ 0.303 -0.227  0.173] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-67 to_pic ction2 [ 0.303 -0.228  0.163] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-68 to_pic ction2 [ 0.303 -0.228  0.163] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-69 to_pic ction2 [ 0.303 -0.228  0.163] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-70 to_pic ction2 [ 0.302 -0.228  0.158] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-71 to_pic ction2 [ 0.302 -0.228  0.158] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-72 to_pic ction2 [ 0.302 -0.228  0.158] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-73 to_pic ction2 [ 0.302 -0.229  0.155] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-74 to_pic ction2 [ 0.302 -0.229  0.155] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-75 grasp ction2 [ 0.302 -0.229  0.155] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
+-76 to_pic ction2 [ 0.302 -0.229  0.155] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-77 to_pic ction2 [ 0.304 -0.229  0.191] sc 1.0 g 0 gr 0.0 np 1 dq 0.14
+-78 to_pic ction2 [ 0.304 -0.229  0.191] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-79 to_pic ction2 [ 0.303 -0.23   0.171] sc 1.0 g 0 gr 0.0 np 1 dq 0.09
+-80 to_pic ction2 [ 0.303 -0.23   0.171] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-81 to_pic ction2 [ 0.303 -0.23   0.171] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-82 to_pic ction2 [ 0.302 -0.23   0.161] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-83 to_pic ction2 [ 0.302 -0.23   0.161] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-84 to_pic ction2 [ 0.302 -0.23   0.161] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-85 to_pic ction2 [ 0.302 -0.23   0.156] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-86 to_pic ction2 [ 0.302 -0.23   0.156] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-87 to_pic ction2 [ 0.302 -0.23   0.156] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-88 grasp ction2 [ 0.302 -0.23   0.156] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
+-89 to_pic ction2 [ 0.302 -0.23   0.156] sc 1.0 g 0 gr 0.0 np 3 dq 0.14
+-90 to_pic ction2 [ 0.302 -0.23   0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
+-91 to_pic ction2 [ 0.302 -0.23   0.212] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-92 to_pic ction2 [ 0.302 -0.231  0.192] sc 1.0 g 0 gr 0.0 np 1 dq 0.15
+-93 to_pic ction2 [ 0.302 -0.231  0.192] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-94 to_pic ction2 [ 0.301 -0.231  0.172] sc 1.0 g 0 gr 0.0 np 1 dq 0.1
+-95 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-96 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-97 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-98 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-99 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-100 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-101 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-102 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-103 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-104 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-105 grasp ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
+-106 to_pic ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-107 to_pic ction2 [ 0.302 -0.232  0.176] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-108 to_pic ction2 [ 0.302 -0.232  0.197] sc 1.0 g 0 gr 0.0 np 3 dq 0.14
+-109 to_pic ction2 [ 0.301 -0.231  0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
+-110 to_pic ction2 [ 0.301 -0.231  0.212] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-111 to_pic ction2 [ 0.301 -0.231  0.192] sc 1.0 g 0 gr 0.0 np 1 dq 0.15
+-112 to_pic ction2 [ 0.301 -0.231  0.192] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-113 to_pic ction2 [ 0.301 -0.231  0.172] sc 1.0 g 0 gr 0.0 np 1 dq 0.09
+-114 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-115 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-116 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-117 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-118 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-119 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-120 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-121 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-122 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-123 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-124 grasp ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
+-125 to_pic ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-126 to_pic ction2 [ 0.303 -0.23   0.188] sc 1.0 g 0 gr 0.0 np 3 dq 0.14
+-127 to_pic ction2 [ 0.301 -0.231  0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
+-128 to_pic ction2 [ 0.301 -0.231  0.212] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-129 to_pic ction2 [ 0.301 -0.231  0.192] sc 1.0 g 0 gr 0.0 np 1 dq 0.15
+-130 to_pic ction2 [ 0.301 -0.231  0.192] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-131 to_pic ction2 [ 0.301 -0.231  0.172] sc 1.0 g 0 gr 0.0 np 1 dq 0.1
+-132 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-133 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-134 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-135 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-136 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-137 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-138 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-139 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-140 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-141 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-142 grasp ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
+-143 to_pic ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-144 to_pic ction2 [ 0.301 -0.232  0.169] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-145 to_pic ction2 [ 0.301 -0.232  0.184] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-146 to_pic ction2 [ 0.301 -0.232  0.2  ] sc 1.0 g 0 gr 0.0 np 3 dq 0.16
+-147 to_pic ction2 [ 0.301 -0.231  0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.19
+-148 to_pic ction2 [ 0.301 -0.231  0.212] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-149 to_pic ction2 [ 0.301 -0.231  0.192] sc 1.0 g 0 gr 0.0 np 1 dq 0.14
+-150 to_pic ction2 [ 0.301 -0.231  0.192] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-151 to_pic ction2 [ 0.301 -0.231  0.172] sc 1.0 g 0 gr 0.0 np 1 dq 0.09
+-152 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-153 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-154 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-155 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-156 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-157 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-158 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-159 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-160 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-161 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-162 grasp ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
+-163 to_pic ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-164 to_pic ction2 [ 0.302 -0.229  0.174] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-165 to_pic ction2 [ 0.302 -0.229  0.195] sc 1.0 g 0 gr 0.0 np 3 dq 0.15
+-166 to_pic ction2 [ 0.301 -0.231  0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
+-167 to_pic ction2 [ 0.301 -0.231  0.212] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-168 to_pic ction2 [ 0.301 -0.231  0.192] sc 1.0 g 0 gr 0.0 np 1 dq 0.15
+-169 to_pic ction2 [ 0.301 -0.231  0.192] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-170 to_pic ction2 [ 0.301 -0.231  0.172] sc 1.0 g 0 gr 0.0 np 1 dq 0.1
+-171 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-172 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-173 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-174 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-175 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-176 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-177 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-178 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-179 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-180 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-181 grasp ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
+-182 to_pic ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-183 to_pic ction2 [ 0.3   -0.232  0.165] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-184 to_pic ction2 [ 0.3   -0.233  0.177] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-185 to_pic ction2 [ 0.3   -0.233  0.189] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-186 to_pic ction2 [ 0.3   -0.232  0.201] sc 1.0 g 0 gr 0.0 np 3 dq 0.17
+-187 to_pic ction2 [ 0.301 -0.231  0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.19
+-188 to_pic ction2 [ 0.301 -0.231  0.212] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-189 to_pic ction2 [ 0.301 -0.231  0.192] sc 1.0 g 0 gr 0.0 np 1 dq 0.14
+-190 to_pic ction2 [ 0.301 -0.231  0.192] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-191 to_pic ction2 [ 0.301 -0.231  0.172] sc 1.0 g 0 gr 0.0 np 1 dq 0.09
+-192 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-193 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.25 g 0 gr 0.0 np 1 dq 0.02
+-194 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-195 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.25 g 0 gr 0.0 np 1 dq 0.02
+-196 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-197 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.25 g 0 gr 0.0 np 1 dq 0.02
+-198 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-199 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-200 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-201 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-202 grasp ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
+-203 to_pic ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-204 to_pic ction2 [ 0.302 -0.229  0.168] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-205 to_pic ction2 [ 0.302 -0.228  0.183] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-206 to_pic ction2 [ 0.302 -0.229  0.198] sc 1.0 g 0 gr 0.0 np 3 dq 0.16
+-207 to_pic ction2 [ 0.301 -0.231  0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
+-208 to_pic ction2 [ 0.301 -0.231  0.212] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-209 to_pic ction2 [ 0.301 -0.231  0.192] sc 1.0 g 0 gr 0.0 np 1 dq 0.15
+-210 to_pic ction2 [ 0.301 -0.231  0.192] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-211 to_pic ction2 [ 0.301 -0.231  0.172] sc 1.0 g 0 gr 0.0 np 1 dq 0.1
+-212 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-213 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-214 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-215 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-216 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-217 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-218 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-219 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-220 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-221 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-222 grasp ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
+-223 to_pic ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-224 to_pic ction2 [ 0.3   -0.232  0.163] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-225 to_pic ction2 [ 0.299 -0.233  0.172] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-226 to_pic ction2 [ 0.299 -0.233  0.181] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-227 to_pic ction2 [ 0.299 -0.233  0.191] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-228 to_pic ction2 [ 0.3   -0.232  0.202] sc 1.0 g 0 gr 0.0 np 3 dq 0.17
+-229 to_pic ction2 [ 0.301 -0.231  0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.18
+-230 to_pic ction2 [ 0.301 -0.231  0.212] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-231 to_pic ction2 [ 0.301 -0.231  0.192] sc 1.0 g 0 gr 0.0 np 1 dq 0.13
+-232 to_pic ction2 [ 0.301 -0.231  0.192] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-233 to_pic ction2 [ 0.301 -0.231  0.172] sc 1.0 g 0 gr 0.0 np 1 dq 0.09
+-234 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-235 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.25 g 0 gr 0.0 np 1 dq 0.02
+-236 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-237 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.25 g 0 gr 0.0 np 1 dq 0.02
+-238 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-239 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.25 g 0 gr 0.0 np 1 dq 0.02
+-240 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-241 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-242 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-243 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-244 grasp ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
+-245 to_pic ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-246 to_pic ction2 [ 0.301 -0.228  0.164] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-247 to_pic ction2 [ 0.301 -0.227  0.175] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-248 to_pic ction2 [ 0.301 -0.227  0.187] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-249 to_pic ction2 [ 0.301 -0.229  0.2  ] sc 1.0 g 0 gr 0.0 np 3 dq 0.18
+-250 to_pic ction2 [ 0.301 -0.231  0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
+-251 to_pic ction2 [ 0.301 -0.231  0.212] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-252 to_pic ction2 [ 0.301 -0.231  0.192] sc 1.0 g 0 gr 0.0 np 1 dq 0.15
+-253 to_pic ction2 [ 0.301 -0.231  0.192] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-254 to_pic ction2 [ 0.301 -0.231  0.172] sc 1.0 g 0 gr 0.0 np 1 dq 0.1
+-255 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-256 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-257 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.5 g 0 gr 0.0 np 1 dq 0.05
+-258 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-259 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-260 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-261 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-262 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-263 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.125 g 0 gr 0.0 np 1 dq 0.01
+-264 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-265 grasp ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
+-266 to_pic ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-267 to_pic ction2 [ 0.301 -0.229  0.162] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-268 to_pic ction2 [ 0.302 -0.228  0.17 ] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-269 to_pic ction2 [ 0.302 -0.227  0.178] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-270 to_pic ction2 [ 0.302 -0.228  0.187] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-271 to_pic ction2 [ 0.302 -0.229  0.197] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-272 to_pic ction2 [ 0.301 -0.23   0.208] sc 1.0 g 0 gr 0.0 np 3 dq 0.09
+-273 to_pic ction2 [ 0.301 -0.231  0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
+-274 to_pic ction2 [ 0.301 -0.231  0.212] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-275 to_pic ction2 [ 0.301 -0.231  0.192] sc 1.0 g 0 gr 0.0 np 1 dq 0.17
+-276 to_pic ction2 [ 0.301 -0.231  0.192] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-277 to_pic ction2 [ 0.301 -0.231  0.172] sc 1.0 g 0 gr 0.0 np 1 dq 0.11
+-278 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-279 to_pic ction2 [ 0.301 -0.231  0.172] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-280 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-281 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-282 to_pic ction2 [ 0.301 -0.231  0.162] sc 0.125 g 0 gr 0.0 np 1 dq 0.02
+-283 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
+-284 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.125 g 0 gr 0.0 np 1 dq 0.02
+-285 to_pic ction2 [ 0.301 -0.231  0.157] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-286 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.125 g 0 gr 0.0 np 1 dq 0.02
+-287 to_pic ction2 [ 0.301 -0.231  0.155] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
+-288 grasp ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
+-289 to_pic ction2 [ 0.301 -0.231  0.155] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-290 to_pic ction2 [ 0.302 -0.23   0.162] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-291 to_pic ction2 [ 0.302 -0.229  0.17 ] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-292 to_pic ction2 [ 0.303 -0.229  0.178] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-293 to_pic ction2 [ 0.303 -0.229  0.186] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-294 to_pic ction2 [ 0.302 -0.229  0.195] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
+-295 to_pic ction2 [ 0.302 -0.23   0.204] sc 1.0 g 0 gr 0.0 np 3 dq 0.17
+-296 to_pic ction2 [ 0.301 -0.231  0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
+-297 to_pic ction2 [ 0.301 -0.231  0.212] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
+-298 to_pic ction2 [ 0.301 -0.231  0.192] sc 1.0 g 0 gr 0.0 np 1 dq 0.18
+-299 to_pic ction2 [ 0.301 -0.231  0.192] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
++58 to_pic _block [ 0.364 -0.087  0.189] sc 1.0 g 0 gr 0.0 np 4 dq 0.2
++59 to_pic _block [ 0.364 -0.088  0.198] sc 1.0 g 0 gr 0.0 np 4 dq 0.2
++60 to_pic _block [ 0.364 -0.088  0.208] sc 1.0 g 0 gr 0.0 np 3 dq 0.15
++61 to_pic _block [ 0.317 -0.158  0.212] sc 1.0 g 0 gr 0.0 np 2 dq 0.2
++62 to_pic _block [ 0.28  -0.215  0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.18
++63 grasp _block [ 0.269 -0.229  0.156] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++64 to_pla _block [ 0.269 -0.229  0.156] sc 1.0 g 1 gr 0.0 np 7 dq 0.12
++65 to_pla _block [ 0.269 -0.229  0.2  ] sc 1.0 g 1 gr 0.0 np 6 dq 0.12
++66 to_pla _block [ 0.269 -0.229  0.243] sc 1.0 g 1 gr 0.0 np 5 dq 0.2
++67 to_pla _block [ 0.241 -0.187  0.246] sc 1.0 g 1 gr 0.0 np 4 dq 0.2
++68 to_pla _block [ 0.223 -0.153  0.246] sc 1.0 g 1 gr 0.0 np 4 dq 0.2
++69 to_pla _block [ 0.201 -0.126  0.245] sc 1.0 g 1 gr 0.0 np 3 dq 0.2
++70 to_pla _block [ 0.179 -0.086  0.244] sc 1.0 g 1 gr 0.0 np 3 dq 0.2
++71 to_pla _block [ 0.151 -0.059  0.243] sc 1.0 g 1 gr 0.0 np 2 dq 0.2
++72 to_pla _block [ 0.15  -0.058  0.202] sc 1.0 g 1 gr 0.0 np 1 dq 0.2
++73 to_pla _block [ 0.151 -0.057  0.167] sc 1.0 g 1 gr 0.0 np 1 dq 0.06
++74 releas _block [ 0.15  -0.058  0.158] sc 1.0 g 1 gr 1.0 np 0 dq 0.0
++75 retrea _block [ 0.15  -0.058  0.158] sc 1.0 g 0 gr 0.0 np 2 dq 0.18
++76 retrea _block [ 0.15  -0.058  0.188] sc 1.0 g 0 gr 0.0 np 1 dq 0.16
++77 to_pic ction2 [ 0.15  -0.058  0.218] sc 1.0 g 0 gr 0.0 np 4 dq 0.2
++78 to_pic ction2 [ 0.178 -0.082  0.216] sc 1.0 g 0 gr 0.0 np 4 dq 0.19
++79 to_pic ction2 [ 0.2   -0.116  0.216] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++80 to_pic ction2 [ 0.218 -0.133  0.215] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++81 to_pic ction2 [ 0.241 -0.159  0.215] sc 1.0 g 0 gr 0.0 np 2 dq 0.2
++82 to_pic ction2 [ 0.283 -0.208  0.217] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++83 to_pic ction2 [ 0.3   -0.228  0.147] sc 1.0 g 0 gr 0.0 np 1 dq 0.03
++84 grasp ction2 [ 0.301 -0.231  0.137] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++85 to_pla ction2 [ 0.301 -0.231  0.137] sc 1.0 g 1 gr 0.0 np 5 dq 0.2
++86 to_pla ction2 [ 0.301 -0.231  0.212] sc 1.0 g 1 gr 0.0 np 4 dq 0.14
++87 to_pla ction2 [ 0.236 -0.232  0.214] sc 1.0 g 1 gr 0.0 np 3 dq 0.13
++88 to_pla ction2 [ 0.171 -0.233  0.214] sc 1.0 g 1 gr 0.0 np 2 dq 0.19
++89 to_pla ction2 [ 0.171 -0.233  0.171] sc 1.0 g 1 gr 0.0 np 1 dq 0.18
++90 releas ction2 [ 0.171 -0.233  0.128] sc 1.0 g 1 gr 1.0 np 0 dq 0.0
++91 retrea ction2 [ 0.171 -0.233  0.128] sc 1.0 g 0 gr 0.0 np 2 dq 0.12
++92 retrea ction2 [ 0.171 -0.233  0.158] sc 1.0 g 0 gr 0.0 np 1 dq 0.12
++93 to_pic _block [ 0.171 -0.233  0.188] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++94 to_pic _block [ 0.173 -0.204  0.197] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++95 to_pic _block [ 0.17  -0.179  0.203] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++96 to_pic _block [ 0.165 -0.159  0.208] sc 1.0 g 0 gr 0.0 np 2 dq 0.2
++97 to_pic _block [ 0.167 -0.121  0.209] sc 1.0 g 0 gr 0.0 np 2 dq 0.2
++98 to_pic _block [ 0.162 -0.088  0.21 ] sc 1.0 g 0 gr 0.0 np 2 dq 0.2
++99 to_pic _block [ 0.152 -0.061  0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++100 to_pic _block [ 0.153 -0.058  0.175] sc 1.0 g 0 gr 0.0 np 1 dq 0.1
++101 grasp _block [ 0.15  -0.058  0.158] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++102 to_pla _block [ 0.15  -0.058  0.158] sc 1.0 g 1 gr 0.0 np 6 dq 0.2
++103 to_pla _block [ 0.151 -0.057  0.192] sc 1.0 g 1 gr 0.0 np 5 dq 0.2
++104 to_pla _block [ 0.151 -0.058  0.231] sc 1.0 g 1 gr 0.0 np 4 dq 0.2
++105 to_pla _block [ 0.183 -0.089  0.238] sc 1.0 g 1 gr 0.0 np 4 dq 0.19
++106 to_pla _block [ 0.207 -0.13   0.243] sc 1.0 g 1 gr 0.0 np 3 dq 0.2
++107 to_pla _block [ 0.23  -0.152  0.244] sc 1.0 g 1 gr 0.0 np 3 dq 0.2
++108 to_pla _block [ 0.255 -0.186  0.244] sc 1.0 g 1 gr 0.0 np 2 dq 0.2
++109 to_pla _block [ 0.3   -0.242  0.248] sc 1.0 g 1 gr 0.0 np 2 dq 0.11
++110 to_pla _block [ 0.322 -0.273  0.243] sc 1.0 g 1 gr 0.0 np 1 dq 0.19
++111 releas _block [ 0.322 -0.273  0.168] sc 1.0 g 1 gr 1.0 np 0 dq 0.0
++DONE 112
+diff --git a/d478.txt b/d478.txt
+new file mode 100644
+index 0000000..e7aa86e
+--- /dev/null
++++ b/d478.txt
+@@ -0,0 +1,310 @@
++target_region [0.207 0.148 0.08 ] [0.033 0.03  0.005]
++obstruction3 [0.39  0.02  0.103] [0.02  0.015 0.028]
++obstruction5 [0.183 0.148 0.104] [0.018 0.013 0.019]
++obstruction6 [ 0.219 -0.068  0.092] [0.02  0.018 0.017]
++target_block [0.368 0.261 0.1  ] [0.027 0.024 0.025]
++obstruction4 [0.242 0.117 0.107] [0.01  0.012 0.022]
++obstruction1 [0.221 0.147 0.108] [0.015 0.013 0.023]
++obstruction7 [0.177 0.182 0.102] [0.016 0.019 0.017]
++obstruction0 [0.192 0.115 0.11 ] [0.012 0.011 0.025]
++obstruction2 [0.217 0.171 0.108] [0.015 0.011 0.023]
++0 to_pic ction0 [0.154 0.001 0.217] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++1 to_pic ction0 [0.171 0.048 0.217] sc 1.0 g 0 gr 0.0 np 2 dq 0.19
++2 to_pic ction0 [0.192 0.115 0.215] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++3 to_pic ction0 [0.193 0.115 0.17 ] sc 1.0 g 0 gr 0.0 np 1 dq 0.02
++4 grasp ction0 [0.192 0.115 0.166] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++5 to_pla ction0 [0.192 0.115 0.166] sc 1.0 g 1 gr 0.0 np 5 dq 0.2
++6 to_pla ction0 [0.196 0.115 0.211] sc 1.0 g 1 gr 0.0 np 5 dq 0.14
++7 to_pla ction0 [0.192 0.115 0.243] sc 1.0 g 1 gr 0.0 np 4 dq 0.2
++8 to_pla ction0 [0.174 0.063 0.243] sc 1.0 g 1 gr 0.0 np 3 dq 0.2
++9 to_pla ction0 [0.157 0.012 0.244] sc 1.0 g 1 gr 0.0 np 2 dq 0.19
++10 to_pla ction0 [0.15 0.   0.2 ] sc 1.0 g 1 gr 0.0 np 1 dq 0.2
++11 to_pla ction0 [0.151 0.    0.164] sc 1.0 g 1 gr 0.0 np 1 dq 0.04
++12 releas ction0 [0.15  0.    0.158] sc 1.0 g 1 gr 1.0 np 0 dq 0.0
++13 retrea ction0 [0.15  0.    0.158] sc 1.0 g 0 gr 0.0 np 2 dq 0.17
++14 retrea ction0 [0.15  0.    0.188] sc 1.0 g 0 gr 0.0 np 1 dq 0.15
++15 to_pic ction4 [0.15  0.    0.218] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++16 to_pic ction4 [0.158 0.007 0.218] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++17 to_pic ction4 [0.167 0.015 0.218] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++18 to_pic ction4 [0.174 0.024 0.218] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++19 to_pic ction4 [0.182 0.034 0.217] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++20 to_pic ction4 [0.188 0.044 0.216] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++21 to_pic ction4 [0.194 0.055 0.215] sc 1.0 g 0 gr 0.0 np 2 dq 0.2
++22 to_pic ction4 [0.227 0.092 0.214] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++23 to_pic ction4 [0.242 0.115 0.163] sc 1.0 g 0 gr 0.0 np 1 dq 0.01
++24 grasp ction4 [0.242 0.117 0.16 ] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++25 to_pla ction4 [0.242 0.117 0.16 ] sc 1.0 g 1 gr 0.0 np 5 dq 0.2
++26 to_pla ction4 [0.245 0.116 0.21 ] sc 1.0 g 1 gr 0.0 np 4 dq 0.19
++27 to_pla ction4 [0.303 0.117 0.237] sc 1.0 g 1 gr 0.0 np 3 dq 0.16
++28 to_pla ction4 [0.364 0.117 0.237] sc 1.0 g 1 gr 0.0 np 2 dq 0.13
++29 to_pla ction4 [0.364 0.117 0.194] sc 1.0 g 1 gr 0.0 np 1 dq 0.13
++30 releas ction4 [0.364 0.117 0.152] sc 1.0 g 1 gr 1.0 np 0 dq 0.0
++31 retrea ction4 [0.364 0.117 0.152] sc 1.0 g 0 gr 0.0 np 2 dq 0.09
++32 retrea ction4 [0.364 0.117 0.182] sc 1.0 g 0 gr 0.0 np 1 dq 0.09
++33 to_pic ction1 [0.364 0.117 0.212] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++34 to_pic ction1 [0.34  0.124 0.212] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++35 to_pic ction1 [0.315 0.129 0.212] sc 1.0 g 0 gr 0.0 np 3 dq 0.18
++36 to_pic ction1 [0.293 0.132 0.212] sc 1.0 g 0 gr 0.0 np 2 dq 0.14
++37 to_pic ction1 [0.221 0.147 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++38 to_pic ction1 [0.222 0.147 0.162] sc 1.0 g 0 gr 0.0 np 1 dq 0.0
++39 grasp ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++40 to_pic ction2 [0.221 0.147 0.162] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++41 to_pic ction2 [0.222 0.147 0.211] sc 1.0 g 0 gr 0.0 np 1 dq 0.18
++42 grasp ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++43 to_pic ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr 0.0 np 3 dq 0.19
++44 to_pic ction2 [0.217 0.171 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.19
++45 grasp ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++46 to_pic ction1 [0.217 0.171 0.163] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++47 to_pic ction1 [0.218 0.172 0.193] sc 1.0 g 0 gr 0.0 np 3 dq 0.12
++48 to_pic ction1 [0.217 0.171 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++49 to_pic ction1 [0.222 0.147 0.163] sc 1.0 g 0 gr 0.0 np 1 dq 0.01
++50 grasp ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++51 to_pic ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++52 to_pic ction1 [0.223 0.146 0.184] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++53 to_pic ction1 [0.222 0.146 0.208] sc 1.0 g 0 gr 0.0 np 1 dq 0.19
++54 grasp ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++55 to_pic ction2 [0.221 0.147 0.162] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++56 to_pic ction2 [0.222 0.147 0.211] sc 1.0 g 0 gr 0.0 np 1 dq 0.19
++57 grasp ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++58 to_pic ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++59 to_pic ction2 [0.217 0.172 0.174] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++60 to_pic ction2 [0.218 0.172 0.186] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++61 to_pic ction2 [0.218 0.172 0.198] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++62 to_pic ction2 [0.217 0.172 0.21 ] sc 1.0 g 0 gr 0.0 np 1 dq 0.18
++63 grasp ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++64 to_pic ction1 [0.217 0.171 0.163] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++65 to_pic ction1 [0.218 0.171 0.177] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++66 to_pic ction1 [0.218 0.171 0.191] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++67 to_pic ction1 [0.217 0.171 0.206] sc 1.0 g 0 gr 0.0 np 1 dq 0.19
++68 grasp ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++69 to_pic ction5 [0.221 0.147 0.162] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++70 to_pic ction5 [0.222 0.147 0.211] sc 1.0 g 0 gr 0.0 np 2 dq 0.08
++71 to_pic ction5 [0.183 0.148 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++72 to_pic ction5 [0.185 0.147 0.166] sc 1.0 g 0 gr 0.0 np 1 dq 0.06
++73 to_pic ction5 [0.185 0.147 0.166] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
++74 to_pic ction5 [0.185 0.147 0.166] sc 0.25 g 0 gr 0.0 np 1 dq 0.05
++75 to_pic ction5 [0.185 0.147 0.166] sc 0.125 g 0 gr 0.0 np 1 dq 0.02
++76 to_pic ction5 [0.184 0.147 0.161] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
++77 to_pic ction5 [0.184 0.147 0.161] sc 0.125 g 0 gr 0.0 np 1 dq 0.02
++78 to_pic ction5 [0.184 0.147 0.161] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
++79 grasp ction5 [0.184 0.147 0.161] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
++80 to_pic ction7 [0.184 0.147 0.161] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++81 to_pic ction7 [0.186 0.147 0.19 ] sc 1.0 g 0 gr 0.0 np 3 dq 0.15
++82 to_pic ction7 [0.184 0.147 0.212] sc 1.0 g 0 gr 0.0 np 2 dq 0.16
++83 to_pic ction7 [0.177 0.182 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++84 to_pic ction7 [0.179 0.182 0.163] sc 1.0 g 0 gr 0.0 np 1 dq 0.06
++85 to_pic ction7 [0.179 0.182 0.163] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
++86 to_pic ction7 [0.179 0.182 0.163] sc 0.25 g 0 gr 0.0 np 1 dq 0.04
++87 to_pic ction7 [0.179 0.182 0.163] sc 0.125 g 0 gr 0.0 np 1 dq 0.02
++88 to_pic ction7 [0.179 0.182 0.163] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
++89 grasp ction7 [0.179 0.182 0.163] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
++90 to_pic ction7 [0.179 0.182 0.163] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++91 to_pic ction7 [0.181 0.182 0.189] sc 1.0 g 0 gr 0.0 np 3 dq 0.17
++92 to_pic ction7 [0.179 0.182 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++93 to_pic ction7 [0.18  0.182 0.163] sc 1.0 g 0 gr 0.0 np 1 dq 0.06
++94 to_pic ction7 [0.18  0.182 0.163] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
++95 to_pic ction7 [0.18  0.182 0.163] sc 0.25 g 0 gr 0.0 np 1 dq 0.04
++96 to_pic ction7 [0.18  0.182 0.163] sc 0.125 g 0 gr 0.0 np 1 dq 0.02
++97 to_pic ction7 [0.18  0.182 0.163] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
++98 to_pic ction7 [0.179 0.182 0.16 ] sc 0.125 g 0 gr 0.0 np 1 dq 0.02
++99 to_pic ction7 [0.179 0.182 0.16 ] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
++100 grasp ction7 [0.179 0.182 0.16 ] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
++101 to_pic ction5 [0.179 0.182 0.16 ] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++102 to_pic ction5 [0.18  0.181 0.168] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++103 to_pic ction5 [0.181 0.181 0.177] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++104 to_pic ction5 [0.181 0.181 0.185] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++105 to_pic ction5 [0.181 0.181 0.194] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++106 to_pic ction5 [0.18  0.181 0.204] sc 1.0 g 0 gr 0.0 np 3 dq 0.18
++107 to_pic ction5 [0.179 0.182 0.212] sc 1.0 g 0 gr 0.0 np 2 dq 0.15
++108 to_pic ction5 [0.183 0.148 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++109 to_pic ction5 [0.185 0.147 0.166] sc 1.0 g 0 gr 0.0 np 1 dq 0.06
++110 grasp ction5 [0.183 0.148 0.153] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++111 to_pic ction5 [0.183 0.148 0.153] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++112 to_pic ction5 [0.185 0.148 0.166] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++113 to_pic ction5 [0.185 0.148 0.179] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++114 to_pic ction5 [0.185 0.148 0.193] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++115 to_pic ction5 [0.184 0.148 0.206] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++116 to_pic ction5 [0.184 0.147 0.161] sc 1.0 g 0 gr 0.0 np 1 dq 0.03
++117 to_pic ction5 [0.184 0.147 0.161] sc 0.5 g 0 gr 0.0 np 1 dq 0.03
++118 to_pic ction5 [0.184 0.147 0.161] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
++119 to_pic ction5 [0.184 0.147 0.161] sc 0.125 g 0 gr 0.0 np 1 dq 0.02
++120 to_pic ction5 [0.184 0.147 0.161] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
++121 grasp ction5 [0.184 0.147 0.161] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
++122 to_pic ction2 [0.184 0.147 0.161] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++123 to_pic ction2 [0.185 0.147 0.169] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++124 to_pic ction2 [0.186 0.147 0.178] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++125 to_pic ction2 [0.186 0.147 0.187] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++126 to_pic ction2 [0.186 0.147 0.196] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++127 to_pic ction2 [0.185 0.147 0.205] sc 1.0 g 0 gr 0.0 np 3 dq 0.15
++128 to_pic ction2 [0.184 0.147 0.212] sc 1.0 g 0 gr 0.0 np 2 dq 0.1
++129 to_pic ction2 [0.217 0.171 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.19
++130 grasp ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++131 to_pic ction7 [0.217 0.171 0.163] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++132 to_pic ction7 [0.218 0.172 0.192] sc 1.0 g 0 gr 0.0 np 3 dq 0.14
++133 to_pic ction7 [0.217 0.171 0.212] sc 1.0 g 0 gr 0.0 np 2 dq 0.09
++134 to_pic ction7 [0.177 0.182 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++135 to_pic ction7 [0.179 0.182 0.162] sc 1.0 g 0 gr 0.0 np 1 dq 0.05
++136 grasp ction7 [0.177 0.182 0.15 ] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++137 to_pic ction7 [0.177 0.182 0.15 ] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++138 to_pic ction7 [0.18  0.181 0.184] sc 1.0 g 0 gr 0.0 np 3 dq 0.15
++139 to_pic ction7 [0.177 0.182 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++140 to_pic ction7 [0.179 0.182 0.163] sc 1.0 g 0 gr 0.0 np 1 dq 0.06
++141 grasp ction7 [0.177 0.182 0.15 ] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++142 to_pla ction7 [0.177 0.182 0.15 ] sc 1.0 g 1 gr 0.0 np 5 dq 0.2
++143 to_pla ction7 [0.181 0.182 0.198] sc 1.0 g 1 gr 0.0 np 4 dq 0.2
++144 to_pla ction7 [0.175 0.247 0.224] sc 1.0 g 1 gr 0.0 np 3 dq 0.2
++145 to_pla ction7 [0.173 0.313 0.227] sc 1.0 g 1 gr 0.0 np 2 dq 0.13
++146 to_pla ction7 [0.171 0.321 0.184] sc 1.0 g 1 gr 0.0 np 1 dq 0.13
++147 releas ction7 [0.171 0.321 0.141] sc 1.0 g 1 gr 1.0 np 0 dq 0.0
++148 retrea ction7 [0.171 0.321 0.141] sc 1.0 g 0 gr 0.0 np 2 dq 0.09
++149 retrea ction7 [0.171 0.321 0.171] sc 1.0 g 0 gr 0.0 np 1 dq 0.09
++150 to_pic ction5 [0.171 0.321 0.201] sc 1.0 g 0 gr 0.0 np 4 dq 0.2
++151 to_pic ction5 [0.171 0.32  0.204] sc 1.0 g 0 gr 0.0 np 4 dq 0.2
++152 to_pic ction5 [0.172 0.32  0.207] sc 1.0 g 0 gr 0.0 np 4 dq 0.2
++153 to_pic ction5 [0.171 0.321 0.21 ] sc 1.0 g 0 gr 0.0 np 4 dq 0.09
++154 to_pic ction5 [0.171 0.321 0.212] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++155 to_pic ction5 [0.178 0.246 0.212] sc 1.0 g 0 gr 0.0 np 2 dq 0.2
++156 to_pic ction5 [0.186 0.19  0.213] sc 1.0 g 0 gr 0.0 np 2 dq 0.17
++157 to_pic ction5 [0.183 0.148 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++158 to_pic ction5 [0.185 0.147 0.166] sc 1.0 g 0 gr 0.0 np 1 dq 0.06
++159 to_pic ction5 [0.185 0.147 0.166] sc 0.5 g 0 gr 0.0 np 1 dq 0.06
++160 to_pic ction5 [0.185 0.147 0.166] sc 0.25 g 0 gr 0.0 np 1 dq 0.05
++161 to_pic ction5 [0.185 0.147 0.166] sc 0.125 g 0 gr 0.0 np 1 dq 0.02
++162 to_pic ction5 [0.184 0.148 0.161] sc 0.25 g 0 gr 0.0 np 1 dq 0.03
++163 to_pic ction5 [0.184 0.148 0.161] sc 0.125 g 0 gr 0.0 np 1 dq 0.02
++164 to_pic ction5 [0.184 0.148 0.161] sc 0.0625 g 0 gr 0.0 np 1 dq 0.01
++165 grasp ction5 [0.184 0.148 0.161] sc 1.0 g 0 gr -1.0 np 1 dq 0.0
++166 to_pic ction5 [0.184 0.148 0.161] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++167 to_pic ction5 [0.186 0.147 0.183] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++168 to_pic ction5 [0.185 0.147 0.206] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++169 to_pic ction5 [0.184 0.148 0.161] sc 1.0 g 0 gr 0.0 np 1 dq 0.03
++170 grasp ction5 [0.183 0.148 0.153] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++171 to_pic ction1 [0.183 0.148 0.153] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++172 to_pic ction1 [0.185 0.148 0.198] sc 1.0 g 0 gr 0.0 np 2 dq 0.1
++173 to_pic ction1 [0.221 0.147 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++174 to_pic ction1 [0.222 0.147 0.162] sc 1.0 g 0 gr 0.0 np 1 dq 0.0
++175 grasp ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++176 to_pic ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++177 to_pic ction1 [0.222 0.147 0.211] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++178 grasp ction1 [0.222 0.147 0.162] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++179 to_pic ction2 [0.222 0.147 0.162] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++180 to_pic ction2 [0.222 0.147 0.211] sc 1.0 g 0 gr 0.0 np 1 dq 0.19
++181 grasp ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++182 to_pic ction5 [0.217 0.171 0.163] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++183 to_pic ction5 [0.218 0.171 0.176] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++184 to_pic ction5 [0.218 0.171 0.19 ] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++185 to_pic ction5 [0.217 0.171 0.204] sc 1.0 g 0 gr 0.0 np 3 dq 0.11
++186 to_pic ction5 [0.217 0.171 0.212] sc 1.0 g 0 gr 0.0 np 2 dq 0.1
++187 to_pic ction5 [0.183 0.148 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++188 to_pic ction5 [0.185 0.148 0.166] sc 1.0 g 0 gr 0.0 np 1 dq 0.06
++189 grasp ction5 [0.183 0.148 0.153] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++190 to_pla ction5 [0.183 0.148 0.153] sc 1.0 g 1 gr 0.0 np 5 dq 0.2
++191 to_pla ction5 [0.183 0.148 0.153] sc 0.5 g 1 gr 0.0 np 5 dq 0.09
++192 to_pla ction5 [0.183 0.148 0.173] sc 1.0 g 1 gr 0.0 np 5 dq 0.2
++193 to_pla ction5 [0.183 0.148 0.173] sc 0.5 g 1 gr 0.0 np 5 dq 0.09
++194 to_pla ction5 [0.183 0.148 0.193] sc 1.0 g 1 gr 0.0 np 5 dq 0.15
++195 to_pla ction5 [0.183 0.148 0.23 ] sc 1.0 g 1 gr 0.0 np 4 dq 0.2
++196 to_pla ction5 [0.218 0.111 0.23 ] sc 1.0 g 1 gr 0.0 np 4 dq 0.17
++197 to_pla ction5 [0.242 0.074 0.23 ] sc 1.0 g 1 gr 0.0 np 3 dq 0.2
++198 to_pla ction5 [0.28  0.032 0.231] sc 1.0 g 1 gr 0.0 np 3 dq 0.12
++199 to_pla ction5 [ 0.3  -0.    0.23] sc 1.0 g 1 gr 0.0 np 2 dq 0.16
++200 to_pla ction5 [0.3   0.    0.188] sc 1.0 g 1 gr 0.0 np 1 dq 0.16
++201 releas ction5 [ 0.3   -0.     0.145] sc 1.0 g 1 gr 1.0 np 0 dq 0.0
++202 retrea ction5 [ 0.3   -0.     0.145] sc 1.0 g 0 gr 0.0 np 2 dq 0.11
++203 retrea ction5 [0.3   0.    0.175] sc 1.0 g 0 gr 0.0 np 1 dq 0.11
++204 to_pic ction1 [0.3   0.    0.205] sc 1.0 g 0 gr 0.0 np 3 dq 0.16
++205 to_pic ction1 [0.261 0.073 0.208] sc 1.0 g 0 gr 0.0 np 2 dq 0.2
++206 to_pic ction1 [0.239 0.12  0.211] sc 1.0 g 0 gr 0.0 np 2 dq 0.12
++207 to_pic ction1 [0.221 0.147 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++208 to_pic ction1 [0.222 0.147 0.163] sc 1.0 g 0 gr 0.0 np 1 dq 0.01
++209 grasp ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++210 to_pic ction2 [0.221 0.147 0.162] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++211 to_pic ction2 [0.222 0.147 0.203] sc 1.0 g 0 gr 0.0 np 1 dq 0.16
++212 grasp ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++213 to_pic ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++214 to_pic ction2 [0.217 0.172 0.198] sc 1.0 g 0 gr 0.0 np 1 dq 0.14
++215 grasp ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++216 to_pic ction1 [0.217 0.171 0.163] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++217 to_pic ction1 [0.218 0.172 0.182] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++218 to_pic ction1 [0.217 0.172 0.203] sc 1.0 g 0 gr 0.0 np 1 dq 0.17
++219 grasp ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++220 to_pic ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++221 to_pic ction1 [0.222 0.147 0.174] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++222 to_pic ction1 [0.222 0.147 0.187] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++223 to_pic ction1 [0.222 0.147 0.2  ] sc 1.0 g 0 gr 0.0 np 3 dq 0.18
++224 to_pic ction1 [0.221 0.147 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++225 to_pic ction1 [0.222 0.147 0.163] sc 1.0 g 0 gr 0.0 np 1 dq 0.01
++226 grasp ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++227 to_pic ction2 [0.221 0.147 0.162] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++228 to_pic ction2 [0.223 0.147 0.181] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++229 to_pic ction2 [0.222 0.147 0.202] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++230 to_pic ction2 [0.217 0.171 0.164] sc 1.0 g 0 gr 0.0 np 1 dq 0.0
++231 grasp ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++232 to_pic ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++233 to_pic ction2 [0.217 0.172 0.175] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++234 to_pic ction2 [0.217 0.172 0.187] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++235 to_pic ction2 [0.217 0.172 0.2  ] sc 1.0 g 0 gr 0.0 np 3 dq 0.19
++236 to_pic ction2 [0.217 0.171 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.19
++237 grasp ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++238 to_pic ction1 [0.217 0.171 0.163] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++239 to_pic ction1 [0.218 0.171 0.176] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++240 to_pic ction1 [0.218 0.171 0.189] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++241 to_pic ction1 [0.217 0.171 0.203] sc 1.0 g 0 gr 0.0 np 3 dq 0.13
++242 to_pic ction1 [0.217 0.171 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++243 to_pic ction1 [0.222 0.148 0.163] sc 1.0 g 0 gr 0.0 np 1 dq 0.01
++244 grasp ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++245 to_pic ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++246 to_pic ction1 [0.222 0.147 0.171] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++247 to_pic ction1 [0.222 0.147 0.18 ] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++248 to_pic ction1 [0.222 0.147 0.19 ] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++249 to_pic ction1 [0.222 0.147 0.2  ] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++250 to_pic ction1 [0.222 0.147 0.209] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++251 grasp ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++252 to_pic ction2 [0.221 0.147 0.162] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++253 to_pic ction2 [0.222 0.146 0.171] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++254 to_pic ction2 [0.223 0.146 0.181] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++255 to_pic ction2 [0.223 0.146 0.191] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++256 to_pic ction2 [0.222 0.147 0.201] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++257 to_pic ction2 [0.221 0.147 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.19
++258 grasp ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++259 to_pic ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++260 to_pic ction2 [0.217 0.172 0.17 ] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++261 to_pic ction2 [0.217 0.172 0.177] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++262 to_pic ction2 [0.217 0.172 0.185] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++263 to_pic ction2 [0.217 0.172 0.192] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++264 to_pic ction2 [0.217 0.172 0.2  ] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++265 to_pic ction2 [0.217 0.172 0.208] sc 1.0 g 0 gr 0.0 np 3 dq 0.11
++266 to_pic ction2 [0.217 0.171 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.19
++267 grasp ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++268 to_pic ction1 [0.217 0.171 0.163] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++269 to_pic ction1 [0.217 0.172 0.169] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++270 to_pic ction1 [0.217 0.172 0.175] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++271 to_pic ction1 [0.217 0.172 0.181] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++272 to_pic ction1 [0.217 0.172 0.187] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++273 to_pic ction1 [0.217 0.172 0.194] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++274 to_pic ction1 [0.217 0.172 0.2  ] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++275 to_pic ction1 [0.217 0.172 0.206] sc 1.0 g 0 gr 0.0 np 3 dq 0.19
++276 to_pic ction1 [0.217 0.171 0.212] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++277 to_pic ction1 [0.222 0.147 0.163] sc 1.0 g 0 gr 0.0 np 1 dq 0.0
++278 grasp ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++279 to_pic ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++280 to_pic ction1 [0.222 0.147 0.168] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++281 to_pic ction1 [0.222 0.147 0.174] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++282 to_pic ction1 [0.223 0.147 0.18 ] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++283 to_pic ction1 [0.223 0.147 0.186] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++284 to_pic ction1 [0.223 0.147 0.192] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++285 to_pic ction1 [0.223 0.147 0.199] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++286 to_pic ction1 [0.222 0.147 0.205] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++287 to_pic ction1 [0.222 0.147 0.211] sc 1.0 g 0 gr 0.0 np 1 dq 0.19
++288 grasp ction1 [0.221 0.147 0.162] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
++289 to_pic ction2 [0.221 0.147 0.162] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++290 to_pic ction2 [0.222 0.147 0.168] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++291 to_pic ction2 [0.222 0.147 0.174] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++292 to_pic ction2 [0.223 0.147 0.18 ] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++293 to_pic ction2 [0.223 0.147 0.186] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++294 to_pic ction2 [0.223 0.147 0.193] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++295 to_pic ction2 [0.223 0.147 0.199] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++296 to_pic ction2 [0.222 0.147 0.205] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++297 to_pic ction2 [0.222 0.147 0.211] sc 1.0 g 0 gr 0.0 np 1 dq 0.2
++298 to_pic ction2 [0.221 0.161 0.179] sc 1.0 g 0 gr 0.0 np 1 dq 0.09
++299 grasp ction2 [0.217 0.171 0.163] sc 1.0 g 0 gr -1.0 np 0 dq 0.0
+diff --git a/probe478.py b/probe478.py
+new file mode 100644
+index 0000000..9ad2d62
+--- /dev/null
++++ b/probe478.py
+@@ -0,0 +1,31 @@
++import numpy as np, copy
++from th import H
++from approach import GeneratedApproach
++from kin import fk, ik, down_R
++h=H(478,oc=8)
++ap=GeneratedApproach(None,None,{}); ap.reset(h.obs,{})
++for t in range(39):
++    a=ap.get_action(h.obs); h.step(a)
++print(ap.phase, ap.task['name'], 'yaw', ap.task['yaw'], 'tool', h.tool()[:3,3].round(3))
++n=ap.task['name']; p=h.pose(n)[:3]; he=h.he(n); top=p[2]+he[2]
++q0=h.q(); y=ap.task['yaw']
++def go(pos,yaw):
++    for k in range(30):
++        q=h.q(); qt,e=ik(h.base(),q,np.asarray(pos,float),down_R(yaw),iters=100)
++        d=qt-q; m=np.abs(d).max()
++        if m<1e-5: return True
++        a=np.zeros(11); a[3:10]=d*min(1,0.2/m); h.step(a)
++        if np.allclose(h.q(),q): return False
++    return False
++for dz in [0.031,0.028,0.025,0.02]:
++    ok=go((p[0],p[1],top+dz),y)
++    h.grip(-1); g=h.grasped()
++    print('dz',dz,'reached',ok,h.tool()[:3,3].round(3),'grasped',g)
++    if g: break
++    h.grip(1)
++for k in range(12):
++    yy=k*np.pi/12
++    go((p[0],p[1],0.2),yy); ok=go((p[0],p[1],top+0.025),yy)
++    h.grip(-1); g=h.grasped(); print('yaw',round(np.degrees(yy)),'reached',ok,'grasped',g)
++    if g: break
++    h.grip(1)
+diff --git a/probe478b.py b/probe478b.py
+new file mode 100644
+index 0000000..2dc564f
+--- /dev/null
++++ b/probe478b.py
+@@ -0,0 +1,27 @@
++import numpy as np
++from th import H
++from approach import GeneratedApproach
++from kin import fk, ik, down_R
++h=H(478,oc=8)
++ap=GeneratedApproach(None,None,{}); ap.reset(h.obs,{})
++for t in range(39):
++    a=ap.get_action(h.obs); h.step(a)
++def go(pos,yaw):
++    for k in range(30):
++        q=h.q(); qt,e=ik(h.base(),q,np.asarray(pos,float),down_R(yaw),iters=100)
++        d=qt-q; m=np.abs(d).max()
++        if m<1e-5: return True
++        a=np.zeros(11); a[3:10]=d*min(1,0.2/m); h.step(a)
++        if np.allclose(h.q(),q): return False
++    return False
++for n in ['obstruction2','obstruction5','obstruction7']:
++    p=h.pose(n)[:3]; he=h.he(n); top=p[2]+he[2]; res=[]
++    for k in range(0,12,1):
++        yy=k*np.pi/12
++        go((p[0],p[1],0.21),yy); ok=go((p[0],p[1],top+0.025),yy)
++        h.grip(-1); g=h.grasped(); res.append((k*15,int(ok),int(g)))
++        if g:
++            go((p[0],p[1],top+0.03),yy); h.grip(1); 
++        else: h.grip(1)
++        go((p[0],p[1],0.21),yy)
++    print(n,res)
+diff --git a/sweep2.txt b/sweep2.txt
+new file mode 100644
+index 0000000..1ed51cf
+--- /dev/null
++++ b/sweep2.txt
+@@ -0,0 +1,3 @@
++success 100/100  mean steps(success) 29.4  max compute 0.4s
++FAIL (478, False, 1000, 9.0, 306, 'to_pick', 'obstruction2', 8)
++success 59/60  mean steps(success) 97.8  max compute 9.0s
+diff --git a/touch.py b/touch.py
+new file mode 100644
+index 0000000..560b9ce
+--- /dev/null
++++ b/touch.py
+@@ -0,0 +1,30 @@
++import numpy as np, sys
++from th import H
++from approach import GeneratedApproach
++from kin import fk, ik, down_R
++gap=float(sys.argv[1])
++h=H(478,oc=8)
++ap=GeneratedApproach(None,None,{}); ap.reset(h.obs,{})
++for t in range(39):
++    a=ap.get_action(h.obs); h.step(a)
++def go(pos,yaw):
++    for k in range(40):
++        q=h.q(); qt,e=ik(h.base(),q,np.asarray(pos,float),down_R(yaw),iters=100)
++        d=qt-q; m=np.abs(d).max()
++        if m<1e-5: return True
++        a=np.zeros(11); a[3:10]=d*min(1,0.2/m); h.step(a)
++        if np.allclose(h.q(),q): return False
++    return False
++n='obstruction7'; p=h.pose(n)[:3]; he=h.he(n); top=p[2]+he[2]; yy=np.pi/6
++go((p[0],p[1],0.21),yy); go((p[0],p[1],top+0.025),yy); h.grip(-1); print('g7',h.grasped())
++off=h.tool()[2,3]-p[2]
++b=h.pose('target_block')[:3]; bhe=h.he('target_block')
++# yaw 30 deg: obj rotates by 0 (held with same yaw at place) -> AABB same
++dest=np.array([b[0]-bhe[0]-he[0]-gap, b[1], 0.075+he[2]+off+0.0015])
++go((p[0],p[1],0.23),yy); go((dest[0],dest[1],0.23),yy); r=go(dest,yy); print('reached',r,h.tool()[:3,3].round(4))
++h.grip(1); h.grip(1); print('released', not h.grasped(), h.pose(n)[:3].round(4), 'gapx', round(b[0]-bhe[0]-(h.pose(n)[0]+he[0]),4))
++go((dest[0],dest[1],0.23),yy)
++for yb in [np.pi/2, 0.0]:
++    go((b[0],b[1],0.23),yb); ok=go((b[0],b[1],b[2]+bhe[2]+0.025),yb); h.grip(-1); print('block yaw',yb,'reached',ok,'grasped',h.grasped())
++    if h.grasped(): break
++    h.grip(1); go((b[0],b[1],0.23),yb)

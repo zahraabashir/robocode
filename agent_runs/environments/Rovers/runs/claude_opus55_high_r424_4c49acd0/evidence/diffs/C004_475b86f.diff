@@ -1,0 +1,199 @@
+diff --git a/approach.py b/approach.py
+index d0b001f..40cd7e9 100644
+--- a/approach.py
++++ b/approach.py
+@@ -100,6 +100,8 @@ def to_cell(x, y):
+ class GeneratedApproach:
+     def __init__(self, action_space, observation_space, primitives):
+         self.action_space = action_space
++        self._predicting = False
++        self._pred_cache = None
+         self.topk = 12
+         self.observation_space = observation_space
+ 
+@@ -129,6 +131,7 @@ class GeneratedApproach:
+         self._plan()
+         self.stage_fields = {}
+         self.t = 0
++        self._pred_cache = None
+ 
+     def _build_free(self):
+         free = np.ones((N, N), dtype=bool)
+@@ -164,8 +167,7 @@ class GeneratedApproach:
+                 self.obj_vis[(r, o)] = self._vis_mask(r, tx, ty, OBJ_RANGE) & fr
+             other = [q for q in self.rovers if q != r][0]
+             oh = self.home[other]
+-            self.send_reg[r] = self._vis_mask(r, self.lander[0], self.lander[1], LANDER_RANGE,
+-                                              other_rover=(oh[0], oh[1])) & fr
++            self.send_reg[r] = self._vis_mask(r, self.lander[0], self.lander[1], LANDER_RANGE) & fr
+         self.samp_reg = {}
+         for s, (sx, sy, _) in self.samples.items():
+             self.samp_reg[s] = (np.hypot(GX - sx, GY - sy) <= SAMPLE_RANGE) & self.free
+@@ -439,9 +441,11 @@ class GeneratedApproach:
+         return d2
+ 
+     def _simulate(self, d, max_steps=150):
++        self._pred_cache = None
+         for t in range(max_steps):
+             act = self._policy(d)
+             d = self._model_step(d, act)
++            d["_t"] = t + 1
+             if self._goal(d):
+                 return t + 1
+         return max_steps + 100
+@@ -495,7 +499,7 @@ class GeneratedApproach:
+         for p in self.pillars:
+             if float(seg_dist_grid(ex, ey, tx, ty, p["x"], p["y"])) <= LOS_PILLAR - 0.01:
+                 return False
+-        if float(seg_dist_grid(ex, ey, tx, ty, other[0], other[1])) <= LOS_ROVER - 0.03:
++        if other is not None and float(seg_dist_grid(ex, ey, tx, ty, other[0], other[1])) <= LOS_ROVER - 0.03:
+             return False
+         return True
+ 
+@@ -518,10 +522,73 @@ class GeneratedApproach:
+ 
+     def get_action(self, state):
+         d = parse(state)
++        d["_t"] = self.t
+         act = self._policy(d)
+         self.t += 1
+         return act
+ 
++    def _predict_other(self, d, r, H=45):
++        """Predict positions of the other rover after each of the next H steps."""
++        other = [q for q in self.rovers if q != r][0]
++        key = (d.get("_t", 0), other, round(d["rover"][other]["x"], 3), round(d["rover"][other]["y"], 3))
++        c = self._pred_cache
++        if c is not None:
++            t0, traj = c
++            k = d.get("_t", 0) - t0
++            if 0 <= k < len(traj) and abs(traj[k][0] - d["rover"][other]["x"]) < 1e-6 and \
++                    abs(traj[k][1] - d["rover"][other]["y"]) < 1e-6 and \
++                    len(traj) - k > H // 2:
++                return traj[k + 1:]
++        prev = self._predicting
++        self._predicting = True
++        dd = d
++        traj = [(d["rover"][other]["x"], d["rover"][other]["y"])]
++        for kk in range(H + 25):
++            act = self._policy(dd)
++            dd = self._model_step(dd, act)
++            dd["_t"] = d.get("_t", 0) + kk + 1
++            traj.append((dd["rover"][other]["x"], dd["rover"][other]["y"]))
++        self._predicting = prev
++        self._pred_cache = (d.get("_t", 0), traj)
++        return traj[1:]
++
++    def _final_send_target(self, d, r, H=45):
++        ro = d["rover"][r]
++        x, y = ro["x"], ro["y"]
++        a = to_cell(x, y)
++        Fa = self._point_field(r, a)
++        pred = self._predict_other(d, r, H)
++        ox, oy = self.sense[r]
++        ex = GX + ox
++        ey = GY + oy
++        tx, ty = self.lander
++        best = None
++        Vh = self.V_home[r]
++        base = self.send_reg[r] & (Fa < INF)
++        for k in range(0, H):
++            if k >= len(pred):
++                break
++            if best is not None and k >= best[0]:
++                break
++            reach = base & (Fa <= k + 1)
++            if not reach.any():
++                continue
++            px, py = pred[k]
++            ok = reach & (seg_dist_grid(ex, ey, tx, ty, px, py) > LOS_ROVER)
++            if not ok.any():
++                continue
++            tot = np.where(ok, Vh + (k + 1), INF)
++            idx = np.unravel_index(np.argmin(tot), tot.shape)
++            v = tot[idx]
++            if best is None or v < best[0]:
++                best = (v, k, idx)
++        if best is None:
++            return None
++        _, k, idx = best
++        Fp = self._point_field(r, idx)
++        # cost-to-go: reach idx then home; encode as field
++        return np.where(Fp < INF, Fp, INF)
++
+     def _policy(self, d):
+         act = np.zeros(8, dtype=np.float32)
+         for k, r in enumerate(self.rovers):
+@@ -558,6 +625,10 @@ class GeneratedApproach:
+             if pending:
+                 F = self.V_send[r]
+                 reg = None
++                if not self._predicting:
++                    tgt = self._final_send_target(d, r)
++                    if tgt is not None:
++                        F = tgt
+             else:
+                 F = self.V_home[r]
+                 reg = None
+@@ -615,6 +686,6 @@ class GeneratedApproach:
+             return mdx, mdy, "drop"
+         if not cal and need_imgs and vis:
+             return mdx, mdy, "calibrate"
+-        if pending and self._lander_visible(r, px, py, th, other_xy):
++        if pending and self._lander_visible(r, px, py, th, None):
+             return mdx, mdy, "send"
+         return mdx, mdy, op
+diff --git a/pD_t3.out b/pD_t3.out
+new file mode 100644
+index 0000000..6c7f5ee
+--- /dev/null
++++ b/pD_t3.out
+@@ -0,0 +1,16 @@
++t=0.45 side=+1 th=0.00 (0.0, 0.002)
++t=0.45 side=+1 th=0.39 (0.0, 0.002)
++t=0.45 side=+1 th=0.79 (0.0, 0.002)
++t=0.45 side=+1 th=1.18 (0.0, 0.002)
++t=0.45 side=+1 th=1.57 (0.0117, 0.0137)
++t=0.45 side=+1 th=1.96 (0.0664, 0.0684)
++t=0.45 side=+1 th=2.36 (0.1133, 0.1152)
++t=0.45 side=+1 th=2.75 (0.127, 0.1289)
++t=0.45 side=-1 th=0.00 (0.0, 0.002)
++t=0.45 side=-1 th=0.39 (0.0, 0.002)
++t=0.45 side=-1 th=0.79 (0.0, 0.002)
++t=0.45 side=-1 th=1.18 (0.0, 0.002)
++t=0.45 side=-1 th=1.57 (0.0156, 0.0176)
++t=0.45 side=-1 th=1.96 (0.0664, 0.0684)
++t=0.45 side=-1 th=2.36 (0.0078, 0.0098)
++t=0.45 side=-1 th=2.75 (0.127, 0.1289)
+diff --git a/pD_t3.py b/pD_t3.py
+new file mode 100644
+index 0000000..4589a6f
+--- /dev/null
++++ b/pD_t3.py
+@@ -0,0 +1,9 @@
++import sys
++from multiprocessing import Pool
++from pD_t2 import bis
++from pD_lib import *
++if __name__=='__main__':
++    S=(0.4,-0.6,np.pi)
++    jobs=[(S,t,sd,th) for t in [0.45,0.65] for sd in [1,-1] for th in np.arange(8)*np.pi/8]
++    with Pool(16) as p:
++        for j,r in p.imap(bis,jobs): print('t=%.2f side=%+d th=%.2f'%j[1:],r,flush=True)
+diff --git a/timing.py b/timing.py
+new file mode 100644
+index 0000000..d365d3d
+--- /dev/null
++++ b/timing.py
+@@ -0,0 +1,11 @@
++import time
++from env_client import make_env
++from approach import GeneratedApproach
++env=make_env(); obs,info=env.reset(seed=0)
++ap=GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs,info)
++t=time.time(); 
++for _ in range(10): a=ap.get_action(obs)
++print('get_action', (time.time()-t)/10)
++t=time.time()
++for _ in range(10): obs2=env.step(a*0)
++print('env step', (time.time()-t)/10)

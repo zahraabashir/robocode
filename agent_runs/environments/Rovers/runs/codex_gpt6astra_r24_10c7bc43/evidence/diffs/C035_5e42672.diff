@@ -1,0 +1,36 @@
+diff --git a/approach.py b/approach.py
+index a8afb6b..0078060 100644
+--- a/approach.py
++++ b/approach.py
+@@ -40,12 +40,12 @@ class GeneratedApproach:
+         rows=[]; cols=[]
+         for i in np.flatnonzero(self.valid):
+             x,y=divmod(i,self.n)
+-            for dx,dy in [(1,0),(-1,0),(0,1),(0,-1),(1,1),(1,-1),(-1,1),(-1,-1)]:
++            for dx,dy in [(dx,dy) for dx in range(-2,3) for dy in range(-2,3) if dx or dy]:
+                 xx,yy=x+dx,y+dy
+                 if 0<=xx<self.n and 0<=yy<self.n:
+                     j=xx*self.n+yy
+                     if self.valid[j]: rows.append(i);cols.append(j)
+-        self.graph=csr_matrix((np.ones(len(rows)),(rows,cols)),shape=(len(self.points),len(self.points)))
++        self.graph=csr_matrix((np.full(len(rows),2.),(rows,cols)),shape=(len(self.points),len(self.points)))
+     def visible(self,p,target,limit):
+         p=np.atleast_2d(p); target=np.asarray(target)
+         ok=np.linalg.norm(p-target,axis=1)<(3.91 if limit>3 else limit-.025)
+@@ -105,6 +105,7 @@ class GeneratedApproach:
+             for mask,task,o,j in candidates:
+                 dd=dist+.001*np.minimum(self.home_dist[i],1e4);dd[~mask]=np.inf
+                 target=int(np.argmin(dd)); cost=dd[target]
++                if task=='sample': cost-=6
+                 if task=='send': cost+=5 if any(c[1]!='send' for c in candidates) else 0
+                 if cost<score: score=cost;best=(target,task,o,j)
+             if best is None: best=(self.nearest(self.homes[i]),'home',None,None)
+diff --git a/stress_500.jsonl b/stress_500.jsonl
+index 63a14b9..58f50d5 100644
+--- a/stress_500.jsonl
++++ b/stress_500.jsonl
+@@ -97,3 +97,4 @@
+ {"seed": 596, "n": 4, "steps": 25, "success": true, "sec": 0.413}
+ {"seed": 597, "n": 4, "steps": 25, "success": true, "sec": 0.43}
+ {"seed": 598, "n": 4, "steps": 30, "success": true, "sec": 0.367}
++{"seed": 599, "n": 4, "steps": 30, "success": true, "sec": 0.73}

@@ -1,0 +1,1088 @@
+diff --git a/angles_validation.txt b/angles_validation.txt
+new file mode 100644
+index 0000000..dcf72fd
+--- /dev/null
++++ b/angles_validation.txt
+@@ -0,0 +1,16 @@
++{'seed': 0, 'baseline': [True, 520, 1.486], 'angles': [True, 254, 1.282]}
++{'seed': 1, 'baseline': [True, 189, 0.491], 'angles': [True, 216, 1.055]}
++{'seed': 2, 'baseline': [True, 148, 0.404], 'angles': [True, 150, 0.752]}
++{'seed': 3, 'baseline': [True, 133, 0.353], 'angles': [True, 146, 0.778]}
++{'seed': 4, 'baseline': [True, 152, 0.419], 'angles': [True, 127, 0.655]}
++{'seed': 5, 'baseline': [True, 187, 0.422], 'angles': [True, 191, 0.927]}
++{'seed': 6, 'baseline': [True, 172, 0.478], 'angles': [True, 258, 1.335]}
++{'seed': 7, 'baseline': [True, 234, 0.7], 'angles': [True, 223, 1.134]}
++{'seed': 8, 'baseline': [True, 183, 0.489], 'angles': [True, 116, 0.558]}
++{'seed': 9, 'baseline': [True, 151, 0.445], 'angles': [True, 141, 0.718]}
++{'seed': 10, 'baseline': [True, 146, 0.346], 'angles': [True, 134, 0.67]}
++{'seed': 11, 'baseline': [True, 175, 0.448], 'angles': [True, 154, 0.785]}
++{'seed': 12, 'baseline': [True, 100, 0.214], 'angles': [True, 95, 0.467]}
++{'seed': 13, 'baseline': [True, 114, 0.29], 'angles': [True, 215, 1.083]}
++{'seed': 14, 'baseline': [True, 185, 0.627], 'angles': [True, 218, 1.135]}
++{'seed': 15, 'baseline': [True, 102, 0.242], 'angles': [True, 109, 0.557]}
+diff --git a/policy_baselineprobe.py b/policy_baselineprobe.py
+new file mode 100644
+index 0000000..4e53503
+--- /dev/null
++++ b/policy_baselineprobe.py
+@@ -0,0 +1,133 @@
++import numpy as np
++import math
++import heapq
++
++def wrap(a):
++    return (a+math.pi)%(2*math.pi)-math.pi
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.reset(None, {})
++
++    def reset(self, state, info):
++        self.steps=0
++        self.contact=None
++        self.age=0
++        self.last=None
++
++    def geometry(self,s):
++        w,h,v=s[12:15]
++        self.rects=[np.array([-h/2,h/2,-w,0]),np.array([-w/2,w/2,-v-w,-w])]
++        # Sample exposed surfaces with inward normals.
++        points=[]; normals=[]
++        def edge(a,b,n,count):
++            for t in np.linspace(.04,.96,count):
++                points.append(np.array(a)*(1-t)+np.array(b)*t); normals.append(n)
++        edge([-h/2,0],[h/2,0],[0,-1],15)
++        edge([-h/2,-w],[-h/2,0],[1,0],3)
++        edge([h/2,-w],[h/2,0],[-1,0],3)
++        edge([-h/2,-w],[-w/2,-w],[0,1],6)
++        edge([w/2,-w],[h/2,-w],[0,1],6)
++        edge([-w/2,-v-w],[-w/2,-w],[1,0],13)
++        edge([w/2,-v-w],[w/2,-w],[-1,0],13)
++        edge([-w/2,-v-w],[w/2,-v-w],[0,1],3)
++        self.pts=np.array(points); self.normals=np.array(normals)
++
++    def free(self,a,b,margin):
++        for rect in self.rects:
++            lo=rect[[0,2]]-margin; hi=rect[[1,3]]+margin
++            dd=b-a; t0=0.; t1=1.
++            for j in range(2):
++                if abs(dd[j])<1e-10:
++                    if a[j]<=lo[j] or a[j]>=hi[j]: t1=-1.; break
++                else:
++                    z=(lo[j]-a[j])/dd[j]; zz=(hi[j]-a[j])/dd[j]
++                    t0=max(t0,min(z,zz)); t1=min(t1,max(z,zz))
++            if t0<t1-1e-7: return False
++        return True
++
++    def navigate(self,a,b,radius):
++        margin=radius+.009
++        if self.free(a,b,margin): return b
++        # Axis-aligned expanded rectangles give a small visibility graph.
++        vertices=[a,b]
++        for rect in self.rects:
++            x0,x1,y0,y1=rect+np.array([-1,1,-1,1])*(margin+.006)
++            for x,y in [(x0,y0),(x0,y1),(x1,y0),(x1,y1)]:
++                p=np.array([x,y])
++                if self.free(p,p,margin) and np.all((p@self.R.T+self.origin>.105)&(p@self.R.T+self.origin<4.895)): vertices.append(p)
++        # If touching, first move out along the nearest boundary.
++        if not self.free(a,a,margin):
++            choices=[]
++            for rect in self.rects:
++                lo=rect[[0,2]]-margin-.008; hi=rect[[1,3]]+margin+.008
++                for j in range(2):
++                    for v in [lo[j],hi[j]]:
++                        p=a.copy(); p[j]=v
++                        if self.free(p,p,margin): choices.append(p)
++            if choices: return min(choices,key=lambda p:np.linalg.norm(p-a))
++        n=len(vertices); dist=[1e9]*n; prev=[-1]*n; dist[0]=0; heap=[(0,0)]
++        while heap:
++            d,i=heapq.heappop(heap)
++            if d>dist[i]+1e-8: continue
++            if i==1: break
++            for j in range(1,n):
++                if i!=j and self.free(vertices[i],vertices[j],margin):
++                    nd=d+np.linalg.norm(vertices[i]-vertices[j])
++                    if nd<dist[j]: dist[j]=nd;prev[j]=i;heapq.heappush(heap,(nd,j))
++        j=1
++        if prev[j]<0:return b
++        while prev[j]>0:j=prev[j]
++        return vertices[j]
++
++    def get_action(self,state):
++        s=np.asarray(state); self.steps+=1
++        self.geometry(s)
++        self.origin=s[:2]
++        c,ss=math.cos(s[2]),math.sin(s[2]); R=np.array([[c,-ss],[ss,c]])
++        self.R=R
++        robot=(s[16:18]-s[:2])@R
++        delta=(s[29:31]-s[:2])@R; angle=wrap(s[31]-s[2])
++        # Approximate generalized displacement due to unit normal force.
++        w,h,v=s[12:15]
++        cy=-(h*w/2+v*(w+v/2))/(h+v)
++        com=np.array([0.,cy])
++        inertia=(h*((h*h+w*w)/12+(-w/2-cy)**2)+v*((w*w+v*v)/12+(-w-v/2-cy)**2))/(h+v)
++        rr=self.pts-com
++        torque=rr[:,0]*self.normals[:,1]-rr[:,1]*self.normals[:,0]
++        omega=torque/(inertia+np.sum(rr*rr,axis=1))
++        vel=self.normals-omega[:,None]*np.column_stack((-self.pts[:,1],self.pts[:,0]))
++        desired=np.r_[delta,angle]
++        J=np.column_stack((vel,omega))
++        weights=np.array([1.,1.,.35])
++        dot=(J*weights)@desired
++        norm=np.sum(J*J*weights,axis=1)
++        gain=np.maximum(0,dot)**2/norm
++        staging=self.pts-self.normals*(s[28]+.045)
++        distances=np.linalg.norm(staging-robot,axis=1)
++        score=gain/(.20+distances*.28)
++        world_stage=staging@R.T+s[:2]
++        score[np.any((world_stage<.115)|(world_stage>4.885),axis=1)]=0.
++        for i in range(len(score)):
++            cp=self.pts[i]-self.normals[i]*(s[28]+.002)
++            if not self.free(cp,cp,s[28]-.001) or not self.free(staging[i],staging[i],s[28]+.009): score[i]=0.
++        best=int(np.argmax(score))
++        if self.contact is None:
++            self.contact=best; self.age=0
++        else:
++            self.age+=1
++            cur=self.contact
++            if score[cur]<=0 or dot[cur]<=0 or (self.age>8 and score[best]>score[cur]*1.5) or self.age>70:
++                self.contact=best; self.age=0
++        k=self.contact; n=self.normals[k]; p=self.pts[k]
++        stage=staging[k]
++        along=np.dot(robot-p,n); lateral=np.linalg.norm(robot-p-along*n)
++        if lateral<.035 and along<-.06 and along>-(s[28]+.10):
++            step=min(.045,max(.004,dot[k]/norm[k]*.45))
++            target=p-n*(s[28]-.008)+n*step
++        else:
++            target=self.navigate(robot,stage,s[28])
++        a=(target-robot)@R.T
++        a*=min(1.,.049/max(np.max(np.abs(a)),1e-9))
++        self.last=s.copy()
++        return a
+diff --git a/policy_distance010.py b/policy_distance010.py
+new file mode 100644
+index 0000000..3a9409c
+--- /dev/null
++++ b/policy_distance010.py
+@@ -0,0 +1,133 @@
++import numpy as np
++import math
++import heapq
++
++def wrap(a):
++    return (a+math.pi)%(2*math.pi)-math.pi
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.reset(None, {})
++
++    def reset(self, state, info):
++        self.steps=0
++        self.contact=None
++        self.age=0
++        self.last=None
++
++    def geometry(self,s):
++        w,h,v=s[12:15]
++        self.rects=[np.array([-h/2,h/2,-w,0]),np.array([-w/2,w/2,-v-w,-w])]
++        # Sample exposed surfaces with inward normals.
++        points=[]; normals=[]
++        def edge(a,b,n,count):
++            for t in np.linspace(.04,.96,count):
++                points.append(np.array(a)*(1-t)+np.array(b)*t); normals.append(n)
++        edge([-h/2,0],[h/2,0],[0,-1],15)
++        edge([-h/2,-w],[-h/2,0],[1,0],3)
++        edge([h/2,-w],[h/2,0],[-1,0],3)
++        edge([-h/2,-w],[-w/2,-w],[0,1],6)
++        edge([w/2,-w],[h/2,-w],[0,1],6)
++        edge([-w/2,-v-w],[-w/2,-w],[1,0],13)
++        edge([w/2,-v-w],[w/2,-w],[-1,0],13)
++        edge([-w/2,-v-w],[w/2,-v-w],[0,1],3)
++        self.pts=np.array(points); self.normals=np.array(normals)
++
++    def free(self,a,b,margin):
++        for rect in self.rects:
++            lo=rect[[0,2]]-margin; hi=rect[[1,3]]+margin
++            dd=b-a; t0=0.; t1=1.
++            for j in range(2):
++                if abs(dd[j])<1e-10:
++                    if a[j]<=lo[j] or a[j]>=hi[j]: t1=-1.; break
++                else:
++                    z=(lo[j]-a[j])/dd[j]; zz=(hi[j]-a[j])/dd[j]
++                    t0=max(t0,min(z,zz)); t1=min(t1,max(z,zz))
++            if t0<t1-1e-7: return False
++        return True
++
++    def navigate(self,a,b,radius):
++        margin=radius+.009
++        if self.free(a,b,margin): return b
++        # Axis-aligned expanded rectangles give a small visibility graph.
++        vertices=[a,b]
++        for rect in self.rects:
++            x0,x1,y0,y1=rect+np.array([-1,1,-1,1])*(margin+.006)
++            for x,y in [(x0,y0),(x0,y1),(x1,y0),(x1,y1)]:
++                p=np.array([x,y])
++                if self.free(p,p,margin) and np.all((p@self.R.T+self.origin>.105)&(p@self.R.T+self.origin<4.895)): vertices.append(p)
++        # If touching, first move out along the nearest boundary.
++        if not self.free(a,a,margin):
++            choices=[]
++            for rect in self.rects:
++                lo=rect[[0,2]]-margin-.008; hi=rect[[1,3]]+margin+.008
++                for j in range(2):
++                    for v in [lo[j],hi[j]]:
++                        p=a.copy(); p[j]=v
++                        if self.free(p,p,margin): choices.append(p)
++            if choices: return min(choices,key=lambda p:np.linalg.norm(p-a))
++        n=len(vertices); dist=[1e9]*n; prev=[-1]*n; dist[0]=0; heap=[(0,0)]
++        while heap:
++            d,i=heapq.heappop(heap)
++            if d>dist[i]+1e-8: continue
++            if i==1: break
++            for j in range(1,n):
++                if i!=j and self.free(vertices[i],vertices[j],margin):
++                    nd=d+np.linalg.norm(vertices[i]-vertices[j])
++                    if nd<dist[j]: dist[j]=nd;prev[j]=i;heapq.heappush(heap,(nd,j))
++        j=1
++        if prev[j]<0:return b
++        while prev[j]>0:j=prev[j]
++        return vertices[j]
++
++    def get_action(self,state):
++        s=np.asarray(state); self.steps+=1
++        self.geometry(s)
++        self.origin=s[:2]
++        c,ss=math.cos(s[2]),math.sin(s[2]); R=np.array([[c,-ss],[ss,c]])
++        self.R=R
++        robot=(s[16:18]-s[:2])@R
++        delta=(s[29:31]-s[:2])@R; angle=wrap(s[31]-s[2])
++        # Approximate generalized displacement due to unit normal force.
++        w,h,v=s[12:15]
++        cy=-(h*w/2+v*(w+v/2))/(h+v)
++        com=np.array([0.,cy])
++        inertia=(h*((h*h+w*w)/12+(-w/2-cy)**2)+v*((w*w+v*v)/12+(-w-v/2-cy)**2))/(h+v)
++        rr=self.pts-com
++        torque=rr[:,0]*self.normals[:,1]-rr[:,1]*self.normals[:,0]
++        omega=torque/(inertia+np.sum(rr*rr,axis=1))
++        vel=self.normals-omega[:,None]*np.column_stack((-self.pts[:,1],self.pts[:,0]))
++        desired=np.r_[delta,angle]
++        J=np.column_stack((vel,omega))
++        weights=np.array([1.,1.,.35])
++        dot=(J*weights)@desired
++        norm=np.sum(J*J*weights,axis=1)
++        gain=np.maximum(0,dot)**2/norm
++        staging=self.pts-self.normals*(s[28]+.045)
++        distances=np.linalg.norm(staging-robot,axis=1)
++        score=gain/(.20+distances*.1)
++        world_stage=staging@R.T+s[:2]
++        score[np.any((world_stage<.115)|(world_stage>4.885),axis=1)]=0.
++        for i in range(len(score)):
++            cp=self.pts[i]-self.normals[i]*(s[28]+.002)
++            if not self.free(cp,cp,s[28]-.001) or not self.free(staging[i],staging[i],s[28]+.009): score[i]=0.
++        best=int(np.argmax(score))
++        if self.contact is None:
++            self.contact=best; self.age=0
++        else:
++            self.age+=1
++            cur=self.contact
++            if score[cur]<=0 or dot[cur]<=0 or (self.age>8 and score[best]>score[cur]*1.5) or self.age>70:
++                self.contact=best; self.age=0
++        k=self.contact; n=self.normals[k]; p=self.pts[k]
++        stage=staging[k]
++        along=np.dot(robot-p,n); lateral=np.linalg.norm(robot-p-along*n)
++        if lateral<.035 and along<-.06 and along>-(s[28]+.10):
++            step=min(.045,max(.004,dot[k]/norm[k]*.45))
++            target=p-n*(s[28]-.008)+n*step
++        else:
++            target=self.navigate(robot,stage,s[28])
++        a=(target-robot)@R.T
++        a*=min(1.,.049/max(np.max(np.abs(a)),1e-9))
++        self.last=s.copy()
++        return a
+diff --git a/policy_distance060.py b/policy_distance060.py
+new file mode 100644
+index 0000000..0b86054
+--- /dev/null
++++ b/policy_distance060.py
+@@ -0,0 +1,133 @@
++import numpy as np
++import math
++import heapq
++
++def wrap(a):
++    return (a+math.pi)%(2*math.pi)-math.pi
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.reset(None, {})
++
++    def reset(self, state, info):
++        self.steps=0
++        self.contact=None
++        self.age=0
++        self.last=None
++
++    def geometry(self,s):
++        w,h,v=s[12:15]
++        self.rects=[np.array([-h/2,h/2,-w,0]),np.array([-w/2,w/2,-v-w,-w])]
++        # Sample exposed surfaces with inward normals.
++        points=[]; normals=[]
++        def edge(a,b,n,count):
++            for t in np.linspace(.04,.96,count):
++                points.append(np.array(a)*(1-t)+np.array(b)*t); normals.append(n)
++        edge([-h/2,0],[h/2,0],[0,-1],15)
++        edge([-h/2,-w],[-h/2,0],[1,0],3)
++        edge([h/2,-w],[h/2,0],[-1,0],3)
++        edge([-h/2,-w],[-w/2,-w],[0,1],6)
++        edge([w/2,-w],[h/2,-w],[0,1],6)
++        edge([-w/2,-v-w],[-w/2,-w],[1,0],13)
++        edge([w/2,-v-w],[w/2,-w],[-1,0],13)
++        edge([-w/2,-v-w],[w/2,-v-w],[0,1],3)
++        self.pts=np.array(points); self.normals=np.array(normals)
++
++    def free(self,a,b,margin):
++        for rect in self.rects:
++            lo=rect[[0,2]]-margin; hi=rect[[1,3]]+margin
++            dd=b-a; t0=0.; t1=1.
++            for j in range(2):
++                if abs(dd[j])<1e-10:
++                    if a[j]<=lo[j] or a[j]>=hi[j]: t1=-1.; break
++                else:
++                    z=(lo[j]-a[j])/dd[j]; zz=(hi[j]-a[j])/dd[j]
++                    t0=max(t0,min(z,zz)); t1=min(t1,max(z,zz))
++            if t0<t1-1e-7: return False
++        return True
++
++    def navigate(self,a,b,radius):
++        margin=radius+.009
++        if self.free(a,b,margin): return b
++        # Axis-aligned expanded rectangles give a small visibility graph.
++        vertices=[a,b]
++        for rect in self.rects:
++            x0,x1,y0,y1=rect+np.array([-1,1,-1,1])*(margin+.006)
++            for x,y in [(x0,y0),(x0,y1),(x1,y0),(x1,y1)]:
++                p=np.array([x,y])
++                if self.free(p,p,margin) and np.all((p@self.R.T+self.origin>.105)&(p@self.R.T+self.origin<4.895)): vertices.append(p)
++        # If touching, first move out along the nearest boundary.
++        if not self.free(a,a,margin):
++            choices=[]
++            for rect in self.rects:
++                lo=rect[[0,2]]-margin-.008; hi=rect[[1,3]]+margin+.008
++                for j in range(2):
++                    for v in [lo[j],hi[j]]:
++                        p=a.copy(); p[j]=v
++                        if self.free(p,p,margin): choices.append(p)
++            if choices: return min(choices,key=lambda p:np.linalg.norm(p-a))
++        n=len(vertices); dist=[1e9]*n; prev=[-1]*n; dist[0]=0; heap=[(0,0)]
++        while heap:
++            d,i=heapq.heappop(heap)
++            if d>dist[i]+1e-8: continue
++            if i==1: break
++            for j in range(1,n):
++                if i!=j and self.free(vertices[i],vertices[j],margin):
++                    nd=d+np.linalg.norm(vertices[i]-vertices[j])
++                    if nd<dist[j]: dist[j]=nd;prev[j]=i;heapq.heappush(heap,(nd,j))
++        j=1
++        if prev[j]<0:return b
++        while prev[j]>0:j=prev[j]
++        return vertices[j]
++
++    def get_action(self,state):
++        s=np.asarray(state); self.steps+=1
++        self.geometry(s)
++        self.origin=s[:2]
++        c,ss=math.cos(s[2]),math.sin(s[2]); R=np.array([[c,-ss],[ss,c]])
++        self.R=R
++        robot=(s[16:18]-s[:2])@R
++        delta=(s[29:31]-s[:2])@R; angle=wrap(s[31]-s[2])
++        # Approximate generalized displacement due to unit normal force.
++        w,h,v=s[12:15]
++        cy=-(h*w/2+v*(w+v/2))/(h+v)
++        com=np.array([0.,cy])
++        inertia=(h*((h*h+w*w)/12+(-w/2-cy)**2)+v*((w*w+v*v)/12+(-w-v/2-cy)**2))/(h+v)
++        rr=self.pts-com
++        torque=rr[:,0]*self.normals[:,1]-rr[:,1]*self.normals[:,0]
++        omega=torque/(inertia+np.sum(rr*rr,axis=1))
++        vel=self.normals-omega[:,None]*np.column_stack((-self.pts[:,1],self.pts[:,0]))
++        desired=np.r_[delta,angle]
++        J=np.column_stack((vel,omega))
++        weights=np.array([1.,1.,.35])
++        dot=(J*weights)@desired
++        norm=np.sum(J*J*weights,axis=1)
++        gain=np.maximum(0,dot)**2/norm
++        staging=self.pts-self.normals*(s[28]+.045)
++        distances=np.linalg.norm(staging-robot,axis=1)
++        score=gain/(.20+distances*.6)
++        world_stage=staging@R.T+s[:2]
++        score[np.any((world_stage<.115)|(world_stage>4.885),axis=1)]=0.
++        for i in range(len(score)):
++            cp=self.pts[i]-self.normals[i]*(s[28]+.002)
++            if not self.free(cp,cp,s[28]-.001) or not self.free(staging[i],staging[i],s[28]+.009): score[i]=0.
++        best=int(np.argmax(score))
++        if self.contact is None:
++            self.contact=best; self.age=0
++        else:
++            self.age+=1
++            cur=self.contact
++            if score[cur]<=0 or dot[cur]<=0 or (self.age>8 and score[best]>score[cur]*1.5) or self.age>70:
++                self.contact=best; self.age=0
++        k=self.contact; n=self.normals[k]; p=self.pts[k]
++        stage=staging[k]
++        along=np.dot(robot-p,n); lateral=np.linalg.norm(robot-p-along*n)
++        if lateral<.035 and along<-.06 and along>-(s[28]+.10):
++            step=min(.045,max(.004,dot[k]/norm[k]*.45))
++            target=p-n*(s[28]-.008)+n*step
++        else:
++            target=self.navigate(robot,stage,s[28])
++        a=(target-robot)@R.T
++        a*=min(1.,.049/max(np.max(np.abs(a)),1e-9))
++        self.last=s.copy()
++        return a
+diff --git a/policy_switch12.py b/policy_switch12.py
+new file mode 100644
+index 0000000..943430f
+--- /dev/null
++++ b/policy_switch12.py
+@@ -0,0 +1,133 @@
++import numpy as np
++import math
++import heapq
++
++def wrap(a):
++    return (a+math.pi)%(2*math.pi)-math.pi
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.reset(None, {})
++
++    def reset(self, state, info):
++        self.steps=0
++        self.contact=None
++        self.age=0
++        self.last=None
++
++    def geometry(self,s):
++        w,h,v=s[12:15]
++        self.rects=[np.array([-h/2,h/2,-w,0]),np.array([-w/2,w/2,-v-w,-w])]
++        # Sample exposed surfaces with inward normals.
++        points=[]; normals=[]
++        def edge(a,b,n,count):
++            for t in np.linspace(.04,.96,count):
++                points.append(np.array(a)*(1-t)+np.array(b)*t); normals.append(n)
++        edge([-h/2,0],[h/2,0],[0,-1],15)
++        edge([-h/2,-w],[-h/2,0],[1,0],3)
++        edge([h/2,-w],[h/2,0],[-1,0],3)
++        edge([-h/2,-w],[-w/2,-w],[0,1],6)
++        edge([w/2,-w],[h/2,-w],[0,1],6)
++        edge([-w/2,-v-w],[-w/2,-w],[1,0],13)
++        edge([w/2,-v-w],[w/2,-w],[-1,0],13)
++        edge([-w/2,-v-w],[w/2,-v-w],[0,1],3)
++        self.pts=np.array(points); self.normals=np.array(normals)
++
++    def free(self,a,b,margin):
++        for rect in self.rects:
++            lo=rect[[0,2]]-margin; hi=rect[[1,3]]+margin
++            dd=b-a; t0=0.; t1=1.
++            for j in range(2):
++                if abs(dd[j])<1e-10:
++                    if a[j]<=lo[j] or a[j]>=hi[j]: t1=-1.; break
++                else:
++                    z=(lo[j]-a[j])/dd[j]; zz=(hi[j]-a[j])/dd[j]
++                    t0=max(t0,min(z,zz)); t1=min(t1,max(z,zz))
++            if t0<t1-1e-7: return False
++        return True
++
++    def navigate(self,a,b,radius):
++        margin=radius+.009
++        if self.free(a,b,margin): return b
++        # Axis-aligned expanded rectangles give a small visibility graph.
++        vertices=[a,b]
++        for rect in self.rects:
++            x0,x1,y0,y1=rect+np.array([-1,1,-1,1])*(margin+.006)
++            for x,y in [(x0,y0),(x0,y1),(x1,y0),(x1,y1)]:
++                p=np.array([x,y])
++                if self.free(p,p,margin) and np.all((p@self.R.T+self.origin>.105)&(p@self.R.T+self.origin<4.895)): vertices.append(p)
++        # If touching, first move out along the nearest boundary.
++        if not self.free(a,a,margin):
++            choices=[]
++            for rect in self.rects:
++                lo=rect[[0,2]]-margin-.008; hi=rect[[1,3]]+margin+.008
++                for j in range(2):
++                    for v in [lo[j],hi[j]]:
++                        p=a.copy(); p[j]=v
++                        if self.free(p,p,margin): choices.append(p)
++            if choices: return min(choices,key=lambda p:np.linalg.norm(p-a))
++        n=len(vertices); dist=[1e9]*n; prev=[-1]*n; dist[0]=0; heap=[(0,0)]
++        while heap:
++            d,i=heapq.heappop(heap)
++            if d>dist[i]+1e-8: continue
++            if i==1: break
++            for j in range(1,n):
++                if i!=j and self.free(vertices[i],vertices[j],margin):
++                    nd=d+np.linalg.norm(vertices[i]-vertices[j])
++                    if nd<dist[j]: dist[j]=nd;prev[j]=i;heapq.heappush(heap,(nd,j))
++        j=1
++        if prev[j]<0:return b
++        while prev[j]>0:j=prev[j]
++        return vertices[j]
++
++    def get_action(self,state):
++        s=np.asarray(state); self.steps+=1
++        self.geometry(s)
++        self.origin=s[:2]
++        c,ss=math.cos(s[2]),math.sin(s[2]); R=np.array([[c,-ss],[ss,c]])
++        self.R=R
++        robot=(s[16:18]-s[:2])@R
++        delta=(s[29:31]-s[:2])@R; angle=wrap(s[31]-s[2])
++        # Approximate generalized displacement due to unit normal force.
++        w,h,v=s[12:15]
++        cy=-(h*w/2+v*(w+v/2))/(h+v)
++        com=np.array([0.,cy])
++        inertia=(h*((h*h+w*w)/12+(-w/2-cy)**2)+v*((w*w+v*v)/12+(-w-v/2-cy)**2))/(h+v)
++        rr=self.pts-com
++        torque=rr[:,0]*self.normals[:,1]-rr[:,1]*self.normals[:,0]
++        omega=torque/(inertia+np.sum(rr*rr,axis=1))
++        vel=self.normals-omega[:,None]*np.column_stack((-self.pts[:,1],self.pts[:,0]))
++        desired=np.r_[delta,angle]
++        J=np.column_stack((vel,omega))
++        weights=np.array([1.,1.,.35])
++        dot=(J*weights)@desired
++        norm=np.sum(J*J*weights,axis=1)
++        gain=np.maximum(0,dot)**2/norm
++        staging=self.pts-self.normals*(s[28]+.045)
++        distances=np.linalg.norm(staging-robot,axis=1)
++        score=gain/(.20+distances*.28)
++        world_stage=staging@R.T+s[:2]
++        score[np.any((world_stage<.115)|(world_stage>4.885),axis=1)]=0.
++        for i in range(len(score)):
++            cp=self.pts[i]-self.normals[i]*(s[28]+.002)
++            if not self.free(cp,cp,s[28]-.001) or not self.free(staging[i],staging[i],s[28]+.009): score[i]=0.
++        best=int(np.argmax(score))
++        if self.contact is None:
++            self.contact=best; self.age=0
++        else:
++            self.age+=1
++            cur=self.contact
++            if score[cur]<=0 or dot[cur]<=0 or (self.age>8 and score[best]>score[cur]*1.2) or self.age>70:
++                self.contact=best; self.age=0
++        k=self.contact; n=self.normals[k]; p=self.pts[k]
++        stage=staging[k]
++        along=np.dot(robot-p,n); lateral=np.linalg.norm(robot-p-along*n)
++        if lateral<.035 and along<-.06 and along>-(s[28]+.10):
++            step=min(.045,max(.004,dot[k]/norm[k]*.45))
++            target=p-n*(s[28]-.008)+n*step
++        else:
++            target=self.navigate(robot,stage,s[28])
++        a=(target-robot)@R.T
++        a*=min(1.,.049/max(np.max(np.abs(a)),1e-9))
++        self.last=s.copy()
++        return a
+diff --git a/policy_switch20.py b/policy_switch20.py
+new file mode 100644
+index 0000000..bd0b8fb
+--- /dev/null
++++ b/policy_switch20.py
+@@ -0,0 +1,133 @@
++import numpy as np
++import math
++import heapq
++
++def wrap(a):
++    return (a+math.pi)%(2*math.pi)-math.pi
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.reset(None, {})
++
++    def reset(self, state, info):
++        self.steps=0
++        self.contact=None
++        self.age=0
++        self.last=None
++
++    def geometry(self,s):
++        w,h,v=s[12:15]
++        self.rects=[np.array([-h/2,h/2,-w,0]),np.array([-w/2,w/2,-v-w,-w])]
++        # Sample exposed surfaces with inward normals.
++        points=[]; normals=[]
++        def edge(a,b,n,count):
++            for t in np.linspace(.04,.96,count):
++                points.append(np.array(a)*(1-t)+np.array(b)*t); normals.append(n)
++        edge([-h/2,0],[h/2,0],[0,-1],15)
++        edge([-h/2,-w],[-h/2,0],[1,0],3)
++        edge([h/2,-w],[h/2,0],[-1,0],3)
++        edge([-h/2,-w],[-w/2,-w],[0,1],6)
++        edge([w/2,-w],[h/2,-w],[0,1],6)
++        edge([-w/2,-v-w],[-w/2,-w],[1,0],13)
++        edge([w/2,-v-w],[w/2,-w],[-1,0],13)
++        edge([-w/2,-v-w],[w/2,-v-w],[0,1],3)
++        self.pts=np.array(points); self.normals=np.array(normals)
++
++    def free(self,a,b,margin):
++        for rect in self.rects:
++            lo=rect[[0,2]]-margin; hi=rect[[1,3]]+margin
++            dd=b-a; t0=0.; t1=1.
++            for j in range(2):
++                if abs(dd[j])<1e-10:
++                    if a[j]<=lo[j] or a[j]>=hi[j]: t1=-1.; break
++                else:
++                    z=(lo[j]-a[j])/dd[j]; zz=(hi[j]-a[j])/dd[j]
++                    t0=max(t0,min(z,zz)); t1=min(t1,max(z,zz))
++            if t0<t1-1e-7: return False
++        return True
++
++    def navigate(self,a,b,radius):
++        margin=radius+.009
++        if self.free(a,b,margin): return b
++        # Axis-aligned expanded rectangles give a small visibility graph.
++        vertices=[a,b]
++        for rect in self.rects:
++            x0,x1,y0,y1=rect+np.array([-1,1,-1,1])*(margin+.006)
++            for x,y in [(x0,y0),(x0,y1),(x1,y0),(x1,y1)]:
++                p=np.array([x,y])
++                if self.free(p,p,margin) and np.all((p@self.R.T+self.origin>.105)&(p@self.R.T+self.origin<4.895)): vertices.append(p)
++        # If touching, first move out along the nearest boundary.
++        if not self.free(a,a,margin):
++            choices=[]
++            for rect in self.rects:
++                lo=rect[[0,2]]-margin-.008; hi=rect[[1,3]]+margin+.008
++                for j in range(2):
++                    for v in [lo[j],hi[j]]:
++                        p=a.copy(); p[j]=v
++                        if self.free(p,p,margin): choices.append(p)
++            if choices: return min(choices,key=lambda p:np.linalg.norm(p-a))
++        n=len(vertices); dist=[1e9]*n; prev=[-1]*n; dist[0]=0; heap=[(0,0)]
++        while heap:
++            d,i=heapq.heappop(heap)
++            if d>dist[i]+1e-8: continue
++            if i==1: break
++            for j in range(1,n):
++                if i!=j and self.free(vertices[i],vertices[j],margin):
++                    nd=d+np.linalg.norm(vertices[i]-vertices[j])
++                    if nd<dist[j]: dist[j]=nd;prev[j]=i;heapq.heappush(heap,(nd,j))
++        j=1
++        if prev[j]<0:return b
++        while prev[j]>0:j=prev[j]
++        return vertices[j]
++
++    def get_action(self,state):
++        s=np.asarray(state); self.steps+=1
++        self.geometry(s)
++        self.origin=s[:2]
++        c,ss=math.cos(s[2]),math.sin(s[2]); R=np.array([[c,-ss],[ss,c]])
++        self.R=R
++        robot=(s[16:18]-s[:2])@R
++        delta=(s[29:31]-s[:2])@R; angle=wrap(s[31]-s[2])
++        # Approximate generalized displacement due to unit normal force.
++        w,h,v=s[12:15]
++        cy=-(h*w/2+v*(w+v/2))/(h+v)
++        com=np.array([0.,cy])
++        inertia=(h*((h*h+w*w)/12+(-w/2-cy)**2)+v*((w*w+v*v)/12+(-w-v/2-cy)**2))/(h+v)
++        rr=self.pts-com
++        torque=rr[:,0]*self.normals[:,1]-rr[:,1]*self.normals[:,0]
++        omega=torque/(inertia+np.sum(rr*rr,axis=1))
++        vel=self.normals-omega[:,None]*np.column_stack((-self.pts[:,1],self.pts[:,0]))
++        desired=np.r_[delta,angle]
++        J=np.column_stack((vel,omega))
++        weights=np.array([1.,1.,.35])
++        dot=(J*weights)@desired
++        norm=np.sum(J*J*weights,axis=1)
++        gain=np.maximum(0,dot)**2/norm
++        staging=self.pts-self.normals*(s[28]+.045)
++        distances=np.linalg.norm(staging-robot,axis=1)
++        score=gain/(.20+distances*.28)
++        world_stage=staging@R.T+s[:2]
++        score[np.any((world_stage<.115)|(world_stage>4.885),axis=1)]=0.
++        for i in range(len(score)):
++            cp=self.pts[i]-self.normals[i]*(s[28]+.002)
++            if not self.free(cp,cp,s[28]-.001) or not self.free(staging[i],staging[i],s[28]+.009): score[i]=0.
++        best=int(np.argmax(score))
++        if self.contact is None:
++            self.contact=best; self.age=0
++        else:
++            self.age+=1
++            cur=self.contact
++            if score[cur]<=0 or dot[cur]<=0 or (self.age>8 and score[best]>score[cur]*2.0) or self.age>70:
++                self.contact=best; self.age=0
++        k=self.contact; n=self.normals[k]; p=self.pts[k]
++        stage=staging[k]
++        along=np.dot(robot-p,n); lateral=np.linalg.norm(robot-p-along*n)
++        if lateral<.035 and along<-.06 and along>-(s[28]+.10):
++            step=min(.045,max(.004,dot[k]/norm[k]*.45))
++            target=p-n*(s[28]-.008)+n*step
++        else:
++            target=self.navigate(robot,stage,s[28])
++        a=(target-robot)@R.T
++        a*=min(1.,.049/max(np.max(np.abs(a)),1e-9))
++        self.last=s.copy()
++        return a
+diff --git a/policy_weight015.py b/policy_weight015.py
+new file mode 100644
+index 0000000..2db49f1
+--- /dev/null
++++ b/policy_weight015.py
+@@ -0,0 +1,133 @@
++import numpy as np
++import math
++import heapq
++
++def wrap(a):
++    return (a+math.pi)%(2*math.pi)-math.pi
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.reset(None, {})
++
++    def reset(self, state, info):
++        self.steps=0
++        self.contact=None
++        self.age=0
++        self.last=None
++
++    def geometry(self,s):
++        w,h,v=s[12:15]
++        self.rects=[np.array([-h/2,h/2,-w,0]),np.array([-w/2,w/2,-v-w,-w])]
++        # Sample exposed surfaces with inward normals.
++        points=[]; normals=[]
++        def edge(a,b,n,count):
++            for t in np.linspace(.04,.96,count):
++                points.append(np.array(a)*(1-t)+np.array(b)*t); normals.append(n)
++        edge([-h/2,0],[h/2,0],[0,-1],15)
++        edge([-h/2,-w],[-h/2,0],[1,0],3)
++        edge([h/2,-w],[h/2,0],[-1,0],3)
++        edge([-h/2,-w],[-w/2,-w],[0,1],6)
++        edge([w/2,-w],[h/2,-w],[0,1],6)
++        edge([-w/2,-v-w],[-w/2,-w],[1,0],13)
++        edge([w/2,-v-w],[w/2,-w],[-1,0],13)
++        edge([-w/2,-v-w],[w/2,-v-w],[0,1],3)
++        self.pts=np.array(points); self.normals=np.array(normals)
++
++    def free(self,a,b,margin):
++        for rect in self.rects:
++            lo=rect[[0,2]]-margin; hi=rect[[1,3]]+margin
++            dd=b-a; t0=0.; t1=1.
++            for j in range(2):
++                if abs(dd[j])<1e-10:
++                    if a[j]<=lo[j] or a[j]>=hi[j]: t1=-1.; break
++                else:
++                    z=(lo[j]-a[j])/dd[j]; zz=(hi[j]-a[j])/dd[j]
++                    t0=max(t0,min(z,zz)); t1=min(t1,max(z,zz))
++            if t0<t1-1e-7: return False
++        return True
++
++    def navigate(self,a,b,radius):
++        margin=radius+.009
++        if self.free(a,b,margin): return b
++        # Axis-aligned expanded rectangles give a small visibility graph.
++        vertices=[a,b]
++        for rect in self.rects:
++            x0,x1,y0,y1=rect+np.array([-1,1,-1,1])*(margin+.006)
++            for x,y in [(x0,y0),(x0,y1),(x1,y0),(x1,y1)]:
++                p=np.array([x,y])
++                if self.free(p,p,margin) and np.all((p@self.R.T+self.origin>.105)&(p@self.R.T+self.origin<4.895)): vertices.append(p)
++        # If touching, first move out along the nearest boundary.
++        if not self.free(a,a,margin):
++            choices=[]
++            for rect in self.rects:
++                lo=rect[[0,2]]-margin-.008; hi=rect[[1,3]]+margin+.008
++                for j in range(2):
++                    for v in [lo[j],hi[j]]:
++                        p=a.copy(); p[j]=v
++                        if self.free(p,p,margin): choices.append(p)
++            if choices: return min(choices,key=lambda p:np.linalg.norm(p-a))
++        n=len(vertices); dist=[1e9]*n; prev=[-1]*n; dist[0]=0; heap=[(0,0)]
++        while heap:
++            d,i=heapq.heappop(heap)
++            if d>dist[i]+1e-8: continue
++            if i==1: break
++            for j in range(1,n):
++                if i!=j and self.free(vertices[i],vertices[j],margin):
++                    nd=d+np.linalg.norm(vertices[i]-vertices[j])
++                    if nd<dist[j]: dist[j]=nd;prev[j]=i;heapq.heappush(heap,(nd,j))
++        j=1
++        if prev[j]<0:return b
++        while prev[j]>0:j=prev[j]
++        return vertices[j]
++
++    def get_action(self,state):
++        s=np.asarray(state); self.steps+=1
++        self.geometry(s)
++        self.origin=s[:2]
++        c,ss=math.cos(s[2]),math.sin(s[2]); R=np.array([[c,-ss],[ss,c]])
++        self.R=R
++        robot=(s[16:18]-s[:2])@R
++        delta=(s[29:31]-s[:2])@R; angle=wrap(s[31]-s[2])
++        # Approximate generalized displacement due to unit normal force.
++        w,h,v=s[12:15]
++        cy=-(h*w/2+v*(w+v/2))/(h+v)
++        com=np.array([0.,cy])
++        inertia=(h*((h*h+w*w)/12+(-w/2-cy)**2)+v*((w*w+v*v)/12+(-w-v/2-cy)**2))/(h+v)
++        rr=self.pts-com
++        torque=rr[:,0]*self.normals[:,1]-rr[:,1]*self.normals[:,0]
++        omega=torque/(inertia+np.sum(rr*rr,axis=1))
++        vel=self.normals-omega[:,None]*np.column_stack((-self.pts[:,1],self.pts[:,0]))
++        desired=np.r_[delta,angle]
++        J=np.column_stack((vel,omega))
++        weights=np.array([1.,1.,.15])
++        dot=(J*weights)@desired
++        norm=np.sum(J*J*weights,axis=1)
++        gain=np.maximum(0,dot)**2/norm
++        staging=self.pts-self.normals*(s[28]+.045)
++        distances=np.linalg.norm(staging-robot,axis=1)
++        score=gain/(.20+distances*.28)
++        world_stage=staging@R.T+s[:2]
++        score[np.any((world_stage<.115)|(world_stage>4.885),axis=1)]=0.
++        for i in range(len(score)):
++            cp=self.pts[i]-self.normals[i]*(s[28]+.002)
++            if not self.free(cp,cp,s[28]-.001) or not self.free(staging[i],staging[i],s[28]+.009): score[i]=0.
++        best=int(np.argmax(score))
++        if self.contact is None:
++            self.contact=best; self.age=0
++        else:
++            self.age+=1
++            cur=self.contact
++            if score[cur]<=0 or dot[cur]<=0 or (self.age>8 and score[best]>score[cur]*1.5) or self.age>70:
++                self.contact=best; self.age=0
++        k=self.contact; n=self.normals[k]; p=self.pts[k]
++        stage=staging[k]
++        along=np.dot(robot-p,n); lateral=np.linalg.norm(robot-p-along*n)
++        if lateral<.035 and along<-.06 and along>-(s[28]+.10):
++            step=min(.045,max(.004,dot[k]/norm[k]*.45))
++            target=p-n*(s[28]-.008)+n*step
++        else:
++            target=self.navigate(robot,stage,s[28])
++        a=(target-robot)@R.T
++        a*=min(1.,.049/max(np.max(np.abs(a)),1e-9))
++        self.last=s.copy()
++        return a
+diff --git a/policy_weight060.py b/policy_weight060.py
+new file mode 100644
+index 0000000..d8e339b
+--- /dev/null
++++ b/policy_weight060.py
+@@ -0,0 +1,133 @@
++import numpy as np
++import math
++import heapq
++
++def wrap(a):
++    return (a+math.pi)%(2*math.pi)-math.pi
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.reset(None, {})
++
++    def reset(self, state, info):
++        self.steps=0
++        self.contact=None
++        self.age=0
++        self.last=None
++
++    def geometry(self,s):
++        w,h,v=s[12:15]
++        self.rects=[np.array([-h/2,h/2,-w,0]),np.array([-w/2,w/2,-v-w,-w])]
++        # Sample exposed surfaces with inward normals.
++        points=[]; normals=[]
++        def edge(a,b,n,count):
++            for t in np.linspace(.04,.96,count):
++                points.append(np.array(a)*(1-t)+np.array(b)*t); normals.append(n)
++        edge([-h/2,0],[h/2,0],[0,-1],15)
++        edge([-h/2,-w],[-h/2,0],[1,0],3)
++        edge([h/2,-w],[h/2,0],[-1,0],3)
++        edge([-h/2,-w],[-w/2,-w],[0,1],6)
++        edge([w/2,-w],[h/2,-w],[0,1],6)
++        edge([-w/2,-v-w],[-w/2,-w],[1,0],13)
++        edge([w/2,-v-w],[w/2,-w],[-1,0],13)
++        edge([-w/2,-v-w],[w/2,-v-w],[0,1],3)
++        self.pts=np.array(points); self.normals=np.array(normals)
++
++    def free(self,a,b,margin):
++        for rect in self.rects:
++            lo=rect[[0,2]]-margin; hi=rect[[1,3]]+margin
++            dd=b-a; t0=0.; t1=1.
++            for j in range(2):
++                if abs(dd[j])<1e-10:
++                    if a[j]<=lo[j] or a[j]>=hi[j]: t1=-1.; break
++                else:
++                    z=(lo[j]-a[j])/dd[j]; zz=(hi[j]-a[j])/dd[j]
++                    t0=max(t0,min(z,zz)); t1=min(t1,max(z,zz))
++            if t0<t1-1e-7: return False
++        return True
++
++    def navigate(self,a,b,radius):
++        margin=radius+.009
++        if self.free(a,b,margin): return b
++        # Axis-aligned expanded rectangles give a small visibility graph.
++        vertices=[a,b]
++        for rect in self.rects:
++            x0,x1,y0,y1=rect+np.array([-1,1,-1,1])*(margin+.006)
++            for x,y in [(x0,y0),(x0,y1),(x1,y0),(x1,y1)]:
++                p=np.array([x,y])
++                if self.free(p,p,margin) and np.all((p@self.R.T+self.origin>.105)&(p@self.R.T+self.origin<4.895)): vertices.append(p)
++        # If touching, first move out along the nearest boundary.
++        if not self.free(a,a,margin):
++            choices=[]
++            for rect in self.rects:
++                lo=rect[[0,2]]-margin-.008; hi=rect[[1,3]]+margin+.008
++                for j in range(2):
++                    for v in [lo[j],hi[j]]:
++                        p=a.copy(); p[j]=v
++                        if self.free(p,p,margin): choices.append(p)
++            if choices: return min(choices,key=lambda p:np.linalg.norm(p-a))
++        n=len(vertices); dist=[1e9]*n; prev=[-1]*n; dist[0]=0; heap=[(0,0)]
++        while heap:
++            d,i=heapq.heappop(heap)
++            if d>dist[i]+1e-8: continue
++            if i==1: break
++            for j in range(1,n):
++                if i!=j and self.free(vertices[i],vertices[j],margin):
++                    nd=d+np.linalg.norm(vertices[i]-vertices[j])
++                    if nd<dist[j]: dist[j]=nd;prev[j]=i;heapq.heappush(heap,(nd,j))
++        j=1
++        if prev[j]<0:return b
++        while prev[j]>0:j=prev[j]
++        return vertices[j]
++
++    def get_action(self,state):
++        s=np.asarray(state); self.steps+=1
++        self.geometry(s)
++        self.origin=s[:2]
++        c,ss=math.cos(s[2]),math.sin(s[2]); R=np.array([[c,-ss],[ss,c]])
++        self.R=R
++        robot=(s[16:18]-s[:2])@R
++        delta=(s[29:31]-s[:2])@R; angle=wrap(s[31]-s[2])
++        # Approximate generalized displacement due to unit normal force.
++        w,h,v=s[12:15]
++        cy=-(h*w/2+v*(w+v/2))/(h+v)
++        com=np.array([0.,cy])
++        inertia=(h*((h*h+w*w)/12+(-w/2-cy)**2)+v*((w*w+v*v)/12+(-w-v/2-cy)**2))/(h+v)
++        rr=self.pts-com
++        torque=rr[:,0]*self.normals[:,1]-rr[:,1]*self.normals[:,0]
++        omega=torque/(inertia+np.sum(rr*rr,axis=1))
++        vel=self.normals-omega[:,None]*np.column_stack((-self.pts[:,1],self.pts[:,0]))
++        desired=np.r_[delta,angle]
++        J=np.column_stack((vel,omega))
++        weights=np.array([1.,1.,.6])
++        dot=(J*weights)@desired
++        norm=np.sum(J*J*weights,axis=1)
++        gain=np.maximum(0,dot)**2/norm
++        staging=self.pts-self.normals*(s[28]+.045)
++        distances=np.linalg.norm(staging-robot,axis=1)
++        score=gain/(.20+distances*.28)
++        world_stage=staging@R.T+s[:2]
++        score[np.any((world_stage<.115)|(world_stage>4.885),axis=1)]=0.
++        for i in range(len(score)):
++            cp=self.pts[i]-self.normals[i]*(s[28]+.002)
++            if not self.free(cp,cp,s[28]-.001) or not self.free(staging[i],staging[i],s[28]+.009): score[i]=0.
++        best=int(np.argmax(score))
++        if self.contact is None:
++            self.contact=best; self.age=0
++        else:
++            self.age+=1
++            cur=self.contact
++            if score[cur]<=0 or dot[cur]<=0 or (self.age>8 and score[best]>score[cur]*1.5) or self.age>70:
++                self.contact=best; self.age=0
++        k=self.contact; n=self.normals[k]; p=self.pts[k]
++        stage=staging[k]
++        along=np.dot(robot-p,n); lateral=np.linalg.norm(robot-p-along*n)
++        if lateral<.035 and along<-.06 and along>-(s[28]+.10):
++            step=min(.045,max(.004,dot[k]/norm[k]*.45))
++            target=p-n*(s[28]-.008)+n*step
++        else:
++            target=self.navigate(robot,stage,s[28])
++        a=(target-robot)@R.T
++        a*=min(1.,.049/max(np.max(np.abs(a)),1e-9))
++        self.last=s.copy()
++        return a
+diff --git a/results_batch2.txt b/results_batch2.txt
+index 95401b2..aee4b85 100644
+--- a/results_batch2.txt
++++ b/results_batch2.txt
+@@ -64,3 +64,68 @@
+ 173 success True steps 167 err [0.0126, -0.0021, -0.0452] time 0.345
+ 174 success True steps 116 err [-0.0102, -0.0174, -0.007] time 0.23
+ 175 success True steps 141 err [-0.0078, 0.0145, -0.0051] time 0.298
++176 success True steps 170 err [-0.0117, -0.0257, -0.016] time 0.41
++177 success True steps 98 err [0.0253, 0.0162, 0.0578] time 0.201
++178 success True steps 199 err [0.014, -0.0017, 0.01] time 0.44
++179 success True steps 246 err [-0.0016, 0.0058, -0.0123] time 0.524
++180 success True steps 167 err [0.0088, -0.0149, -0.0201] time 0.35
++181 success True steps 163 err [-0.0021, -0.0136, -0.0024] time 0.33
++182 success True steps 215 err [0.0171, 0.012, -0.0074] time 0.451
++183 success True steps 206 err [-0.0068, 0.0175, 0.0104] time 0.431
++184 success True steps 142 err [0.0099, 0.0116, 0.0078] time 0.306
++185 success True steps 107 err [0.0103, 0.0005, 0.0218] time 0.303
++186 success True steps 79 err [-0.0168, 0.0001, 0.0214] time 0.191
++187 success True steps 115 err [-0.009, -0.0121, -0.1286] time 0.286
++188 success True steps 187 err [-0.0292, -0.0131, -0.0325] time 0.477
++189 success True steps 169 err [0.0026, 0.0334, -0.0043] time 0.425
++190 success True steps 242 err [0.0066, -0.016, -0.0053] time 0.588
++191 success True steps 58 err [0.0007, 0.0073, -0.0437] time 0.134
++192 success True steps 214 err [0.0002, -0.0006, 0.0147] time 0.547
++193 success True steps 198 err [0.0152, -0.0224, 0.0033] time 0.502
++194 success True steps 218 err [-0.0257, 0.0058, -0.0115] time 0.499
++195 success True steps 147 err [-0.0009, 0.0088, -0.0715] time 0.399
++196 success True steps 132 err [-0.0031, -0.0137, 0.0647] time 0.355
++197 success True steps 143 err [0.002, 0.022, -0.0303] time 0.342
++198 success True steps 163 err [-0.013, 0.0009, 0.0726] time 0.421
++199 success True steps 106 err [0.0097, -0.0105, -0.0398] time 0.266
++200 success True steps 104 err [-0.0031, 0.0069, 0.0419] time 0.227
++201 success True steps 114 err [0.0154, 0.0205, 0.0241] time 0.246
++202 success True steps 143 err [0.0114, -0.0058, 0.0051] time 0.361
++203 success True steps 119 err [-0.0326, 0.0644, -0.1391] time 0.315
++204 success True steps 133 err [0.0014, 0.0188, 0.0001] time 0.308
++205 success True steps 253 err [-0.0213, 0.0196, 0.0144] time 0.657
++206 success True steps 341 err [0.03, -0.0213, -0.0761] time 0.81
++207 success True steps 146 err [-0.0198, -0.0064, -0.0185] time 0.384
++208 success True steps 171 err [-0.0019, -0.0155, 0.0012] time 0.471
++209 success True steps 181 err [-0.0104, -0.0009, -0.0212] time 0.401
++210 success True steps 184 err [-0.0018, -0.0109, -0.0019] time 0.452
++211 success True steps 84 err [0.0268, -0.0283, 0.0001] time 0.235
++212 success True steps 154 err [-0.0188, 0.0099, -0.0109] time 0.362
++213 success True steps 99 err [0.0061, -0.0105, -0.0029] time 0.272
++214 success True steps 180 err [0.039, -0.0101, 0.0444] time 0.406
++215 success True steps 160 err [0.0219, -0.0295, 0.0971] time 0.374
++216 success True steps 155 err [-0.0004, -0.0298, -0.0812] time 0.408
++217 success True steps 206 err [0.0112, -0.0004, 0.0089] time 0.533
++218 success True steps 129 err [0.0095, 0.0234, 0.0712] time 0.32
++219 success True steps 114 err [0.0135, 0.011, 0.0592] time 0.265
++220 success True steps 189 err [-0.0242, 0.0239, 0.0361] time 0.473
++221 success True steps 72 err [-0.0007, 0.0113, -0.0036] time 0.174
++222 success True steps 198 err [-0.0049, -0.0042, 0.0494] time 0.565
++223 success True steps 182 err [0.0206, 0.0149, 0.0058] time 0.441
++224 success True steps 141 err [-0.0071, 0.0069, -0.0417] time 0.395
++225 success True steps 143 err [-0.0057, 0.0086, 0.0232] time 0.376
++226 success True steps 186 err [-0.0073, -0.0087, -0.028] time 0.427
++227 success True steps 167 err [-0.0063, -0.0097, 0.0097] time 0.474
++228 success True steps 119 err [0.0165, -0.0363, -0.0535] time 0.307
++229 success True steps 162 err [-0.0078, -0.0067, -0.0237] time 0.449
++230 success True steps 118 err [-0.0266, 0.0292, 0.0339] time 0.283
++231 success True steps 120 err [-0.0098, 0.0101, 0.0146] time 0.286
++232 success True steps 180 err [-0.0046, -0.0169, -0.0221] time 0.485
++233 success True steps 91 err [-0.0241, 0.0243, -0.089] time 0.295
++234 success True steps 113 err [0.0032, -0.0291, 0.0651] time 0.284
++235 success True steps 204 err [-0.0096, 0.0065, 0.0421] time 0.522
++236 success True steps 106 err [-0.0009, -0.0025, -0.0665] time 0.229
++237 success True steps 142 err [0.0237, 0.0255, 0.0274] time 0.429
++238 success True steps 185 err [0.0043, 0.0119, -0.0129] time 0.43
++239 success True steps 230 err [0.007, -0.0137, 0.0063] time 0.574
++240 success True steps 136 err [0.0179, -0.032, 0.0387] time 0.287
+diff --git a/sweep_probe.py b/sweep_probe.py
+new file mode 100644
+index 0000000..c97d85f
+--- /dev/null
++++ b/sweep_probe.py
+@@ -0,0 +1,14 @@
++import argparse, importlib, json, time
++from env_client import make_env
++p=argparse.ArgumentParser();p.add_argument('variant');p.add_argument('--start',type=int,default=0);p.add_argument('--count',type=int,default=20);a=p.parse_args()
++Policy=importlib.import_module(a.variant).GeneratedApproach
++results=[]
++for seed in range(a.start,a.start+a.count):
++ env=make_env();s,info=env.reset(seed=seed);policy=Policy(env.action_space,env.observation_space,{});policy.reset(s,info);start=time.monotonic();done=False
++ for t in range(env.max_steps):
++  s,r,done,trunc,info=env.step(policy.get_action(s))
++  if done or trunc:break
++ env.close();results.append({'seed':seed,'success':bool(done),'steps':t+1,'time':time.monotonic()-start})
++ print(a.variant,seed,done,t+1,flush=True)
++with open('results_%s_%s_%s.json'%(a.variant,a.start,a.count),'w') as f:json.dump(results,f)
++print('SUMMARY',a.variant,'success',sum(x['success'] for x in results),'mean',sum(x['steps'] for x in results)/len(results),'max',max(x['steps'] for x in results),flush=True)

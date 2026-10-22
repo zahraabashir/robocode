@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index ed784db..f8aed93 100644
+--- a/approach.py
++++ b/approach.py
+@@ -618,7 +618,7 @@ class GeneratedApproach:
+             lx, ly = self.lander
+             traj = self._pred.get(self.other[rn]) or [other_xy]
+             dcur = S.dist_from_node(cur)
+-            karr = np.ceil(dcur / CELLS_PER_STEP)
++            karr = np.maximum(np.ceil(dcur / CELLS_PER_STEP), 1)
+             blk = np.zeros(S.N, dtype=bool)
+             for kk in range(len(traj)):
+                 if kk == len(traj) - 1:

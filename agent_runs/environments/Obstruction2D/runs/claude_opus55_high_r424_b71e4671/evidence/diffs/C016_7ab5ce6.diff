@@ -1,0 +1,21 @@
+diff --git a/approach.py b/approach.py
+index 0a1970c..e9f7984 100644
+--- a/approach.py
++++ b/approach.py
+@@ -196,6 +196,7 @@ class GeneratedApproach:
+                 if r[1] > sr[0] - 0.1 and r[0] < sr[1] + 0.1]
+         plans = []
+         t0 = time.time()
++        self._soft_dl = t0 + 8.0
+         for k in range(len(cand) + 1):
+             if plans and (k > 2 or time.time() - t0 > 15.0):
+                 break
+@@ -300,7 +301,7 @@ class GeneratedApproach:
+             opts.sort(key=lambda o: o[0])
+             taken = []
+             for sc, left, dpose, c2 in opts:
+-                if len(taken) >= self.k_drop:
++                if len(taken) >= (self.k_drop if time.time() < self._soft_dl else 1):
+                     break
+                 if any(abs(left - tl) < 0.05 for tl in taken):
+                     continue

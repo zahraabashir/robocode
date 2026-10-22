@@ -1,0 +1,48 @@
+diff --git a/approach.py b/approach.py
+index 3cee2a9..9f56a2c 100644
+--- a/approach.py
++++ b/approach.py
+@@ -80,7 +80,10 @@ class GeneratedApproach:
+         self.pos_tol = 0.012
+         self.ang_tol = math.radians(3.5)
+         self.lam = 0.3
+-        self.obl = math.radians(30)
++        self.obl = 0.0
++        self.tk = 0.6
++        self.rot_end = math.radians(1.0)
++        self.rot_ramp = math.radians(10)
+         self.lam_t = 0.3
+ 
+     def goal_theta(self, obs):
+@@ -368,15 +371,15 @@ class GeneratedApproach:
+                 rem = float(nw @ err)
+                 if rem < 0.004:
+                     done = True
+-                speed = min(MAXS, max(0.6 * rem, 0.002))
++                speed = min(MAXS, max(self.tk * rem, 0.002))
+                 # stop to re-evaluate if angle drifts
+                 if abs(dth) > max(math.radians(6), abs(self.push_dth0) + math.radians(4)):
+                     done = True
+             else:
+                 rem = abs(dth)
+-                if dth * self.push_dth0 <= 0 or rem < math.radians(1.0):
++                if dth * self.push_dth0 <= 0 or rem < self.rot_end:
+                     done = True
+-                speed = MAXS if rem > math.radians(10) else max(0.005, MAXS * rem / math.radians(10))
++                speed = MAXS if rem > self.rot_ramp else max(0.005, MAXS * rem / self.rot_ramp)
+             if self.push_steps == 1:
+                 self.push_start = (B.p.copy(), B.th)
+             if self.push_steps > 40:
+diff --git a/test_approach.py b/test_approach.py
+index 762cb78..2fcaef5 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -8,6 +8,8 @@ def run(seed):
+     env = make_env()
+     obs, info = env.reset(seed=seed)
+     ap = GeneratedApproach(env.action_space, env.observation_space, {})
++    import os, json
++    for k_,v_ in json.loads(os.environ.get('PARAMS','{}')).items(): setattr(ap,k_,v_)
+     ap.reset(obs, info)
+     t0=time.time()
+     for t in range(env.max_steps):

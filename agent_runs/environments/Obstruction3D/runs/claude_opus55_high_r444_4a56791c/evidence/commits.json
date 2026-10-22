@@ -1,0 +1,769 @@
+[
+  {
+    "id": "C001",
+    "commit": "b9486084db5b5332b93d312d20346790b07976ae",
+    "parents": [],
+    "date": "2026-09-30T20:27:47+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".claude/settings.json",
+      ".claude/validate_sandbox.py",
+      ".gitignore",
+      "CLAUDE.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_b948608.diff",
+    "diff_sha256": "59b7a6406fdd5ee890ee2acadb3ff0fe57dd8709aa04d7127ce18a2f2e33f2e1",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "7c86a54d1d334524b83e177a079dbc99a4c8b2a4",
+    "parents": [
+      "b9486084db5b5332b93d312d20346790b07976ae"
+    ],
+    "date": "2026-09-30T20:33:10+02:00",
+    "title": "Calibrated FK for Kinova gen3 (mount offset, tool offset), calibration scripts",
+    "files": [
+      "calib1.py",
+      "calib2.py",
+      "calib3.py",
+      "calib4.py",
+      "calib_0_0.0_0.0_0.0_0.25.json",
+      "calib_0_1.5708_0.0_0.0_0.26.json",
+      "calib_1_0.7_0.1_0.0_0.25.json",
+      "calib_2_0.0_-0.1_0.2_0.27.json",
+      "calib_3_-0.5_0.05_-0.2_0.25.json",
+      "common.py",
+      "dbg/approach.py",
+      "dbg/kin.py",
+      "explore1.py",
+      "explore2.py",
+      "explore3.py",
+      "fit.py",
+      "kin.py"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C002_7c86a54.diff",
+    "diff_sha256": "7964fbe2520471d96a630756edb9640361f199cb468711d0b1f20fa5421642b4",
+    "events": [
+      {
+        "event": "E0071",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C003",
+    "commit": "cb6f0b40eff5895390fe83fdaa4722e6a05ffcf9",
+    "parents": [
+      "7c86a54d1d334524b83e177a079dbc99a4c8b2a4"
+    ],
+    "date": "2026-09-30T20:36:03+02:00",
+    "title": "First full approach: clear obstructions then place block",
+    "files": [
+      "approach.py",
+      "pp1.py",
+      "pp2.py",
+      "pp3.py",
+      "pp4.py",
+      "stats.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C003_cb6f0b4.diff",
+    "diff_sha256": "e5ba45b87503cf012eb8f3e85d8ccefe46b259e79c66f745eedc0bce696d559f",
+    "events": [
+      {
+        "event": "E0104",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "f1d51c2d96e16a03dca0e61445ba4a2f07a1d7f2ab1772e3792cbfa5d1584de4",
+    "version": "evidence/versions/C003_cb6f0b4_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C004",
+    "commit": "5ab379c09b70851778359a0e5888a1917be89361",
+    "parents": [
+      "cb6f0b40eff5895390fe83fdaa4722e6a05ffcf9"
+    ],
+    "date": "2026-09-30T20:51:37+02:00",
+    "title": "Finger collision model for grasp candidates, blocked-move abort, grasp height band",
+    "files": [
+      "approach.py",
+      "dbg1.py",
+      "dbg2.py",
+      "o1.txt",
+      "o2.txt",
+      "o3.txt",
+      "pp5.py",
+      "scan.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C004_5ab379c.diff",
+    "diff_sha256": "356a0d164c6515467212598a013f61437f25320a394a3b3191e49b4944f7e4f8",
+    "events": [
+      {
+        "event": "E0186",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "172137992ecc83f0064e33601359ebe7c959ed63a29315c7b6ce16b66f0d58bb",
+    "version": "evidence/versions/C004_5ab379c_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "e469cf1207fbd8dc11cf72ce3976f072ec08b6ec",
+    "parents": [
+      "5ab379c09b70851778359a0e5888a1917be89361"
+    ],
+    "date": "2026-09-30T20:51:44+02:00",
+    "title": "fix abort flag",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C005_e469cf1.diff",
+    "diff_sha256": "303fe87f7e4db256d81740201a724283cc9aad34807b1b096d495ea5853c6ad4",
+    "events": [
+      {
+        "event": "E0194",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "03bea498f43663e80298943d62343750da6d4ce2c8eb58dfa83850ee41768786",
+    "version": "evidence/versions/C005_e469cf1_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C006",
+    "commit": "b36e4ca60b16c0571d49b957c872765e48a13096",
+    "parents": [
+      "e469cf1207fbd8dc11cf72ce3976f072ec08b6ec"
+    ],
+    "date": "2026-09-30T20:54:02+02:00",
+    "title": "lateral escape before lifting held object from touching neighbours",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C006_b36e4ca.diff",
+    "diff_sha256": "f534f6d2ee032f44039f3faa51d59721fa8b8f92bcbf8452e53af2b28952daf4",
+    "events": [
+      {
+        "event": "E0206",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "2b45fc16539b0cff6e6170f2a294441b2f1f1cc78182ea1cc56912f76581a641",
+    "version": "evidence/versions/C006_b36e4ca_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "85a15bc8c4e80a4fdd6ab881c81c06a0d845cbc1",
+    "parents": [
+      "b36e4ca60b16c0571d49b957c872765e48a13096"
+    ],
+    "date": "2026-09-30T21:02:42+02:00",
+    "title": "100/100 seeds 0-99; process-based test runner",
+    "files": [
+      "dbg3.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C007_85a15bc.diff",
+    "diff_sha256": "9a8f72eaf5262b457d1e93b35c1dad28ce3663b0540c2025ac3afa1b49d6c789",
+    "events": [
+      {
+        "event": "E0234",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C008",
+    "commit": "8db5dca7b59c48c6493b562ca035514f6c810439",
+    "parents": [
+      "85a15bc8c4e80a4fdd6ab881c81c06a0d845cbc1"
+    ],
+    "date": "2026-09-30T21:25:20+02:00",
+    "title": "finer grasp offset candidates using measured grasp tolerance",
+    "files": [
+      "approach.py",
+      "dbg3.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C008_8db5dca.diff",
+    "diff_sha256": "743274d5110bff27b104f0fd2515c9e571fd1914110f61e36a1b6dd86183073e",
+    "events": [
+      {
+        "event": "E0329",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "37a822948ed815b9c40602670d63038eeee53b6111cc0f128e7a4c10d673b5e9",
+    "version": "evidence/versions/C008_8db5dca_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C009",
+    "commit": "36ac886fd9821f2a9e125d74c924abc8d5f08b5d",
+    "parents": [
+      "8db5dca7b59c48c6493b562ca035514f6c810439"
+    ],
+    "date": "2026-09-30T21:29:23+02:00",
+    "title": "grasp sweep region must be free of other objects",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C009_36ac886.diff",
+    "diff_sha256": "7922a67870a38dc5a0ad435d87c6c70001a27e7d90f4fe68aaa7f4d4124dda51",
+    "events": [
+      {
+        "event": "E0349",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "7729790004e9c5b5aad98ae097d2cbad0212be3c2ab12f674b3b53d8fef0af91",
+    "version": "evidence/versions/C009_36ac886_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C010",
+    "commit": "d16351b17cc62283a25bd3b7a6cf0709a40d069a",
+    "parents": [
+      "36ac886fd9821f2a9e125d74c924abc8d5f08b5d"
+    ],
+    "date": "2026-09-30T21:31:19+02:00",
+    "title": "height-aware grasp candidates, diagonal yaws",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C010_d16351b.diff",
+    "diff_sha256": "631b5e63c8a9d311b075c4b1193ad75eaf08bc7bd335ddd736851bebbdb1f08c",
+    "events": [
+      {
+        "event": "E0359",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "0d8e1647d83b28719d71530782d4be7bb6f0eaed89ed8b5c10d522022fe56503",
+    "version": "evidence/versions/C010_d16351b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C011",
+    "commit": "88598b5afa8748055de23e707a4e88369e96ea6c",
+    "parents": [
+      "d16351b17cc62283a25bd3b7a6cf0709a40d069a"
+    ],
+    "date": "2026-09-30T21:50:01+02:00",
+    "title": "v2: choose symmetric yaw by full plan cost",
+    "files": [
+      "approach_v2.py",
+      "dbg3.py",
+      "dbg4.py",
+      "gscan.py",
+      "gscan2.py",
+      "r10.txt",
+      "r4.txt",
+      "r7.txt",
+      "rd.txt",
+      "test_approach.py",
+      "timing.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C011_88598b5.diff",
+    "diff_sha256": "b7d1f9a1d90cbf1ac3b664c0a3de9d3ffcef49d3d76e0f5b725b3330c4700f0e",
+    "events": [
+      {
+        "event": "E0498",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C012",
+    "commit": "d07733fd11b110c6d696c006c4a2c74f11951345",
+    "parents": [
+      "88598b5afa8748055de23e707a4e88369e96ea6c"
+    ],
+    "date": "2026-09-30T21:58:55+02:00",
+    "title": "Promote v2 (lookahead pursuit, low transit, plan-cost yaw choice): 100/100, mean 32 steps",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C012_d07733f.diff",
+    "diff_sha256": "976f3864c1ef13ed6e7b297697f682c53343b0f25bd25ce3ddf488cafabbd3a1",
+    "events": [
+      {
+        "event": "E0534",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "f7c669fb19e4dc71224aa1c3d4be153b02fcfad75df71b911a760ef50a6b701b",
+    "version": "evidence/versions/C012_d07733f_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C013",
+    "commit": "872a421dc785b10113a2b6c3e0b1fc9167491cec",
+    "parents": [
+      "d07733fd11b110c6d696c006c4a2c74f11951345"
+    ],
+    "date": "2026-09-30T22:09:22+02:00",
+    "title": "v2: choose escape direction by clearance search",
+    "files": [
+      "approach_v2.py",
+      "r10v2.txt",
+      "r7v2.txt"
+    ],
+    "file_roles": [
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C013_872a421.diff",
+    "diff_sha256": "ed6e32d9d604c2088421fbce932b670ddd394f876d4e6f16b68c4b637929d619",
+    "events": [
+      {
+        "event": "E0570",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C014",
+    "commit": "260fcb1d0181db34d71caa2a8373b3cb408cdf45",
+    "parents": [
+      "872a421dc785b10113a2b6c3e0b1fc9167491cec"
+    ],
+    "date": "2026-09-30T22:10:57+02:00",
+    "title": "IK: clamp to joint limits",
+    "files": [
+      "approach_v2.py",
+      "kin.py"
+    ],
+    "file_roles": [
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C014_260fcb1.diff",
+    "diff_sha256": "d65cb1314fa2152f68dc265f4eebd6920cee36a2e07c7e4416751266ec711325",
+    "events": [
+      {
+        "event": "E0591",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C015",
+    "commit": "32c237a0fed384f71b1317eb942860348974f324",
+    "parents": [
+      "260fcb1d0181db34d71caa2a8373b3cb408cdf45"
+    ],
+    "date": "2026-09-30T22:12:12+02:00",
+    "title": "denser cartesian waypoints",
+    "files": [
+      "approach_v2.py",
+      "probe4.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C015_32c237a.diff",
+    "diff_sha256": "3ab0f4574b906ef949d5fb06f144180b51fe266af89227e97f555cad72284bbc",
+    "events": [
+      {
+        "event": "E0614",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C016",
+    "commit": "64cb9b19f2b84f1ff1f4c7c1a6864809efbbe38b",
+    "parents": [
+      "32c237a0fed384f71b1317eb942860348974f324"
+    ],
+    "date": "2026-09-30T22:14:47+02:00",
+    "title": "escape: search dist+dir for clearance, slow lift when tight",
+    "files": [
+      "approach_v2.py",
+      "probe5.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C016_64cb9b1.diff",
+    "diff_sha256": "75697a45a0704d9cbe478554522c0edb0a48ed5f57200481e53775337a478037",
+    "events": [
+      {
+        "event": "E0630",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C017",
+    "commit": "3fc7f32929ce6d38fc6c9c029245c48b57b00737",
+    "parents": [
+      "64cb9b19f2b84f1ff1f4c7c1a6864809efbbe38b"
+    ],
+    "date": "2026-09-30T22:25:04+02:00",
+    "title": "Promote v2 with escape/IK fixes: 100/100 mean 32.8",
+    "files": [
+      "approach.py",
+      "r7v2.txt",
+      "rdv2.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C017_3fc7f32.diff",
+    "diff_sha256": "33693dd93d876200874bf0b5ead59afb7ba6023515cf9617eeda4c76398d6138",
+    "events": [
+      {
+        "event": "E0675",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "34ab163c98194da9d5f0682a28ae97d727e2333452dd323dc595763ea65ccfc3",
+    "version": "evidence/versions/C017_3fc7f32_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C018",
+    "commit": "3a575890db10cac63344b8cc4fc1064bed85fb18",
+    "parents": [
+      "3fc7f32929ce6d38fc6c9c029245c48b57b00737"
+    ],
+    "date": "2026-09-30T22:36:32+02:00",
+    "title": "kin: analytic Jacobian for IK (faster)",
+    "files": [
+      "kin.py",
+      "r10v2.txt",
+      "r7v2.txt"
+    ],
+    "file_roles": [
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C018_3a57589.diff",
+    "diff_sha256": "2cd34fa84a829cb44688abe1fca2823f12a15bf0cc6a31f6402287863420193b",
+    "events": [
+      {
+        "event": "E0707",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C019",
+    "commit": "c5d528bebc38b642d04e96097eae2bd0e05723e0",
+    "parents": [
+      "3a575890db10cac63344b8cc4fc1064bed85fb18"
+    ],
+    "date": "2026-09-30T23:08:34+02:00",
+    "title": "ban failed free spots, avoid spots near robot base",
+    "files": [
+      "approach_v2.py",
+      "prof.out",
+      "r5.txt",
+      "r9.txt",
+      "rd2.txt"
+    ],
+    "file_roles": [
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C019_c5d528b.diff",
+    "diff_sha256": "4e12cc04083118d78216552ccbfb043f6ec02d8f518a02ca933ce1c949fc5cb5",
+    "events": [
+      {
+        "event": "E0861",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C020",
+    "commit": "118102da2098c2321a43a70488f1c6a7d3532842",
+    "parents": [
+      "c5d528bebc38b642d04e96097eae2bd0e05723e0"
+    ],
+    "date": "2026-09-30T23:17:44+02:00",
+    "title": "grasp height: fingertip offset 0.0305 measured, z_hi top+0.028",
+    "files": [
+      "approach_v2.py",
+      "d101.txt",
+      "d121.txt",
+      "probe6.py",
+      "probe7.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C020_118102d.diff",
+    "diff_sha256": "d0b2b3aa7d9a1ee9ba0b5db0c07d9557be9f28c1cfc496b004649a9e15902b86",
+    "events": [
+      {
+        "event": "E0900",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C021",
+    "commit": "3afee96798a374b3260180034484cbdba363f557",
+    "parents": [
+      "118102da2098c2321a43a70488f1c6a7d3532842"
+    ],
+    "date": "2026-09-30T23:38:26+02:00",
+    "title": "sweep-box check uses conservative height; finger check tight",
+    "files": [
+      "approach_v2.py",
+      "d101.txt",
+      "d113.txt",
+      "probe7.py",
+      "r7v2.txt",
+      "r9.txt",
+      "rdv2.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C021_3afee96.diff",
+    "diff_sha256": "7275b5bec3cc974b5a5be3ea15ad9fa340e6bff9b664ffa501f8615d35d698f1",
+    "events": [
+      {
+        "event": "E0964",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C022",
+    "commit": "1fc80533cd4fade9324d12c67271240b8db6b410",
+    "parents": [
+      "3afee96798a374b3260180034484cbdba363f557"
+    ],
+    "date": "2026-09-30T23:50:15+02:00",
+    "title": "Promote: grasp height model fixes, bad-spot banning; 9-obs 30/30",
+    "files": [
+      "approach.py",
+      "d101.txt",
+      "d113.txt",
+      "r10v2.txt",
+      "r7v2.txt",
+      "r9.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C022_1fc8053.diff",
+    "diff_sha256": "9596ab2fba11b89d45c7b42e4f8b1f08033180ed48d4141231d8bd4ffebcb7ba",
+    "events": [
+      {
+        "event": "E1025",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "75798cf5b79679543f0d1b59c8a1beb3fa69ebf74e3fbdc2269f1214e9f20ce2",
+    "version": "evidence/versions/C022_1fc8053_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C023",
+    "commit": "fd8e56ae51db44d9611ffc81e1a72597aea0f7c5",
+    "parents": [
+      "1fc80533cd4fade9324d12c67271240b8db6b410"
+    ],
+    "date": "2026-10-01T00:41:47+02:00",
+    "title": "faster fk_jac; early-stop failing pick paths",
+    "files": [
+      "approach_v2.py",
+      "kin.py",
+      "prof.out",
+      "r10v2.txt",
+      "r12.txt",
+      "r15.txt",
+      "rd3.txt",
+      "timing.py"
+    ],
+    "file_roles": [
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C023_fd8e56a.diff",
+    "diff_sha256": "80bbf0a8ac2d9a4674d86a1af0502e612c65c95cf80712eb1a1f2a8f79aabaf9",
+    "events": [
+      {
+        "event": "E1153",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C024",
+    "commit": "2b3712c64154d0e000cfc91132a1598e4c141417",
+    "parents": [
+      "fd8e56ae51db44d9611ffc81e1a72597aea0f7c5"
+    ],
+    "date": "2026-10-01T00:50:29+02:00",
+    "title": "move base backward when pick/place point is too close to arm mount",
+    "files": [
+      "approach_v2.py",
+      "basetest.py",
+      "d312.txt",
+      "reach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C024_2b3712c.diff",
+    "diff_sha256": "d0f871773b799159a12ac04b71b4f1742e241244bf25980165d0953d623f78e4",
+    "events": [
+      {
+        "event": "E1198",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C025",
+    "commit": "c09ea7fb670ff583bc80e3ca01e1e405f713935f",
+    "parents": [
+      "2b3712c64154d0e000cfc91132a1598e4c141417"
+    ],
+    "date": "2026-10-01T01:10:44+02:00",
+    "title": "Promote: base backoff for near-mount objects, faster IK; 15-obs 16/16, default 100/100",
+    "files": [
+      "approach.py",
+      "r10v2.txt",
+      "r15.txt",
+      "r7v2.txt",
+      "rdv2.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C025_c09ea7f.diff",
+    "diff_sha256": "c52e095824040f7365cd3bd14ebd6b084b93bff060c75b95a3ec62a1c775f350",
+    "events": [
+      {
+        "event": "E1269",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "c17092014560e236633bdf7a9193466976b2c6304347284d0bbfa30b35a9f5cb",
+    "version": "evidence/versions/C025_c09ea7f_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C026",
+    "commit": "e7d8ee408698d4ca3453b5accdd8dc3d48342f76",
+    "parents": [
+      "c09ea7fb670ff583bc80e3ca01e1e405f713935f"
+    ],
+    "date": "2026-10-01T01:38:34+02:00",
+    "title": "Test results for 12-obstruction stress batch",
+    "files": [
+      "r12b.txt"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C026_e7d8ee4.diff",
+    "diff_sha256": "e042fc852cbdbb25348d358ab89c01df94ba097ae4dadaf2d66479d3dfa395c8",
+    "events": [
+      {
+        "event": "E1318",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  }
+]

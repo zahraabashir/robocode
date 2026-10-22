@@ -1,0 +1,263 @@
+diff --git a/optimized_results.json b/optimized_results.json
+new file mode 100644
+index 0000000..d957dd0
+--- /dev/null
++++ b/optimized_results.json
+@@ -0,0 +1 @@
++[{"seed": 0, "baseline": [true, 520, 7.588], "optimized": [true, 234, 3.574]}, {"seed": 1, "baseline": [true, 189, 2.764], "optimized": [true, 151, 2.06]}, {"seed": 2, "baseline": [true, 148, 2.097], "optimized": [true, 123, 1.534]}, {"seed": 3, "baseline": [true, 133, 1.761], "optimized": [true, 95, 0.66]}, {"seed": 4, "baseline": [true, 152, 0.533], "optimized": [true, 124, 0.427]}, {"seed": 5, "baseline": [true, 187, 0.721], "optimized": [true, 138, 0.434]}, {"seed": 6, "baseline": [true, 172, 0.59], "optimized": [true, 235, 0.891]}, {"seed": 7, "baseline": [true, 234, 0.789], "optimized": [true, 172, 0.639]}, {"seed": 8, "baseline": [true, 183, 0.603], "optimized": [true, 135, 0.544]}, {"seed": 9, "baseline": [true, 151, 0.536], "optimized": [true, 139, 0.493]}, {"seed": 10, "baseline": [true, 146, 0.54], "optimized": [true, 156, 0.593]}, {"seed": 11, "baseline": [true, 175, 0.571], "optimized": [true, 192, 0.681]}, {"seed": 12, "baseline": [true, 100, 0.393], "optimized": [true, 118, 0.432]}, {"seed": 13, "baseline": [true, 114, 0.277], "optimized": [true, 101, 0.254]}, {"seed": 14, "baseline": [true, 185, 0.5], "optimized": [true, 180, 0.559]}, {"seed": 15, "baseline": [true, 102, 0.289], "optimized": [true, 72, 0.237]}, {"seed": 16, "baseline": [true, 178, 0.461], "optimized": [true, 155, 0.432]}, {"seed": 17, "baseline": [true, 53, 0.12], "optimized": [true, 85, 0.217]}, {"seed": 18, "baseline": [true, 114, 0.338], "optimized": [true, 141, 0.413]}, {"seed": 19, "baseline": [true, 130, 0.324], "optimized": [true, 134, 0.396]}, {"seed": 20, "baseline": [true, 101, 0.272], "optimized": [true, 104, 0.308]}, {"seed": 21, "baseline": [true, 142, 0.319], "optimized": [true, 143, 0.395]}, {"seed": 22, "baseline": [true, 84, 0.192], "optimized": [true, 148, 0.495]}, {"seed": 23, "baseline": [true, 71, 0.235], "optimized": [true, 74, 0.308]}, {"seed": 24, "baseline": [true, 72, 0.191], "optimized": [true, 81, 0.242]}, {"seed": 25, "baseline": [true, 145, 0.417], "optimized": [true, 157, 0.523]}, {"seed": 26, "baseline": [true, 182, 0.545], "optimized": [true, 137, 0.41]}, {"seed": 27, "baseline": [true, 219, 0.647], "optimized": [true, 146, 0.422]}, {"seed": 28, "baseline": [true, 31, 0.081], "optimized": [true, 27, 0.062]}, {"seed": 29, "baseline": [true, 129, 0.413], "optimized": [true, 158, 0.429]}]
+\ No newline at end of file
+diff --git a/optimized_validation.txt b/optimized_validation.txt
+index ceb5fe4..ead763d 100644
+--- a/optimized_validation.txt
++++ b/optimized_validation.txt
+@@ -1,3 +1,30 @@
+ {'seed': 0, 'baseline': [True, 520, 7.588], 'optimized': [True, 234, 3.574]}
+ {'seed': 1, 'baseline': [True, 189, 2.764], 'optimized': [True, 151, 2.06]}
+ {'seed': 2, 'baseline': [True, 148, 2.097], 'optimized': [True, 123, 1.534]}
++{'seed': 3, 'baseline': [True, 133, 1.761], 'optimized': [True, 95, 0.66]}
++{'seed': 4, 'baseline': [True, 152, 0.533], 'optimized': [True, 124, 0.427]}
++{'seed': 5, 'baseline': [True, 187, 0.721], 'optimized': [True, 138, 0.434]}
++{'seed': 6, 'baseline': [True, 172, 0.59], 'optimized': [True, 235, 0.891]}
++{'seed': 7, 'baseline': [True, 234, 0.789], 'optimized': [True, 172, 0.639]}
++{'seed': 8, 'baseline': [True, 183, 0.603], 'optimized': [True, 135, 0.544]}
++{'seed': 9, 'baseline': [True, 151, 0.536], 'optimized': [True, 139, 0.493]}
++{'seed': 10, 'baseline': [True, 146, 0.54], 'optimized': [True, 156, 0.593]}
++{'seed': 11, 'baseline': [True, 175, 0.571], 'optimized': [True, 192, 0.681]}
++{'seed': 12, 'baseline': [True, 100, 0.393], 'optimized': [True, 118, 0.432]}
++{'seed': 13, 'baseline': [True, 114, 0.277], 'optimized': [True, 101, 0.254]}
++{'seed': 14, 'baseline': [True, 185, 0.5], 'optimized': [True, 180, 0.559]}
++{'seed': 15, 'baseline': [True, 102, 0.289], 'optimized': [True, 72, 0.237]}
++{'seed': 16, 'baseline': [True, 178, 0.461], 'optimized': [True, 155, 0.432]}
++{'seed': 17, 'baseline': [True, 53, 0.12], 'optimized': [True, 85, 0.217]}
++{'seed': 18, 'baseline': [True, 114, 0.338], 'optimized': [True, 141, 0.413]}
++{'seed': 19, 'baseline': [True, 130, 0.324], 'optimized': [True, 134, 0.396]}
++{'seed': 20, 'baseline': [True, 101, 0.272], 'optimized': [True, 104, 0.308]}
++{'seed': 21, 'baseline': [True, 142, 0.319], 'optimized': [True, 143, 0.395]}
++{'seed': 22, 'baseline': [True, 84, 0.192], 'optimized': [True, 148, 0.495]}
++{'seed': 23, 'baseline': [True, 71, 0.235], 'optimized': [True, 74, 0.308]}
++{'seed': 24, 'baseline': [True, 72, 0.191], 'optimized': [True, 81, 0.242]}
++{'seed': 25, 'baseline': [True, 145, 0.417], 'optimized': [True, 157, 0.523]}
++{'seed': 26, 'baseline': [True, 182, 0.545], 'optimized': [True, 137, 0.41]}
++{'seed': 27, 'baseline': [True, 219, 0.647], 'optimized': [True, 146, 0.422]}
++{'seed': 28, 'baseline': [True, 31, 0.081], 'optimized': [True, 27, 0.062]}
++{'seed': 29, 'baseline': [True, 129, 0.413], 'optimized': [True, 158, 0.429]}
+diff --git a/results_batch2.txt b/results_batch2.txt
+index 8463428..1efa22c 100644
+--- a/results_batch2.txt
++++ b/results_batch2.txt
+@@ -163,3 +163,38 @@
+ 272 success True steps 192 err [0.0059, -0.0034, 0.0028] time 2.577
+ 273 success True steps 73 err [0.0151, -0.0187, -0.0261] time 1.048
+ 274 success True steps 122 err [0.008, -0.0023, 0.0249] time 1.473
++275 success True steps 104 err [0.0013, 0.0122, 0.0156] time 1.251
++276 success True steps 304 err [0.0003, -0.0123, 0.0075] time 1.696
++277 success True steps 159 err [0.0069, -0.0046, 0.0138] time 0.483
++278 success True steps 97 err [-0.0171, 0.0032, -0.0447] time 0.359
++279 success True steps 222 err [-0.0028, 0.0003, 0.0193] time 0.795
++280 success True steps 220 err [0.0078, 0.005, 0.0017] time 0.742
++281 success True steps 76 err [0.0034, 0.0096, 0.0538] time 0.234
++282 success True steps 229 err [0.0007, 0.0179, 0.0196] time 0.764
++283 success True steps 164 err [-0.0112, -0.0027, 0.0368] time 0.557
++284 success True steps 188 err [-0.0145, 0.0137, 0.0055] time 0.669
++285 success True steps 113 err [-0.0037, 0.0071, -0.0063] time 0.435
++286 success True steps 53 err [0.0037, 0.0088, 0.0328] time 0.187
++287 success True steps 174 err [-0.0048, 0.0046, -0.0102] time 0.592
++288 success True steps 197 err [-0.0066, 0.0286, 0.0055] time 0.726
++289 success True steps 228 err [0.0076, -0.0046, -0.0163] time 0.771
++290 success True steps 157 err [-0.0054, 0.0013, -0.0054] time 0.59
++291 success True steps 279 err [-0.0051, 0.0033, -0.0033] time 1.075
++292 success True steps 166 err [-0.0018, -0.0033, -0.0065] time 0.659
++293 success True steps 117 err [0.0147, 0.0042, 0.0168] time 0.32
++294 success True steps 156 err [0.0139, 0.0216, 0.0156] time 0.434
++295 success True steps 148 err [-0.0027, 0.0135, -0.0222] time 0.393
++296 success True steps 100 err [-0.0324, 0.0135, 0.0316] time 0.248
++297 success True steps 106 err [-0.0066, 0.0189, -0.0083] time 0.293
++298 success True steps 107 err [0.0012, -0.0045, 0.0346] time 0.33
++299 success True steps 149 err [0.0074, 0.0048, 0.0113] time 0.389
++300 success True steps 183 err [0.0091, 0.0108, 0.0221] time 0.495
++301 success True steps 226 err [0.0049, 0.0035, -0.0146] time 0.682
++302 success True steps 218 err [0.0027, -0.0116, -0.012] time 0.6
++303 success True steps 163 err [0.0279, -0.0118, 0.0291] time 0.493
++304 success True steps 139 err [-0.0232, -0.0035, 0.0958] time 0.369
++305 success True steps 176 err [0.0009, 0.0217, 0.0035] time 0.47
++306 success True steps 202 err [0.009, 0.0278, -0.0137] time 0.555
++307 success True steps 187 err [-0.0196, -0.0199, -0.0133] time 0.556
++308 success True steps 161 err [-0.0042, -0.0089, 0.0002] time 0.502
++309 success True steps 142 err [-0.0099, -0.0291, -0.0268] time 0.587
+diff --git a/results_policy_baselineprobe_0_20.json b/results_policy_baselineprobe_0_20.json
+new file mode 100644
+index 0000000..a36b44e
+--- /dev/null
++++ b/results_policy_baselineprobe_0_20.json
+@@ -0,0 +1 @@
++[{"seed": 0, "success": true, "steps": 520, "time": 6.993674391065724}, {"seed": 1, "success": true, "steps": 189, "time": 2.62942054704763}, {"seed": 2, "success": true, "steps": 148, "time": 2.0485746369231492}, {"seed": 3, "success": true, "steps": 133, "time": 1.7897950520273298}, {"seed": 4, "success": true, "steps": 152, "time": 2.100732969935052}, {"seed": 5, "success": true, "steps": 187, "time": 2.8056312799453735}, {"seed": 6, "success": true, "steps": 172, "time": 2.41934249503538}, {"seed": 7, "success": true, "steps": 234, "time": 3.333296710974537}, {"seed": 8, "success": true, "steps": 183, "time": 2.5415192670188844}, {"seed": 9, "success": true, "steps": 151, "time": 2.1215497020166367}, {"seed": 10, "success": true, "steps": 146, "time": 2.0397940820548683}, {"seed": 11, "success": true, "steps": 175, "time": 2.448468663962558}, {"seed": 12, "success": true, "steps": 100, "time": 1.3873542069923133}, {"seed": 13, "success": true, "steps": 114, "time": 1.695343633997254}, {"seed": 14, "success": true, "steps": 185, "time": 2.580464610015042}, {"seed": 15, "success": true, "steps": 102, "time": 1.4936078710015863}, {"seed": 16, "success": true, "steps": 178, "time": 2.5341460240306333}, {"seed": 17, "success": true, "steps": 53, "time": 0.6421506829792634}, {"seed": 18, "success": true, "steps": 114, "time": 1.6821190089685842}, {"seed": 19, "success": true, "steps": 130, "time": 1.71893815707881}]
+\ No newline at end of file
+diff --git a/results_policy_distance010_0_20.json b/results_policy_distance010_0_20.json
+new file mode 100644
+index 0000000..48354e2
+--- /dev/null
++++ b/results_policy_distance010_0_20.json
+@@ -0,0 +1 @@
++[{"seed": 0, "success": true, "steps": 532, "time": 7.267977740964852}, {"seed": 1, "success": true, "steps": 180, "time": 2.379436222021468}, {"seed": 2, "success": true, "steps": 197, "time": 2.77999946300406}, {"seed": 3, "success": true, "steps": 122, "time": 1.828080745995976}, {"seed": 4, "success": true, "steps": 136, "time": 1.754021566011943}, {"seed": 5, "success": true, "steps": 238, "time": 3.440581260016188}, {"seed": 6, "success": true, "steps": 160, "time": 2.474156765965745}, {"seed": 7, "success": true, "steps": 224, "time": 3.19721418293193}, {"seed": 8, "success": true, "steps": 211, "time": 2.8746585609624162}, {"seed": 9, "success": true, "steps": 175, "time": 2.432160017080605}, {"seed": 10, "success": true, "steps": 193, "time": 2.738889630069025}, {"seed": 11, "success": true, "steps": 142, "time": 2.089287764043547}, {"seed": 12, "success": true, "steps": 126, "time": 1.7947043429594487}, {"seed": 13, "success": true, "steps": 237, "time": 3.262892865925096}, {"seed": 14, "success": true, "steps": 177, "time": 2.506380680948496}, {"seed": 15, "success": true, "steps": 70, "time": 0.9235313349636272}, {"seed": 16, "success": true, "steps": 188, "time": 2.5479206569725648}, {"seed": 17, "success": true, "steps": 53, "time": 0.8238476439146325}, {"seed": 18, "success": true, "steps": 125, "time": 1.5062732219230384}, {"seed": 19, "success": true, "steps": 128, "time": 0.6456769619835541}]
+\ No newline at end of file
+diff --git a/results_policy_distance060_0_20.json b/results_policy_distance060_0_20.json
+new file mode 100644
+index 0000000..53296f1
+--- /dev/null
++++ b/results_policy_distance060_0_20.json
+@@ -0,0 +1 @@
++[{"seed": 0, "success": true, "steps": 364, "time": 4.792962849023752}, {"seed": 1, "success": true, "steps": 177, "time": 2.493013228988275}, {"seed": 2, "success": true, "steps": 125, "time": 1.6617913920199499}, {"seed": 3, "success": true, "steps": 184, "time": 2.616960474057123}, {"seed": 4, "success": true, "steps": 168, "time": 2.40181365609169}, {"seed": 5, "success": true, "steps": 180, "time": 2.5113915109541267}, {"seed": 6, "success": true, "steps": 278, "time": 3.9931682040914893}, {"seed": 7, "success": true, "steps": 216, "time": 3.130272301961668}, {"seed": 8, "success": true, "steps": 181, "time": 2.506349868956022}, {"seed": 9, "success": true, "steps": 151, "time": 2.120662264060229}, {"seed": 10, "success": true, "steps": 215, "time": 2.9468088009161875}, {"seed": 11, "success": true, "steps": 161, "time": 2.273961892002262}, {"seed": 12, "success": true, "steps": 102, "time": 1.407070053042844}, {"seed": 13, "success": true, "steps": 109, "time": 1.5549563360400498}, {"seed": 14, "success": true, "steps": 216, "time": 2.9640446320408955}, {"seed": 15, "success": true, "steps": 125, "time": 1.79569044301752}, {"seed": 16, "success": true, "steps": 159, "time": 2.199143215082586}, {"seed": 17, "success": true, "steps": 90, "time": 1.3132824590429664}, {"seed": 18, "success": true, "steps": 136, "time": 1.6989501870702952}, {"seed": 19, "success": true, "steps": 130, "time": 1.8125212950399145}]
+\ No newline at end of file
+diff --git a/results_policy_switch12_0_20.json b/results_policy_switch12_0_20.json
+new file mode 100644
+index 0000000..472c228
+--- /dev/null
++++ b/results_policy_switch12_0_20.json
+@@ -0,0 +1 @@
++[{"seed": 0, "success": true, "steps": 613, "time": 8.366339472937398}, {"seed": 1, "success": true, "steps": 191, "time": 2.710131585947238}, {"seed": 2, "success": true, "steps": 170, "time": 2.425669214106165}, {"seed": 3, "success": true, "steps": 193, "time": 2.7995975500671193}, {"seed": 4, "success": true, "steps": 117, "time": 1.7624527029693127}, {"seed": 5, "success": true, "steps": 170, "time": 2.3042719279183075}, {"seed": 6, "success": true, "steps": 160, "time": 2.3852942729135975}, {"seed": 7, "success": true, "steps": 195, "time": 2.7306753139710054}, {"seed": 8, "success": true, "steps": 179, "time": 2.390199354966171}, {"seed": 9, "success": true, "steps": 153, "time": 2.104705256060697}, {"seed": 10, "success": true, "steps": 148, "time": 2.03784727898892}, {"seed": 11, "success": true, "steps": 159, "time": 2.2670725180068985}, {"seed": 12, "success": true, "steps": 99, "time": 1.4473543179919943}, {"seed": 13, "success": true, "steps": 151, "time": 2.0699711400084198}, {"seed": 14, "success": true, "steps": 188, "time": 2.706514946068637}, {"seed": 15, "success": true, "steps": 114, "time": 1.6107225730083883}, {"seed": 16, "success": true, "steps": 176, "time": 2.4403161560185254}, {"seed": 17, "success": true, "steps": 53, "time": 0.7512196359457448}, {"seed": 18, "success": true, "steps": 129, "time": 1.67104799405206}, {"seed": 19, "success": true, "steps": 130, "time": 1.6056535670068115}]
+\ No newline at end of file
+diff --git a/results_policy_switch20_0_20.json b/results_policy_switch20_0_20.json
+new file mode 100644
+index 0000000..422e946
+--- /dev/null
++++ b/results_policy_switch20_0_20.json
+@@ -0,0 +1 @@
++[{"seed": 0, "success": true, "steps": 285, "time": 3.763976864051074}, {"seed": 1, "success": true, "steps": 222, "time": 3.0280100150266662}, {"seed": 2, "success": true, "steps": 206, "time": 2.9716583479894325}, {"seed": 3, "success": true, "steps": 132, "time": 1.7880306160077453}, {"seed": 4, "success": true, "steps": 152, "time": 2.1285698609426618}, {"seed": 5, "success": true, "steps": 205, "time": 2.8972210430074483}, {"seed": 6, "success": true, "steps": 214, "time": 3.025021016015671}, {"seed": 7, "success": true, "steps": 240, "time": 3.5282045080093667}, {"seed": 8, "success": true, "steps": 173, "time": 2.4134748380165547}, {"seed": 9, "success": true, "steps": 149, "time": 2.0034107810351998}, {"seed": 10, "success": true, "steps": 181, "time": 2.5970771389547735}, {"seed": 11, "success": true, "steps": 164, "time": 2.192833123030141}, {"seed": 12, "success": true, "steps": 102, "time": 1.4820399529999122}, {"seed": 13, "success": true, "steps": 140, "time": 2.04003900999669}, {"seed": 14, "success": true, "steps": 195, "time": 2.7315034279599786}, {"seed": 15, "success": true, "steps": 143, "time": 2.0833045080071315}, {"seed": 16, "success": true, "steps": 238, "time": 3.3499686380382627}, {"seed": 17, "success": true, "steps": 53, "time": 0.6885716760298237}, {"seed": 18, "success": true, "steps": 196, "time": 2.711402098997496}, {"seed": 19, "success": true, "steps": 146, "time": 1.4431135340128094}]
+\ No newline at end of file
+diff --git a/results_policy_weight015_20_50.json b/results_policy_weight015_20_50.json
+new file mode 100644
+index 0000000..3a64183
+--- /dev/null
++++ b/results_policy_weight015_20_50.json
+@@ -0,0 +1 @@
++[{"seed": 20, "success": true, "steps": 137, "time": 0.5413274710299447}, {"seed": 21, "success": true, "steps": 141, "time": 0.4609584189020097}, {"seed": 22, "success": true, "steps": 101, "time": 0.27051891095470637}, {"seed": 23, "success": true, "steps": 89, "time": 0.29299299395643175}, {"seed": 24, "success": true, "steps": 70, "time": 0.17538867704570293}, {"seed": 25, "success": true, "steps": 161, "time": 0.44759694405365735}, {"seed": 26, "success": true, "steps": 174, "time": 0.4993037049425766}, {"seed": 27, "success": true, "steps": 217, "time": 0.6129512180341408}, {"seed": 28, "success": true, "steps": 31, "time": 0.0756756931077689}, {"seed": 29, "success": true, "steps": 114, "time": 0.3212299490114674}, {"seed": 30, "success": true, "steps": 170, "time": 0.5588467200286686}, {"seed": 31, "success": true, "steps": 78, "time": 0.2103315859567374}, {"seed": 32, "success": true, "steps": 159, "time": 0.4041349570034072}, {"seed": 33, "success": true, "steps": 169, "time": 0.4484743420034647}, {"seed": 34, "success": true, "steps": 168, "time": 0.3653857159661129}, {"seed": 35, "success": true, "steps": 149, "time": 0.32163725898135453}, {"seed": 36, "success": true, "steps": 129, "time": 0.301815303042531}, {"seed": 37, "success": true, "steps": 156, "time": 0.33866647200193256}, {"seed": 38, "success": true, "steps": 100, "time": 0.21182512096129358}, {"seed": 39, "success": true, "steps": 150, "time": 0.328530588070862}, {"seed": 40, "success": true, "steps": 188, "time": 0.39904730301350355}, {"seed": 41, "success": true, "steps": 188, "time": 0.3957022139802575}, {"seed": 42, "success": true, "steps": 93, "time": 0.2066785959759727}, {"seed": 43, "success": true, "steps": 213, "time": 0.4735663669416681}, {"seed": 44, "success": true, "steps": 202, "time": 0.4217598360264674}, {"seed": 45, "success": true, "steps": 133, "time": 0.2822970199631527}, {"seed": 46, "success": true, "steps": 164, "time": 0.35062678705435246}, {"seed": 47, "success": true, "steps": 246, "time": 0.5210187290795147}, {"seed": 48, "success": true, "steps": 127, "time": 0.2726209959946573}, {"seed": 49, "success": true, "steps": 185, "time": 0.3855956649640575}, {"seed": 50, "success": true, "steps": 182, "time": 0.39536673901602626}, {"seed": 51, "success": true, "steps": 151, "time": 0.383874318911694}, {"seed": 52, "success": true, "steps": 233, "time": 0.5024329909356311}, {"seed": 53, "success": true, "steps": 139, "time": 0.27786066802218556}, {"seed": 54, "success": true, "steps": 200, "time": 0.42026754294056445}, {"seed": 55, "success": true, "steps": 190, "time": 0.3891472030663863}, {"seed": 56, "success": true, "steps": 203, "time": 0.45092583692166954}, {"seed": 57, "success": true, "steps": 159, "time": 0.3338798569748178}, {"seed": 58, "success": true, "steps": 147, "time": 0.29978682403452694}, {"seed": 59, "success": true, "steps": 459, "time": 0.96628427808173}, {"seed": 60, "success": true, "steps": 238, "time": 0.49323553207796067}, {"seed": 61, "success": true, "steps": 154, "time": 0.3268154830439016}, {"seed": 62, "success": true, "steps": 75, "time": 0.1533535619964823}, {"seed": 63, "success": true, "steps": 146, "time": 0.302804370992817}, {"seed": 64, "success": true, "steps": 180, "time": 0.39618322195019573}, {"seed": 65, "success": true, "steps": 181, "time": 0.3915956140263006}, {"seed": 66, "success": true, "steps": 161, "time": 0.3372875819914043}, {"seed": 67, "success": true, "steps": 161, "time": 0.344314994988963}, {"seed": 68, "success": true, "steps": 541, "time": 1.1746422270080075}, {"seed": 69, "success": true, "steps": 103, "time": 0.19463134498801082}]
+\ No newline at end of file
+diff --git a/results_policy_weight060_0_20.json b/results_policy_weight060_0_20.json
+new file mode 100644
+index 0000000..0977fe8
+--- /dev/null
++++ b/results_policy_weight060_0_20.json
+@@ -0,0 +1 @@
++[{"seed": 0, "success": true, "steps": 449, "time": 5.940018969005905}, {"seed": 1, "success": true, "steps": 225, "time": 3.2015929269837216}, {"seed": 2, "success": true, "steps": 152, "time": 2.0097036050865427}, {"seed": 3, "success": true, "steps": 133, "time": 1.7635329919867218}, {"seed": 4, "success": true, "steps": 152, "time": 2.2396276069339365}, {"seed": 5, "success": true, "steps": 193, "time": 2.862724011996761}, {"seed": 6, "success": true, "steps": 223, "time": 3.2269608409842476}, {"seed": 7, "success": true, "steps": 242, "time": 3.372759270016104}, {"seed": 8, "success": true, "steps": 178, "time": 2.4368071529315785}, {"seed": 9, "success": true, "steps": 149, "time": 2.150517409085296}, {"seed": 10, "success": true, "steps": 149, "time": 2.085695083020255}, {"seed": 11, "success": true, "steps": 161, "time": 2.272107233060524}, {"seed": 12, "success": true, "steps": 100, "time": 1.4203143370104954}, {"seed": 13, "success": true, "steps": 130, "time": 1.85491774789989}, {"seed": 14, "success": true, "steps": 196, "time": 2.6635797370690852}, {"seed": 15, "success": true, "steps": 125, "time": 1.8752819049404934}, {"seed": 16, "success": true, "steps": 184, "time": 2.459254021057859}, {"seed": 17, "success": true, "steps": 53, "time": 0.6769005589885637}, {"seed": 18, "success": true, "steps": 161, "time": 2.070945331011899}, {"seed": 19, "success": true, "steps": 130, "time": 1.6999667669879273}]
+\ No newline at end of file
+diff --git a/sweep_baselineprobe.log b/sweep_baselineprobe.log
+index a1caf5b..f5b1426 100644
+--- a/sweep_baselineprobe.log
++++ b/sweep_baselineprobe.log
+@@ -17,3 +17,5 @@ policy_baselineprobe 15 True 102
+ policy_baselineprobe 16 True 178
+ policy_baselineprobe 17 True 53
+ policy_baselineprobe 18 True 114
++policy_baselineprobe 19 True 130
++SUMMARY policy_baselineprobe success 20 mean 168.3 max 520
+diff --git a/sweep_distance010.log b/sweep_distance010.log
+index 25afbda..d503d79 100644
+--- a/sweep_distance010.log
++++ b/sweep_distance010.log
+@@ -15,3 +15,7 @@ policy_distance010 13 True 237
+ policy_distance010 14 True 177
+ policy_distance010 15 True 70
+ policy_distance010 16 True 188
++policy_distance010 17 True 53
++policy_distance010 18 True 125
++policy_distance010 19 True 128
++SUMMARY policy_distance010 success 20 mean 180.7 max 532
+diff --git a/sweep_distance060.log b/sweep_distance060.log
+index b2b38d7..5b77987 100644
+--- a/sweep_distance060.log
++++ b/sweep_distance060.log
+@@ -17,3 +17,5 @@ policy_distance060 15 True 125
+ policy_distance060 16 True 159
+ policy_distance060 17 True 90
+ policy_distance060 18 True 136
++policy_distance060 19 True 130
++SUMMARY policy_distance060 success 20 mean 173.35 max 364
+diff --git a/sweep_switch12.log b/sweep_switch12.log
+index 9c89011..6be4ab6 100644
+--- a/sweep_switch12.log
++++ b/sweep_switch12.log
+@@ -16,3 +16,6 @@ policy_switch12 14 True 188
+ policy_switch12 15 True 114
+ policy_switch12 16 True 176
+ policy_switch12 17 True 53
++policy_switch12 18 True 129
++policy_switch12 19 True 130
++SUMMARY policy_switch12 success 20 mean 174.4 max 613
+diff --git a/sweep_switch20.log b/sweep_switch20.log
+index 11f8282..8e393b0 100644
+--- a/sweep_switch20.log
++++ b/sweep_switch20.log
+@@ -16,3 +16,6 @@ policy_switch20 14 True 195
+ policy_switch20 15 True 143
+ policy_switch20 16 True 238
+ policy_switch20 17 True 53
++policy_switch20 18 True 196
++policy_switch20 19 True 146
++SUMMARY policy_switch20 success 20 mean 176.8 max 285
+diff --git a/sweep_weight015_more.log b/sweep_weight015_more.log
+new file mode 100644
+index 0000000..4e88479
+--- /dev/null
++++ b/sweep_weight015_more.log
+@@ -0,0 +1,51 @@
++policy_weight015 20 True 137
++policy_weight015 21 True 141
++policy_weight015 22 True 101
++policy_weight015 23 True 89
++policy_weight015 24 True 70
++policy_weight015 25 True 161
++policy_weight015 26 True 174
++policy_weight015 27 True 217
++policy_weight015 28 True 31
++policy_weight015 29 True 114
++policy_weight015 30 True 170
++policy_weight015 31 True 78
++policy_weight015 32 True 159
++policy_weight015 33 True 169
++policy_weight015 34 True 168
++policy_weight015 35 True 149
++policy_weight015 36 True 129
++policy_weight015 37 True 156
++policy_weight015 38 True 100
++policy_weight015 39 True 150
++policy_weight015 40 True 188
++policy_weight015 41 True 188
++policy_weight015 42 True 93
++policy_weight015 43 True 213
++policy_weight015 44 True 202
++policy_weight015 45 True 133
++policy_weight015 46 True 164
++policy_weight015 47 True 246
++policy_weight015 48 True 127
++policy_weight015 49 True 185
++policy_weight015 50 True 182
++policy_weight015 51 True 151
++policy_weight015 52 True 233
++policy_weight015 53 True 139
++policy_weight015 54 True 200
++policy_weight015 55 True 190
++policy_weight015 56 True 203
++policy_weight015 57 True 159
++policy_weight015 58 True 147
++policy_weight015 59 True 459
++policy_weight015 60 True 238
++policy_weight015 61 True 154
++policy_weight015 62 True 75
++policy_weight015 63 True 146
++policy_weight015 64 True 180
++policy_weight015 65 True 181
++policy_weight015 66 True 161
++policy_weight015 67 True 161
++policy_weight015 68 True 541
++policy_weight015 69 True 103
++SUMMARY policy_weight015 success 50 mean 168.1 max 541
+diff --git a/sweep_weight060.log b/sweep_weight060.log
+index aa8400e..cf9f4a2 100644
+--- a/sweep_weight060.log
++++ b/sweep_weight060.log
+@@ -17,3 +17,5 @@ policy_weight060 15 True 125
+ policy_weight060 16 True 184
+ policy_weight060 17 True 53
+ policy_weight060 18 True 161
++policy_weight060 19 True 130
++SUMMARY policy_weight060 success 20 mean 174.25 max 449

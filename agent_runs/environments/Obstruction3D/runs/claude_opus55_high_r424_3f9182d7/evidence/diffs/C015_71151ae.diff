@@ -1,0 +1,18 @@
+diff --git a/approach.py b/approach.py
+index d2e18ad..d444777 100644
+--- a/approach.py
++++ b/approach.py
+@@ -319,8 +319,12 @@ class GeneratedApproach:
+         if self.last_q is not None and np.allclose(self.last_q, q, atol=1e-7):
+             # previous action rejected (collision)
+             allow = len(cmd) > 3 and cmd[3]
+-            self.queue.pop(0)
+             self.qtarget = None
++            if not self.fine and kind in ('move', 'place_move', 'move_rel_up'):
++                # retry same motion with small interpolation steps
++                self.queue[0] = tuple(cmd[:3]) + (allow, FINE)
++                return None
++            self.queue.pop(0)
+             if not allow:
+                 if kind == 'place_move' and self.cur_spot is not None and self.place_yaw is None:
+                     self.bad_spots.append(tuple(self.cur_spot))

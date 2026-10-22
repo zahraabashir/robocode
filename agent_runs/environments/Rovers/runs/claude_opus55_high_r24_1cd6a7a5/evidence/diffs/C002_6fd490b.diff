@@ -1,0 +1,1095 @@
+diff --git a/approach.py b/approach.py
+new file mode 100644
+index 0000000..4db1072
+--- /dev/null
++++ b/approach.py
+@@ -0,0 +1,379 @@
++import itertools
++import numpy as np
++
++H = 0.1            # lattice spacing (a step can move up to 2 cells per axis)
++R_STEP = 2         # cells per step
++IMG_R = 1.96       # imaging range (true ~2.0)
++SAMP_R = 0.235     # sampling range (true 0.25)
++SEND_R = 3.85      # send range (true ~4.0)
++BAND = {"sample": -5 / 6, "calibrate": -0.5, "image": -1 / 6, "noop": 1 / 6,
++        "send": 0.5, "drop": 5 / 6}
++INF = 1e9
++
++
++def _type(space, name):
++    for t in space.types:
++        if t.name == name:
++            return t
++    return None
++
++
++class Scene:
++    def __init__(self, state, space):
++        self.T = {n: _type(space, n) for n in ["rover", "lander", "objective", "sample", "obstacle"]}
++        g = state.get
++        self.rovers = sorted(state.get_objects(self.T["rover"]), key=lambda o: o.name)
++        self.lander = state.get_objects(self.T["lander"])[0]
++        self.objectives = sorted(state.get_objects(self.T["objective"]), key=lambda o: o.name)
++        self.samples = sorted(state.get_objects(self.T["sample"]), key=lambda o: o.name)
++        self.obstacles = state.get_objects(self.T["obstacle"])
++        self.lpos = np.array([g(self.lander, "x"), g(self.lander, "y")])
++        self.obs_boxes = []
++        for o in self.obstacles:
++            self.obs_boxes.append((g(o, "x"), g(o, "y"), g(o, "half_x"), g(o, "half_y"), g(o, "half_z")))
++        self.opos = [np.array([g(o, "x"), g(o, "y")]) for o in self.objectives]
++        self.spos = [np.array([g(o, "x"), g(o, "y")]) for o in self.samples]
++        self.ssoil = [g(o, "is_soil") > 0.5 for o in self.samples]
++
++
++class RoverPlanner:
++    """Lattice anchored at the rover's home; subset DP over task regions."""
++
++    def __init__(self, scene, idx, home):
++        self.scene = scene
++        self.idx = idx
++        self.home = np.array(home, dtype=float)
++        side = 1.0 if home[0] > 0 else -1.0
++        self.side = side
++        xs = []
++        x = self.home[0]
++        while x - H >= -2.27:
++            x -= H
++        while x <= 2.27:
++            xs.append(x)
++            x += H
++        ys = []
++        y = self.home[1]
++        while y - H >= -2.27:
++            y -= H
++        while y <= 2.27:
++            ys.append(y)
++            y += H
++        self.xs = np.array(xs)
++        self.ys = np.array(ys)
++        X, Y = np.meshgrid(self.xs, self.ys, indexing="ij")
++        self.X, self.Y = X, Y
++        free = (np.abs(X) <= 2.265) & (np.abs(Y) <= 2.265) & (X * side >= 0.235)
++        for (ox, oy, hx, hy, hz) in scene.obs_boxes:
++            margin = 0.21 if max(hx, hy) >= 0.15 else 0.25
++            dx = np.maximum(np.abs(X - ox) - hx, 0.0)
++            dy = np.maximum(np.abs(Y - oy) - hy, 0.0)
++            free &= (dx * dx + dy * dy) >= margin * margin
++        lx, ly = scene.lpos
++        free &= ~((X < lx + 0.71) & (Y < ly + 0.54))
++        self.hi = int(np.argmin(np.abs(self.xs - self.home[0])))
++        self.hj = int(np.argmin(np.abs(self.ys - self.home[1])))
++        free[self.hi, self.hj] = True
++        self.free = free
++        self.shape = free.shape
++        self.offsets = [(a, b) for a in range(-R_STEP, R_STEP + 1) for b in range(-R_STEP, R_STEP + 1)
++                        if (a, b) != (0, 0)]
++
++    def pos(self, c):
++        return np.array([self.xs[c[0]], self.ys[c[1]]])
++
++    def cell(self, p):
++        i = int(np.argmin(np.abs(self.xs - p[0])))
++        j = int(np.argmin(np.abs(self.ys - p[1])))
++        return (i, j)
++
++    def region_mask(self, task):
++        kind, k = task
++        sc = self.scene
++        if kind == "obj":
++            o = sc.opos[k]
++            m = (self.X - o[0]) ** 2 + (self.Y - o[1]) ** 2 <= IMG_R ** 2
++        else:  # 'stone' or 'soil'
++            want_soil = kind == "soil"
++            m = np.zeros(self.shape, bool)
++            for s, soil in zip(sc.spos, sc.ssoil):
++                if soil == want_soil:
++                    m |= (self.X - s[0]) ** 2 + (self.Y - s[1]) ** 2 <= SAMP_R ** 2
++        return m & self.free
++
++    def propagate(self, F):
++        G = F.copy()
++        R = R_STEP
++        W, Hh = self.shape
++        free = self.free
++        while True:
++            P = np.full((W + 2 * R, Hh + 2 * R), INF)
++            P[R:R + W, R:R + Hh] = G
++            best = G.copy()
++            for a, b in self.offsets:
++                np.minimum(best, P[R + a:R + a + W, R + b:R + b + Hh] + 1.0, out=best)
++            best[~free] = INF
++            if np.array_equal(best, G):
++                return G
++            G = best
++
++    def dp(self, tasks, start=None):
++        """Returns dict subset(bitmask)->cost of tour start->tasks->home, and stores fields."""
++        if start is None:
++            start = (self.hi, self.hj)
++        n = len(tasks)
++        masks = [self.region_mask(t) for t in tasks]
++        F0 = np.full(self.shape, INF)
++        F0[start] = 0.0
++        Fs = {0: F0}
++        Gs = {}
++        order = sorted(range(1 << n), key=lambda s: bin(s).count("1"))
++        for s in order:
++            F = Fs.get(s)
++            if F is None:
++                continue
++            G = self.propagate(F)
++            Gs[s] = G
++            for r in range(n):
++                if s & (1 << r):
++                    continue
++                if not masks[r].any():
++                    continue
++                s2 = s | (1 << r)
++                cand = np.where(masks[r], G, INF)
++                if s2 in Fs:
++                    np.minimum(Fs[s2], cand, out=Fs[s2])
++                else:
++                    Fs[s2] = cand
++        self._tasks = tasks
++        self._masks = masks
++        self._Fs = Fs
++        self._Gs = Gs
++        self._start = start
++        costs = {}
++        for s, G in Gs.items():
++            costs[s] = G[self.hi, self.hj]
++        return costs
++
++    def extract(self, s):
++        """Backtrack path for subset s (from last dp). Returns list of cells and visits dict idx->[tasks]."""
++        Gs, Fs, masks = self._Gs, self._Fs, self._masks
++        c = (self.hi, self.hj)
++        v = Gs[s][c]
++        rev = [c]
++        rev_visits = []  # (position in rev, task index)
++        W, Hh = self.shape
++        guard = 0
++        while True:
++            guard += 1
++            if guard > 10000:
++                break
++            if s == 0 and c == self._start:
++                break
++            # try region entry at c
++            moved = False
++            if s != 0 and Fs[s][c] <= v + 1e-9:
++                for r in range(len(masks)):
++                    if s & (1 << r) and masks[r][c]:
++                        s2 = s & ~(1 << r)
++                        if s2 in Gs and Gs[s2][c] <= v + 1e-9:
++                            rev_visits.append((len(rev) - 1, r))
++                            s = s2
++                            moved = True
++                            break
++            if moved:
++                continue
++            for a, b in self.offsets:
++                n = (c[0] + a, c[1] + b)
++                if 0 <= n[0] < W and 0 <= n[1] < Hh and Gs[s][n] <= v - 1 + 1e-9:
++                    c = n
++                    v = Gs[s][n]
++                    rev.append(c)
++                    moved = True
++                    break
++            if not moved:
++                break
++        L = len(rev)
++        path = rev[::-1]
++        visits = {}
++        for (ri, r) in rev_visits:
++            visits.setdefault(L - 1 - ri, []).append(self._tasks[r])
++        return path, visits
++
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.action_space = action_space
++        self.space = observation_space
++
++    # ------------------------------------------------------------------
++    def reset(self, state, info):
++        self.sc = Scene(state, self.space)
++        sc = self.sc
++        g = state.get
++        self.homes = [np.array([g(r, "x"), g(r, "y")]) for r in sc.rovers]
++        self.planners = [RoverPlanner(sc, i, self.homes[i]) for i in range(2)]
++        nobj = len(sc.objectives)
++        tasks = [("obj", k) for k in range(nobj)] + [("stone", 0), ("soil", 0)]
++        self.tasks = tasks
++        costs = []
++        for i in range(2):
++            costs.append(self.planners[i].dp(tasks))
++        # store fields per rover (dp overwrote): re-run later for chosen subset
++        n = len(tasks)
++        full = (1 << n) - 1
++        best = None
++        for s0 in range(1 << n):
++            s1 = full & ~s0
++            c0 = costs[0].get(s0, INF)
++            c1 = costs[1].get(s1, INF)
++            if c0 >= INF or c1 >= INF:
++                continue
++            ops0 = self._ops(tasks, s0)
++            ops1 = self._ops(tasks, s1)
++            k0 = max(c0, ops0) + 0.5 * self._extra(tasks, s0)
++            k1 = max(c1, ops1) + 0.5 * self._extra(tasks, s1)
++            key = (max(k0, k1), k0 + k1)
++            if best is None or key < best[0]:
++                best = (key, s0, s1)
++        self.assign = [best[1], best[2]] if best else [full, 0]
++        self.plans = []
++        for i in range(2):
++            p = self.planners[i]
++            p.dp(tasks)
++            path, visits = p.extract(self.assign[i])
++            self.plans.append({"path": path, "visits": visits, "k": 0, "wait": 0, "stuck": 0})
++        self.my_tasks = [[tasks[r] for r in range(n) if self.assign[i] & (1 << r)] for i in range(2)]
++        self.last_target = [None, None]
++
++    def _ops(self, tasks, s):
++        c = 0
++        for r, t in enumerate(tasks):
++            if s & (1 << r):
++                c += 2 if t[0] == "obj" else 2
++        return c + 1
++
++    def _extra(self, tasks, s):
++        return 0
++
++    # ------------------------------------------------------------------
++    def _task_done(self, state, t):
++        sc = self.sc
++        g = state.get
++        if t[0] == "obj":
++            o = sc.objectives[t[1]]
++            return g(o, "have_image_rover0") > 0.5 or g(o, "have_image_rover1") > 0.5 or g(o, "received_image") > 0.5
++        want_soil = t[0] == "soil"
++        for s, soil in zip(sc.samples, sc.ssoil):
++            if soil == want_soil and (g(s, "analyzed_rover0") > 0.5 or g(s, "analyzed_rover1") > 0.5
++                                      or g(s, "received_analysis") > 0.5):
++                return True
++        return False
++
++    def _choose_op(self, state, i, p, at_visit_tasks):
++        sc = self.sc
++        g = state.get
++        rv = sc.rovers[i]
++        me = "rover%d" % i
++        other = "rover%d" % (1 - i)
++        store_full = g(rv, "store_full") > 0.5
++        calibrated = g(rv, "calibrated") > 0.5
++        # sample
++        if not store_full:
++            for s, soil, sp in zip(sc.samples, sc.ssoil, sc.spos):
++                if np.linalg.norm(sp - p) <= SAMP_R:
++                    t = ("soil", 0) if soil else ("stone", 0)
++                    if not self._task_done(state, t):
++                        return "sample"
++        # imaging
++        visible = [k for k in range(len(sc.objectives)) if np.linalg.norm(sc.opos[k] - p) <= IMG_R]
++        need = [k for k in range(len(sc.objectives)) if not self._task_done(state, ("obj", k))]
++        vis_need = [k for k in visible if k in need]
++        if vis_need:
++            if calibrated:
++                cands = [k for k in visible if g(sc.objectives[k], "have_image_" + me) < 0.5]
++                if cands:
++                    return "image"
++            else:
++                return "calibrate"
++        # calibrate early if I still have images to take and something is visible
++        mine_left = [t for t in self.my_tasks[i] if t[0] == "obj" and not self._task_done(state, t)]
++        if not calibrated and mine_left and any(
++                np.linalg.norm(sc.opos[k] - p) <= IMG_R for k in range(len(sc.objectives))):
++            return "calibrate"
++        if store_full:
++            # is my store's analysis already recorded? (store full => yes)
++            return "drop"
++        # send
++        all_done = all(self._task_done(state, t) for t in self.my_tasks[i])
++        holding = False
++        for o in sc.objectives:
++            if g(o, "have_image_" + me) > 0.5 and g(o, "received_image") < 0.5:
++                holding = True
++        for s in sc.samples:
++            if g(s, "analyzed_" + me) > 0.5 and g(s, "received_analysis") < 0.5:
++                holding = True
++        if holding and all_done and np.linalg.norm(p - sc.lpos) <= SEND_R:
++            return "send"
++        return "noop"
++
++    def _rover_action(self, state, i):
++        sc = self.sc
++        g = state.get
++        rv = sc.rovers[i]
++        cur = np.array([g(rv, "x"), g(rv, "y")])
++        plan = self.plans[i]
++        path = plan["path"]
++        P = self.planners[i]
++        k = plan["k"]
++        # verify position
++        exp = P.pos(path[k])
++        if np.linalg.norm(exp - cur) > 0.02:
++            # previous move blocked or drifted; find closest path index or stay
++            plan["stuck"] += 1
++            if plan["stuck"] > 3:
++                self._replan(state, i, cur)
++                plan = self.plans[i]
++                path = plan["path"]
++                k = plan["k"]
++            else:
++                # step back on k to retry previous move
++                if k > 0 and np.linalg.norm(P.pos(path[k - 1]) - cur) < 0.02:
++                    k = k - 1
++                    plan["k"] = k
++        # decide whether to stay at current index
++        stay = False
++        vt = plan["visits"].get(k, [])
++        for t in vt:
++            if not self._task_done(state, t) and plan["wait"] < 12:
++                stay = True
++        if k >= len(path) - 1:
++            stay = True
++        if stay:
++            plan["wait"] += 1
++            nxt = k
++        else:
++            plan["wait"] = 0
++            nxt = k + 1
++            # don't leave if next index arrival leaves region needed... (handled by visits)
++        target = P.pos(path[nxt])
++        d = target - cur
++        d = np.clip(d, -0.2, 0.2)
++        newp = cur + d
++        op = self._choose_op(state, i, newp, vt)
++        plan["k"] = nxt
++        return np.array([d[0], d[1], 0.0, BAND[op]], dtype=np.float32)
++
++    def _replan(self, state, i, cur):
++        P = self.planners[i]
++        rem = [t for t in self.my_tasks[i] if not self._task_done(state, t)]
++        start = P.cell(cur)
++        P.free[start] = True
++        costs = P.dp(rem, start=start)
++        path, visits = P.extract((1 << len(rem)) - 1)
++        self.plans[i] = {"path": path, "visits": visits, "k": 0, "wait": 0, "stuck": 0}
++
++    def get_action(self, state):
++        a0 = self._rover_action(state, 0)
++        a1 = self._rover_action(state, 1)
++        return np.concatenate([a0, a1]).astype(np.float32)
+diff --git a/probe.py b/probe.py
+new file mode 100644
+index 0000000..fc443f5
+--- /dev/null
++++ b/probe.py
+@@ -0,0 +1,18 @@
++from env_client import make_env
++env = make_env()
++for seed in [0,1]:
++    obs, info = env.reset(seed=seed)
++    print("seed", seed, info)
++    for t in obs.get_objects(None) if False else []: pass
++    for name in obs.get_object_names():
++        o = obs.get_object_from_name(name)
++        tname = o.type.name if hasattr(o.type,'name') else o.type
++        feats = env.observation_space.type_features[env.observation_space.get_type(tname)] if False else None
++        print(name, tname, end=' ')
++        for typ in ['rover','lander','objective','sample','obstacle']:
++            pass
++        print()
++    for typ in env.observation_space.types:
++        for o in obs.get_objects(typ):
++            print(o.name, [round(float(obs.get(o,f)),3) for f in env.observation_space.type_features[typ]])
++env.close()
+diff --git a/probe_motion_1.py b/probe_motion_1.py
+new file mode 100644
+index 0000000..6a0dbda
+--- /dev/null
++++ b/probe_motion_1.py
+@@ -0,0 +1,7 @@
++from probe_motion_lib import *
++obs,info = env.reset(seed=0)
++for n,v in obstacles(obs): print(n,v)
++print('max_steps', getattr(env,'max_steps',None))
++print(rov(obs,0))
++for a in [(0.1,0,0),(0,0.1,0),(0.3,0,0),(0,0,0.3),(0.1,0,0),(0,0,1.0),(0.1,0.0,0)]:
++    obs,r,te,tr,inf = step(0,*a); print(a, np.round(rov(obs,0),4), r, te, tr)
+diff --git a/probe_motion_2.py b/probe_motion_2.py
+new file mode 100644
+index 0000000..13e5194
+--- /dev/null
++++ b/probe_motion_2.py
+@@ -0,0 +1,12 @@
++from probe_motion_lib import *
++# bounds with rover0 (step 0.2 then 0.01)
++for d in [(1,0),(0,1),(0,-1)]:
++    obs,_=env.reset(seed=0)
++    drive_until_stop(0, .2*d[0], .2*d[1])
++    p=drive_until_stop(0, .01*d[0], .01*d[1])
++    print('rover0 dir',d,np.round(p,4))
++for d in [(-1,0),(0,1),(0,-1)]:
++    obs,_=env.reset(seed=0)
++    p=drive_until_stop(1, .2*d[0], .2*d[1]); print(' coarse',np.round(p,4))
++    p=drive_until_stop(1, .01*d[0], .01*d[1])
++    print('rover1 dir',d,np.round(p,4))
+diff --git a/probe_motion_3.py b/probe_motion_3.py
+new file mode 100644
+index 0000000..c5f08a3
+--- /dev/null
++++ b/probe_motion_3.py
+@@ -0,0 +1,15 @@
++from probe_motion_lib import *
++obs,_=env.reset(seed=0)
++L=[o for o in obs.get_objects(T['lander'])][0]
++print('lander feats', {f:round(float(obs.get(L,f)),3) for f in env.observation_space.type_features[T['lander']]})
++# partial move test: rover1 toward lander with big step from near contact
++obs,_=env.reset(seed=0)
++goto(1,-1.15,-1.75,s=0.05); obs,*_=step(1,-0.2,0); print('big step near block ->',np.round(rov(obs,1)[:2],4))
++# wall: rover0 at x=1, various y, drive -x
++for seed in [0]:
++  for y in np.arange(-2.25,2.26,0.25):
++    obs,_=env.reset(seed=seed)
++    p=goto(0,1.0,y)
++    if abs(p[1]-y)>1e-3: print(y,'could not reach',np.round(p,3)); continue
++    p=approach(0,-1,0)
++    print(f'y={y:.2f} blocked at x={p[0]:.3f} y={p[1]:.3f}')
+diff --git a/probe_motion_4.py b/probe_motion_4.py
+new file mode 100644
+index 0000000..99fc58d
+--- /dev/null
++++ b/probe_motion_4.py
+@@ -0,0 +1,14 @@
++from probe_motion_lib import *
++import sys
++seed=int(sys.argv[1])
++obs,_=env.reset(seed=seed)
++print('pillars/mounds', [(n,v[0],v[1],v[3]) for n,v in obstacles(obs)])
++for i,sx,ux in [(0,1.0,-1),(1,-1.0,1)]:
++  res=[]
++  for y in np.arange(-2.25,2.26,0.05):
++    obs,_=env.reset(seed=seed)
++    p=goto(i,sx,-1.75); p=goto(i,sx,y)
++    if abs(p[1]-y)>1e-3: res.append((round(y,2),'unreach')); continue
++    p=approach(i,ux,0,steps=(0.2,0.05,0.01))
++    res.append((round(y,2),round(p[0],3)))
++  print('rover',i,res)
+diff --git a/probe_motion_5.py b/probe_motion_5.py
+new file mode 100644
+index 0000000..c3ed225
+--- /dev/null
++++ b/probe_motion_5.py
+@@ -0,0 +1,43 @@
++from probe_motion_lib import *
++import math,sys
++def probe(seed, i, start, ang, th=None):
++    obs,_=env.reset(seed=seed)
++    p=goto(i,*start)
++    if th is not None:
++        for _ in range(20):
++            cur=rov(env.step(act(i))[0],i)[2]; d=(th-cur+math.pi)%(2*math.pi)-math.pi
++            if abs(d)<1e-4: break
++            step(i,0,0,np.clip(d,-.4,.4))
++    ux,uy=math.cos(ang),math.sin(ang)
++    p=approach(i,ux,uy,steps=(0.1,0.02,0.004,0.001,0.0002))
++    return p
++mode=sys.argv[1]
++if mode=='pillar':
++    # seed2 pillar obstacle11 at (0.735,0.444) half .05
++    cx,cy=0.735,0.444
++    for deg in [0,30,45,60,90,180,225,270]:
++        a=math.radians(deg)
++        st=(cx-0.5*math.cos(a), cy-0.5*math.sin(a))
++        p=probe(2,0,st,a)
++        dx,dy=p[0]-cx,p[1]-cy
++        # box distance
++        bx=max(abs(dx)-0.05,0); by=max(abs(dy)-0.05,0)
++        print(f'pillar approach {deg}deg stop ({p[0]:.4f},{p[1]:.4f}) center-dist {math.hypot(dx,dy):.4f} box-dist {math.hypot(bx,by):.4f} gaps {abs(dx)-0.05:.4f},{abs(dy)-0.05:.4f}')
++    for th in [0, math.pi/4, math.pi/2]:
++        p=probe(2,0,(cx+0.5,cy),math.pi,th); print('theta',round(th,3),'from +x stop x',round(p[0],4),'gap',round(p[0]-cx-0.05,4))
++elif mode=='mound':
++    # mound obstacle2 (0.5,2.0) half .25 ; approach from below and from right, diag
++    cx,cy=0.5,2.0
++    for deg,st in [(90,(0.5,1.2)),(180,(1.3,2.0)),(135,(1.2,1.3)),(90,(0.9,1.2)),(90,(0.95,1.2)),(90,(1.0,1.2)),(180,(1.3,2.3))]:
++        a=math.radians(deg); p=probe(int(sys.argv[2]),0,st,a)
++        dx,dy=p[0]-cx,p[1]-cy; bx=max(abs(dx)-0.25,0); by=max(abs(dy)-0.25,0)
++        print(f'mound from {st} dir {deg} stop ({p[0]:.4f},{p[1]:.4f}) box-dist {math.hypot(bx,by):.4f} center-dist {math.hypot(dx,dy):.4f}')
++elif mode=='bounds':
++    for deg,st in [(0,(1,0)),(90,(1,0)),(270,(1,0)),(180,(-1,0.)),(180,(1,0))]:
++        i=1 if st[0]<0 else 0
++        p=probe(2,i,st,math.radians(deg)); print('bound dir',deg,'rover',i,np.round(p,4))
++elif mode=='lander':
++    cx,cy=-1.9,-2.0
++    for deg,st in [(180,(-1.0,-2.0)),(180,(-1.0,-1.75)),(270,(-1.9,-1.0)),(270,(-1.7,-1.0)),(225,(-1.2,-1.3)),(180,(-1.0,-2.2))]:
++        p=probe(int(sys.argv[2]),1,st,math.radians(deg))
++        print(f'lander from {st} dir {deg} stop ({p[0]:.4f},{p[1]:.4f}) center-dist {math.hypot(p[0]-cx,p[1]-cy):.4f}')
+diff --git a/probe_motion_6.py b/probe_motion_6.py
+new file mode 100644
+index 0000000..8b3b9cd
+--- /dev/null
++++ b/probe_motion_6.py
+@@ -0,0 +1,12 @@
++from probe_motion_lib import *
++import math
++for ang in [0,90,180,270]:
++    obs,_=env.reset(seed=0); ux,uy=math.cos(math.radians(ang)),math.sin(math.radians(ang))
++    d=0
++    for k in range(200):
++        obs,*_=step(0,0.005*ux,0.005*uy); r=rov(obs,0)
++        if r[5]<0.5: print('dir',ang,'at_home->0 at dist',round(math.hypot(r[0]-1,r[1]+1.75),4)); break
++obs,_=env.reset(seed=0); n=0
++while True:
++    obs,r,te,tr,inf=env.step(act(0)); n+=1
++    if te or tr or n>1100: print('ended at',n,te,tr); break
+diff --git a/probe_motion_lib.py b/probe_motion_lib.py
+new file mode 100644
+index 0000000..9683999
+--- /dev/null
++++ b/probe_motion_lib.py
+@@ -0,0 +1,33 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++T = {t.name: t for t in env.observation_space.types}
++def rov(obs, i):
++    o = [r for r in obs.get_objects(T['rover']) if r.name==f'rover{i}'][0]
++    return [float(obs.get(o,f)) for f in ['x','y','theta','store_full','calibrated','at_home']]
++def obstacles(obs):
++    return [(o.name,[round(float(obs.get(o,f)),3) for f in ['x','y','z','half_x','half_y','half_z']]) for o in obs.get_objects(T['obstacle'])]
++def act(i, dx=0, dy=0, dth=0):
++    a = np.zeros(8, dtype=np.float32); a[4*i:4*i+3]=[dx,dy,dth]; return a
++def step(i, dx=0, dy=0, dth=0):
++    return env.step(act(i,dx,dy,dth))
++def drive_until_stop(i, dx, dy, nmax=200):
++    obs = None
++    prev = None
++    for k in range(nmax):
++        obs,*_ = step(i,dx,dy)
++        p = rov(obs,i)[:2]
++        if prev is not None and abs(p[0]-prev[0])<1e-9 and abs(p[1]-prev[1])<1e-9: return p
++        prev = p
++    return prev
++def goto(i, tx, ty, s=0.2, n=100):
++    for k in range(n):
++        obs,*_ = step(i,0,0); p=rov(obs,i)
++        ex,ey = tx-p[0], ty-p[1]
++        if abs(ex)<1e-6 and abs(ey)<1e-6: return p
++        obs,*_ = step(i, np.clip(ex,-s,s), np.clip(ey,-s,s))
++    return rov(obs,i)
++def approach(i, ux, uy, steps=(0.2,0.05,0.01,0.002)):
++    p=None
++    for s in steps: p=drive_until_stop(i, s*ux, s*uy)
++    return p
+diff --git a/probe_ops_1.py b/probe_ops_1.py
+new file mode 100644
+index 0000000..f228da9
+--- /dev/null
++++ b/probe_ops_1.py
+@@ -0,0 +1,12 @@
++from probe_ops_lib import *
++reset(1)
++# test move semantics: is dx world frame? rover1 theta=0
++print(pos(1)); step(1,0.1,0); print(pos(1)); step(1,dth=0.4); step(1,0.1,0); print(pos(1))
++# sample1 at (-1.49,-1.37); approach to various distances
++sx,sy=get('sample1')[:2]
++for d in [0.4,0.3,0.27,0.25,0.23,0.2,0.15,0.1]:
++    goto(1,sx+d,sy)
++    step(1,op='sample'); p=pos(1)
++    print('d',d,'pos',[round(v,3) for v in p],'dist',round(math.hypot(p[0]-sx,p[1]-sy),3),'s1',[round(v,2) for v in get('sample1')] if 'sample1' in names('sample') else 'GONE')
++    if p[3]==1: break
++print(dump('sample'))
+diff --git a/probe_ops_10.py b/probe_ops_10.py
+new file mode 100644
+index 0000000..0a80d05
+--- /dev/null
++++ b/probe_ops_10.py
+@@ -0,0 +1,15 @@
++from probe_ops_lib import *
++reset(14)
++ox,oy=get('objective0')[:2]; px,py=get('obstacle7')[:2]
++dd=math.hypot(px-ox,py-oy); ux,uy=(px-ox)/dd,(py-oy)/dd; vx,vy=-uy,ux
++goto(0,1.0,0.0)
++for L in [1.8,1.3]:
++  for s in [-0.4,-0.3,-0.2,-0.15,-0.1,-0.05,0,0.05,0.1,0.15,0.2,0.3,0.4]:
++    tx,ty=ox+L*ux+s*vx,oy+L*uy+s*vy
++    ok=goto(0,tx,ty,tol=0.005)
++    step(0,op='calibrate'); c=pos(0)[4]
++    if c: step(0,op='image')
++    x,y=pos(0)[:2]
++    # perpendicular distance of pillar center from rover-objective segment
++    ax,ay=ox-x,oy-y; t=((px-x)*ax+(py-y)*ay)/(ax*ax+ay*ay); perp=math.hypot(x+t*ax-px,y+t*ay-py)
++    print('L',L,'s',s,'reached',ok,'cal',c,'perp_dist_pillar_to_line',round(perp,3),'img',get('objective0')[3])
+diff --git a/probe_ops_11.py b/probe_ops_11.py
+new file mode 100644
+index 0000000..3c263cd
+--- /dev/null
++++ b/probe_ops_11.py
+@@ -0,0 +1,13 @@
++from probe_ops_lib import *
++reset(0)
++for wp in [(-0.5,-1.2),(-0.45,-0.2),(-0.3,0.6)]: print(goto(1,*wp),[round(v,2) for v in pos(1)[:2]])
++x,y=pos(1)[:2]
++for n in names('objective'): o=get(n); print(n,'dist',round(math.hypot(o[0]-x,o[1]-y),2))
++step(1,op='calibrate'); print('cal',pos(1)[4])
++if pos(1)[4]: step(1,op='image'); print(dump('objective'))
++# move closer to wall & up
++for wp in [(-0.3,1.2)]:
++    print(goto(1,*wp)); x,y=pos(1)[:2]
++    for n in names('objective'): o=get(n); print(n,'dist',round(math.hypot(o[0]-x,o[1]-y),2))
++    step(1,op='calibrate'); print('cal',pos(1)[4])
++    if pos(1)[4]: step(1,op='image'); print(dump('objective'))
+diff --git a/probe_ops_12.py b/probe_ops_12.py
+new file mode 100644
+index 0000000..eb01e4b
+--- /dev/null
++++ b/probe_ops_12.py
+@@ -0,0 +1,11 @@
++from probe_ops_lib import *
++reset(14)
++ox,oy=get('objective0')[:2]; px,py=get('obstacle7')[:2]
++dd=math.hypot(px-ox,py-oy); ux,uy=(px-ox)/dd,(py-oy)/dd
++goto(0,1.0,0.0)
++for L in [1.6,1.45,1.4,1.36]:
++    tx,ty=ox+L*ux,oy+L*uy
++    ok=goto(0,tx,ty,tol=0.005); x,y=pos(0)[:2]
++    step(0,op='calibrate'); c=pos(0)[4]
++    if c: step(0,op='image')
++    print('L',L,ok,'pos',round(x,3),round(y,3),'distpillar',round(math.hypot(px-x,py-y),3),'cal',c)
+diff --git a/probe_ops_13.py b/probe_ops_13.py
+new file mode 100644
+index 0000000..5fc182d
+--- /dev/null
++++ b/probe_ops_13.py
+@@ -0,0 +1,15 @@
++from probe_ops_lib import *
++reset(14)
++for wp in [(1.0,0.0),(1.3,1.2),(1.78,1.45)]: print(goto(0,*wp),[round(v,2) for v in pos(0)[:2]])
++step(0,op='sample'); print('store',pos(0)[3],get('sample5'))
++step(0,op='calibrate'); step(0,op='image'); print('img',get('objective0'))
++for wp in [(2.2,1.2),(2.2,0.6)]: print(goto(0,*wp))
++lx,ly=get('lander')[:2]
++turn_to(0,0.56); print('theta',pos(0)[2])
++x,y=pos(0)[:2]; d=math.hypot(lx-x,ly-y); ux,uy=(lx-x)/d,(ly-y)/d
++for k in range(40):
++    step(0,op='send'); x,y=pos(0)[:2]
++    r1=get('objective0')[5]; r2=get('sample5')[6]
++    if r1 or r2: print('send ok at dist',round(math.hypot(lx-x,ly-y),3),'img recv',r1,'ana recv',r2,'store',pos(0)[3],'theta',pos(0)[2]); break
++    step(0,0.05*ux,0.05*uy)
++print(dump('rover'))
+diff --git a/probe_ops_14.py b/probe_ops_14.py
+new file mode 100644
+index 0000000..d4f0cb3
+--- /dev/null
++++ b/probe_ops_14.py
+@@ -0,0 +1,26 @@
++from probe_ops_lib import *
++reset(14)
++for wp in [(1.0,0.0),(1.3,1.2),(1.78,1.45)]: goto(0,*wp)
++step(0,op='sample')
++ox,oy=get('objective0')[:2]
++# calibrate threshold: move away to 2.1, approach in 0.005 steps
++for wp in [(2.2,1.2),(2.2,0.6)]: goto(0,*wp)
++x,y=pos(0)[:2]; d=math.hypot(ox-x,oy-y); ux,uy=(ox-x)/d,(oy-y)/d
++goto(0,ox-2.05*ux,oy-2.05*uy,tol=0.002)
++for k in range(30):
++    step(0,op='calibrate'); x,y=pos(0)[:2]
++    if pos(0)[4]: print('cal at 2D',round(math.hypot(ox-x,oy-y),4)); break
++    step(0,0.005*ux,0.005*uy)
++step(0,op='image')
++lx,ly=get('lander')[:2]
++x,y=pos(0)[:2]; d=math.hypot(lx-x,ly-y); ux,uy=(lx-x)/d,(ly-y)/d
++goto(0,lx-4.12*ux,ly-4.12*uy,tol=0.002)
++for k in range(30):
++    step(0,op='send'); x,y=pos(0)[:2]
++    if get('objective0')[5]: print('send at 2D',round(math.hypot(lx-x,ly-y),4)); break
++    step(0,0.005*ux,0.005*uy)
++step(0,op='drop'); print('after drop',pos(0))
++goto(0,1.0,0.0); goto(0,1.0,-1.75,tol=0.001)
++r,term,trunc=step(0); print('home',pos(0),'r',r,'term',term,'n',S.n, dump('sample'),dump('objective'), S.info)
++for (x,y) in [(1.2,-1.75),(1.0,-1.4)]:
++    goto(0,x,y,tol=0.001); r,term,trunc=step(0); print((x,y),'at_home',pos(0)[5],r,term)
+diff --git a/probe_ops_15.py b/probe_ops_15.py
+new file mode 100644
+index 0000000..6242249
+--- /dev/null
++++ b/probe_ops_15.py
+@@ -0,0 +1,12 @@
++from probe_ops_lib import *
++reset(14)
++for wp in [(-1.0,-1.2),(-1.5,-1.2),(-1.47,-0.65)]: print(goto(1,*wp))
++step(1,op='sample'); print('r1 store',pos(1)[3])
++for wp in [(-1.5,0.0),(-1.5,2.25)]: print(goto(1,*wp,tol=0.002),pos(1)[:2])
++lx,ly=get('lander')[:2]
++for k in range(80):
++    step(1,op='send'); x,y=pos(1)[:2]
++    if get('sample2')[6]: print('send at 2D',round(math.hypot(lx-x,ly-y),4),'pos',x,y); break
++    yy=pos(1)[1]; step(1,0,-0.005)
++    if abs(pos(1)[1]-yy)<1e-6: print('blocked'); break
++print(S.n)
+diff --git a/probe_ops_16.py b/probe_ops_16.py
+new file mode 100644
+index 0000000..d9bb9ce
+--- /dev/null
++++ b/probe_ops_16.py
+@@ -0,0 +1,11 @@
++from probe_ops_lib import *
++reset(14)
++for wp in [(-1.0,-1.2),(-1.5,-1.2),(-1.47,-0.65)]: goto(1,*wp)
++step(1,op='sample'); goto(1,-1.5,-1.2); step(1,op='send'); step(1,op='drop'); goto(1,-1.0,-1.75,tol=0.001)
++r,term,tr=step(1); print('r1 home',pos(1),r,term,S.n)
++for wp in [(1.0,0.0),(1.3,1.2),(1.78,1.45)]: goto(0,*wp)
++step(0,op='sample'); step(0,op='calibrate'); step(0,op='image')
++for wp in [(1.3,1.2),(1.0,0.0),(1.0,-0.5)]: goto(0,*wp)
++r,term,tr=step(0,op='send'); print('sent',r,term,dump('objective'),get('sample5'))
++r,term,tr=step(0,op='drop'); print('drop',r,term)
++goto(0,1.0,-1.75,tol=0.001); r,term,tr=step(0); print('home',r,term,tr,pos(0),pos(1),S.n,S.info)
+diff --git a/probe_ops_17.py b/probe_ops_17.py
+new file mode 100644
+index 0000000..4c61611
+--- /dev/null
++++ b/probe_ops_17.py
+@@ -0,0 +1,17 @@
++from probe_ops_lib import *
++import sys
++def run(do_rock, do_drop):
++    reset(14)
++    for wp in [(-1.0,-1.2),(-1.5,-1.2),(-1.47,-0.65)]: goto(1,*wp)
++    step(1,op='sample'); goto(1,-1.5,-1.2); step(1,op='send')
++    if do_drop: step(1,op='drop')
++    goto(1,-1.0,-1.75,tol=0.001)
++    for wp in [(1.0,0.0),(1.3,1.2),(1.78,1.45)]: goto(0,*wp)
++    if do_rock: step(0,op='sample')
++    step(0,op='calibrate'); step(0,op='image')
++    for wp in [(1.3,1.2),(1.0,0.0),(1.0,-0.5)]: goto(0,*wp)
++    step(0,op='send'); step(0,op='drop')
++    goto(0,1.0,-1.75,tol=0.001); r,term,tr=step(0); print('rock',do_rock,'drop',do_drop,'term',term,'store1',pos(1)[3])
++    if not term and not do_drop:
++        r,term,tr=step(1,op='drop'); print(' after r1 drop term',term)
++run(False,True); run(True,False)
+diff --git a/probe_ops_18.py b/probe_ops_18.py
+new file mode 100644
+index 0000000..7ea76d6
+--- /dev/null
++++ b/probe_ops_18.py
+@@ -0,0 +1,19 @@
++from probe_ops_lib import *
++def run(two_soil, two_rock=True):
++    reset(1)
++    goto(1,-1.27,-1.37); step(1,op='sample'); step(1,op='send'); step(1,op='drop')
++    goto(1,-1.7,-1.2); goto(1,-1.7,0.17)
++    if two_soil:
++        goto(1,-1.92,0.17); step(1,op='sample'); step(1,op='send'); step(1,op='drop')
++    goto(1,-1.92,0.17); step(1,op='calibrate'); step(1,op='image'); step(1,op='send')
++    goto(1,-1.7,-1.2); goto(1,-1.0,-1.2); goto(1,-1.0,-1.75,tol=0.001)
++    goto(0,0.77,-1.35); step(0,op='sample'); step(0,op='send'); step(0,op='drop')
++    if two_rock:
++        goto(0,1.0,-0.5); goto(0,2.0,0.5); goto(0,2.3,1.17); step(0,op='sample')
++    else: goto(0,1.0,-0.5); goto(0,2.0,0.5); goto(0,2.3,1.17)
++    step(0,op='calibrate'); step(0,op='image')
++    goto(0,2.0,0.5); goto(0,1.0,-0.5); step(0,op='send'); step(0,op='drop')
++    goto(0,1.0,-1.75,tol=0.001); r,term,tr=step(0)
++    print('two_soil',two_soil,'two_rock',two_rock,'term',term,'n',S.n)
++    print(' ',dump('objective')); print(' ',dump('sample')); print(' ',dump('rover'))
++run(True); run(False); run(True,False)
+diff --git a/probe_ops_2.py b/probe_ops_2.py
+new file mode 100644
+index 0000000..ab25be3
+--- /dev/null
++++ b/probe_ops_2.py
+@@ -0,0 +1,17 @@
++from probe_ops_lib import *
++reset(1)
++sx,sy=get('sample3')[:2]
++goto(0,sx+0.3,sy); print(pos(0))
++for k in range(20):
++    step(0,-0.005,0,op='sample'); p=pos(0)
++    if p[3]==1: print('sampled at dist',round(math.hypot(p[0]-sx,p[1]-sy),4),'theta',p[2]); break
++# small move test
++x0=pos(0)[0]; step(0,0.01,0); print('small move dx', pos(0)[0]-x0)
++# drop
++step(0,op='drop'); print('after drop',[round(v,2) for v in pos(0)], get('sample3'))
++# sample again same sample with rover0
++step(0,op='sample'); print('resample', pos(0)[3], get('sample3'))
++step(0,op='drop')
++# rover1: go to sample3? wall in middle; try sample1 by rover1 then rover0 can't. Instead try rover1 sampling sample1, drop, then sample again
++sx1,sy1=get('sample1')[:2]
++goto(1,sx1+0.2,sy1); step(1,op='sample'); print('r1 sample1',pos(1)[3],get('sample1'))
+diff --git a/probe_ops_3.py b/probe_ops_3.py
+new file mode 100644
+index 0000000..5e02842
+--- /dev/null
++++ b/probe_ops_3.py
+@@ -0,0 +1,12 @@
++from probe_ops_lib import *
++reset(0)
++for y in [-1.75,-1.0,0.5,1.5,2.4]:
++    goto(0,1.0,y); goto(0,-0.5,y,maxn=30); print('r0 wall test y',y,[round(v,3) for v in pos(0)[:2]])
++reset(0)
++goto(1,-0.27,-1.75); goto(1,0.5,-1.75,maxn=20); print('r1 rightmost',pos(1)[:2])
++# sample4 at -0.27,-2.04
++sx,sy=get('sample4')[:2]
++goto(1,sx-0.2,sy); step(1,op='sample'); print('r1 sampled',pos(1)[3],get('sample4'))
++step(1,op='drop'); goto(1,sx-0.4,sy+0.3)
++goto(0,0.3,-1.75); goto(0,sx+0.22,sy); print('r0 pos',pos(0)[:2],'dist',math.hypot(pos(0)[0]-sx,pos(0)[1]-sy))
++step(0,op='sample'); print('r0 sampled',pos(0)[3],get('sample4'))
+diff --git a/probe_ops_4.py b/probe_ops_4.py
+new file mode 100644
+index 0000000..bc2fc17
+--- /dev/null
++++ b/probe_ops_4.py
+@@ -0,0 +1,19 @@
++from probe_ops_lib import *
++reset(0)
++last=None
++for k in range(60):
++    step(0,-0.02,0); x=pos(0)[0]
++    if last is not None and abs(x-last)<1e-6: break
++    last=x
++print('r0 stops at',pos(0)[:2])
++for k in range(30):
++    step(1,0.02,0); 
++print('r1 at',pos(1)[:2])
++reset(1)
++# approach sample1 from +x in tiny steps on its y
++sx,sy=get('sample1')[:2]
++goto(1,sx+0.4,sy)
++for k in range(40):
++    x=pos(1)[0]; step(1,-0.005,0); 
++    if abs(pos(1)[0]-x)<1e-6: print('blocked at dist',pos(1)[0]-sx); break
++else: print('no block, dist',pos(1)[0]-sx)
+diff --git a/probe_ops_5.py b/probe_ops_5.py
+new file mode 100644
+index 0000000..d53aeca
+--- /dev/null
++++ b/probe_ops_5.py
+@@ -0,0 +1,13 @@
++from probe_ops_lib import *
++for y in [-1.75,-1.2]:
++    reset(0)
++    if y!=-1.75:
++        for k in range(3): step(1,0,0.2)
++    for k in range(80):
++        x=pos(1)[0]; step(1,0.02,0)
++        if abs(pos(1)[0]-x)<1e-6: break
++    print('r1 stops',pos(1)[:2])
++    for k in range(80):
++        x=pos(0)[0]; step(0,-0.02,0)
++        if abs(pos(0)[0]-x)<1e-6: break
++    print('r0 stops',pos(0)[:2])
+diff --git a/probe_ops_6.py b/probe_ops_6.py
+new file mode 100644
+index 0000000..ebef129
+--- /dev/null
++++ b/probe_ops_6.py
+@@ -0,0 +1,18 @@
++from probe_ops_lib import *
++reset(1)
++def push(i,dx,dy,n=200):
++    for k in range(n):
++        x,y=pos(i)[:2]; step(i,dx,dy)
++        if math.hypot(pos(i)[0]-x,pos(i)[1]-y)<1e-6: break
++    return [round(v,3) for v in pos(i)[:2]]
++print('down',push(1,0,-0.05)); print('left',push(1,-0.05,0))
++print('right', push(1,0.05,0))
++for yy in [-1.0,-0.5,0,0.5,1.0,1.5,2.0,2.5]:
++    p=pos(1); 
++    push(1,-0.05,0,n=4)
++    for k in range(60):
++        y=pos(1)[1]
++        if y>=yy: break
++        step(1,0,min(0.1,yy-y)); 
++    print('y',round(pos(1)[1],2),'right',push(1,0.05,0))
++print('up',push(1,0,0.05))
+diff --git a/probe_ops_7.py b/probe_ops_7.py
+new file mode 100644
+index 0000000..9eb4421
+--- /dev/null
++++ b/probe_ops_7.py
+@@ -0,0 +1,15 @@
++from probe_ops_lib import *
++reset(1)
++for wp in [(-1.0,-1.2),(-1.7,-1.2),(-1.7,0.9)]:
++    print(goto(1,*wp), [round(v,2) for v in pos(1)])
++ox,oy=get('objective1')[:2]
++x,y=pos(1)[:2]; bearing=math.atan2(oy-y,ox-x); print('bearing',bearing,'dist',math.hypot(ox-x,oy-y))
++th0=pos(1)[2]
++for k in range(17):
++    step(1,op='calibrate'); c=pos(1)[4]
++    msg=''
++    if c==1:
++        step(1,op='image'); msg='img->'+str(get('objective1')[3:6])+' cal '+str(pos(1)[4])
++    rel=(pos(1)[2]-bearing+math.pi)%(2*math.pi)-math.pi
++    print('theta',round(pos(1)[2],2),'rel',round(rel,2),'cal',c,msg)
++    step(1,dth=0.4)
+diff --git a/probe_ops_8.py b/probe_ops_8.py
+new file mode 100644
+index 0000000..9f3d716
+--- /dev/null
++++ b/probe_ops_8.py
+@@ -0,0 +1,18 @@
++from probe_ops_lib import *
++reset(1)
++for wp in [(-1.0,-1.2),(-1.7,-1.2)]: goto(1,*wp)
++ox,oy=get('objective1')[:2]
++def d(): x,y=pos(1)[:2]; return math.hypot(ox-x,oy-y)
++step(1,op='image'); print('image w/o cal ->',get('objective1')[3:6])
++# scan calibrate far->near
++while pos(1)[1]<1.0:
++    step(1,op='calibrate')
++    if pos(1)[4]==1: print('calibrated at dist',round(d(),3),pos(1)[:2]); break
++    step(1,0,0.05)
++# move back far keeping cal
++goto(1,-1.7,-1.2); print('cal after moving',pos(1)[4])
++while pos(1)[1]<1.0:
++    step(1,op='image')
++    if get('objective1')[4]==1: print('image at dist',round(d(),3),'cal now',pos(1)[4]); break
++    if pos(1)[4]==0: print('cal lost at',d()); break
++    step(1,0,0.05)
+diff --git a/probe_ops_9.py b/probe_ops_9.py
+new file mode 100644
+index 0000000..151cbc6
+--- /dev/null
++++ b/probe_ops_9.py
+@@ -0,0 +1,13 @@
++from probe_ops_lib import *
++for seed in range(30):
++    reset(seed)
++    pil=[get(n) for n in names('obstacle') if get(n)[3]<0.1]
++    for on in names('objective'):
++        ox,oy=get(on)[:2]
++        for p in pil:
++            dd=math.hypot(p[0]-ox,p[1]-oy)
++            if 0.5<dd<1.3 and p[0]*ox>0:
++                ux,uy=(p[0]-ox)/dd,(p[1]-oy)/dd
++                tx,ty=ox+1.8*ux,oy+1.8*uy
++                if abs(tx)>0.4 and tx*ox>0 and abs(ty)<2.2 and abs(tx)<2.2:
++                    print(seed,on,(round(ox,2),round(oy,2)),'pillar',(round(p[0],2),round(p[1],2)),'d',round(dd,2),'target',(round(tx,2),round(ty,2)))
+diff --git a/probe_ops_layout.py b/probe_ops_layout.py
+new file mode 100644
+index 0000000..1f10e8a
+--- /dev/null
++++ b/probe_ops_layout.py
+@@ -0,0 +1,9 @@
++from env_client import make_env
++env=make_env()
++T={t.name:t for t in env.observation_space.types}
++F={'rover':['x','y','theta','store_full','calibrated','at_home'],'lander':['x','y','z'],'objective':['x','y','z','have_image_rover0','have_image_rover1','received_image'],'sample':['x','y','z','is_soil','analyzed_rover0','analyzed_rover1','received_analysis'],'obstacle':['x','y','z','half_x','half_y','half_z']}
++import sys
++for seed in map(int,sys.argv[1:]):
++    obs,info=env.reset(seed=seed); print('seed',seed,info)
++    for t in F:
++        for o in obs.get_objects(T[t]): print(' ',o.name,[round(float(obs.get(o,f)),2) for f in F[t]])
+diff --git a/probe_ops_lib.py b/probe_ops_lib.py
+new file mode 100644
+index 0000000..291c92b
+--- /dev/null
++++ b/probe_ops_lib.py
+@@ -0,0 +1,50 @@
++from env_client import make_env
++import numpy as np, math
++env=make_env()
++T={t.name:t for t in env.observation_space.types}
++F={'rover':['x','y','theta','store_full','calibrated','at_home'],'lander':['x','y','z'],'objective':['x','y','z','have_image_rover0','have_image_rover1','received_image'],'sample':['x','y','z','is_soil','analyzed_rover0','analyzed_rover1','received_analysis'],'obstacle':['x','y','z','half_x','half_y','half_z']}
++SEL={'sample':-5/6,'calibrate':-0.5,'image':-1/6,'noop':1/6,'send':0.5,'drop':5/6}
++class S:
++    obs=None; term=False; info=None; n=0
++def reset(seed):
++    S.obs,S.info=env.reset(seed=seed); S.n=0; return S.obs
++def get(name):
++    o=S.obs.get_object_from_name(name)
++    return [float(S.obs.get(o,f)) for f in F[o.type.name]]
++def names(t): return [o.name for o in S.obs.get_objects(T[t])]
++def dump(t):
++    return {n:[round(v,2) for v in get(n)] for n in names(t)}
++def step(i=0,dx=0,dy=0,dth=0,op='noop',op2='noop'):
++    a=np.zeros(8,dtype=np.float32)
++    a[3]=SEL['noop']; a[7]=SEL['noop']
++    a[4*i:4*i+3]=[dx,dy,dth]; a[4*i+3]=SEL[op]
++    a[4*(1-i)+3]=SEL[op2]
++    S.obs,r,term,trunc,S.info=env.step(a); S.n+=1; S.term=term
++    return r,term,trunc
++def pos(i): return get(f'rover{i}')
++def goto(i,tx,ty,tol=0.02,maxn=200):
++    import random
++    stuck=0
++    for k in range(maxn):
++        x,y=pos(i)[:2]; d=math.hypot(tx-x,ty-y)
++        if d<tol: return True
++        s=min(0.2,d); dx=(tx-x)/d*s; dy=(ty-y)/d*s
++        step(i,dx,dy)
++        x2,y2=pos(i)[:2]
++        if math.hypot(x2-x,y2-y)<1e-4:
++            # detour
++            moved=False
++            for ang in [math.pi/2,-math.pi/2,math.pi/4,-math.pi/4,3*math.pi/4,-3*math.pi/4]:
++                c,sn=math.cos(ang),math.sin(ang)
++                ddx=(dx*c-dy*sn); ddy=(dx*sn+dy*c)
++                n=0.2/max(1e-9,math.hypot(ddx,ddy))
++                for _ in range(2): step(i,ddx*n,ddy*n)
++                x3,y3=pos(i)[:2]
++                if math.hypot(x3-x,y3-y)>1e-3: moved=True; break
++            if not moved: return False
++    return False
++def turn_to(i,th):
++    for _ in range(40):
++        t=pos(i)[2]; e=(th-t+math.pi)%(2*math.pi)-math.pi
++        if abs(e)<1e-3: return
++        step(i,dth=max(-0.4,min(0.4,e)))
+diff --git a/probe_order.py b/probe_order.py
+new file mode 100644
+index 0000000..7f459d2
+--- /dev/null
++++ b/probe_order.py
+@@ -0,0 +1,19 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=0)
++T = {t.name:t for t in env.observation_space.types}
++def g(name,f): return float(obs.get(obs.get_object_from_name(name),f))
++# rover1 at (-1,-1.75). sample3 soil at (-1.387,0.152). move rover1 up along x=-1 ... find path: go to x=-1.387+? check pillars
++print([ (o.name, round(g(o.name,'x'),2), round(g(o.name,'y'),2)) for o in obs.get_objects(T['obstacle'])])
++def step(a):
++    global obs
++    obs,r,te,tr,info = env.step(np.array(a,dtype=np.float32)); return te
++# move rover1 to (-1.0, 0.152-0.45) area: path along x=-1 upward: pillars at (-0.808,0.192),(-1.354,0.554),(-1.808,-1.549)
++for i in range(10): step([0,0,0,1/6, 0,0.2,0,1/6])
++print('r1', g('rover1','x'), g('rover1','y'))
++# now at y=0.25? compute
++step([0,0,0,1/6, -0.2,0.15,0,-5/6])
++print('r1', g('rover1','x'), g('rover1','y'), 'store', g('rover1','store_full'))
++# move away while sampling? test pre: drop then move away with sample
++step([0,0,0,1/6, 0,0,0,5/6])
+diff --git a/test_approach.py b/test_approach.py
+new file mode 100644
+index 0000000..3d83868
+--- /dev/null
++++ b/test_approach.py
+@@ -0,0 +1,22 @@
++import sys, time
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++seeds = [int(s) for s in sys.argv[1].split(',')] if len(sys.argv) > 1 else list(range(10))
++env = make_env()
++res = []
++for seed in seeds:
++    obs, info = env.reset(seed=seed)
++    ap = GeneratedApproach(env.action_space, env.observation_space, {})
++    t0 = time.time()
++    ap.reset(obs, info)
++    tp = time.time() - t0
++    steps = 0; term = False
++    while steps < 400:
++        obs, r, term, trunc, info = env.step(ap.get_action(obs))
++        steps += 1
++        if term or trunc: break
++    nobj = len(ap.sc.objectives)
++    print(f"seed {seed} nobj {nobj} steps {steps} term {term} plan {tp:.2f}s assign {ap.assign} pathlens {[len(p['path'])-1 for p in ap.plans]}", flush=True)
++    res.append(steps if term else 9999)
++print("mean", np.mean(res), "fails", sum(r == 9999 for r in res))

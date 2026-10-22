@@ -1,0 +1,602 @@
+{
+  "schema_version": 1,
+  "sample_id": "claude_opus55_rovers_generalized_replicate_222",
+  "source_run": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222",
+  "backend": "claude",
+  "model": "claude-opus-5-5",
+  "replicate_seed": 222,
+  "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1",
+  "git_head": "72f2c981349ab6bae0defb03a8c640e44cde60eb",
+  "generated_date": "2026-10-11",
+  "review_status": "targeted controller review and selected trace checks; full trace annotation pending",
+  "copied": [
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/stream.jsonl",
+      "copy": "evidence/stream.jsonl",
+      "sha256": "c6c9dc3118f263effb87427fa130e6a104a9afa06d41e2bff81fd004bc9f5f33"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/.hydra/config.yaml",
+      "copy": "evidence/config.yaml",
+      "sha256": "6d9ebc1f07190c19f2967b040b2a215ff3e8008aaec932d187ba944f9f1cfb0e"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/approach.py",
+      "copy": "evidence/final/approach.py",
+      "sha256": "f5d2e1e0eb7aac3cd3f363fc39e305b22c6a33183680a51c3a2bb4cb189c594f"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/env_description.md",
+      "copy": "evidence/task.md",
+      "sha256": "0c861719eb0c3ab9cdcf77370ab4a7d5ac4b65d4ad6d2424a5ecf450f8540c1b"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/results.json",
+      "copy": "evidence/results.json",
+      "sha256": "6d5472de86a4cd86d51f331b78b5898c1577ffef7ca3a322d21d4b6df53f2f8c"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/.hydra/overrides.yaml",
+      "copy": "evidence/overrides.yaml",
+      "sha256": "1c3a8a1a77e3d5a8187f4524f1903a94e4ee42743cf62803cb1edf4587b95ed8"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/agent_log.txt",
+      "copy": "evidence/agent_log.txt",
+      "sha256": "f7f36082400aa50f71e8c664404cec082427554846bcaa5c229a9bddb9c47293"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/CLAUDE.md",
+      "copy": "evidence/historical_claude_instructions.txt",
+      "sha256": "615db565753c92ca3afd83357a58cb90df4796d29ad1c8a631b1f2f37f6ff4e3"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_10.py",
+      "copy": "evidence/final/probe_samp_10.py",
+      "sha256": "2809981596931bd73e50a8e46553f59221bd1b15cc7d3de73e9fe04c09c0ff2c"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_10.py",
+      "copy": "evidence/final/probe_vis_10.py",
+      "sha256": "dc28b2af75deac16ae347bbc38236ec507ac7da8707c2346db6257f4367940e3"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/approach_rot.py",
+      "copy": "evidence/final/approach_rot.py",
+      "sha256": "30ab4ec4fd937ab99e3a26a9da18ca91a785fee7592bc3591cec225dadd40bea"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/dbg3.py",
+      "copy": "evidence/final/dbg3.py",
+      "sha256": "2320620681ddd5b8827a7b8155670b220809a3a736a67476342ae9efca9f39d1"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_14.py",
+      "copy": "evidence/final/probe_samp_14.py",
+      "sha256": "166d8ccd4698948c3b7dff48fcbab96c6c499b76212968b190848573af2041be"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/collect_vis.py",
+      "copy": "evidence/final/collect_vis.py",
+      "sha256": "03cee0159e7ac91205e67c45f186dc392f8129268443f2083bee5ac9dc70f743"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_20.py",
+      "copy": "evidence/final/probe_vis_20.py",
+      "sha256": "0e8fd041d55911bcf600c0ba500af2ecfc92cc37bb76642924ea34641712d146"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_9.py",
+      "copy": "evidence/final/probe_vis_9.py",
+      "sha256": "32b5921dd5a535b1384aa206dcddcf61eb54469ae54b8909272b6f3ad2bee51d"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_14.py",
+      "copy": "evidence/final/probe_vis_14.py",
+      "sha256": "b2b5f6c5c67649a6158dc415df623d8ef5c8f00b83c775e0bda8c216a7e30f6d"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/plancmp.py",
+      "copy": "evidence/final/plancmp.py",
+      "sha256": "9e3cd8d7d80e45873faf5b1e3cb8ad68d557b92758ba6d5e0d8c331c78653a47"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/dbg2.py",
+      "copy": "evidence/final/dbg2.py",
+      "sha256": "ce59840913d5e79a377b2dcdf4cef68c63436c14418e860432cd06653ed12684"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_15.py",
+      "copy": "evidence/final/probe_samp_15.py",
+      "sha256": "7ec1e6b8774face4fab7cb7bd5607771cd516266d71c1fd3204947618280a04e"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/fit3d2.py",
+      "copy": "evidence/final/fit3d2.py",
+      "sha256": "11147c5ce59001c43f3d994716b1e7ca770fe02dad84d0ac35bb9569458fc41f"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/env_client.py",
+      "copy": "evidence/final/env_client.py",
+      "sha256": "6e03959d0b67cd897b10c1e32391684481bf45e9a70be27dcd2c391efd32799f"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_21.py",
+      "copy": "evidence/final/probe_vis_21.py",
+      "sha256": "3d6c90035adc8778c140af0468ed63a440fa1ead12b1f6da8455ffcc7cb60bce"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_8.py",
+      "copy": "evidence/final/probe_vis_8.py",
+      "sha256": "fa324f0b4f2cc5680bff88c8059f3c8b1b8a0810130abd42fb3fc280a0554e12"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_15.py",
+      "copy": "evidence/final/probe_vis_15.py",
+      "sha256": "b6da81cd533b3ea56c8d8d0d4371c3f616de377aa3ed3d08580580e9f75ca757"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_pillar2.py",
+      "copy": "evidence/final/probe_pillar2.py",
+      "sha256": "846b5496338fa5c1a64c567632d4e5f670f7de3377e01ffd41a1836f276c3bf2"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/test_approach.py",
+      "copy": "evidence/final/test_approach.py",
+      "sha256": "de036f0050b2c4fc23bbc3ef354773960749b6ed71e347dd62e6629d3d063622"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_11.py",
+      "copy": "evidence/final/probe_samp_11.py",
+      "sha256": "ebc4caa42650c5782c2b23763b7ac7e29b12abf453cc73f613877297197c7e48"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_send549.py",
+      "copy": "evidence/final/probe_send549.py",
+      "sha256": "bd1c34073ec8b84cff028c9ec49a12b7edbbe6cd45965b62d27030b73c8213e9"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_11.py",
+      "copy": "evidence/final/probe_vis_11.py",
+      "sha256": "a9c4bcf7077797b428f867725d8ce371b78628700797f74282d7cd63204b703b"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_coll_5.py",
+      "copy": "evidence/final/probe_coll_5.py",
+      "sha256": "744466c35473683df3f0cd109fc48a3e08be33d33e320f170ce8519a0bca0e7a"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_util.py",
+      "copy": "evidence/final/probe_vis_util.py",
+      "sha256": "cb20769fb2ae79b3ef6e908edba7b19f92f101da2a0b974f42bb613305994757"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_0.py",
+      "copy": "evidence/final/probe_samp_0.py",
+      "sha256": "221f51bc1dca3a078004d7f7586e0495efb0a8f4102549ff71c59ef7e414a1cd"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_coll_12.py",
+      "copy": "evidence/final/probe_coll_12.py",
+      "sha256": "b903d6b7b64ae82ba3a638f4a57f09b3f95857532cd18cb60ec1789849c324a3"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/approach_safe.py",
+      "copy": "evidence/final/approach_safe.py",
+      "sha256": "6a65b3768f1d489b56493b3199eae11f2ed26c9be4d829b54de88d0ad9fbc2b6"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_7.py",
+      "copy": "evidence/final/probe_vis_7.py",
+      "sha256": "9197c54057eadb4969bf273be35b5dfdd69efed132fd45ebce57f67bd837ece4"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/dbg.py",
+      "copy": "evidence/final/dbg.py",
+      "sha256": "c95ec1850b83c57422e4bc77dc68792c34bade50e4346d4dd619281f20214a22"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_coll_1.py",
+      "copy": "evidence/final/probe_coll_1.py",
+      "sha256": "7900a6c94b0f553041a318d4643e002e8da9ef1786ad5e996d32212a84d2ded9"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/mkp.py",
+      "copy": "evidence/final/mkp.py",
+      "sha256": "c969d49cc03c291f4a4323372c272130e97508a58ac1cd398c8a056239569488"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_4.py",
+      "copy": "evidence/final/probe_samp_4.py",
+      "sha256": "15a27f5ac11a85dc1629afb51fb7b4069814dc3f5d16ec512247a89eeac95f6e"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/batch.py",
+      "copy": "evidence/final/batch.py",
+      "sha256": "a04002aad74396e428937f2f1ca61ff3917be9aaa90bc2cb1d90f7e3ad20b31f"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_3.py",
+      "copy": "evidence/final/probe_vis_3.py",
+      "sha256": "2eef5da779a60a165ab94b939d25be47a08f01c9eac7ef9a529bbc53a2509970"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/fit3d.py",
+      "copy": "evidence/final/fit3d.py",
+      "sha256": "03ddd422e73aaab305da8bb0460b74aab10f8ad88d537af9f91e6e71ddc35a42"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/dbg4c.py",
+      "copy": "evidence/final/dbg4c.py",
+      "sha256": "b4a80a882695e33b1f76ff766aee2b274aa399fc42fb6f80ea43bec1ced51d0e"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_fit.py",
+      "copy": "evidence/final/probe_vis_fit.py",
+      "sha256": "2c3a419b2d1bbec9565accdf4f09543ba2370ef39ddb19eec926efb58b75e501"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_5.py",
+      "copy": "evidence/final/probe_samp_5.py",
+      "sha256": "ed8c1a945550fe9ca52b2645301dbc9dc6c6daca0adab89642ac3be7622d23b4"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/lander_pos.py",
+      "copy": "evidence/final/lander_pos.py",
+      "sha256": "9e14dc42e17037708f9ec3d7b3dfe07dafe2e0f21e1bb1dc6e18cbd380f75e3d"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_2.py",
+      "copy": "evidence/final/probe_vis_2.py",
+      "sha256": "818f44eebfa2dabea225f42b77426f6ced29ee7ba58b0ddf711c0f437ca7eef1"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_coll_4.py",
+      "copy": "evidence/final/probe_coll_4.py",
+      "sha256": "4af44d2dffd0a3d0be0d9cdb592f40b6be23787e5349ad8ce1905916c19918da"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/mk.py",
+      "copy": "evidence/final/mk.py",
+      "sha256": "9b0c803d5477eed91b436cac5b794662cbfc31ebbd4813308dc3e7a9386c83cd"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_1.py",
+      "copy": "evidence/final/probe_samp_1.py",
+      "sha256": "ba80cc9b288bb0334c882d13e9616e385fefc0892adec512dbc75bc38c75a8e2"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_coll_13.py",
+      "copy": "evidence/final/probe_coll_13.py",
+      "sha256": "f695c5b7f779023321387ca0d9f7b3d956a227f1b963faeb3dba041903341329"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_6.py",
+      "copy": "evidence/final/probe_vis_6.py",
+      "sha256": "7e0c27eaedcea6990e0ebc52ee93927e44c6b70fcd2b2b0273ee53c3286feaf1"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_fit2.py",
+      "copy": "evidence/final/probe_vis_fit2.py",
+      "sha256": "73dad459fdcdfe6d122d60910362f0fe5594bf89e0001ff0195c3a737979ccd6"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_coll_3.py",
+      "copy": "evidence/final/probe_coll_3.py",
+      "sha256": "422fe52945b5ee8cfddb5c8e9d54575e5143c321b68aa948fe606fe009456225"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_6.py",
+      "copy": "evidence/final/probe_samp_6.py",
+      "sha256": "6d79332edcaa4441f1a83ba15f1204a7f9a9313387dda9eab916025453749fdf"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_1.py",
+      "copy": "evidence/final/probe_vis_1.py",
+      "sha256": "c133a1664ccf44783ff6e1372964ae72d5f40f66767473c0b505ca0f55561b33"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_coll_util.py",
+      "copy": "evidence/final/probe_coll_util.py",
+      "sha256": "7d59196706c73777c72ad306635c580fbe242be7b8fa5fab0622e339a54037b3"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_coll_7.py",
+      "copy": "evidence/final/probe_coll_7.py",
+      "sha256": "a82e0d1044178f9a9a2a7293778b03c9d594f2e8b0f815b86b7e7fbba22524b0"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_2.py",
+      "copy": "evidence/final/probe_samp_2.py",
+      "sha256": "15bd49b72ab3b7a9a5a8979f51b405afe56d2db1a486730151ba74bd8c026e44"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_coll_10.py",
+      "copy": "evidence/final/probe_coll_10.py",
+      "sha256": "bbc8fe8c9f4f411ea80c9421b5392b9b79b1f6522b7a3857c2425ca373c66377"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_18.py",
+      "copy": "evidence/final/probe_vis_18.py",
+      "sha256": "920dbf5aceb8ec87675dfd5a05ce9c0b3dee5c8c80456fb4695686a2bacef304"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/plancmp2.py",
+      "copy": "evidence/final/plancmp2.py",
+      "sha256": "7023498cc0cbaa2794081b7d00451e8c560f6af92597c39c6bec7f494e32fa75"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/count_test.py",
+      "copy": "evidence/final/count_test.py",
+      "sha256": "402fcbb5c5707cbfebd16da27879275f141355aa244be9c74e18b34212f805cd"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_5.py",
+      "copy": "evidence/final/probe_vis_5.py",
+      "sha256": "b45a1363a456b1fec5d0980a107b45355b042db1c062e58f62da9efc384bb600"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/batch_list.py",
+      "copy": "evidence/final/batch_list.py",
+      "sha256": "5bc77ce7d1962a59031c7fb990df5c870cb1f38b602a56e2bee18abc3032e241"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_coll_6.py",
+      "copy": "evidence/final/probe_coll_6.py",
+      "sha256": "2c33f2f7c828dae8110754e82752c272d4e3f001062d233e37cbebf0484c4af7"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_3.py",
+      "copy": "evidence/final/probe_samp_3.py",
+      "sha256": "fc73b4e6e8b6369d4da6f2757b56338f68aae3109214c42f1bbd6606feb1a3f5"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_coll_11.py",
+      "copy": "evidence/final/probe_coll_11.py",
+      "sha256": "f4701c117b8fd26dedb2243296ac13cd6f507359271188267e6c6dd5695630aa"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_19.py",
+      "copy": "evidence/final/probe_vis_19.py",
+      "sha256": "f4f43bf90826097d1e71d3800e1ae835db629b8217f5ae46bfe577085e2db8d6"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/plancmp3.py",
+      "copy": "evidence/final/plancmp3.py",
+      "sha256": "e244a87839658e86691b6cd7b2b6fc7d2af10f6ceef8e533b7c6938bbde433de"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe.py",
+      "copy": "evidence/final/probe.py",
+      "sha256": "6df41f45763a8a7d6d5e23cfd8e72dcef4081feda42b36e1a1bcef8ed361cc46"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/sw.py",
+      "copy": "evidence/final/sw.py",
+      "sha256": "c2f43878d057beff4e660db6cfdf3150dc9921cc150b8815940ea0532e74f7d4"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/obs_list.py",
+      "copy": "evidence/final/obs_list.py",
+      "sha256": "8697951c4eea903de62dceef45ff8a346c9c3f08affcdd2fc588b418189c9b00"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_util.py",
+      "copy": "evidence/final/probe_samp_util.py",
+      "sha256": "b365a699e1aa806c8a17aeb33de2d4c55af038d894d303cb74242fe209a9404b"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_4.py",
+      "copy": "evidence/final/probe_vis_4.py",
+      "sha256": "220752f833daba7db590c38f7ba24d17889a74a2eb8daff70a306626f723098a"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_coll_2.py",
+      "copy": "evidence/final/probe_coll_2.py",
+      "sha256": "f550fc42264e2ddccabaf1e26a05abc220ba4474e713e672a3a42d08fd136bd0"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_send549b.py",
+      "copy": "evidence/final/probe_send549b.py",
+      "sha256": "84555a96c9b2387ed989eabbbc53ad18ee7ed7f81bed0fea39130344c580171f"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_7.py",
+      "copy": "evidence/final/probe_samp_7.py",
+      "sha256": "9ac08da5cd82717a25dd12ba8285749f9a4e1d1919b7b9a94f801c2b1156897c"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/fit_rules.py",
+      "copy": "evidence/final/fit_rules.py",
+      "sha256": "589bd9a5ac0fdca92e9a5b15d675f85b7231400e82732d1c984d6f4bc78f1901"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_pillar.py",
+      "copy": "evidence/final/probe_pillar.py",
+      "sha256": "7ab7298a5ac9a56335cb222d790827c6086a75a9831e3d74f5ca136bfd6ef35c"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_scan.py",
+      "copy": "evidence/final/probe_vis_scan.py",
+      "sha256": "e13f57382902de07c6897e63b2bb8f436e636d14ac8bd116bc539465539a44cc"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/fit_vis.py",
+      "copy": "evidence/final/fit_vis.py",
+      "sha256": "2bd05d5b1b37c9b24088fe4c7d304fd3ba5d954de17275a60ce5d87131b1cd7a"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/find_iso.py",
+      "copy": "evidence/final/find_iso.py",
+      "sha256": "b5736a2ab81d5a38ec94d488224558fa79d9064532f9c407493c95b4c8869c44"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_coll_9.py",
+      "copy": "evidence/final/probe_coll_9.py",
+      "sha256": "57a856676f51b1ddd8626649f3ab9149192f3866378b86b205b80cecaba37cf1"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_16.py",
+      "copy": "evidence/final/probe_samp_16.py",
+      "sha256": "df8e111be844cbb10e8a9ec184af923d21c228ef7e5976d6f4761c82bec339ee"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/near_lander.py",
+      "copy": "evidence/final/near_lander.py",
+      "sha256": "ad344827eb56503513882e581c3c6694d17952fe10b4d83004a8c3efb5e6b0f2"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_22.py",
+      "copy": "evidence/final/probe_vis_22.py",
+      "sha256": "86a4233fb63f6e88169db35225e2585ed33e410a72e5066acb9c86885623865b"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/approach_norot.py",
+      "copy": "evidence/final/approach_norot.py",
+      "sha256": "25d830aa4a9f9519e9ed7f219767f4064d3bc36b0ca5c5018df93bc47805a3bf"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_16.py",
+      "copy": "evidence/final/probe_vis_16.py",
+      "sha256": "c1c871f8ee86074b8b337996032c727d34be8a137c0fceff4114ef6ff7891508"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_8.py",
+      "copy": "evidence/final/probe_samp_8.py",
+      "sha256": "3121144c044c73e922069074a74c9092ad5339e503052b78aa059c3bc019ba57"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_12.py",
+      "copy": "evidence/final/probe_samp_12.py",
+      "sha256": "6fa704e8188c6a90e73f900c02eeafdaac4e0f744d4c6692e49fcfbfe916fe85"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/dbg5.py",
+      "copy": "evidence/final/dbg5.py",
+      "sha256": "214a7f455657a0c6e8c6d4b1606f931e367227d3b08c4ad39f363b03b945aec1"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/dbg_dp.py",
+      "copy": "evidence/final/dbg_dp.py",
+      "sha256": "2b4931ab2cd12cd8b9305c980fbc79f334bb8120e5f2b9fdf7eb74fd128e2d66"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_12.py",
+      "copy": "evidence/final/probe_vis_12.py",
+      "sha256": "62ca5bc454c2ce6e6dd272e2cb5c1dc5e194573b1ec304396b1f7c068c7101e2"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/ana.py",
+      "copy": "evidence/final/ana.py",
+      "sha256": "cda6b955c419e782c2bb8bb873d301dd21a72aa2eeebe805a5a7b5b17e595cf9"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_9.py",
+      "copy": "evidence/final/probe_samp_9.py",
+      "sha256": "6a9e3162090b0d5c91b0e4c9fb760e5cdb84faa4cdc14db964cf5ae44ccdf61a"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_13.py",
+      "copy": "evidence/final/probe_samp_13.py",
+      "sha256": "448cb6aa2414b0cc56c8a35c44793d5d8a3406eda017c87ce6089df224013a63"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/dbg4.py",
+      "copy": "evidence/final/dbg4.py",
+      "sha256": "2f123e593b64bf931f867f0759efacd9e7c53add047b47cc018fd6dee253ca42"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_13.py",
+      "copy": "evidence/final/probe_vis_13.py",
+      "sha256": "2f6f9f095f03cfd9cb83829b64ad033a31660985bc8b3d445f4d1dd83d6414a8"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_coll_8.py",
+      "copy": "evidence/final/probe_coll_8.py",
+      "sha256": "c110321bfbc60554b30aa13a5fa9f4937141d69bfa6e8cd0ccebd6d9b3a0f5e3"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_samp_17.py",
+      "copy": "evidence/final/probe_samp_17.py",
+      "sha256": "7982228962a090700129a1916f526a030af0d3727f609549292df860659897ac"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_order.py",
+      "copy": "evidence/final/probe_order.py",
+      "sha256": "34e983ef0757afa39747b8dbe015a3769c3e7aefa123c00862a7efd9bb00f3eb"
+    },
+    {
+      "source": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222/sandbox/probe_vis_17.py",
+      "copy": "evidence/final/probe_vis_17.py",
+      "sha256": "f9177b5fc30a9f5b3cdeb77581168d322885ec38bb44dd62a30a6f948f039d98"
+    }
+  ],
+  "configured_effort": "high",
+  "matched_gpt_sample_id": null,
+  "matching_settings": {
+    "primitive_level": true,
+    "max_steps": true,
+    "num_eval_tasks": true,
+    "eval_timeout": true,
+    "eval_seed": true,
+    "environment": true,
+    "approach.blackbox": true,
+    "approach.blackbox_strict": true,
+    "approach.max_budget_usd": true,
+    "approach.load_dir": true,
+    "approach.geometry_prompt": true,
+    "approach.modular_code_prompt": true,
+    "approach.token_budget_prompt": true,
+    "approach.backend": true,
+    "approach.max_turns": true,
+    "primitives": true,
+    "mcp_tools": true
+  },
+  "settings_reference_sample_id": "claude_opus55_rovers_generalized_replicate_424",
+  "pairing_note": "Within-Claude expansion: full saved configuration matches the existing Claude reference except replicate_seed and experiment_id. Evaluation seed is unchanged. Cross-model same-seed coverage is incomplete.",
+  "controller_review": {
+    "date": "2026-10-11",
+    "files": [
+      "approach.py"
+    ],
+    "scope": "Targeted review of planner/execution functions, active flags, and cited development diffs/messages. Not a complete controller/helper audit or exhaustive trace labeling. No archived code executed; no formal ACT*ONOMY annotation."
+  },
+  "source_stream_types": {
+    "system": 443,
+    "assistant": 535,
+    "user": 255,
+    "tool_progress": 233,
+    "result": 1
+  },
+  "raw_lines": 1467,
+  "completed_items": 302,
+  "timeline_entries": 590,
+  "saved_head_commits": 23,
+  "saved_all_ref_commits": 23,
+  "policy_changing_commits": 21,
+  "history_bundle_sha256": "88d6b368c455202411638a2303456603fe3a781aeaf475b0adea1706edc368ab",
+  "generated_documents": {
+    "01_timeline.md": "5d1872bcb1b2a35b4f26e5fce701793bda80e460c198d051bff0ab785906aa8c",
+    "02_code_changes.md": "1d7a5a225ac22db5a0b339b31f104c06f67e4f55b0321f4990527c6e6d623e33"
+  },
+  "scope": "Saved stream and Git history extracted; no archived code executed. Claude inline helper records retain actor identity; Codex separate helper session trees are not fully merged. Background launches are not treated as finished jobs. Full original session records remain at source. Findings are separate manual work.",
+  "claude_coverage": {
+    "raw_lines": 1467,
+    "thinking": {
+      "records": 234,
+      "empty_readable_text": 234
+    },
+    "source_types": {
+      "system": 443,
+      "assistant": 535,
+      "user": 255,
+      "tool_progress": 233,
+      "result": 1
+    },
+    "tool_requests": 254,
+    "tool_results": 254,
+    "helper_events": 124,
+    "main_events": 466,
+    "scope": "Every source content block or metadata record accounted for. Empty thinking and routine progress are raw-only. Helper events retain parent identity; background tool return does not establish job completion."
+  }
+}

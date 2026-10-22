@@ -1,0 +1,120 @@
+diff --git a/approach.py b/approach.py
+index eca7767..d12cec7 100644
+--- a/approach.py
++++ b/approach.py
+@@ -6,7 +6,7 @@ AMAX = 0.0499
+ LO, HI = 0.1 + 1e-3, 4.9 - 1e-3
+ POS_TOL, ANG_TOL = 0.03, np.deg2rad(8.0)
+ K_ANG = 0.8
+-LOOKAHEAD = 8
++LOOKAHEAD = 16
+ LOCAL_FAMILY = True
+ 
+ 
+diff --git a/la16_0_25.txt b/la16_0_25.txt
+new file mode 100644
+index 0000000..d4372b7
+--- /dev/null
++++ b/la16_0_25.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 107.04 tmax 4.7
+diff --git a/la16_25_50.txt b/la16_25_50.txt
+new file mode 100644
+index 0000000..e608101
+--- /dev/null
++++ b/la16_25_50.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 106.92 tmax 4.3
+diff --git a/la16_50_75.txt b/la16_50_75.txt
+new file mode 100644
+index 0000000..7022b1e
+--- /dev/null
++++ b/la16_50_75.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 116.52 tmax 5.3
+diff --git a/la16_75_100.txt b/la16_75_100.txt
+new file mode 100644
+index 0000000..633e5a7
+--- /dev/null
++++ b/la16_75_100.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 114.24 tmax 5.3
+diff --git a/lf_0_0_25.txt b/lf_0_0_25.txt
+new file mode 100644
+index 0000000..217129f
+--- /dev/null
++++ b/lf_0_0_25.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 105.4
+diff --git a/lf_0_25_50.txt b/lf_0_25_50.txt
+new file mode 100644
+index 0000000..101b4dd
+--- /dev/null
++++ b/lf_0_25_50.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 111.72
+diff --git a/lf_0_50_75.txt b/lf_0_50_75.txt
+new file mode 100644
+index 0000000..732fcc5
+--- /dev/null
++++ b/lf_0_50_75.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 128.84
+diff --git a/lf_0_75_100.txt b/lf_0_75_100.txt
+new file mode 100644
+index 0000000..93a7c5c
+--- /dev/null
++++ b/lf_0_75_100.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 121.28
+diff --git a/lf_1_0_25.txt b/lf_1_0_25.txt
+new file mode 100644
+index 0000000..201367a
+--- /dev/null
++++ b/lf_1_0_25.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 105.52
+diff --git a/lf_1_25_50.txt b/lf_1_25_50.txt
+new file mode 100644
+index 0000000..941a2ad
+--- /dev/null
++++ b/lf_1_25_50.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 110.12
+diff --git a/lf_1_50_75.txt b/lf_1_50_75.txt
+new file mode 100644
+index 0000000..106a1db
+--- /dev/null
++++ b/lf_1_50_75.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 122.12
+diff --git a/lf_1_75_100.txt b/lf_1_75_100.txt
+new file mode 100644
+index 0000000..90d40d9
+--- /dev/null
++++ b/lf_1_75_100.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 115.0
+diff --git a/sweep.py b/sweep.py
+index c9db88c..fb05330 100644
+--- a/sweep.py
++++ b/sweep.py
+@@ -3,13 +3,14 @@ from env_client import make_env
+ import approach
+ K=float(sys.argv[1]); approach.K_ANG=K; approach.LOOKAHEAD=int(sys.argv[3]) if len(sys.argv)>3 else 8; approach.LOCAL_FAMILY=(sys.argv[4]=="1") if len(sys.argv)>4 else True
+ seeds=[int(x) for x in sys.argv[2].split(',')] if ',' in sys.argv[2] else range(*map(int,sys.argv[2].split(':')))
+-env=make_env(); res=[]; steps=[]
++import time
++env=make_env(); res=[]; steps=[]; tmax=0
+ for sd in seeds:
+     obs,info=env.reset(seed=sd); ap=approach.GeneratedApproach(env.action_space,env.observation_space,{}); ap.reset(obs,info)
+-    ok=False
++    ok=False; t0=time.time()
+     for t in range(1000):
+         obs,r,term,trunc,info=env.step(ap.get_action(obs))
+         if term: ok=True; break
+-    res.append(ok); steps.append(t+1)
++    res.append(ok); steps.append(t+1); tmax=max(tmax,time.time()-t0)
+     if not ok: print('fail',sd)
+-print('K',K,'succ',np.mean(res),'meansteps',np.mean(steps))
++print('K',K,'succ',np.mean(res),'meansteps',np.mean(steps),'tmax',round(tmax,1))

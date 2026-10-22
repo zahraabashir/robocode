@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 25daa61..5ba7558 100644
+--- a/approach.py
++++ b/approach.py
+@@ -204,7 +204,7 @@ class GeneratedApproach:
+             base_error = max(abs(bxerr), abs(byerr))
+             if self.phase_steps > 20:
+                 if self.object.startswith("obstruction"):
+-                    self.deferred.add(self.object)
++                    self.generic_objects.add(self.object)
+                     self.phase, self.phase_steps = "retract", 0
+                     return self._act_to(q, q, 1.0)
+                 self.carry_rotation = None

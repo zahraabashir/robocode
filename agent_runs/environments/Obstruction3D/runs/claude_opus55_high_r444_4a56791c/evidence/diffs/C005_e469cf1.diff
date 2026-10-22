@@ -1,0 +1,29 @@
+diff --git a/approach.py b/approach.py
+index d344e32..c2738f2 100644
+--- a/approach.py
++++ b/approach.py
+@@ -200,6 +200,7 @@ class GeneratedApproach:
+         self.fail_count = {}
+         self.steps = 0
+         self.plans_made = 0
++        self.aborting = False
+ 
+     def _block_place_candidates(self, objs):
+         """candidate (tool-free) placement yaws for target block on region, with blockers."""
+@@ -392,7 +393,7 @@ class GeneratedApproach:
+                 return
+             G = self._G(state)
+             Rt = rotz3(o.yaw) @ np.linalg.inv(G)[:3, :3]
+-            tool_yaw = np.arctan2(Rt[1, 1], Rt[0, 1]) * 0 + np.arctan2(-Rt[0, 0], Rt[1, 0])
++            tool_yaw = np.arctan2(-Rt[0, 0], Rt[1, 0])
+             spot = self._free_spot(o, objs, tool_yaw)
+             if spot is None:
+                 spot = o.p[:2]
+@@ -424,6 +425,7 @@ class GeneratedApproach:
+         q = self._q(state)
+         for _ in range(20):
+             if not self.plan:
++                self.aborting = False
+                 self._next_task(state)
+                 self.last_q = None
+                 if not self.plan:

@@ -1,0 +1,660 @@
+"""Obstruction3D approach: clear obstructions from target region, then place target block.
+
+Kinematics: Kinova Gen3 URDF chain, calibrated empirically (see kin.py):
+  arm mount = base pose + 0.12 m along base x, z=-0.0052; tool point 0.12 m along flange z.
+grasp_tf = object pose expressed in tool frame (T_obj = T_tool @ G).
+Grasp succeeds if tool z in [obj_bottom+0.042, obj_top+0.03] and object between fingers.
+Release only succeeds when the held object's bottom is within ~5mm of a support.
+"""
+import numpy as np
+import kin
+
+JN = [f'joint_{i}' for i in range(1, 8)]
+TABLE_TOP = 0.075
+Z_SAFE = 0.25          # tool z for transit
+JLIM = np.array([np.inf, 2.41, np.inf, 2.66, np.inf, 2.23, np.inf])
+TABLE_X = (0.13, 0.47)
+TABLE_Y = (-0.36, 0.36)
+
+
+def quat_mat(x, y, z, w):
+    return np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                     [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                     [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+
+
+def rotz3(a):
+    c, s = np.cos(a), np.sin(a)
+    return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1.0]])
+
+
+def expso3(w):
+    th = np.linalg.norm(w)
+    if th < 1e-12:
+        return np.eye(3)
+    k = w / th
+    K = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
+    return np.eye(3) + np.sin(th) * K + (1 - np.cos(th)) * K @ K
+
+
+def wrap(a):
+    return (a + np.pi) % (2 * np.pi) - np.pi
+
+
+class Obj:
+    def __init__(self, state, o):
+        g = lambda f: float(state.get(o, f))
+        self.name = o.name
+        self.p = np.array([g('pose_x'), g('pose_y'), g('pose_z')])
+        self.h = np.array([g('half_extent_x'), g('half_extent_y'), g('half_extent_z')])
+        self.q = np.array([g('pose_qx'), g('pose_qy'), g('pose_qz'), g('pose_qw')])
+        self.R = quat_mat(*self.q)
+        self.yaw = np.arctan2(self.R[1, 0], self.R[0, 0])
+        try:
+            self.grasped = g('grasp_active') > 0.5
+        except Exception:
+            self.grasped = False
+
+    def footprint(self):
+        c, s = abs(np.cos(self.yaw)), abs(np.sin(self.yaw))
+        return np.array([c * self.h[0] + s * self.h[1], s * self.h[0] + c * self.h[1]])
+
+    @property
+    def top(self):
+        return self.p[2] + self.h[2]
+
+    @property
+    def bottom(self):
+        return self.p[2] - self.h[2]
+
+
+def overlap(pa, ha, pb, hb, margin=0.0):
+    return (abs(pa[0] - pb[0]) < ha[0] + hb[0] + margin) and (abs(pa[1] - pb[1]) < ha[1] + hb[1] + margin)
+
+
+class GeneratedApproach:
+    def __init__(self, action_space, observation_space, primitives):
+        self.action_space = action_space
+        self.observation_space = observation_space
+        self.rng = np.random.default_rng(0)
+
+    # ------------------------------------------------------------------ utils
+    def _parse(self, state):
+        self.robot = state.get_object_from_name('robot')
+        objs = {}
+        for n in sorted(state.get_object_names()):
+            if n == 'robot':
+                continue
+            o = state.get_object_from_name(n)
+            try:
+                objs[n] = Obj(state, o)
+            except Exception:
+                pass
+        return objs
+
+    def _q(self, state):
+        return np.array([float(state.get(self.robot, f)) for f in JN])
+
+    def _base(self, state):
+        return np.array([float(state.get(self.robot, f)) for f in ['pos_base_x', 'pos_base_y', 'pos_base_rot']])
+
+    def _G(self, state):
+        g = [float(state.get(self.robot, f)) for f in
+             ['grasp_tf_x', 'grasp_tf_y', 'grasp_tf_z', 'grasp_tf_qx', 'grasp_tf_qy', 'grasp_tf_qz', 'grasp_tf_qw']]
+        G = np.eye(4)
+        G[:3, :3] = quat_mat(*g[3:])
+        G[:3, 3] = g[:3]
+        return G
+
+    def _ik(self, q0, p, R):
+        best = None
+        for attempt in range(3):
+            qs = np.array(q0, dtype=float)
+            if attempt > 0:
+                qs = qs + self.rng.uniform(-0.4, 0.4, 7)
+            q, ok = kin.ik(self.base, qs, np.asarray(p, float), R, iters=100, tol=1e-5, lim=JLIM - 0.02)
+            if ok and np.all(np.abs(q) <= JLIM):
+                return q, True
+            if best is None:
+                best = np.clip(q, -JLIM, JLIM)
+        return best, False
+
+    def _cart_path(self, q0, p_from, p_to, R, step=0.04, R_from=None, stop_on_fail=False):
+        """IK waypoints along a straight line in tool position; orientation interpolated
+        from R_from (default: R) to R."""
+        p_from = np.asarray(p_from, float)
+        p_to = np.asarray(p_to, float)
+        d = np.linalg.norm(p_to - p_from)
+        w = np.zeros(3)
+        if R_from is not None:
+            w = kin.rot_err(R_from, R)
+        n = max(1, int(np.ceil(d / step)), int(np.ceil(np.linalg.norm(w) / 0.35)))
+        qs = []
+        q = np.array(q0, float)
+        allok = True
+        for i in range(1, n + 1):
+            p = p_from + (p_to - p_from) * i / n
+            Ri = R if (R_from is None or i == n) else expso3(w * i / n) @ R_from
+            q, ok = self._ik(q, p, Ri)
+            allok &= ok
+            qs.append(q.copy())
+            if stop_on_fail and not ok:
+                return qs, q, False
+        return qs, q, allok
+
+    @staticmethod
+    def _ztransit(objs, held):
+        tops = [b.top for n, b in objs.items() if n != held] + [TABLE_TOP]
+        return max(tops) + 0.05
+
+    @staticmethod
+    def _seg(qs):
+        if not qs:
+            return []
+        return [('move', x) for x in qs[:-1]] + [('move', qs[-1], 'stop')]
+
+    def _tool(self, q):
+        return kin.fk(self.base, q)
+
+    def _finger_boxes(self, x, y, yaw, inner=0.042, outer=0.067, half_across=0.015):
+        d = np.array([-np.sin(yaw), np.cos(yaw)])
+        a = np.array([np.cos(yaw), np.sin(yaw)])
+        c = 0.5 * (inner + outer)
+        hl = 0.5 * (outer - inner)
+        return [(np.array([x, y]) + sgn * c * d, d, a, hl, half_across) for sgn in (1, -1)]
+
+    @staticmethod
+    def _box_hits_obj(box, b, infl=0.003):
+        """SAT test: oriented finger box vs object footprint (yawed rectangle)."""
+        cen, d, a, hd, ha = box
+        cy, sy = np.cos(b.yaw), np.sin(b.yaw)
+        bx = np.array([cy, sy]); by = np.array([-sy, cy])
+        bh = (b.h[0] + infl, b.h[1] + infl)
+        rel = b.p[:2] - cen
+        for ax in (d, a, bx, by):
+            r1 = hd * abs(ax @ d) + ha * abs(ax @ a)
+            r2 = bh[0] * abs(ax @ bx) + bh[1] * abs(ax @ by)
+            if abs(rel @ ax) > r1 + r2:
+                return False
+        return True
+
+    def _grasp_candidates(self, o, objs):
+        """list of (score, yaw, x, y, blockers, zg) grasp candidates for object o."""
+        out = []
+        near = [(n, b) for n, b in objs.items() if n != o.name and n != 'target_region'
+                and np.linalg.norm(b.p[:2] - o.p[:2]) < 0.16]
+        z_lo = o.bottom + 0.044
+        z_hi = o.top + 0.028
+        if z_hi < z_lo:
+            z_hi = z_lo = 0.5 * (z_lo + z_hi)
+        zs = [min(0.5 * (z_lo + z_hi), z_lo + 0.012)]
+        if z_hi > zs[0] + 1e-3:
+            zs.append(z_hi)
+        for k, yoff in enumerate([0.0, np.pi / 2, np.pi / 4, -np.pi / 4]):
+            yaw = o.yaw + yoff
+            d = np.array([-np.sin(yaw), np.cos(yaw)])
+            a = np.array([np.cos(yaw), np.sin(yaw)])
+            wd = abs(d @ o.R[:2, 0]) * o.h[0] + abs(d @ o.R[:2, 1]) * o.h[1]
+            wa = abs(a @ o.R[:2, 0]) * o.h[0] + abs(a @ o.R[:2, 1]) * o.h[1]
+            if wd > 0.041:
+                continue
+            smax = max(0.0, min(0.019, 0.040 - wd))
+            amax = max(0.0, (wa + 0.003) if k < 2 else 0.005)
+            sds = np.linspace(-smax, smax, 7) if smax > 0 else [0.0]
+            sas = np.linspace(-amax, amax, 7) if amax > 0 else [0.0]
+            for zi, zg in enumerate(zs):
+                tip = zg - 0.0315
+                rel = [(n, b) for n, b in near if b.top > zg - 0.042]
+                for sd in sds:
+                    for sa in sas:
+                        x, y = o.p[:2] + sd * d + sa * a
+                        fboxes = self._finger_boxes(x, y, yaw)
+                        sbox = (np.array([x, y]), d, a, 0.043, 0.011)
+                        blockers = []
+                        for n, b in rel:
+                            boxes = ([sbox] + fboxes) if b.top > tip else [sbox]
+                            for box in boxes:
+                                if self._box_hits_obj(box, b):
+                                    blockers.append(n)
+                                    break
+                        score = (len(blockers) * 10 + abs(sd) + abs(sa) + 0.01 * (k == 1) * (wd > wa)
+                                 + 0.05 * (k >= 2) + 0.03 * zi)
+                        out.append((score, yaw, x, y, blockers, zg))
+        out.sort(key=lambda c: c[0])
+        return out
+
+    def _support_top(self, o, objs):
+        top = TABLE_TOP
+        for n, b in objs.items():
+            if n == o.name:
+                continue
+            if b.top <= o.bottom + 2e-3 and overlap(o.p, o.footprint(), b.p, b.footprint()):
+                top = max(top, b.top)
+        return top
+
+    # --------------------------------------------------------------- episode
+    def reset(self, state, info):
+        self.objs = self._parse(state)
+        self.base = self._base(state)
+        self.plan = []
+        self.current = None
+        self.blocked = 0
+        self.last_q = None
+        self.fail_count = {}
+        self.bad_spots = []
+        self.last_spot = None
+        self.steps = 0
+        self.plans_made = 0
+        self.aborting = False
+
+    def _block_place_candidates(self, objs):
+        """candidate (tool-free) placement yaws for target block on region, with blockers."""
+        reg = objs['target_region']
+        tb = objs['target_block']
+        out = []
+        for k in range(2):
+            yaw = reg.yaw + k * np.pi / 2  # tool yaw (fingers close along (-sin, cos))
+            blockers = []
+            for n, b in objs.items():
+                if n in ('target_region', 'target_block'):
+                    continue
+                for box in self._finger_boxes(reg.p[0], reg.p[1], yaw):
+                    if self._box_hits_obj(box, b):
+                        blockers.append(n)
+                        break
+            out.append((len(blockers), yaw, blockers))
+        return out
+
+    def _to_clear(self, objs):
+        reg = objs['target_region']
+        res = set()
+        for n, o in objs.items():
+            if not n.startswith('obstruction'):
+                continue
+            if overlap(o.p, o.footprint(), reg.p, reg.footprint(), 0.004):
+                res.add(n)
+        return res
+
+    def _pick_target(self, objs):
+        """decide which object to pick next and the grasp candidate."""
+        clear = self._to_clear(objs)
+        tb = objs['target_block']
+        if not clear:
+            # placement fingers: if the block can be grasped along an axis whose placement is blocked,
+            # handled at place time; ensure at least one clean placement yaw.
+            pc = self._block_place_candidates(objs)
+            if min(c[0] for c in pc) > 0:
+                clear |= set(min(pc, key=lambda c: c[0])[2])
+        if not clear:
+            want = ['target_block']
+        else:
+            want = sorted(clear)
+        # expand with blockers
+        best = None
+        seen = set()
+        frontier = list(want)
+        depth = 0
+        while frontier and depth < 3:
+            nxt = []
+            for n in frontier:
+                if n in seen or n not in objs:
+                    continue
+                seen.add(n)
+                cands = self._grasp_candidates(objs[n], objs)
+                if n == 'target_block':
+                    # prefer tool yaws allowing clean placement
+                    pc = {round(wrap(c[1]) % np.pi, 3): c[0] for c in self._block_place_candidates(objs)}
+                    cands = sorted(cands, key=lambda c: c[0] + 5 * (pc.get(round(wrap(c[1] - objs['target_region'].yaw + objs['target_region'].yaw) % np.pi, 3), 0) > 0))
+                if not cands:
+                    continue
+                fc = self.fail_count.get(n, 0)
+                c = cands[min(fc, len(cands) - 1)] if fc < len(cands) else cands[fc % len(cands)]
+                score = len(c[4]) + 0.3 * fc + 0.1 * depth
+                if best is None or score < best[0]:
+                    best = (score, n, c)
+                for bn in c[4]:
+                    if bn.startswith('obstruction') or bn == 'target_block':
+                        nxt.append(bn)
+            frontier = nxt
+            depth += 1
+        return best
+
+    @staticmethod
+    def _plan_cost(q, plan):
+        c = 0.0
+        for item in plan:
+            if item[0] == 'move':
+                c += np.max(np.abs(wrap(item[1] - q)))
+                q = item[1]
+        return c
+
+    def _mount(self, base=None):
+        b = self.base if base is None else base
+        return np.array([b[0] + kin.MOUNT_X * np.cos(b[2]), b[1] + kin.MOUNT_X * np.sin(b[2])])
+
+    def _base_for(self, pts, rmin=0.165):
+        m = self._mount()
+        need = m[0]
+        for p in pts:
+            dy = p[1] - m[1]
+            if np.hypot(p[0] - m[0], dy) < rmin - 0.005:
+                need = min(need, p[0] - np.sqrt(max(rmin ** 2 - dy ** 2, 0.0)))
+        if need >= m[0] - 1e-4:
+            return None
+        nb = np.array(self.base, float).copy()
+        nb[0] -= (m[0] - need)
+        return nb
+
+    def _plan_base_move(self, state, objs, held, nb):
+        q = self._q(state)
+        T = self._tool(q)
+        p0 = T[:3, 3]
+        zt = self._ztransit(objs, held)
+        plan = []
+        if p0[2] < zt:
+            qs, _, _ = self._cart_path(q, p0, np.array([p0[0], p0[1], zt]), T[:3, :3], step=0.015)
+            plan = self._seg(qs)
+        self.plan = plan + [('base', nb)]
+
+    def _plan_pick(self, state, name, cand):
+        objs = self._parse(state)
+        o = objs[name]
+        _, yaw, gx, gy, _, _ = cand
+        pts = [(gx, gy)]
+        if name == 'target_block':
+            pts.append(tuple(objs['target_region'].p[:2]))
+        nb = self._base_for(pts)
+        if nb is not None:
+            self._plan_base_move(state, objs, None, nb)
+            return
+        zt = self._ztransit(objs, None)
+        q0 = self._q(state)
+        T = self._tool(q0)
+        zg = cand[5]
+        p0 = T[:3, 3]
+        above = np.array([gx, gy, max(zt, p0[2])])
+        start = np.array([p0[0], p0[1], max(p0[2], zt)])
+        best = None
+        for y, sof in [(yaw, True), (yaw + np.pi, True), (yaw, False)]:
+            if not sof and best is not None and best[0] < 100:
+                break
+            R = kin.topdown_R(y)
+            q = q0
+            plan = []
+            if p0[2] < zt - 0.005:
+                qs, q, _ = self._cart_path(q, p0, start, T[:3, :3], step=0.015)
+                plan += self._seg(qs)
+            qs, q, ok1 = self._cart_path(q, start, above, R, step=0.04, R_from=T[:3, :3], stop_on_fail=sof)
+            plan += self._seg(qs)
+            ok2 = False
+            if ok1 or not sof:
+                qs, q, ok2 = self._cart_path(q, above, np.array([gx, gy, zg]), R, step=0.015, stop_on_fail=sof)
+                plan += self._seg(qs)
+            plan += [('grip', -1.0), ('check', 'grasp')]
+            c = self._plan_cost(q0, plan) + (0 if (ok1 and ok2) else 100)
+            if best is None or c < best[0] or (not sof and best[0] >= 100):
+                best = (c, plan)
+        self.plan = best[1]
+
+    def _free_spot(self, o, objs, tool_yaw):
+        fp = o.footprint()
+        best = None
+        cur = o.p[:2]
+        for x in np.arange(TABLE_X[0] + fp[0], TABLE_X[1] - fp[0], 0.02):
+            for y in np.arange(TABLE_Y[0] + fp[1], TABLE_Y[1] - fp[1], 0.02):
+                p = np.array([x, y])
+                cost = np.linalg.norm(p - cur) + 2.0 * max(0.0, 0.2 - x)
+                if np.linalg.norm(p - self._mount()) < 0.17:
+                    continue
+                if any(np.linalg.norm(p - bs) < 0.035 for bs in self.bad_spots):
+                    continue
+                if best is not None and cost >= best[0]:
+                    continue
+                ok = True
+                for n, b in objs.items():
+                    if n == o.name:
+                        continue
+                    m = 0.075 if n in ('target_region', 'target_block') else 0.02
+                    if overlap(p, fp, b.p, b.footprint(), m):
+                        ok = False
+                        break
+                if not ok:
+                    continue
+                for box in self._finger_boxes(x, y, tool_yaw):
+                    for n, b in objs.items():
+                        if n != o.name and self._box_hits_obj(box, b, 0.01):
+                            ok = False
+                            break
+                    if not ok:
+                        break
+                if ok:
+                    best = (cost, p)
+        return None if best is None else best[1]
+
+    def _plan_place(self, state, name, xy, support_top, yaw_obj):
+        objs = self._parse(state)
+        o = objs[name]
+        nb = self._base_for([xy])
+        if nb is not None:
+            self._plan_base_move(state, objs, name, nb)
+            return
+        q = self._q(state)
+        T = self._tool(q)
+        G = self._G(state)
+        Ginv = np.linalg.inv(G)
+        zt = self._ztransit(objs, name)
+        q_init = q
+        best = None
+        for yo in [yaw_obj, yaw_obj + np.pi]:
+            q = q_init
+            p0 = T[:3, 3]
+            To = np.eye(4)
+            To[:3, :3] = rotz3(yo)
+            To[:3, 3] = [xy[0], xy[1], support_top + o.h[2] + 0.0015]
+            Tt = To @ Ginv
+            R = Tt[:3, :3]
+            p0 = T[:3, 3]
+            maxtop = max([b.top for n, b in objs.items() if n != name] + [TABLE_TOP])
+            obj_bottom = (T @ G)[2, 3] - o.h[2]
+            lift_z = max(zt, p0[2] + (maxtop + 0.02 - obj_bottom))
+            plan = []
+            # escape laterally from touching neighbours before lifting
+            e = np.zeros(2)
+            touch = False
+            Ho = o.footprint()
+            for n, b in objs.items():
+                if n == name or b.top <= o.bottom + 2e-3 or b.bottom >= o.top - 2e-3:
+                    continue
+                fb = b.footprint()
+                dxy = o.p[:2] - b.p[:2]
+                gaps = np.abs(dxy) - (Ho + fb)
+                if max(gaps) < 0.006:
+                    ax = int(np.argmax(gaps))
+                    v = np.zeros(2)
+                    v[ax] = np.sign(dxy[ax]) if dxy[ax] != 0 else 1.0
+                    e += v
+                    touch = True
+            if touch:
+                nbrs = [b for n, b in objs.items() if n != name and b.top > o.bottom + 2e-3 and b.bottom < o.top - 2e-3]
+                opts = []
+                for k in range(16):
+                    ang = 2 * np.pi * k / 16
+                    d = np.array([np.cos(ang), np.sin(ang)])
+                    for dist in (0.003, 0.005, 0.008, 0.012):
+                        sep = min([np.max(np.abs(o.p[:2] + dist * d - b.p[:2]) - (Ho + b.footprint())) for b in nbrs] + [1.0])
+                        opts.append((-min(sep, 0.005) + 0.05 * dist, k, d * dist, sep))
+                opts.sort(key=lambda t: t[0])
+                nf = self.fail_count.get(name, 0)
+                pick = opts[nf % len(opts)]
+                ev = pick[2]
+                p1 = p0 + np.array([ev[0], ev[1], 0.002])
+                qs, q, _ = self._cart_path(q, p0, p1, T[:3, :3], step=0.004)
+                plan += self._seg(qs)
+                p0 = p1
+                if pick[3] < 0.004 or nf > 0:
+                    for k in range(3):
+                        p1 = p0 + np.array([0, 0, 0.008])
+                        qs, q, _ = self._cart_path(q, p0, p1, T[:3, :3], step=0.004)
+                        plan += self._seg(qs)
+                        p0 = p1
+            up = np.array([p0[0], p0[1], lift_z])
+            above = np.array([Tt[0, 3], Tt[1, 3], lift_z])
+            qs, q, _ = self._cart_path(q, p0, up, T[:3, :3], step=0.015)
+            plan += self._seg(qs)
+            qs, q, _ = self._cart_path(q, up, above, R, step=0.04, R_from=T[:3, :3])
+            plan += self._seg(qs)
+            qs, q, _ = self._cart_path(q, above, Tt[:3, 3], R, step=0.015)
+            plan += self._seg(qs)
+            plan += [('grip', 1.0), ('check', 'release')]
+            c = self._plan_cost(q_init, plan)
+            if best is None or c < best[0]:
+                best = (c, plan)
+        self.plan = best[1]
+
+    def _held(self, state, objs):
+        for n, o in objs.items():
+            if o.grasped:
+                return n
+        return self.current
+
+    def _next_task(self, state):
+        self.plans_made += 1
+        objs = self._parse(state)
+        grasped = float(state.get(self.robot, 'grasp_active')) > 0.5
+        if grasped:
+            held = self._held(state, objs)
+            self.current = held
+            o = objs[held]
+            clear = self._to_clear(objs)
+            reg = objs['target_region']
+            if held == 'target_block' and not clear:
+                self.last_spot = None
+                self._plan_place(state, held, reg.p[:2], reg.top, reg.yaw)
+                return
+            G = self._G(state)
+            Rt = rotz3(o.yaw) @ np.linalg.inv(G)[:3, :3]
+            tool_yaw = np.arctan2(-Rt[0, 0], Rt[1, 0])
+            spot = self._free_spot(o, objs, tool_yaw)
+            if spot is None:
+                spot = o.p[:2]
+            self.last_spot = np.array(spot, float)
+            self._plan_place(state, held, spot, TABLE_TOP, o.yaw)
+            return
+        best = self._pick_target(objs)
+        if best is None:
+            self.current = 'target_block'
+            cands = self._grasp_candidates(objs['target_block'], objs)
+            if not cands:
+                return
+            best = (0, 'target_block', cands[0])
+        self.current = best[1]
+        self._plan_pick(state, best[1], best[2])
+
+    def _abort(self, state):
+        """blocked: retreat straight up and replan."""
+        self.fail_count[self.current] = self.fail_count.get(self.current, 0) + 1
+        if self.last_spot is not None and float(state.get(self.robot, 'grasp_active')) > 0.5:
+            self.bad_spots.append(self.last_spot)
+        q = self._q(state)
+        T = self._tool(q)
+        p0 = T[:3, 3]
+        qs, _, _ = self._cart_path(q, p0, np.array([p0[0], p0[1], max(p0[2] + 0.03, Z_SAFE)]), T[:3, :3], step=0.015)
+        self.plan = self._seg(qs)
+
+    # ---------------------------------------------------------------- acting
+    def _lookahead(self, q, budget=0.199):
+        cur = q.copy()
+        i = 0
+        target = q.copy()
+        while i < len(self.plan) and self.plan[i][0] == 'move':
+            w = cur + wrap(self.plan[i][1] - cur)
+            if np.max(np.abs(w - q)) <= budget:
+                target = w
+                cur = w
+                i += 1
+                if len(self.plan[i - 1]) > 2:
+                    break  # hard stop
+                continue
+            lo, hi = 0.0, 1.0
+            for _ in range(20):
+                mid = 0.5 * (lo + hi)
+                if np.max(np.abs(cur + mid * (w - cur) - q)) <= budget:
+                    lo = mid
+                else:
+                    hi = mid
+            target = cur + lo * (w - cur)
+            # waypoints before i are passed; head becomes the segment end we are heading to
+            if i > 0:
+                del self.plan[:i]
+            return target
+        # drop fully passed waypoints except the last reached (kept so arrival is confirmed)
+        if i > 1:
+            del self.plan[:i - 1]
+        return target
+
+    def get_action(self, state):
+        self.steps += 1
+        a = np.zeros(11, dtype=np.float32)
+        q = self._q(state)
+        self.base = self._base(state)
+        for _ in range(20):
+            if not self.plan:
+                self.aborting = False
+                self._next_task(state)
+                self.last_q = None
+                if not self.plan:
+                    return a
+            kind, val = self.plan[0][0], self.plan[0][1]
+            if kind == 'move':
+                d = wrap(val - q)
+                if np.max(np.abs(d)) < 1e-4:
+                    self.plan.pop(0)
+                    self.last_q = None
+                    self.blocked = 0
+                    continue
+                if self.last_q is not None and np.max(np.abs(q - self.last_q)) < 1e-7:
+                    self.blocked += 1
+                else:
+                    self.blocked = 0
+                if self.blocked >= 1:
+                    self.blocked = 0
+                    self.last_q = None
+                    if getattr(self, 'aborting', False):
+                        self.plan.pop(0)
+                    else:
+                        self.aborting = True
+                        self._abort(state)
+                    continue
+                self.last_q = q.copy()
+                target = self._lookahead(q)
+                a[3:10] = np.clip(wrap(target - q), -0.2, 0.2)
+                return a
+            self.aborting = False
+            if kind == 'base':
+                cur = np.array(self.base, float)
+                d = np.array(val, float) - cur
+                d[2] = wrap(d[2])
+                lb = getattr(self, 'last_base', None)
+                if np.max(np.abs(d)) < 1e-4 or (lb is not None and np.max(np.abs(cur - lb)) < 1e-7):
+                    self.plan.pop(0)
+                    self.last_base = None
+                    continue
+                self.last_base = cur.copy()
+                a[0:3] = np.clip(d, -0.1, 0.1)
+                return a
+            if kind == 'grip':
+                self.plan.pop(0)
+                a[10] = val
+                self.last_q = None
+                return a
+            if kind == 'check':
+                self.plan.pop(0)
+                g = float(state.get(self.robot, 'grasp_active')) > 0.5
+                if val == 'grasp' and not g:
+                    self.fail_count[self.current] = self.fail_count.get(self.current, 0) + 1
+                    self.plan = []
+                elif val == 'release' and g:
+                    self.fail_count[self.current] = self.fail_count.get(self.current, 0) + 1
+                    self.plan = []
+                continue
+        return a

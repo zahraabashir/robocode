@@ -1,0 +1,24 @@
+diff --git a/approach.py b/approach.py
+index 20cac2c..f6208e8 100644
+--- a/approach.py
++++ b/approach.py
+@@ -129,7 +129,8 @@ class GeneratedApproach:
+         if self.mode=="release":
+             needs_push=(self.object_name!="target_block" or self.release_t>=2)
+             if needs_push and self.release_t<60:
+-                g=np.array([self.release_x,self.dest[1],self.rest_z-.005])
++                gz=self.rest_z-.005 if self.object_name!="target_block" else self.release_z+.04
++                g=np.array([self.release_x,self.dest[1],gz])
+                 er=np.r_[g-pos,-feat[3:]]
+                 u=np.linalg.solve(self.J.T@self.J+1e-5*np.eye(5),self.J.T@np.clip(er,-.03,.03))
+                 a += self.B@np.clip(u,-.05,.05)
+@@ -150,7 +151,8 @@ class GeneratedApproach:
+         if arrived and np.linalg.norm(feat[3:])<.025:
+             self.waypoint+=1
+             # The last waypoint seats the object before opening the fingers.
+-            if self.waypoint>=3: self.mode="release"; self.release_t=0; self.release_x=pos[0]
++            if self.waypoint>=3:
++                self.mode="release"; self.release_t=0; self.release_x=pos[0]; self.release_z=pos[2]
+             else: self._start_calibration(state)
+             a[10]=-1.; return a
+         u=np.linalg.solve(self.J.T@self.J+1e-5*np.eye(5),self.J.T@np.clip(err,-.06,.06))

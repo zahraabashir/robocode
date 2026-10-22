@@ -1,0 +1,18 @@
+diff --git a/approach.py b/approach.py
+index 6b13d6a..c429300 100644
+--- a/approach.py
++++ b/approach.py
+@@ -126,7 +126,12 @@ class GeneratedApproach:
+                 if (frac < 0.60 and self.turn_sign > 0.0 and
+                         (obj[1] < 1.30 or obj[1] > 3.70)):
+                     self.cap_preferred = True
+-                self.rot_cap = self.cap_preferred
++                stem_force_world = self._world(np.array([self.turn_sign, 0.0]), theta)
++                # Stem-side and cap-end contacts create the same torque with
++                # opposite linear components. Prefer the one that also moves
++                # toward the goal instead of later undoing rotation drift.
++                helps_position = float(np.dot(stem_force_world, dp)) >= 0.0
++                self.rot_cap = self.cap_preferred or not helps_position
+                 self.rot_y = -frac*lv
+                 if self.rot_cap:
+                     far_local0 = np.array([self.turn_sign*(lh*.5+.34), 0.0])

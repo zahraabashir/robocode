@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index bf6ffbe..2077f7d 100644
+--- a/approach.py
++++ b/approach.py
+@@ -87,7 +87,7 @@ class GeneratedApproach:
+                 a[:2]=dest[:2]-p[:2]
+                 if np.max(abs(a[:2]))<1e-4:
+                     if self.goal!='target_block':self.phase='release';continue
+-                    self.destination=dest.copy();self.destination[2]+=state.get(region,'half_extent_z')+state.get(obj,'half_extent_z')
++                    self.destination=dest.copy();self.destination[2]+=state.get(region,'half_extent_z')+state.get(obj,'half_extent_z')+.001
+                     self.finalheight=ee[2]+self.destination[2]-p[2]
+                     self.height=max(self.finalheight,ee[2]-.02);self.phase='lower';continue
+             elif self.phase=='lower':

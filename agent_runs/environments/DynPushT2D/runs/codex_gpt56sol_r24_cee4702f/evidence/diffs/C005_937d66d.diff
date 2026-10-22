@@ -1,0 +1,23 @@
+diff --git a/probe_dynamics.py b/probe_dynamics.py
+index 90980b3..2140a5a 100644
+--- a/probe_dynamics.py
++++ b/probe_dynamics.py
+@@ -72,7 +72,8 @@ def ram_center(seed):
+     for step in range(1, 121):
+         vec = obs[0:2] - obs[16:18]
+         norm = float(np.linalg.norm(vec))
+-        act = 0.05 * vec / max(norm, 1e-9)
++        # Stay just inside the server's strict Euclidean-norm action bound.
++        act = 0.049 * vec / max(norm, 1e-9)
+         obs, reward, term, trunc, _ = env.step(act.astype(np.float32))
+         bdisp = float(np.linalg.norm(obs[0:2] - initial[0:2]))
+         if first_contact is None and bdisp > 1e-5:
+@@ -126,7 +127,7 @@ def coast_after_push(seed):
+     push_action = None
+     for _ in range(100):
+         vec = obs[0:2] - obs[16:18]
+-        act = 0.05 * vec / max(float(np.linalg.norm(vec)), 1e-9)
++        act = 0.049 * vec / max(float(np.linalg.norm(vec)), 1e-9)
+         obs, _, term, trunc, _ = env.step(act.astype(np.float32))
+         if np.linalg.norm(obs[0:2] - initial[0:2]) > 1e-5:
+             contacted = True

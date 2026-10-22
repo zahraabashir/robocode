@@ -1,0 +1,59 @@
+diff --git a/approach.py b/approach.py
+index d0ff213..85c350e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -200,7 +200,7 @@ class GeneratedApproach:
+         th = np.full(K, pose[2])
+         valid = np.ones(K, bool)
+         ds = 0.01
+-        nsteps = 100
++        nsteps = 150
+         best = (-np.inf, None)
+         # travel cost to each candidate start
+         standoff = 0.04
+@@ -275,7 +275,7 @@ class GeneratedApproach:
+ 
+         imp = E0 - results_E
+         # rate = improvement / steps, with lower bound travel first
+-        push_steps = results_len / AMAX + 3
++        push_steps = results_len * np.max(np.abs(uw), 1) / AMAX + 3
+         order = np.argsort(-(imp / (lb + push_steps + 4)))
+         best_i, best_rate, best_path = None, -np.inf, None
+         for i in order[:60]:
+@@ -314,9 +314,10 @@ class GeneratedApproach:
+         done = 0.0
+         while done < Ltot - 1e-6:
+             rem = Ltot - done
+-            st = AMAX if rem > 0.15 else max(0.01, min(AMAX, rem / 3))
++            mc = max(abs(u[0]), abs(u[1]))
++            st = AMAX / mc if rem > 0.15 else max(0.01, min(AMAX, rem / 3))
+             st = min(st, rem)
+-            acts.append(('push', u * st / max(abs(u[0]), abs(u[1]), 1e-9) * max(abs(u[0]), abs(u[1]))))
++            acts.append(('push', u * st))
+             done += st
+         return acts
+ 
+diff --git a/stats.py b/stats.py
+new file mode 100644
+index 0000000..6997914
+--- /dev/null
++++ b/stats.py
+@@ -0,0 +1,18 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++from concurrent.futures import ThreadPoolExecutor
++def run(seed):
++    env=make_env(); ap=GeneratedApproach(None,None,{})
++    obs,info=env.reset(seed=seed); ap.reset(obs,info)
++    nav=push=npl=0
++    for t in range(1000):
++        if not ap.plan: npl+=1
++        a=ap.get_action(obs)
++        kind = ap._lastkind if hasattr(ap,'_lastkind') else None
++        obs,r,te,tr,_=env.step(a)
++        if te: break
++    env.close()
++    return seed,t+1,npl
++with ThreadPoolExecutor(8) as ex: res=list(ex.map(run, range(int(sys.argv[1]),int(sys.argv[2]))))
++print(np.mean([r[1] for r in res]), np.mean([r[2] for r in res]))

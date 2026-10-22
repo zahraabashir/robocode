@@ -1,0 +1,26 @@
+diff --git a/approach.py b/approach.py
+index 5b31b09..88884f2 100644
+--- a/approach.py
++++ b/approach.py
+@@ -48,14 +48,18 @@ class GeneratedApproach:
+         # a reachable stance on their own side.
+         self.obstacles.append((0.0, 0.0, 0.18, 2.6))
+         self.lander_xy = self._xy(state, self._objs(state, "lander")[0])
++        self.obstacles.append((self.lander_xy[0], self.lander_xy[1], 0.30, 0.22))
+         samples = self._objs(state, "sample")
+         stones = [s for s in samples if self._v(state, s, "is_soil") < 0.5]
+         soils = [s for s in samples if self._v(state, s, "is_soil") > 0.5]
+         def feasible(items, idx):
+             # A sample near the wall can be reached from a stance at x=+/-0.43.
+-            return [s for s in items if
+-                    (self._v(state, s, "x") >= 0.18 if idx == 0
+-                     else self._v(state, s, "x") <= -0.18)]
++            result = [s for s in items if
++                      (self._v(state, s, "x") >= 0.18 if idx == 0
++                       else self._v(state, s, "x") <= -0.18)]
++            away = [s for s in result if self._dist(
++                self._xy(state, s), self.lander_xy) > 0.62]
++            return away or result
+         self.sample_queues = [[], []]
+         # Assign each required type independently. Some layouts put both types
+         # on one side, in which case one rover collects two samples sequentially.

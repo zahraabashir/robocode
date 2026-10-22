@@ -1,0 +1,71 @@
+diff --git a/approach.py b/approach.py
+index 6f8578b..7258b7f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -430,9 +430,10 @@ class GeneratedApproach:
+             lx, ly = sc.lander
+             t = tmin
+             while pending_mask.any() and t < tmin + 200:
+-                ox, oy = other[min(t, len(other) - 1)]
+-                blk = seg_hits_disk(P.X, P.Y, lx, ly, ox, oy, ROVER_OCC_R) | \
+-                    seg_hits_disk(P.camx, P.camy, lx, ly, ox, oy, ROVER_OCC_R)
++                blk = np.zeros(P.X.shape, dtype=bool)
++                for tt in (t - 1, t):
++                    ox, oy = other[max(0, min(tt, len(other) - 1))]
++                    blk |= seg_hits_disk(P.camx, P.camy, lx, ly, ox, oy, ROVER_OCC_R)
+                 ok = pending_mask & (G0 <= t) & ~blk
+                 G[ok] = t
+                 pending_mask &= ~ok
+diff --git a/dbg6.py b/dbg6.py
+new file mode 100644
+index 0000000..3b5b6e8
+--- /dev/null
++++ b/dbg6.py
+@@ -0,0 +1,18 @@
++import sys
++import numpy as np
++from test_approach import *
++seed=int(sys.argv[1]); dy=float(sys.argv[2]) if len(sys.argv)>2 else 0.05
++env = make_env(); obs, info = env.reset(seed=seed)
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++steps=0
++while True:
++    n=len(ap.log)
++    a=ap.get_action(obs)
++    if len(ap.log)>n: break
++    obs,r,term,tr,info=env.step(a); steps+=1
++r0=obs.get_object_from_name('rover0'); r1=obs.get_object_from_name('rover1')
++objs=[o for o in obs if o.type.name=='objective']
++print('fail at', obs.get(r0,'x'), obs.get(r0,'y'), obs.get(r0,'theta'))
++for k in range(12):
++    obs,*_=env.step(np.array([0,0,0,0.5, 0,dy,0,0],dtype=np.float32))
++    print(k, round(obs.get(r1,'x'),3), round(obs.get(r1,'y'),3), [obs.get(o,'received_image') for o in objs])
+diff --git a/dbg7.py b/dbg7.py
+new file mode 100644
+index 0000000..b82f421
+--- /dev/null
++++ b/dbg7.py
+@@ -0,0 +1,15 @@
++import sys
++import numpy as np
++from test_approach import *
++seed=int(sys.argv[1])
++env = make_env(); obs, info = env.reset(seed=seed)
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++r0=obs.get_object_from_name('rover0'); r1=obs.get_object_from_name('rover1')
++hist=[]
++while True:
++    n=len(ap.log)
++    a=ap.get_action(obs)
++    if len(ap.log)>n: break
++    hist.append((round(obs.get(r1,'x'),2), round(obs.get(r1,'y'),2)))
++    obs,r,term,tr,info=env.step(a)
++print(hist[-4:])
+diff --git a/res_occ26.json b/res_occ26.json
+new file mode 100644
+index 0000000..19a6fa4
+--- /dev/null
++++ b/res_occ26.json
+@@ -0,0 +1 @@
++[[0, 3, true, 26, 0, 0.29, 5.3], [1, 2, true, 21, 0, 0.09, 3.5], [2, 3, true, 21, 0, 0.79, 3.3], [3, 3, true, 22, 0, 0.63, 3.7], [4, 3, true, 21, 0, 0.84, 2.8], [5, 3, true, 24, 0, 0.99, 4.9], [6, 2, true, 21, 0, 0.58, 5.1], [7, 3, true, 22, 0, 1.44, 5.6], [8, 3, true, 22, 0, 0.4, 5.2], [9, 2, true, 23, 0, 0.6, 5.1], [10, 3, true, 22, 0, 1.28, 4.9], [11, 1, true, 20, 0, 0.07, 3.9], [12, 2, true, 24, 0, 0.49, 4.9], [13, 3, true, 25, 0, 1.21, 6.2], [14, 1, true, 30, 0, 0.08, 5.9], [15, 3, true, 22, 0, 0.7, 3.9], [16, 2, true, 22, 0, 0.15, 4.0], [17, 3, true, 22, 0, 2.2, 7.2], [18, 3, true, 22, 0, 0.81, 4.6], [19, 2, true, 24, 0, 0.41, 5.2], [20, 3, true, 28, 0, 0.55, 6.3], [21, 1, true, 20, 0, 0.2, 4.9], [22, 3, true, 24, 0, 0.7, 5.8], [23, 1, true, 18, 0, 0.08, 4.3], [24, 2, true, 20, 0, 0.21, 3.8], [25, 2, true, 20, 0, 0.38, 5.6], [26, 3, true, 22, 0, 0.99, 5.9], [27, 1, true, 22, 0, 0.06, 5.4], [28, 2, true, 23, 0, 0.36, 5.8], [29, 3, true, 22, 0, 0.36, 5.3], [30, 1, true, 20, 0, 0.17, 3.8], [31, 2, true, 26, 0, 0.19, 5.3], [32, 3, true, 21, 0, 0.49, 5.1], [33, 3, true, 24, 0, 0.49, 6.8], [34, 1, true, 21, 0, 0.1, 5.7], [35, 1, true, 19, 0, 0.12, 5.3], [36, 2, true, 21, 0, 0.23, 6.0], [37, 1, true, 19, 0, 0.14, 5.2], [38, 1, true, 21, 1, 0.2, 5.2], [39, 3, true, 23, 0, 0.2, 5.6], [40, 2, true, 21, 0, 0.38, 5.5], [41, 2, true, 20, 0, 0.27, 5.2], [42, 1, true, 25, 1, 0.24, 6.0], [43, 2, true, 25, 0, 0.3, 5.7], [44, 3, true, 21, 0, 0.43, 5.4], [45, 3, true, 22, 0, 0.55, 5.2], [46, 2, true, 20, 0, 0.21, 5.0], [47, 1, true, 21, 0, 0.15, 4.6], [48, 1, true, 18, 0, 0.15, 3.6], [49, 1, true, 23, 0, 0.24, 5.0], [50, 3, true, 22, 0, 0.89, 5.4], [51, 2, true, 22, 0, 0.25, 4.4], [52, 3, true, 22, 0, 0.57, 4.9], [53, 3, true, 21, 0, 1.01, 5.4], [54, 1, true, 20, 0, 0.1, 4.8], [55, 3, true, 27, 0, 0.98, 6.6], [56, 2, true, 23, 0, 0.46, 5.7], [57, 1, true, 19, 0, 0.11, 4.8], [58, 2, true, 24, 0, 0.67, 5.4], [59, 3, true, 22, 0, 1.61, 5.3], [60, 1, true, 23, 0, 0.37, 4.2], [61, 2, true, 21, 0, 0.22, 3.6], [62, 2, true, 23, 0, 0.45, 4.3], [63, 2, true, 22, 0, 0.41, 4.5], [64, 2, true, 22, 0, 0.2, 4.8], [65, 1, true, 18, 0, 0.21, 4.3], [66, 3, true, 22, 0, 0.2, 4.8], [67, 3, true, 21, 0, 0.43, 4.7], [68, 2, true, 21, 0, 0.19, 3.7], [69, 1, true, 21, 0, 0.06, 3.4], [70, 2, true, 21, 0, 0.5, 4.0], [71, 3, true, 22, 0, 1.71, 6.8], [72, 3, true, 21, 0, 1.6, 5.9], [73, 3, true, 21, 0, 0.81, 4.7], [74, 1, true, 20, 0, 0.1, 4.0], [75, 2, true, 19, 0, 0.44, 3.9], [76, 2, true, 23, 0, 0.39, 4.9], [77, 1, true, 21, 0, 0.16, 4.1], [78, 3, true, 23, 0, 0.41, 5.6], [79, 1, true, 23, 0, 0.13, 4.8], [80, 3, true, 21, 0, 1.0, 4.1], [81, 1, true, 21, 0, 0.15, 3.5], [82, 3, true, 21, 0, 0.46, 3.9], [83, 3, true, 22, 0, 0.38, 4.4], [84, 2, true, 23, 0, 0.64, 4.7], [85, 3, true, 21, 0, 1.6, 4.7], [86, 3, true, 21, 0, 0.67, 4.0], [87, 2, true, 23, 0, 0.28, 4.0], [88, 2, true, 21, 0, 0.36, 3.6], [89, 3, true, 30, 0, 0.28, 5.6], [90, 2, true, 22, 0, 0.53, 5.0], [91, 3, true, 24, 0, 0.53, 5.5], [92, 2, true, 24, 0, 0.24, 4.8], [93, 3, true, 24, 0, 0.93, 5.0], [94, 1, true, 20, 0, 0.27, 4.0], [95, 2, true, 22, 0, 0.6, 4.6], [96, 3, true, 22, 0, 0.58, 4.3], [97, 1, true, 27, 0, 0.15, 4.9], [98, 2, true, 24, 0, 0.57, 5.2], [99, 3, true, 24, 0, 0.75, 6.2], [100, 3, true, 25, 0, 0.64, 6.2], [101, 1, true, 19, 0, 0.09, 3.0], [102, 2, true, 22, 0, 0.42, 6.1], [103, 2, true, 23, 1, 0.25, 5.9], [104, 3, true, 22, 0, 0.95, 5.3], [105, 1, true, 21, 0, 0.14, 4.7], [106, 2, true, 21, 0, 0.41, 3.9], [107, 1, true, 22, 0, 0.18, 4.2], [108, 1, true, 18, 0, 0.12, 3.0], [109, 2, true, 21, 0, 0.46, 6.1], [110, 2, true, 21, 0, 0.55, 6.6], [111, 2, true, 21, 0, 0.12, 6.5], [112, 1, true, 19, 0, 0.22, 4.9], [113, 1, true, 20, 0, 0.06, 5.0], [114, 1, true, 21, 0, 0.16, 5.8], [115, 2, true, 22, 0, 0.19, 4.3], [116, 1, true, 22, 0, 0.05, 3.8], [117, 1, true, 26, 0, 0.14, 3.1], [118, 2, true, 21, 0, 0.28, 2.1], [119, 2, true, 20, 0, 0.49, 0.9]]
+\ No newline at end of file

@@ -1,0 +1,388 @@
+diff --git a/angles_results.json b/angles_results.json
+new file mode 100644
+index 0000000..2f8fe9f
+--- /dev/null
++++ b/angles_results.json
+@@ -0,0 +1 @@
++[{"seed": 0, "baseline": [true, 520, 1.486], "angles": [true, 254, 1.282]}, {"seed": 1, "baseline": [true, 189, 0.491], "angles": [true, 216, 1.055]}, {"seed": 2, "baseline": [true, 148, 0.404], "angles": [true, 150, 0.752]}, {"seed": 3, "baseline": [true, 133, 0.353], "angles": [true, 146, 0.778]}, {"seed": 4, "baseline": [true, 152, 0.419], "angles": [true, 127, 0.655]}, {"seed": 5, "baseline": [true, 187, 0.422], "angles": [true, 191, 0.927]}, {"seed": 6, "baseline": [true, 172, 0.478], "angles": [true, 258, 1.335]}, {"seed": 7, "baseline": [true, 234, 0.7], "angles": [true, 223, 1.134]}, {"seed": 8, "baseline": [true, 183, 0.489], "angles": [true, 116, 0.558]}, {"seed": 9, "baseline": [true, 151, 0.445], "angles": [true, 141, 0.718]}, {"seed": 10, "baseline": [true, 146, 0.346], "angles": [true, 134, 0.67]}, {"seed": 11, "baseline": [true, 175, 0.448], "angles": [true, 154, 0.785]}, {"seed": 12, "baseline": [true, 100, 0.214], "angles": [true, 95, 0.467]}, {"seed": 13, "baseline": [true, 114, 0.29], "angles": [true, 215, 1.083]}, {"seed": 14, "baseline": [true, 185, 0.627], "angles": [true, 218, 1.135]}, {"seed": 15, "baseline": [true, 102, 0.242], "angles": [true, 109, 0.557]}, {"seed": 16, "baseline": [true, 178, 0.395], "angles": [true, 178, 0.854]}, {"seed": 17, "baseline": [true, 53, 0.121], "angles": [true, 112, 0.556]}, {"seed": 18, "baseline": [true, 114, 0.317], "angles": [true, 144, 0.722]}, {"seed": 19, "baseline": [true, 130, 0.395], "angles": [true, 76, 0.415]}, {"seed": 20, "baseline": [true, 101, 0.237], "angles": [true, 151, 0.8]}, {"seed": 21, "baseline": [true, 142, 0.411], "angles": [true, 171, 0.897]}, {"seed": 22, "baseline": [true, 84, 0.2], "angles": [true, 69, 0.74]}, {"seed": 23, "baseline": [true, 71, 0.817], "angles": [true, 70, 1.088]}, {"seed": 24, "baseline": [true, 72, 0.828], "angles": [true, 56, 0.844]}, {"seed": 25, "baseline": [true, 145, 2.005], "angles": [true, 139, 2.308]}, {"seed": 26, "baseline": [true, 182, 2.579], "angles": [true, 140, 2.37]}, {"seed": 27, "baseline": [true, 219, 3.232], "angles": [true, 205, 3.517]}, {"seed": 28, "baseline": [true, 31, 0.405], "angles": [true, 32, 0.593]}, {"seed": 29, "baseline": [true, 129, 1.804], "angles": [true, 150, 2.513]}]
+\ No newline at end of file
+diff --git a/angles_validation.txt b/angles_validation.txt
+index f128859..3961119 100644
+--- a/angles_validation.txt
++++ b/angles_validation.txt
+@@ -27,3 +27,4 @@
+ {'seed': 26, 'baseline': [True, 182, 2.579], 'angles': [True, 140, 2.37]}
+ {'seed': 27, 'baseline': [True, 219, 3.232], 'angles': [True, 205, 3.517]}
+ {'seed': 28, 'baseline': [True, 31, 0.405], 'angles': [True, 32, 0.593]}
++{'seed': 29, 'baseline': [True, 129, 1.804], 'angles': [True, 150, 2.513]}
+diff --git a/approach.py b/approach.py
+index 4e53503..3a4d7e6 100644
+--- a/approach.py
++++ b/approach.py
+@@ -14,6 +14,9 @@ class GeneratedApproach:
+         self.contact=None
+         self.age=0
+         self.last=None
++        self.history=[]
++        self.cooldown=None
++        self.pushing=False
+ 
+     def geometry(self,s):
+         w,h,v=s[12:15]
+@@ -64,7 +67,7 @@ class GeneratedApproach:
+                 for j in range(2):
+                     for v in [lo[j],hi[j]]:
+                         p=a.copy(); p[j]=v
+-                        if self.free(p,p,margin): choices.append(p)
++                        if self.free(p,p,margin) and np.all((p@self.R.T+self.origin>.105)&(p@self.R.T+self.origin<4.895)): choices.append(p)
+             if choices: return min(choices,key=lambda p:np.linalg.norm(p-a))
+         n=len(vertices); dist=[1e9]*n; prev=[-1]*n; dist[0]=0; heap=[(0,0)]
+         while heap:
+@@ -83,6 +86,19 @@ class GeneratedApproach:
+     def get_action(self,state):
+         s=np.asarray(state); self.steps+=1
+         self.geometry(s)
++        if self.cooldown is None: self.cooldown=np.zeros(len(self.pts))
++        self.cooldown=np.maximum(self.cooldown-1,0)
++        error=s[29:31]-s[:2]
++        cost=np.dot(error,error)+.35*wrap(s[31]-s[2])**2
++        self.history.append((cost,self.pushing))
++        if len(self.history)>35: self.history.pop(0)
++        if len(self.history)==35 and sum(h[1] for h in self.history)>10 and cost>self.history[0][0]-.005:
++            if self.contact is not None:
++                nearby=np.linalg.norm(self.pts-self.pts[self.contact],axis=1)<.35
++                self.cooldown[nearby]=140
++            self.contact=None
++            self.history=[]
++        self.pushing=False
+         self.origin=s[:2]
+         c,ss=math.cos(s[2]),math.sin(s[2]); R=np.array([[c,-ss],[ss,c]])
+         self.R=R
+@@ -111,6 +127,7 @@ class GeneratedApproach:
+         for i in range(len(score)):
+             cp=self.pts[i]-self.normals[i]*(s[28]+.002)
+             if not self.free(cp,cp,s[28]-.001) or not self.free(staging[i],staging[i],s[28]+.009): score[i]=0.
++        score[self.cooldown>0]=0.
+         best=int(np.argmax(score))
+         if self.contact is None:
+             self.contact=best; self.age=0
+@@ -123,6 +140,7 @@ class GeneratedApproach:
+         stage=staging[k]
+         along=np.dot(robot-p,n); lateral=np.linalg.norm(robot-p-along*n)
+         if lateral<.035 and along<-.06 and along>-(s[28]+.10):
++            self.pushing=True
+             step=min(.045,max(.004,dot[k]/norm[k]*.45))
+             target=p-n*(s[28]-.008)+n*step
+         else:
+diff --git a/baseline_normal.py b/baseline_normal.py
+new file mode 100644
+index 0000000..4e53503
+--- /dev/null
++++ b/baseline_normal.py
+@@ -0,0 +1,133 @@
++import numpy as np
++import math
++import heapq
++
++def wrap(a):
++    return (a+math.pi)%(2*math.pi)-math.pi
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.reset(None, {})
++
++    def reset(self, state, info):
++        self.steps=0
++        self.contact=None
++        self.age=0
++        self.last=None
++
++    def geometry(self,s):
++        w,h,v=s[12:15]
++        self.rects=[np.array([-h/2,h/2,-w,0]),np.array([-w/2,w/2,-v-w,-w])]
++        # Sample exposed surfaces with inward normals.
++        points=[]; normals=[]
++        def edge(a,b,n,count):
++            for t in np.linspace(.04,.96,count):
++                points.append(np.array(a)*(1-t)+np.array(b)*t); normals.append(n)
++        edge([-h/2,0],[h/2,0],[0,-1],15)
++        edge([-h/2,-w],[-h/2,0],[1,0],3)
++        edge([h/2,-w],[h/2,0],[-1,0],3)
++        edge([-h/2,-w],[-w/2,-w],[0,1],6)
++        edge([w/2,-w],[h/2,-w],[0,1],6)
++        edge([-w/2,-v-w],[-w/2,-w],[1,0],13)
++        edge([w/2,-v-w],[w/2,-w],[-1,0],13)
++        edge([-w/2,-v-w],[w/2,-v-w],[0,1],3)
++        self.pts=np.array(points); self.normals=np.array(normals)
++
++    def free(self,a,b,margin):
++        for rect in self.rects:
++            lo=rect[[0,2]]-margin; hi=rect[[1,3]]+margin
++            dd=b-a; t0=0.; t1=1.
++            for j in range(2):
++                if abs(dd[j])<1e-10:
++                    if a[j]<=lo[j] or a[j]>=hi[j]: t1=-1.; break
++                else:
++                    z=(lo[j]-a[j])/dd[j]; zz=(hi[j]-a[j])/dd[j]
++                    t0=max(t0,min(z,zz)); t1=min(t1,max(z,zz))
++            if t0<t1-1e-7: return False
++        return True
++
++    def navigate(self,a,b,radius):
++        margin=radius+.009
++        if self.free(a,b,margin): return b
++        # Axis-aligned expanded rectangles give a small visibility graph.
++        vertices=[a,b]
++        for rect in self.rects:
++            x0,x1,y0,y1=rect+np.array([-1,1,-1,1])*(margin+.006)
++            for x,y in [(x0,y0),(x0,y1),(x1,y0),(x1,y1)]:
++                p=np.array([x,y])
++                if self.free(p,p,margin) and np.all((p@self.R.T+self.origin>.105)&(p@self.R.T+self.origin<4.895)): vertices.append(p)
++        # If touching, first move out along the nearest boundary.
++        if not self.free(a,a,margin):
++            choices=[]
++            for rect in self.rects:
++                lo=rect[[0,2]]-margin-.008; hi=rect[[1,3]]+margin+.008
++                for j in range(2):
++                    for v in [lo[j],hi[j]]:
++                        p=a.copy(); p[j]=v
++                        if self.free(p,p,margin): choices.append(p)
++            if choices: return min(choices,key=lambda p:np.linalg.norm(p-a))
++        n=len(vertices); dist=[1e9]*n; prev=[-1]*n; dist[0]=0; heap=[(0,0)]
++        while heap:
++            d,i=heapq.heappop(heap)
++            if d>dist[i]+1e-8: continue
++            if i==1: break
++            for j in range(1,n):
++                if i!=j and self.free(vertices[i],vertices[j],margin):
++                    nd=d+np.linalg.norm(vertices[i]-vertices[j])
++                    if nd<dist[j]: dist[j]=nd;prev[j]=i;heapq.heappush(heap,(nd,j))
++        j=1
++        if prev[j]<0:return b
++        while prev[j]>0:j=prev[j]
++        return vertices[j]
++
++    def get_action(self,state):
++        s=np.asarray(state); self.steps+=1
++        self.geometry(s)
++        self.origin=s[:2]
++        c,ss=math.cos(s[2]),math.sin(s[2]); R=np.array([[c,-ss],[ss,c]])
++        self.R=R
++        robot=(s[16:18]-s[:2])@R
++        delta=(s[29:31]-s[:2])@R; angle=wrap(s[31]-s[2])
++        # Approximate generalized displacement due to unit normal force.
++        w,h,v=s[12:15]
++        cy=-(h*w/2+v*(w+v/2))/(h+v)
++        com=np.array([0.,cy])
++        inertia=(h*((h*h+w*w)/12+(-w/2-cy)**2)+v*((w*w+v*v)/12+(-w-v/2-cy)**2))/(h+v)
++        rr=self.pts-com
++        torque=rr[:,0]*self.normals[:,1]-rr[:,1]*self.normals[:,0]
++        omega=torque/(inertia+np.sum(rr*rr,axis=1))
++        vel=self.normals-omega[:,None]*np.column_stack((-self.pts[:,1],self.pts[:,0]))
++        desired=np.r_[delta,angle]
++        J=np.column_stack((vel,omega))
++        weights=np.array([1.,1.,.35])
++        dot=(J*weights)@desired
++        norm=np.sum(J*J*weights,axis=1)
++        gain=np.maximum(0,dot)**2/norm
++        staging=self.pts-self.normals*(s[28]+.045)
++        distances=np.linalg.norm(staging-robot,axis=1)
++        score=gain/(.20+distances*.28)
++        world_stage=staging@R.T+s[:2]
++        score[np.any((world_stage<.115)|(world_stage>4.885),axis=1)]=0.
++        for i in range(len(score)):
++            cp=self.pts[i]-self.normals[i]*(s[28]+.002)
++            if not self.free(cp,cp,s[28]-.001) or not self.free(staging[i],staging[i],s[28]+.009): score[i]=0.
++        best=int(np.argmax(score))
++        if self.contact is None:
++            self.contact=best; self.age=0
++        else:
++            self.age+=1
++            cur=self.contact
++            if score[cur]<=0 or dot[cur]<=0 or (self.age>8 and score[best]>score[cur]*1.5) or self.age>70:
++                self.contact=best; self.age=0
++        k=self.contact; n=self.normals[k]; p=self.pts[k]
++        stage=staging[k]
++        along=np.dot(robot-p,n); lateral=np.linalg.norm(robot-p-along*n)
++        if lateral<.035 and along<-.06 and along>-(s[28]+.10):
++            step=min(.045,max(.004,dot[k]/norm[k]*.45))
++            target=p-n*(s[28]-.008)+n*step
++        else:
++            target=self.navigate(robot,stage,s[28])
++        a=(target-robot)@R.T
++        a*=min(1.,.049/max(np.max(np.abs(a)),1e-9))
++        self.last=s.copy()
++        return a
+diff --git a/optimized_validation.txt b/optimized_validation.txt
+new file mode 100644
+index 0000000..ceb5fe4
+--- /dev/null
++++ b/optimized_validation.txt
+@@ -0,0 +1,3 @@
++{'seed': 0, 'baseline': [True, 520, 7.588], 'optimized': [True, 234, 3.574]}
++{'seed': 1, 'baseline': [True, 189, 2.764], 'optimized': [True, 151, 2.06]}
++{'seed': 2, 'baseline': [True, 148, 2.097], 'optimized': [True, 123, 1.534]}
+diff --git a/results_batch2.txt b/results_batch2.txt
+index e2f9ce3..8463428 100644
+--- a/results_batch2.txt
++++ b/results_batch2.txt
+@@ -151,3 +151,15 @@
+ 260 success True steps 135 err [-0.0135, -0.0067, -0.0192] time 2.09
+ 261 success True steps 178 err [-0.0073, 0.0071, -0.0177] time 2.315
+ 262 success True steps 177 err [-0.0095, -0.0074, -0.009] time 2.712
++263 success True steps 128 err [0.038, -0.0051, -0.012] time 1.779
++264 success True steps 190 err [0.0096, -0.0117, 0.0045] time 2.597
++265 success True steps 122 err [0.038, 0.0334, -0.0801] time 1.714
++266 success True steps 130 err [0.0192, -0.0125, -0.0201] time 1.724
++267 success True steps 210 err [-0.0246, -0.0173, 0.0204] time 2.895
++268 success True steps 158 err [-0.0062, -0.014, 0.003] time 2.379
++269 success True steps 214 err [-0.0175, 0.0121, -0.0285] time 2.967
++270 success True steps 112 err [-0.0289, -0.0024, -0.0082] time 1.556
++271 success True steps 132 err [-0.0016, 0.0153, 0.0063] time 1.909
++272 success True steps 192 err [0.0059, -0.0034, 0.0028] time 2.577
++273 success True steps 73 err [0.0151, -0.0187, -0.0261] time 1.048
++274 success True steps 122 err [0.008, -0.0023, 0.0249] time 1.473
+diff --git a/results_policy_weight015_0_20.json b/results_policy_weight015_0_20.json
+new file mode 100644
+index 0000000..8276ec4
+--- /dev/null
++++ b/results_policy_weight015_0_20.json
+@@ -0,0 +1 @@
++[{"seed": 0, "success": true, "steps": 191, "time": 2.3954815049655735}, {"seed": 1, "success": true, "steps": 180, "time": 2.3985723280347884}, {"seed": 2, "success": true, "steps": 150, "time": 1.8435059150215238}, {"seed": 3, "success": true, "steps": 119, "time": 1.6515972680645064}, {"seed": 4, "success": true, "steps": 135, "time": 1.884324767976068}, {"seed": 5, "success": true, "steps": 178, "time": 2.4852328420383856}, {"seed": 6, "success": true, "steps": 273, "time": 4.054402490030043}, {"seed": 7, "success": true, "steps": 234, "time": 3.209418468992226}, {"seed": 8, "success": true, "steps": 152, "time": 2.291991262929514}, {"seed": 9, "success": true, "steps": 182, "time": 2.5193052069516852}, {"seed": 10, "success": true, "steps": 129, "time": 1.763479236047715}, {"seed": 11, "success": true, "steps": 174, "time": 2.510699041071348}, {"seed": 12, "success": true, "steps": 118, "time": 1.5737850500736386}, {"seed": 13, "success": true, "steps": 118, "time": 1.6106101489858702}, {"seed": 14, "success": true, "steps": 177, "time": 2.505413844017312}, {"seed": 15, "success": true, "steps": 67, "time": 1.0061719689983875}, {"seed": 16, "success": true, "steps": 214, "time": 2.9480392260011286}, {"seed": 17, "success": true, "steps": 55, "time": 0.8168064180063084}, {"seed": 18, "success": true, "steps": 114, "time": 1.6244995450833812}, {"seed": 19, "success": true, "steps": 111, "time": 1.4980460840743035}]
+\ No newline at end of file
+diff --git a/sweep_baselineprobe.log b/sweep_baselineprobe.log
+index 843ee5a..a1caf5b 100644
+--- a/sweep_baselineprobe.log
++++ b/sweep_baselineprobe.log
+@@ -5,3 +5,15 @@ policy_baselineprobe 3 True 133
+ policy_baselineprobe 4 True 152
+ policy_baselineprobe 5 True 187
+ policy_baselineprobe 6 True 172
++policy_baselineprobe 7 True 234
++policy_baselineprobe 8 True 183
++policy_baselineprobe 9 True 151
++policy_baselineprobe 10 True 146
++policy_baselineprobe 11 True 175
++policy_baselineprobe 12 True 100
++policy_baselineprobe 13 True 114
++policy_baselineprobe 14 True 185
++policy_baselineprobe 15 True 102
++policy_baselineprobe 16 True 178
++policy_baselineprobe 17 True 53
++policy_baselineprobe 18 True 114
+diff --git a/sweep_distance010.log b/sweep_distance010.log
+index 8eeec72..25afbda 100644
+--- a/sweep_distance010.log
++++ b/sweep_distance010.log
+@@ -5,3 +5,13 @@ policy_distance010 3 True 122
+ policy_distance010 4 True 136
+ policy_distance010 5 True 238
+ policy_distance010 6 True 160
++policy_distance010 7 True 224
++policy_distance010 8 True 211
++policy_distance010 9 True 175
++policy_distance010 10 True 193
++policy_distance010 11 True 142
++policy_distance010 12 True 126
++policy_distance010 13 True 237
++policy_distance010 14 True 177
++policy_distance010 15 True 70
++policy_distance010 16 True 188
+diff --git a/sweep_distance060.log b/sweep_distance060.log
+index 8f5e85e..b2b38d7 100644
+--- a/sweep_distance060.log
++++ b/sweep_distance060.log
+@@ -5,3 +5,15 @@ policy_distance060 3 True 184
+ policy_distance060 4 True 168
+ policy_distance060 5 True 180
+ policy_distance060 6 True 278
++policy_distance060 7 True 216
++policy_distance060 8 True 181
++policy_distance060 9 True 151
++policy_distance060 10 True 215
++policy_distance060 11 True 161
++policy_distance060 12 True 102
++policy_distance060 13 True 109
++policy_distance060 14 True 216
++policy_distance060 15 True 125
++policy_distance060 16 True 159
++policy_distance060 17 True 90
++policy_distance060 18 True 136
+diff --git a/sweep_switch12.log b/sweep_switch12.log
+index 9931439..9c89011 100644
+--- a/sweep_switch12.log
++++ b/sweep_switch12.log
+@@ -5,3 +5,14 @@ policy_switch12 3 True 193
+ policy_switch12 4 True 117
+ policy_switch12 5 True 170
+ policy_switch12 6 True 160
++policy_switch12 7 True 195
++policy_switch12 8 True 179
++policy_switch12 9 True 153
++policy_switch12 10 True 148
++policy_switch12 11 True 159
++policy_switch12 12 True 99
++policy_switch12 13 True 151
++policy_switch12 14 True 188
++policy_switch12 15 True 114
++policy_switch12 16 True 176
++policy_switch12 17 True 53
+diff --git a/sweep_switch20.log b/sweep_switch20.log
+index 10db62d..11f8282 100644
+--- a/sweep_switch20.log
++++ b/sweep_switch20.log
+@@ -5,3 +5,14 @@ policy_switch20 3 True 132
+ policy_switch20 4 True 152
+ policy_switch20 5 True 205
+ policy_switch20 6 True 214
++policy_switch20 7 True 240
++policy_switch20 8 True 173
++policy_switch20 9 True 149
++policy_switch20 10 True 181
++policy_switch20 11 True 164
++policy_switch20 12 True 102
++policy_switch20 13 True 140
++policy_switch20 14 True 195
++policy_switch20 15 True 143
++policy_switch20 16 True 238
++policy_switch20 17 True 53
+diff --git a/sweep_weight015.log b/sweep_weight015.log
+index 2c4ae2d..a497aff 100644
+--- a/sweep_weight015.log
++++ b/sweep_weight015.log
+@@ -7,3 +7,15 @@ policy_weight015 5 True 178
+ policy_weight015 6 True 273
+ policy_weight015 7 True 234
+ policy_weight015 8 True 152
++policy_weight015 9 True 182
++policy_weight015 10 True 129
++policy_weight015 11 True 174
++policy_weight015 12 True 118
++policy_weight015 13 True 118
++policy_weight015 14 True 177
++policy_weight015 15 True 67
++policy_weight015 16 True 214
++policy_weight015 17 True 55
++policy_weight015 18 True 114
++policy_weight015 19 True 111
++SUMMARY policy_weight015 success 20 mean 153.55 max 273
+diff --git a/sweep_weight060.log b/sweep_weight060.log
+index 4ffab57..aa8400e 100644
+--- a/sweep_weight060.log
++++ b/sweep_weight060.log
+@@ -5,3 +5,15 @@ policy_weight060 3 True 133
+ policy_weight060 4 True 152
+ policy_weight060 5 True 193
+ policy_weight060 6 True 223
++policy_weight060 7 True 242
++policy_weight060 8 True 178
++policy_weight060 9 True 149
++policy_weight060 10 True 149
++policy_weight060 11 True 161
++policy_weight060 12 True 100
++policy_weight060 13 True 130
++policy_weight060 14 True 196
++policy_weight060 15 True 125
++policy_weight060 16 True 184
++policy_weight060 17 True 53
++policy_weight060 18 True 161

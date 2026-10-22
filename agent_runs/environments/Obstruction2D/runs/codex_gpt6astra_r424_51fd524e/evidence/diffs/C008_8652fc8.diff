@@ -1,0 +1,25 @@
+diff --git a/probe_grasp_threshold.py b/probe_grasp_threshold.py
+new file mode 100644
+index 0000000..e5e8765
+--- /dev/null
++++ b/probe_grasp_threshold.py
+@@ -0,0 +1,19 @@
++from env_client import make_env
++import numpy as np
++for jointdelta in [0,.1,-.1]:
++ for goal_y in [.58,.50,.48,.46,.44,.42,.40,.38,.36]:
++  e=make_env();s,_=e.reset(seed=1);r=s.get_object_from_name('robot');b=s.get_object_from_name('target_block')
++  def step(a):
++   global s
++   s,*_=e.step(np.array(a,dtype=np.float32))
++  x=s.get(b,'x')+s.get(b,'width')/2
++  for _ in range(20):
++   step([np.clip(x-s.get(r,'x'),-.05,.05),0,0,jointdelta,0]);jointdelta=0 if False else jointdelta
++   if abs(s.get(r,'x')-x)<1e-6:break
++  for _ in range(20):
++   step([0,np.clip(goal_y-s.get(r,'y'),-.05,.05),0,0,1])
++   if abs(s.get(r,'y')-goal_y)<1e-6:break
++  before=s.get(b,'y');actual=s.get(r,'y');j=s.get(r,'arm_joint');l=s.get(r,'arm_length')
++  step([0,.02,0,0,1])
++  print(jointdelta,goal_y,'actual',round(actual,4),'joint',j,'len',l,'held',round(s.get(b,'y')-before,4))
++  e.close()

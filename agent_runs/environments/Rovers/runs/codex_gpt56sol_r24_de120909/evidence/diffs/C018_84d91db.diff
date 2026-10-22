@@ -1,0 +1,70 @@
+diff --git a/approach.py b/approach.py
+index 08aa295..6532ad2 100644
+--- a/approach.py
++++ b/approach.py
+@@ -28,6 +28,8 @@ class GeneratedApproach:
+         self.targets = [None, None]
+         self.stalls = [0, 0]
+         self.lastpos = list(self.home)
++        self.extra_rects=[[],[]]
++        self.last_motion=[None,None]
+         self.radio_choices=[self._radio_points(state,i) for i in range(2)]
+         self.radio_idx=[0,0]
+         self.last_ops=["noop","noop"]
+@@ -44,7 +46,7 @@ class GeneratedApproach:
+                 owner=0 if x>=0 else 1
+                 # Samples squeezed between the large lander and southwest arena
+                 # corner are not drive-reachable; prefer either of the other two.
+-                trapped = owner==1 and math.dist((x,y),lq)<.60 and y<lq[1]+.05
++                trapped = owner==1 and math.dist((x,y),lq)<.60
+                 choices.append((int(trapped),math.dist(self.home[owner],(x,y)),owner,o.name))
+             if choices:
+                 _,_,owner,name=min(choices)
+@@ -144,10 +146,15 @@ class GeneratedApproach:
+                 if ng < cost.get(nk,10**9):
+                     cost[nk]=ng; parent[nk]=k; heapq.heappush(openq,(ng+h(nk),ng,nk))
+         if end is None: return []
++        endpos=pos(end)
+         ks=[]
+         while end != (0,0): ks.append(end); end=parent[end]
+         ks.reverse()
+-        return [pos(k) for k in ks]
++        path=[pos(k) for k in ks]
++        final=min(goals,key=lambda q:math.dist(endpos,q))
++        if self._free(final,rects) and math.dist(endpos,final)>.025:
++            path.append(final)
++        return path
+ 
+     def _candidates(self, s, q, radius, require_los=True):
+         rects=self._rects(s); out=[]
+@@ -224,9 +231,14 @@ class GeneratedApproach:
+ 
+     def get_action(self, state):
+         a=np.zeros(8,dtype=np.float32)
+-        rects=self._rects(state)
++        base_rects=self._rects(state)
+         for i in range(2):
+             r=state.get_object_from_name(self.names[i]); pos=(state.get(r,"x"),state.get(r,"y"))
++            if self.last_motion[i] is not None and math.dist(pos,self.lastpos[i])<.02:
++                bx,by=self.last_motion[i]
++                self.extra_rects[i].append((bx,by,.07,.07))
++                self.paths[i]=[]; self.targets[i]=None
++            rects=base_rects+self.extra_rects[i]
+             if self.last_ops[i]=="send":
+                 pending_img=any(state.get(o,"have_image_rover%d"%i)>.5 and state.get(o,"received_image")<.5
+                                 for o in self._get(state,"objective"))
+@@ -240,7 +252,7 @@ class GeneratedApproach:
+                 key=(task,round(target[0],2),round(target[1],2))
+                 if self.targets[i]!=key or not self.paths[i] or self.stalls[i]>=2:
+                     if task=="nav_sample":
+-                        goals=[target]; tolerance=.24
++                        goals=self._candidates(state,target,.24,False)+[target]; tolerance=.09
+                     else:
+                         goals=[target]; tolerance=.15
+                     self.paths[i]=self._astar(pos,goals,rects,tolerance)
+@@ -256,4 +268,5 @@ class GeneratedApproach:
+             self.stalls[i]=0 if moved or (abs(a[4*i])+abs(a[4*i+1])<.01) else self.stalls[i]+1
+             self.lastpos[i]=pos
+             self.last_ops[i]=op
++            self.last_motion[i]=(pos[0]+float(a[4*i]),pos[1]+float(a[4*i+1])) if abs(a[4*i])+abs(a[4*i+1])>.01 else None
+         return a

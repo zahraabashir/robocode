@@ -1,0 +1,31 @@
+diff --git a/approach.py b/approach.py
+index b296456..2096509 100644
+--- a/approach.py
++++ b/approach.py
+@@ -181,6 +181,8 @@ class GeneratedApproach:
+         if not need_rot and not need_pos:
+             return None
+         # rotate if angle error large
++        gm = self.wall_margin_pose(B, g, float(obs[31]))
++        wall_m = min(self.wall_m, max(0.0, gm - 0.08))
+         if need_rot and (abs(dth) > math.radians(6) or not need_pos or dist < 0.05):
+             best, bs = None, -1e9
+             for pr in prims:
+@@ -207,14 +209,14 @@ class GeneratedApproach:
+                     R2 = np.array([[c2, -s2], [s2, c2]])
+                     p2 = cw + R2 @ (B.p - cw)
+                     m = min(m, self.wall_margin_pose(B, p2, B.th + a2))
+-                if m < self.wall_m:
+-                    cost += 1000 + (self.wall_m - m) * 1000
++                if m < wall_m:
++                    cost += 1000 + (wall_m - m) * 1000
+                 s = -cost
+                 if s > bs:
+                     bs, best = s, pr
+             if best is not None and bs > -900:
+                 return best, dth, g
+-            if best is not None and self.wall_margin(B, np.zeros(2)) > 0.45:
++            if best is not None and self.wall_margin(B, np.zeros(2)) > min(0.45, gm + 0.1):
+                 return best, dth, g
+             # recenter: move the block away from walls
+             c = np.array([2.5, 2.5]) - B.p

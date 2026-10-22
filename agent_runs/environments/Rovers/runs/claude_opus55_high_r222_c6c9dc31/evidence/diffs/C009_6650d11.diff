@@ -1,0 +1,82 @@
+diff --git a/approach.py b/approach.py
+index f367f0f..a81f832 100644
+--- a/approach.py
++++ b/approach.py
+@@ -182,11 +182,39 @@ class GeneratedApproach:
+             if not held:
+                 need_kind.append(kind)
+ 
++        blockers = {r: [] for r in rnames}
+         per = {}
+-        for r in rnames:
+-            per[r] = self._rover_hk(state, r, need_img, need_kind, must_send[r], rnames)
++        for it in range(4):
++            for r in rnames:
++                if r not in per:
++                    per[r] = self._rover_hk(state, r, need_img, need_kind, must_send[r], rnames, blockers[r])
++            self._assign(per, rnames, need_img, need_kind)
++            changed = False
++            for k, r in enumerate(rnames):
++                other = rnames[1 - k]
++                op_ = self.plans[other]
++                ox0 = g(w.rovers[other], "x"); oy0 = g(w.rovers[other], "y")
++                for t, ((x, y), op) in enumerate(self.plans[r]):
++                    if op != "send":
++                        continue
++                    if t < len(op_):
++                        p = op_[t][0]
++                    elif op_:
++                        p = op_[-1][0]
++                    else:
++                        p = (ox0, oy0)
++                    th = self.home_theta[r]
++                    cx = x + CAM_OFF * math.cos(th + CAM_ANG); cy = y + CAM_OFF * math.sin(th + CAM_ANG)
++                    lx, ly = g(w.lander, "x"), g(w.lander, "y")
++                    dd = float(seg_point_dist(np.array(cx), np.array(cy), lx, ly, p[0], p[1]))
++                    if dd <= ROVER_BLOCK_R:
++                        blockers[r].append(p)
++                        per.pop(r, None)
++                        changed = True
++            if not changed:
++                break
+ 
+-        # ---- joint assignment
++    def _assign(self, per, rnames, need_img, need_kind):
+         best = None
+         tasks_all = [("img", ob.name) for ob in need_img] + [("kind", k) for k in need_kind]
+         r0, r1 = rnames
+@@ -202,7 +230,6 @@ class GeneratedApproach:
+                     best = (key, S0, S1)
+         self.plans = {}
+         if best is None:
+-            # fallback: just go home
+             for r in rnames:
+                 self.plans[r] = self._extract(per[r], per[r]["final_any_empty"])
+         else:
+@@ -246,7 +273,7 @@ class GeneratedApproach:
+                 break
+         return TU, TC, AU, AC
+ 
+-    def _rover_hk(self, state, r, need_img, need_kind, must_send, rnames):
++    def _rover_hk(self, state, r, need_img, need_kind, must_send, rnames, blockers=()):
+         w = self.w
+         g = lambda o, f: self._get(state, o, f)
+         X, Y, start = self._grid(state, r)
+@@ -302,7 +329,7 @@ class GeneratedApproach:
+         for other in rnames:
+             if other == r:
+                 continue
+-            for (px, py) in (self.home[other], (g(w.rovers[other], "x"), g(w.rovers[other], "y"))):
++            for (px, py) in [self.home[other], (g(w.rovers[other], "x"), g(w.rovers[other], "y"))] + list(blockers):
+                 send &= seg_point_dist(CX, CY, lx, ly, px, py) > ROVER_BLOCK_R
+         hx, hy = self.home[r]
+         homereg = (np.hypot(X - hx, Y - hy) <= HOME_R) & free
+@@ -623,7 +650,7 @@ class GeneratedApproach:
+             if op == "image" and imgs <= snap[2]:
+                 self.bad_view[r].append((x, y))
+                 return True
+-            if op == "send" and recv <= snap[3] and self._unsent(state, r):
++            if op == "send" and self._unsent(state, r):
+                 self.bad_send[r].append((x, y))
+                 self.log.append(("send", r, round(x, 3), round(y, 3)))
+                 return True

@@ -1,0 +1,33 @@
+diff --git a/approach.py b/approach.py
+index 16200b2..5152117 100644
+--- a/approach.py
++++ b/approach.py
+@@ -32,18 +32,24 @@ class GeneratedApproach:
+         self.reset_t=0
+         self.cal_i=0; self.cal_sign=1; self.last_delta=0.; self.move_count=0; self.release_t=0
+         x=self._v(state,name,"pose_x"); self.start_x=x
+-        if x<.23: base=(.18,-2.50,-.75)
+-        else: base=(.35+2*(x-.336),-2.20+1.5*(x-.336),-.60+.8*(x-.336))
++        pick_bx=-.12
++        model_x=x
++        if name=="target_block" and self.region[0]>x+.15:
++            # Pick with the base retracted and the arm extended.  The stored base
++            # travel then supplies forward workspace during transport.
++            pick_bx=-.30; model_x=x+.18
++        if model_x<.23: base=(.18,-2.50,-.75)
++        else: base=(.35+2*(model_x-.336),-2.20+1.5*(model_x-.336),-.60+.8*(model_x-.336))
+         triples=[(base[0]-.10,base[1],base[2]),base,(base[0]+.08,base[1],base[2]),
+                  (base[0],base[1]-.10,base[2]-.10),(base[0],base[1]+.10,base[2]+.10),
+                  (base[0],base[1],base[2]-.18),(base[0],base[1],base[2]+.18)]
+-        if x<.23:
++        if model_x<.23:
+             for q2 in (.10,.20,.30,.40):
+                 for q4 in (-2.50,-2.35,-2.20):
+                     for q6 in (-.90,-.75,-.60): triples.append((q2,q4,q6))
+         self.pick_poses=[]
+         for q2,q4,q6 in triples:
+-            self.pick_poses.append((np.array([0.,q2,-np.pi,q4,0.,q6,np.pi/2]),.00135,-.12))
++            self.pick_poses.append((np.array([0.,q2,-np.pi,q4,0.,q6,np.pi/2]),.00135,pick_bx))
+         if name!="target_block":
+             # A second, highly folded grasp family reaches the tiny obstructions.
+             q=np.array([-1.6368,2.41,-2.6184,2.66,-1.0464,2.23,-1.8828])

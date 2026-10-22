@@ -1,0 +1,21 @@
+diff --git a/approach.py b/approach.py
+index 031ef40..1be8c16 100644
+--- a/approach.py
++++ b/approach.py
+@@ -128,6 +128,7 @@ class GeneratedApproach:
+     LOOK = 10
+     GRIDNAV = True
+     CURVS = (0.0,)
++    CURVS2 = (0.0,)
+     def __init__(self, action_space, observation_space, primitives):
+         self.action_space = action_space
+         self.rng = np.random.default_rng(0)
+@@ -312,7 +313,7 @@ class GeneratedApproach:
+             best_tot = np.inf
+             for i in cand:
+                 steps1 = R1["nav"][i] + R1["k"][i]
+-                R2 = self._rollout(R1["pos"][i], float(R1["th"][i]), R1["rob"][i], [AMAX, 0.02])
++                R2 = self._rollout(R1["pos"][i], float(R1["th"][i]), R1["rob"][i], [AMAX, 0.02], curvs=self.CURVS2)
+                 s2 = min(float(R2["score"].min()), R1["score"][i] - self.STEP_PEN * steps1)
+                 tot = s2 + self.STEP_PEN * steps1
+                 if tot < best_tot:

@@ -1,0 +1,143 @@
+diff --git a/assignment_results.jsonl b/assignment_results.jsonl
+index 9444fb2..ba50b2e 100644
+--- a/assignment_results.jsonl
++++ b/assignment_results.jsonl
+@@ -1,2 +1,15 @@
+ {"seed": 0, "base": {"steps": 39, "success": true, "seconds": 1.39}, "candidate": {"steps": 33, "success": true, "seconds": 1.286}}
+ {"seed": 1, "base": {"steps": 23, "success": true, "seconds": 0.623}, "candidate": {"steps": 23, "success": true, "seconds": 1.093}}
++{"seed": 2, "base": {"steps": 23, "success": true, "seconds": 0.996}, "candidate": {"steps": 25, "success": true, "seconds": 1.294}}
++{"seed": 3, "base": {"steps": 28, "success": true, "seconds": 1.237}, "candidate": {"steps": 32, "success": true, "seconds": 1.245}}
++{"seed": 4, "base": {"steps": 26, "success": true, "seconds": 1.65}, "candidate": {"steps": 26, "success": true, "seconds": 1.467}}
++{"seed": 5, "base": {"steps": 30, "success": true, "seconds": 1.617}, "candidate": {"steps": 31, "success": true, "seconds": 2.128}}
++{"seed": 6, "base": {"steps": 20, "success": true, "seconds": 0.988}, "candidate": {"steps": 20, "success": true, "seconds": 1.269}}
++{"seed": 7, "base": {"steps": 32, "success": true, "seconds": 1.946}, "candidate": {"steps": 27, "success": true, "seconds": 1.338}}
++{"seed": 8, "base": {"steps": 25, "success": true, "seconds": 1.625}, "candidate": {"steps": 25, "success": true, "seconds": 1.816}}
++{"seed": 9, "base": {"steps": 28, "success": true, "seconds": 1.779}, "candidate": {"steps": 28, "success": true, "seconds": 1.495}}
++{"seed": 10, "base": {"steps": 30, "success": true, "seconds": 1.578}, "candidate": {"steps": 30, "success": true, "seconds": 1.317}}
++{"seed": 11, "base": {"steps": 29, "success": true, "seconds": 1.651}, "candidate": {"steps": 21, "success": true, "seconds": 2.005}}
++{"seed": 12, "base": {"steps": 26, "success": true, "seconds": 2.068}, "candidate": {"steps": 26, "success": true, "seconds": 2.206}}
++{"seed": 13, "base": {"steps": 34, "success": true, "seconds": 2.591}, "candidate": {"steps": 33, "success": true, "seconds": 1.74}}
++{"seed": 14, "base": {"steps": 37, "success": true, "seconds": 2.23}, "candidate": {"steps": 35, "success": true, "seconds": 1.481}}
+diff --git a/balanced_results.jsonl b/balanced_results.jsonl
+new file mode 100644
+index 0000000..3f6fd9f
+--- /dev/null
++++ b/balanced_results.jsonl
+@@ -0,0 +1,9 @@
++{"seed": 0, "candidate": {"steps": 33, "success": true, "seconds": 2.594}}
++{"seed": 1, "candidate": {"steps": 23, "success": true, "seconds": 2.078}}
++{"seed": 2, "candidate": {"steps": 25, "success": true, "seconds": 1.9}}
++{"seed": 3, "candidate": {"steps": 32, "success": true, "seconds": 2.653}}
++{"seed": 4, "candidate": {"steps": 26, "success": true, "seconds": 2.207}}
++{"seed": 5, "candidate": {"steps": 31, "success": true, "seconds": 1.873}}
++{"seed": 6, "candidate": {"steps": 20, "success": true, "seconds": 1.284}}
++{"seed": 7, "candidate": {"steps": 31, "success": true, "seconds": 1.728}}
++{"seed": 8, "candidate": {"steps": 25, "success": true, "seconds": 1.844}}
+diff --git a/larger_stress.jsonl b/larger_stress.jsonl
+index d757283..cd2f639 100644
+--- a/larger_stress.jsonl
++++ b/larger_stress.jsonl
+@@ -29,3 +29,22 @@
+ {"seed": 128, "n": 4, "steps": 31, "success": true, "sec": 1.13}
+ {"seed": 129, "n": 4, "steps": 32, "success": true, "sec": 1.784}
+ {"seed": 130, "n": 4, "steps": 32, "success": true, "sec": 1.103}
++{"seed": 131, "n": 4, "steps": 29, "success": true, "sec": 0.894}
++{"seed": 132, "n": 4, "steps": 33, "success": true, "sec": 1.477}
++{"seed": 133, "n": 4, "steps": 30, "success": true, "sec": 1.641}
++{"seed": 134, "n": 4, "steps": 30, "success": true, "sec": 1.543}
++{"seed": 135, "n": 4, "steps": 34, "success": true, "sec": 1.771}
++{"seed": 136, "n": 4, "steps": 33, "success": true, "sec": 1.904}
++{"seed": 137, "n": 4, "steps": 34, "success": true, "sec": 2.601}
++{"seed": 138, "n": 4, "steps": 34, "success": true, "sec": 1.854}
++{"seed": 139, "n": 4, "steps": 31, "success": true, "sec": 2.073}
++{"seed": 140, "n": 4, "steps": 30, "success": true, "sec": 1.819}
++{"seed": 141, "n": 4, "steps": 33, "success": true, "sec": 2.196}
++{"seed": 142, "n": 4, "steps": 29, "success": true, "sec": 1.809}
++{"seed": 143, "n": 4, "steps": 27, "success": true, "sec": 1.45}
++{"seed": 144, "n": 4, "steps": 31, "success": true, "sec": 1.638}
++{"seed": 145, "n": 4, "steps": 28, "success": true, "sec": 1.681}
++{"seed": 146, "n": 4, "steps": 28, "success": true, "sec": 3.2}
++{"seed": 147, "n": 4, "steps": 35, "success": true, "sec": 2.84}
++{"seed": 148, "n": 4, "steps": 27, "success": true, "sec": 2.301}
++{"seed": 149, "n": 4, "steps": 34, "success": true, "sec": 2.68}
+diff --git a/probe_samples.py b/probe_samples.py
+new file mode 100644
+index 0000000..e43253b
+--- /dev/null
++++ b/probe_samples.py
+@@ -0,0 +1,42 @@
++from env_client import make_env
++from approach import GeneratedApproach
++from scipy.sparse.csgraph import dijkstra
++import numpy as np
++for seed in range(200):
++ e=make_env();s,_=e.reset(seed=seed)
++ samples=sorted(s.get_objects(e.observation_space.get_type('sample')),key=lambda o:o.name)
++ coords=np.array([[s.get(o,'x'),s.get(o,'y')] for o in samples])
++ pairs=[(i,j) for i in range(3) for j in range(3,6) if np.linalg.norm(coords[i]-coords[j])<.44]
++ if not pairs:e.close();continue
++ p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,{})
++ found=False
++ for stone,soil in pairs:
++  d1=np.linalg.norm(p.points-coords[stone],axis=1);d2=np.linalg.norm(p.points-coords[soil],axis=1)
++  ids=np.flatnonzero(p.valid&(d1<.245)&(d2<d1-.025))
++  for end in ids:
++   j=0 if p.points[end,0]>0 else 1;r=p.rovers[j]
++   dist,pred=dijkstra(p.graph,indices=p.nearest(p.homes[j]),return_predecessors=True)
++   if np.isfinite(dist[end]):found=True;break
++  if found:break
++ if not found:e.close();continue
++ print('seed',seed,'pair',stone,soil,'coords',coords.tolist(),'target',p.points[end].tolist(),'dist',d1[end],d2[end],flush=True)
++ def step(move,op):
++  global s
++  a=np.zeros(8);a[4*j:4*j+2]=move;a[4*j+3]=op;s,*_=e.step(a)
++ for k in range(130):
++  q=p.xy(s,r);start=p.nearest(q)
++  if np.linalg.norm(q-p.points[end])<.01:break
++  dist,pred=dijkstra(p.graph,indices=start,return_predecessors=True);path=[end]
++  while path[-1]!=start:
++   z=int(pred[path[-1]])
++   if z<0:break
++   path.append(z)
++  dest=p.points[path[-2] if len(path)>1 else end];step(np.clip(dest-q,-.2,.2),0)
++  if np.linalg.norm(p.xy(s,r)-q)<1e-7:break
++ print('arrived',p.xy(s,r).tolist(),flush=True)
++ for rep in range(3):
++  step([0,0],-5/6)
++  print('sample',rep,'full',s.get(r,'store_full'),'analyzed',[o.name for o in samples if s.get(o,'analyzed_rover'+str(j))],flush=True)
++  step([0,0],5/6)
++ e.close()
++ break
+diff --git a/refined_radio.jsonl b/refined_radio.jsonl
+new file mode 100644
+index 0000000..8745e54
+--- /dev/null
++++ b/refined_radio.jsonl
+@@ -0,0 +1,24 @@
++{"seed": 0, "n": 3, "steps": 34, "success": true, "sec": 1.438}
++{"seed": 1, "n": 2, "steps": 21, "success": true, "sec": 1.155}
++{"seed": 2, "n": 3, "steps": 22, "success": true, "sec": 1.506}
++{"seed": 3, "n": 3, "steps": 26, "success": true, "sec": 1.324}
++{"seed": 4, "n": 3, "steps": 24, "success": true, "sec": 1.065}
++{"seed": 5, "n": 3, "steps": 30, "success": true, "sec": 1.745}
++{"seed": 6, "n": 2, "steps": 22, "success": true, "sec": 1.869}
++{"seed": 7, "n": 3, "steps": 33, "success": true, "sec": 2.481}
++{"seed": 8, "n": 3, "steps": 26, "success": true, "sec": 1.577}
++{"seed": 9, "n": 2, "steps": 25, "success": true, "sec": 1.07}
++{"seed": 10, "n": 3, "steps": 26, "success": true, "sec": 1.658}
++{"seed": 11, "n": 1, "steps": 28, "success": true, "sec": 1.83}
++{"seed": 12, "n": 2, "steps": 26, "success": true, "sec": 1.848}
++{"seed": 13, "n": 3, "steps": 33, "success": true, "sec": 1.928}
++{"seed": 14, "n": 1, "steps": 37, "success": true, "sec": 2.017}
++{"seed": 15, "n": 3, "steps": 47, "success": true, "sec": 4.129}
++{"seed": 16, "n": 2, "steps": 26, "success": true, "sec": 2.773}
++{"seed": 17, "n": 3, "steps": 31, "success": true, "sec": 2.73}
++{"seed": 18, "n": 3, "steps": 32, "success": true, "sec": 2.573}
++{"seed": 19, "n": 2, "steps": 30, "success": true, "sec": 1.661}
++{"seed": 20, "n": 3, "steps": 36, "success": true, "sec": 2.147}
++{"seed": 21, "n": 1, "steps": 33, "success": true, "sec": 1.885}
++{"seed": 22, "n": 3, "steps": 25, "success": true, "sec": 1.234}
++{"seed": 23, "n": 1, "steps": 18, "success": true, "sec": 1.467}
+diff --git a/stress_500.jsonl b/stress_500.jsonl
+new file mode 100644
+index 0000000..e69de29

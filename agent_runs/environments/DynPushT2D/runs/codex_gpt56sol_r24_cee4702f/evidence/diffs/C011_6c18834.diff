@@ -1,0 +1,15 @@
+diff --git a/test_candidate_strategy.py b/test_candidate_strategy.py
+index 439d104..24f8711 100644
+--- a/test_candidate_strategy.py
++++ b/test_candidate_strategy.py
+@@ -19,7 +19,9 @@ def run(seed, verbose=False):
+             raise
+         if verbose and (step % 100 == 99 or term or trunc):
+             ae = (obs[31] - obs[2] + np.pi) % (2*np.pi) - np.pi
+-            print(seed, step + 1, policy.mode, policy.phase, "poserr", round(float(np.linalg.norm(obs[29:31]-obs[0:2])), 3), "angerr", round(float(ae), 3))
++            print(seed, step + 1, policy.mode, policy.phase, "block", np.round(obs[0:3], 2),
++                  "robot", np.round(obs[16:18], 2), "poserr", round(float(np.linalg.norm(obs[29:31]-obs[0:2])), 3),
++                  "angerr", round(float(ae), 3))
+         if term or trunc:
+             break
+     env.close()

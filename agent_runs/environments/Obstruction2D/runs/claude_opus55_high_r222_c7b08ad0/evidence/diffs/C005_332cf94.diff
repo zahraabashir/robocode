@@ -1,0 +1,138 @@
+diff --git a/approach.py b/approach.py
+index 0f005da..9b89149 100644
+--- a/approach.py
++++ b/approach.py
+@@ -5,6 +5,7 @@ WORLD_Y = (0.0, 1.0)
+ MAXD = 0.05
+ ARM_MAX = 0.2
+ EARLY = True
++BOTTOM_OFF = 0.018
+ 
+ 
+ class GeneratedApproach:
+@@ -145,7 +146,7 @@ class GeneratedApproach:
+             gy = blk['y1'] + ARM_MAX + r['gw'] + self.grasp_eps
+             held = dict(name=blk['name'], dx0=blk['x0'] - gx, dx1=blk['x1'] - gx,
+                         dy0=blk['y0'] - gy, dy1=blk['y1'] - gy)
+-            bottom = surf['y1'] + 0.008
++            bottom = surf['y1'] + BOTTOM_OFF
+             ry = bottom - held['dy0']
+             res = []
+             for px in xs:
+@@ -172,23 +173,72 @@ class GeneratedApproach:
+             return [], held, gx, gy
+         return best
+ 
++    # ------------------------------------------------------ vectorised costs
++    def _colprof(self, xs, b, held, aj=ARM_MAX):
++        r = self.r
++        R = r['R']
++        bx0, bx1, by1 = b
++        d = np.maximum(np.maximum(bx0 - xs, 0.0), xs - bx1)
++        out = np.where(d < R, by1 + np.sqrt(np.maximum(R * R - d * d, 0.0)), -1.0)
++        g = (xs + r['gh'] / 2 > bx0) & (xs - r['gh'] / 2 < bx1)
++        out = np.maximum(out, np.where(g, by1 + aj + r['gw'], -1.0))
++        if held is not None:
++            h = (xs + held['dx1'] > bx0) & (xs + held['dx0'] < bx1)
++            out = np.maximum(out, np.where(h, by1 - held['dy0'], -1.0))
++        return out
++
++    def _profile(self, xs, rects, held, exclude=()):
++        out = np.full(len(xs), -1.0)
++        for n, o in rects.items():
++            if n in exclude or (held is not None and n == held['name']):
++                continue
++            out = np.maximum(out, self._colprof(xs, (o['x0'], o['x1'], o['y1']), held))
++        return out
++
++    def _xi(self, x):
++        return int(np.clip(round((x - self.xs[0]) / self.dxs), 0, len(self.xs) - 1))
++
++    def _est(self, xa, ya, xb, yb, prof, margin=0.004):
++        dx = abs(xb - xa)
++        if dx < 1e-6:
++            return np.ceil(abs(yb - ya) / MAXD - 1e-6)
++        i, j = sorted((self._xi(xa), self._xi(xb)))
++        H = prof[i:j + 1].max() + margin
++        top = max(H, ya, yb)
++        vert = (top - ya) + (top - yb)
++        return np.ceil(max(dx, vert) / MAXD - 1e-6)
++
++    def _mk_held(self, o, gx, gy):
++        return dict(name=o['name'], dx0=o['x0'] - gx, dx1=o['x1'] - gx,
++                    dy0=o['y0'] - gy, dy1=o['y1'] - gy)
++
+     def _drop_spot(self, o, rects, surf, blk):
+         r = self.r
++        self.xs = xs = np.arange(0.0, WORLD_X[1] + 1e-9, 0.005)
++        self.dxs = 0.005
+         gx = self._grasp_x(o, rects)
+-        held = dict(name=o['name'], dx0=o['x0'] - gx, dx1=o['x1'] - gx)
+         gy = o['y1'] + ARM_MAX + r['gw'] + self.grasp_eps
+-        held['dy0'] = o['y0'] - gy
+-        held['dy1'] = o['y1'] - gy
+-        ry = gy + 0.003
++        held = self._mk_held(o, gx, gy)
+         others = {k: v for k, v in rects.items() if k != o['name']}
+-        for margin in (0.12, 0.06, 0.02, 0.005):
+-            best = None
+-            for rx in np.arange(WORLD_X[0] + r['R'] + 0.002, WORLD_X[1] - r['R'] - 0.002, 0.005):
++        # target plan assuming o removed
++        cands, held_b, gxb, gyb = self._place_candidates_target(blk, surf, others)
++        if cands:
++            _, _, rxt, ryt, _ = cands[0]
++        else:
++            rxt, ryt = (surf['x0'] + surf['x1']) / 2, 0.5
++        P1 = self._profile(xs, others, held)
++        P2 = self._profile(xs, others, None)
++        P3 = self._profile(xs, {k: v for k, v in others.items() if k != blk['name']}, held_b)
++        ymax = WORLD_Y[1] - r['R'] - 0.002
++        best = None
++        for margin in (0.03, 0.01):
++            for rx in xs:
++                if rx < WORLD_X[0] + r['R'] + 0.002 or rx > WORLD_X[1] - r['R'] - 0.002:
++                    continue
+                 x0, x1 = rx + held['dx0'], rx + held['dx1']
+                 if x0 < WORLD_X[0] or x1 > WORLD_X[1]:
+                     continue
+-                # stay away from the surface
+-                if x1 > surf['x0'] - margin - 0.02 and x0 < surf['x1'] + margin + 0.02:
++                if x1 > surf['x0'] - margin and x0 < surf['x1'] + margin:
+                     continue
+                 ok = True
+                 for k, v in others.items():
+@@ -197,13 +247,19 @@ class GeneratedApproach:
+                         break
+                 if not ok:
+                     continue
+-                if self._clear_y_at(rx, others, held, ARM_MAX) > ry - 1e-4:
+-                    continue
+-                cost = abs(rx - gx) + abs(rx - self.r['x']) * 0.2
+-                if best is None or cost < best[0]:
+-                    best = (cost, rx)
++                ry_low = max(gy + 0.003, P1[self._xi(rx)] + 0.004)
++                for ry in np.arange(ry_low, ymax, 0.05)[:8]:
++                    c1 = self._est(gx, gy, rx, ry, P1)
++                    box = (x0, x1, ry + held['dy1'])
++                    P2n = np.maximum(P2, self._colprof(xs, box, None))
++                    c2 = self._est(rx, ry, gxb, gyb, P2n)
++                    P3n = np.maximum(P3, self._colprof(xs, box, held_b))
++                    c3 = self._est(gxb, gyb, rxt, ryt, P3n)
++                    cost = c1 + c2 + c3 + 0.01 * (ry - ry_low)
++                    if best is None or cost < best[0]:
++                        best = (cost, rx, ry)
+             if best is not None:
+-                return best[1], ry, gx, gy
++                return best[1], best[2], gx, gy
+         return None
+ 
+     def _plan(self, rects):
+@@ -220,7 +276,7 @@ class GeneratedApproach:
+                 _, _, rx, ry, _ = cands[0]
+             else:
+                 rx = (surf['x0'] + surf['x1']) / 2 - (held['dx0'] + held['dx1']) / 2
+-                ry = surf['y1'] + 0.008 - held['dy0']
++                ry = surf['y1'] + BOTTOM_OFF - held['dy0']
+             return dict(obj=blk['name'], gx=gx, gy=gy, px=rx, py=ry, kind='target')
+         blockers = cands[0][4]
+         # remove the blocker closest to robot

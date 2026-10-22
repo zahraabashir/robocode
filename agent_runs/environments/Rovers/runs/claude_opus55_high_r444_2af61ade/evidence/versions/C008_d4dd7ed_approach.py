@@ -1,0 +1,492 @@
+"""Rovers approach: staged grid BFS planner per rover + joint task assignment."""
+import itertools
+import math
+
+import numpy as np
+from scipy.ndimage import minimum_filter
+
+INF = 10 ** 6
+RES = 0.05            # grid resolution
+WIN = 4               # max cells per step per axis (0.2 / RES)
+SEL = {"sample": -0.8333, "cal": -0.5, "img": -0.1667, "noop": 0.1667,
+       "send": 0.5, "drop": 0.8333}
+
+# geometry constants (empirically probed)
+WALL_IN = 0.2271 + 0.004
+ARENA = 2.2729 - 0.004
+PILLAR_R = 0.245
+MOUND_R = 0.185
+LANDER_XMIN = -1.195
+LANDER_YMIN = -1.455
+OBJ_RANGE = 1.95
+LANDER_RANGE = 3.95
+SAMPLE_R = 0.235
+PILLAR_INFL_OBJ = 0.03
+PILLAR_INFL_LAND = 0.04
+ROVER_OCC_R = 0.27
+CAM_OFF = (-0.087, -0.0125)
+OBJ_BACK_DEG = 108.0     # if |rel bearing| > this, pillars don't occlude objectives
+LAND_BACK_DEG = 110.0    # same quirk for lander (sending)
+USE_BACK_OBJ = True
+USE_BACK_LAND = True
+
+
+def _wrap(a):
+    return (a + np.pi) % (2 * np.pi) - np.pi
+
+
+def seg_hits_box(px, py, qx, qy, cx, cy, hx, hy):
+    """Vectorised: does segment p->q (p arrays, q scalar) intersect AABB?"""
+    dx = qx - px
+    dy = qy - py
+    t0 = np.zeros_like(px)
+    t1 = np.ones_like(px)
+    ok = np.ones(px.shape, dtype=bool)
+    for d, p, lo, hi in ((dx, px, cx - hx, cx + hx), (dy, py, cy - hy, cy + hy)):
+        small = np.abs(d) < 1e-12
+        ok &= ~(small & ((p < lo) | (p > hi)))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            ta = (lo - p) / d
+            tb = (hi - p) / d
+        tmin = np.where(small, -np.inf, np.minimum(ta, tb))
+        tmax = np.where(small, np.inf, np.maximum(ta, tb))
+        t0 = np.maximum(t0, tmin)
+        t1 = np.minimum(t1, tmax)
+    return ok & (t0 <= t1)
+
+
+def seg_hits_disk(px, py, qx, qy, cx, cy, r):
+    dx = qx - px
+    dy = qy - py
+    L2 = dx * dx + dy * dy + 1e-12
+    t = np.clip(((cx - px) * dx + (cy - py) * dy) / L2, 0, 1)
+    ex = px + t * dx - cx
+    ey = py + t * dy - cy
+    return ex * ex + ey * ey < r * r
+
+
+def box_dist(px, py, cx, cy, hx, hy):
+    ddx = np.maximum(np.abs(px - cx) - hx, 0)
+    ddy = np.maximum(np.abs(py - cy) - hy, 0)
+    return np.hypot(ddx, ddy)
+
+
+def propagate(f, free):
+    f = np.where(free, f, INF)
+    while True:
+        m = minimum_filter(f, size=2 * WIN + 1, mode="constant", cval=INF) + 1
+        nf = np.where(free, np.minimum(f, m), INF)
+        if np.array_equal(nf, f):
+            return f
+        f = nf
+
+
+def op_stage(fprev, region):
+    m = minimum_filter(fprev, size=2 * WIN + 1, mode="constant", cval=INF) + 1
+    return np.where(region, np.minimum(m, INF), INF)
+
+
+class Scene:
+    def __init__(self, state):
+        self.rovers = {}
+        self.objectives = []
+        self.samples = []
+        self.pillars = []
+        self.mounds = []
+        self.lander = (-1.9, -2.0)
+        for o in state:
+            t = o.type.name
+            g = lambda f: state.get(o, f)
+            if t == "rover":
+                self.rovers[o.name] = dict(x=g("x"), y=g("y"), th=g("theta"),
+                                           full=g("store_full") > 0.5,
+                                           cal=g("calibrated") > 0.5)
+            elif t == "lander":
+                self.lander = (g("x"), g("y"))
+            elif t == "objective":
+                self.objectives.append(dict(name=o.name, x=g("x"), y=g("y"),
+                                            img=(g("have_image_rover0") > 0.5,
+                                                 g("have_image_rover1") > 0.5),
+                                            recv=g("received_image") > 0.5))
+            elif t == "sample":
+                self.samples.append(dict(name=o.name, x=g("x"), y=g("y"),
+                                         soil=g("is_soil") > 0.5,
+                                         an=(g("analyzed_rover0") > 0.5,
+                                             g("analyzed_rover1") > 0.5),
+                                         recv=g("received_analysis") > 0.5))
+            elif t == "obstacle":
+                d = (g("x"), g("y"), g("half_x"), g("half_y"))
+                if g("half_x") > 0.15:
+                    self.mounds.append(d)
+                else:
+                    self.pillars.append(d)
+
+
+class RoverPlanner:
+    """Grid + regions for one rover."""
+
+    def __init__(self, idx, home, scene, other_pos_list):
+        self.idx = idx
+        self.home = home  # (x, y, th)
+        hx, hy, th = home
+        self.th = th
+        side = 1 if hx > 0 else -1
+        lo_x, hi_x = (WALL_IN, ARENA) if side > 0 else (-ARENA, -WALL_IN)
+        i0 = math.ceil((lo_x - hx) / RES - 1e-9)
+        i1 = math.floor((hi_x - hx) / RES + 1e-9)
+        j0 = math.ceil((-ARENA - hy) / RES - 1e-9)
+        j1 = math.floor((ARENA - hy) / RES + 1e-9)
+        self.xs = hx + RES * np.arange(i0, i1 + 1)
+        self.ys = hy + RES * np.arange(j0, j1 + 1)
+        self.hi = -i0
+        self.hj = -j0
+        X, Y = np.meshgrid(self.xs, self.ys, indexing="ij")
+        self.X, self.Y = X, Y
+        free = np.ones(X.shape, dtype=bool)
+        for (cx, cy, ax, ay) in scene.pillars:
+            free &= box_dist(X, Y, cx, cy, ax, ay) > PILLAR_R
+        for (cx, cy, ax, ay) in scene.mounds:
+            free &= box_dist(X, Y, cx, cy, ax, ay) > MOUND_R
+        free &= (X >= LANDER_XMIN) | (Y >= LANDER_YMIN)
+        free[self.hi, self.hj] = True
+        self.free = free
+        c, s = math.cos(th), math.sin(th)
+        self.camx = X + c * CAM_OFF[0] - s * CAM_OFF[1]
+        self.camy = Y + s * CAM_OFF[0] + c * CAM_OFF[1]
+        self.scene = scene
+        # objective visibility
+        self.vis = []
+        self.objd = []
+        for ob in scene.objectives:
+            ox, oy = ob["x"], ob["y"]
+            d = np.hypot(ox - self.camx, oy - self.camy)
+            v = (d <= OBJ_RANGE) & (np.hypot(ox - X, oy - Y) <= OBJ_RANGE)
+            occ = np.zeros(X.shape, dtype=bool)
+            for (cx, cy, ax, ay) in scene.pillars:
+                e = PILLAR_INFL_OBJ
+                occ |= seg_hits_box(self.camx, self.camy, ox, oy, cx, cy, ax + e, ay + e)
+                occ |= seg_hits_box(X, Y, ox, oy, cx, cy, ax + e, ay + e)
+            if USE_BACK_OBJ:
+                rel = np.abs(_wrap(np.arctan2(oy - Y, ox - X) - th))
+                back = rel > math.radians(OBJ_BACK_DEG)
+            else:
+                back = np.zeros(X.shape, dtype=bool)
+            occ2 = np.zeros(X.shape, dtype=bool)
+            for (px, py) in other_pos_list:
+                occ2 |= seg_hits_disk(self.camx, self.camy, ox, oy, px, py, ROVER_OCC_R)
+            self.vis.append(v & ((~occ) | back) & ~occ2 & free)
+            self.objd.append(d)
+        self.any_vis = np.zeros(X.shape, dtype=bool)
+        for v in self.vis:
+            self.any_vis |= v
+        # lander visibility
+        lx, ly = scene.lander
+        v = np.hypot(lx - X, ly - Y) <= LANDER_RANGE
+        occ = np.zeros(X.shape, dtype=bool)
+        for (cx, cy, ax, ay) in scene.pillars:
+            e = PILLAR_INFL_LAND
+            occ |= seg_hits_box(X, Y, lx, ly, cx, cy, ax + e, ay + e)
+            occ |= seg_hits_box(self.camx, self.camy, lx, ly, cx, cy, ax + e, ay + e)
+        if USE_BACK_LAND:
+            rel = np.abs(_wrap(np.arctan2(ly - Y, lx - X) - th))
+            back = rel > math.radians(LAND_BACK_DEG)
+        else:
+            back = np.zeros(X.shape, dtype=bool)
+        occ2 = np.zeros(X.shape, dtype=bool)
+        for (px, py) in other_pos_list:
+            occ2 |= seg_hits_disk(X, Y, lx, ly, px, py, ROVER_OCC_R)
+            occ2 |= seg_hits_disk(self.camx, self.camy, lx, ly, px, py, ROVER_OCC_R)
+        self.land = v & ((~occ) | back) & ~occ2 & free
+        # samples
+        self.sreg = {}
+        dk = {}
+        for kind in ("stone", "soil"):
+            d = np.full(X.shape, 1e9)
+            for sm in scene.samples:
+                if sm["soil"] == (kind == "soil"):
+                    d = np.minimum(d, np.hypot(sm["x"] - X, sm["y"] - Y))
+            dk[kind] = d
+        for kind, oth in (("stone", "soil"), ("soil", "stone")):
+            r = (dk[kind] <= SAMPLE_R) & ((dk[oth] > 0.26) | (dk[oth] > dk[kind] + 0.03))
+            self.sreg[kind] = r & free
+
+    def cell_of(self, x, y):
+        i = int(round((x - self.xs[0]) / RES))
+        j = int(round((y - self.ys[0]) / RES))
+        i = min(max(i, 0), len(self.xs) - 1)
+        j = min(max(j, 0), len(self.ys) - 1)
+        return i, j
+
+    def img_region(self, k, imaged):
+        """cells where image would photograph objective k given set imaged."""
+        reg = self.vis[k].copy()
+        if not reg.any():
+            return reg
+        dk = self.objd[k]
+        for m in range(len(self.vis)):
+            if m == k or m in imaged:
+                continue
+            reg &= ~((self.objd[m] <= 2.03) & (self.objd[m] < dk + 0.03))
+        return reg
+
+
+class GeneratedApproach:
+    def __init__(self, action_space, observation_space, primitives):
+        self.action_space = action_space
+        self.homes = None
+
+    # ------------------------------------------------------------------
+    def reset(self, state, info):
+        sc = Scene(state)
+        self.homes = {n: (r["x"], r["y"], r["th"]) for n, r in sc.rovers.items()}
+        self.replans = 0
+        self.fail_count = 0
+        self.expect = [None, None]
+        self.prev_sc = sc
+        self.log = []
+        self._plan(state)
+
+    # ------------------------------------------------------------------
+    def _rover_tables(self, ri, sc, need_objs, need_stone, need_soil, pending):
+        name = "rover%d" % ri
+        r = sc.rovers[name]
+        other = sc.rovers["rover%d" % (1 - ri)]
+        ohome = self.homes["rover%d" % (1 - ri)]
+        occl = [(ohome[0], ohome[1])]
+        if math.hypot(other["x"] - ohome[0], other["y"] - ohome[1]) > 0.05:
+            occl.append((other["x"], other["y"]))
+        P = RoverPlanner(ri, self.homes[name], sc, occl)
+        self_planner = P
+        start = P.cell_of(r["x"], r["y"])
+        P.free[start] = True
+        f0 = np.full(P.free.shape, INF, dtype=np.int64)
+        f0[start] = 0
+        stages0 = []
+        F = propagate(f0, P.free)
+        stages0.append(("start", None, f0, F))
+        if r["full"]:
+            G = op_stage(F, P.free)
+            F = propagate(G, P.free)
+            stages0.append(("drop", None, G, F))
+        imaged0 = set(k for k, ob in enumerate(sc.objectives) if ob["img"][ri])
+        tasks = []
+        for k in need_objs:
+            if P.vis[k].any():
+                tasks.append(("obj", k))
+        if need_stone and P.sreg["stone"].any():
+            tasks.append(("stone", None))
+        if need_soil and P.sreg["soil"].any():
+            tasks.append(("soil", None))
+        hcell = (P.hi, P.hj)
+        table = {}  # frozenset(task keys) -> (cost, stages)
+
+        def finish(F, stages, done_keys):
+            if not done_keys and not pending:
+                cost = F[hcell]
+                st = stages
+            else:
+                G = op_stage(F, P.land)
+                F2 = propagate(G, P.free)
+                cost = F2[hcell]
+                st = stages + [("send", None, G, F2)]
+            if cost >= INF:
+                return
+            key = frozenset(done_keys)
+            if key not in table or cost < table[key][0]:
+                table[key] = (int(cost), st)
+
+        def dfs(F, stages, done_keys, imaged, cal):
+            finish(F, stages, done_keys)
+            if F.min() >= INF:
+                return
+            for t in tasks:
+                key = t if t[0] != "obj" else ("obj", t[1])
+                if key in done_keys:
+                    continue
+                if t[0] == "obj":
+                    k = t[1]
+                    st = list(stages)
+                    Fc = F
+                    if not cal:
+                        G = op_stage(F, P.any_vis)
+                        Fc = propagate(G, P.free)
+                        st.append(("cal", None, G, Fc))
+                    reg = P.img_region(k, imaged)
+                    G = op_stage(Fc, reg)
+                    Fi = propagate(G, P.free)
+                    st.append(("img", k, G, Fi))
+                    dfs(Fi, st, done_keys | {key}, imaged | {k}, False)
+                else:
+                    G = op_stage(F, P.sreg[t[0]])
+                    Fs = propagate(G, P.free)
+                    G2 = op_stage(Fs, P.free)
+                    Fd = propagate(G2, P.free)
+                    st = stages + [("sample", t[0], G, Fs), ("drop", None, G2, Fd)]
+                    dfs(Fd, st, done_keys | {key}, imaged, cal)
+
+        dfs(F, stages0, frozenset(), imaged0, r["cal"])
+        return P, table
+
+    def _plan(self, state):
+        sc = Scene(state)
+        self.scene = sc
+        # what is needed
+        need_objs = [k for k, ob in enumerate(sc.objectives)
+                     if not ob["recv"] and not ob["img"][0] and not ob["img"][1]]
+        pending = [False, False]
+        for k, ob in enumerate(sc.objectives):
+            if not ob["recv"]:
+                for ri in range(2):
+                    if ob["img"][ri]:
+                        pending[ri] = True
+        need = {}
+        for kind in ("stone", "soil"):
+            recv = any(s["recv"] for s in sc.samples if s["soil"] == (kind == "soil"))
+            holders = [ri for ri in range(2)
+                       if any(s["an"][ri] for s in sc.samples if s["soil"] == (kind == "soil"))]
+            if recv:
+                need[kind] = False
+            elif holders:
+                need[kind] = False
+                pending[holders[0]] = True
+            else:
+                need[kind] = True
+        tabs = []
+        for ri in range(2):
+            tabs.append(self._rover_tables(ri, sc, need_objs, need["stone"], need["soil"],
+                                           pending[ri]))
+        # joint assignment
+        best = None
+        n = len(need_objs)
+        stone_opts = [0, 1] if need["stone"] else [None]
+        soil_opts = [0, 1] if need["soil"] else [None]
+        for assign in itertools.product([0, 1], repeat=n):
+            for so in stone_opts:
+                for sl in soil_opts:
+                    sets = [set(), set()]
+                    for k, a in zip(need_objs, assign):
+                        sets[a].add(("obj", k))
+                    if so is not None:
+                        sets[so].add(("stone", None))
+                    if sl is not None:
+                        sets[sl].add(("soil", None))
+                    costs = []
+                    for ri in range(2):
+                        e = tabs[ri][1].get(frozenset(sets[ri]))
+                        costs.append(e)
+                    if costs[0] is None or costs[1] is None:
+                        continue
+                    key = (max(costs[0][0], costs[1][0]), costs[0][0] + costs[1][0])
+                    if best is None or key < best[0]:
+                        self.pred = key
+                        best = (key, costs)
+        self.actions = [[], []]
+        if best is None:
+            return
+        for ri in range(2):
+            P = tabs[ri][0]
+            self.actions[ri] = self._extract(P, best[1][ri][1])
+
+    def _extract(self, P, stages):
+        """Backtrack through stage fields; returns list of (x,y,op) targets."""
+        hcell = (P.hi, P.hj)
+        cell = hcell
+        k = len(stages) - 1
+        v = stages[k][3][cell]
+        seq = []
+        W = WIN
+        nx, ny = P.free.shape
+        while True:
+            name, arg, G, F = stages[k]
+            if k == 0 and v == 0:
+                break
+            if name != "start" and G[cell] == v:
+                Fp = stages[k - 1][3]
+                op = (name, arg)
+                k -= 1
+                Fsrc = Fp
+            else:
+                op = None
+                Fsrc = F
+            found = None
+            i, j = cell
+            for di in range(-W, W + 1):
+                for dj in range(-W, W + 1):
+                    a, b = i + di, j + dj
+                    if 0 <= a < nx and 0 <= b < ny and Fsrc[a, b] == v - 1:
+                        if found is None or abs(di) + abs(dj) < found[1]:
+                            found = ((a, b), abs(di) + abs(dj))
+            if found is None:
+                break
+            seq.append((float(P.xs[cell[0]]), float(P.ys[cell[1]]), op))
+            cell = found[0]
+            v -= 1
+        seq.reverse()
+        return seq
+
+    # ------------------------------------------------------------------
+    def get_action(self, state):
+        act = np.zeros(8, dtype=np.float32)
+        sc = Scene(state)
+        if self._deviated(sc) or (not self.actions[0] and not self.actions[1]):
+            self.replans += 1
+            if self.replans < 40:
+                self._plan(state)
+        for ri in range(2):
+            r = sc.rovers["rover%d" % ri]
+            if self.actions[ri]:
+                x, y, op = self.actions[ri].pop(0)
+                dx = float(np.clip(x - r["x"], -0.2, 0.2))
+                dy = float(np.clip(y - r["y"], -0.2, 0.2))
+                act[4 * ri] = dx
+                act[4 * ri + 1] = dy
+                act[4 * ri + 3] = SEL[op[0]] if op else 0.0
+                self.expect[ri] = (x, y, op)
+            else:
+                # at end: if at home do nothing
+                self.expect[ri] = None
+        return act
+
+    def _deviated(self, sc):
+        dev = False
+        for ri in range(2):
+            e = self.expect[ri]
+            if e is None:
+                continue
+            d0 = dev
+            dev = False
+            r = sc.rovers["rover%d" % ri]
+            if abs(r["x"] - e[0]) > 1e-3 or abs(r["y"] - e[1]) > 1e-3:
+                dev = True
+                self.log.append(("move", ri, e, r["x"], r["y"]))
+            op, arg = e[2] if e[2] else (None, None)
+            pr = self.prev_sc.rovers["rover%d" % ri]
+            if op == "img":
+                ob = sc.objectives[arg]
+                if not ob["img"][ri]:
+                    dev = True
+            if op == "sample":
+                if not any(s["an"][ri] for s in sc.samples if s["soil"] == (arg == "soil")):
+                    dev = True
+            if op == "cal" and not r["cal"]:
+                dev = True
+            elif op == "img" and (r["cal"] or not pr["cal"]):
+                dev = True
+            elif op == "sample" and not r["full"]:
+                dev = True
+            elif op == "drop" and r["full"]:
+                dev = True
+            elif op == "send":
+                for ob in sc.objectives:
+                    if ob["img"][ri] and not ob["recv"]:
+                        dev = True
+                for s in sc.samples:
+                    if s["an"][ri] and not s["recv"]:
+                        dev = True
+            if dev:
+                self.log.append(("dev", ri, e, round(r["x"], 3), round(r["y"], 3), r["cal"], pr["cal"],
+                                 [ob["img"][ri] for ob in sc.objectives]))
+            dev = dev or d0
+        self.prev_sc = sc
+        self.expect = [None, None]
+        return dev

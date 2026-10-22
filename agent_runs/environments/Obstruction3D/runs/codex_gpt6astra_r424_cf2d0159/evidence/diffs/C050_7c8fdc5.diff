@@ -1,0 +1,59 @@
+diff --git a/probe_count10_seed8.log b/probe_count10_seed8.log
+index eb3794b..ba3921a 100644
+--- a/probe_count10_seed8.log
++++ b/probe_count10_seed8.log
+@@ -1,2 +1,22 @@
+ 0 obstruction7 raise yaw 1.5707963267948966 height 0.35 retries 0 held 0.0
+ 25 obstruction7 reopen yaw 1.5707963267948966 height 0.16999999999999996 retries 3 held 1.0
++46 obstruction7 release yaw 1.5707963267948966 height 0.16100119756350084 retries 3 held 0.0
++47 obstruction4 raise yaw 1.5707963267948966 height 0.16100119756350084 retries 0 held 0.0
++50 obstruction4 raise yaw 1.5707963267948966 height 0.16100119756350084 retries 0 held 0.0
++62 obstruction4 reopen yaw 1.5707963267948966 height 0.1602196178585291 retries 1 held 1.0
++86 obstruction4 release yaw 1.5707963267948966 height 0.15122119542847423 retries 1 held 0.0
++87 obstruction1 raise yaw 1.5707963267948966 height 0.15122119542847423 retries 0 held 0.0
++100 obstruction1 descend yaw 1.5707963267948966 height 0.22999999999999995 retries 0 held 0.0
++104 obstruction1 reopen yaw 1.5707963267948966 height 0.15917088903486729 retries 1 held 1.0
++128 obstruction1 release yaw 1.5707963267948966 height 0.15017228157958468 retries 1 held 0.0
++129 obstruction3 raise yaw 1.5707963267948966 height 0.15017228157958468 retries 0 held 0.0
++150 obstruction3 descend yaw 1.5707963267948966 height 0.14499999999999996 retries 2 held 0.0
++164 obstruction3 raise yaw 0 height 0.14499997287910538 retries 4 held 0.0
++198 obstruction3 raise yaw 0.7853981633974483 height 0.13499999999999995 retries 8 held 0.0
++200 obstruction3 raise yaw 0.7853981633974483 height 0.13499999999999995 retries 8 held 0.0
++230 obstruction3 raise yaw 2.356194490192345 height 0.14499997615353974 retries 12 held 0.0
++250 obstruction3 descend yaw 2.356194490192345 height 0.14999999999999997 retries 13 held 0.0
++265 obstruction3 raise yaw 1.5707963267948966 height 0.13999999728159107 retries 16 held 0.0
++293 obstruction3 raise yaw 0 height 0.14499999975380973 retries 19 held 0.0
++300 obstruction3 raise yaw 0 height 0.14499999975380973 retries 19 held 0.0
++RESULT 307 False False 57.01337122917175 obstruction3 descend 0 0.27999999999999997
+diff --git a/probe_dense_neighbors.py b/probe_dense_neighbors.py
+new file mode 100644
+index 0000000..912b2b8
+--- /dev/null
++++ b/probe_dense_neighbors.py
+@@ -0,0 +1,6 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import numpy as np
++E=make_env();s,inf=E.reset(seed=8,options={'object_count':10});p=GeneratedApproach(E.action_space,E.observation_space,{});p.reset(s,inf);print('TASKS',[p.goal]+p.tasks,flush=True)
++for o in s.get_objects(p.cube_type):print(o.name,'pos',[s.get(o,'pose_'+v) for v in 'xyz'],'half',[s.get(o,'half_extent_'+v) for v in 'xyz'],flush=True)
++E.close()
+diff --git a/sweep_final_default.log b/sweep_final_default.log
+index 8776954..d832da3 100644
+--- a/sweep_final_default.log
++++ b/sweep_final_default.log
+@@ -14,3 +14,8 @@
+ {"seed": 43, "count": null, "success": true, "steps": 80, "phase": "release", "goal": "target_block", "seconds": 1.66, "grasp": 0.0}
+ {"seed": 44, "count": null, "success": true, "steps": 81, "phase": "release", "goal": "target_block", "seconds": 1.69, "grasp": 0.0}
+ {"seed": 45, "count": null, "success": true, "steps": 149, "phase": "release", "goal": "target_block", "seconds": 7.27, "grasp": 0.0}
++{"seed": 46, "count": null, "success": true, "steps": 83, "phase": "release", "goal": "target_block", "seconds": 10.69, "grasp": 0.0}
++{"seed": 47, "count": null, "success": true, "steps": 41, "phase": "release", "goal": "target_block", "seconds": 5.46, "grasp": 0.0}
++{"seed": 48, "count": null, "success": true, "steps": 39, "phase": "release", "goal": "target_block", "seconds": 4.35, "grasp": 0.0}
++{"seed": 49, "count": null, "success": true, "steps": 42, "phase": "release", "goal": "target_block", "seconds": 5.68, "grasp": 0.0}
++{"seed": 50, "count": null, "success": true, "steps": 124, "phase": "release", "goal": "target_block", "seconds": 10.01, "grasp": 0.0}
+diff --git a/sweep_lift_fixed2.log b/sweep_lift_fixed2.log
+new file mode 100644
+index 0000000..86b7e58
+--- /dev/null
++++ b/sweep_lift_fixed2.log
+@@ -0,0 +1 @@
++{"seed": 10, "count": 5, "success": true, "steps": 178, "phase": "release", "goal": "target_block", "seconds": 36.41, "grasp": 0.0}

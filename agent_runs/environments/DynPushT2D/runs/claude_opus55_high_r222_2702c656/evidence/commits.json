@@ -1,0 +1,840 @@
+[
+  {
+    "id": "C001",
+    "commit": "3c20cb8181b18e90748d33a296c4e58bc3c24f06",
+    "parents": [],
+    "date": "2026-09-30T17:32:47+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".claude/settings.json",
+      ".claude/validate_sandbox.py",
+      ".gitignore",
+      "CLAUDE.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_3c20cb8.diff",
+    "diff_sha256": "045525ca343e1981c97975b4e5284ed701dadacdb8c6128b26aba17044870113",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "f581dfc6651cc74f2abf20a3c18479b5838cf65a",
+    "parents": [
+      "3c20cb8181b18e90748d33a296c4e58bc3c24f06"
+    ],
+    "date": "2026-09-30T17:37:28+02:00",
+    "title": "Initial push-primitive controller with navigation",
+    "files": [
+      "approach.py",
+      "dyn_a.py",
+      "dyn_b.py",
+      "dyn_c.py",
+      "dyn_d.py",
+      "explore0.py",
+      "explore1.py",
+      "explore2.py",
+      "geom_com.py",
+      "geom_probe.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C002_f581dfc.diff",
+    "diff_sha256": "1d08e15021e70a83685b7c8963dcdad75a298f261eb71d453ed22269bbc88835",
+    "events": [
+      {
+        "event": "E0131",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "eafcd4615eb5612e8f10c0affd388d0d1c1e671dd5243e50db2688d55949c524",
+    "version": "evidence/versions/C002_f581dfc_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "83f1d8b58ba59a2d6f8fc5c44a49e04c79cba0f3",
+    "parents": [
+      "f581dfc6651cc74f2abf20a3c18479b5838cf65a"
+    ],
+    "date": "2026-09-30T17:38:11+02:00",
+    "title": "Fix nav stuck near block",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C003_83f1d8b.diff",
+    "diff_sha256": "5df9fc478c0877a1f8361f7de2b8f1a0f9bda31e69e66122b67f741e852c5877",
+    "events": [
+      {
+        "event": "E0144",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "39577627262844bd467effb4d5106d855412009f052aef5ac449a78b3f42ab78",
+    "version": "evidence/versions/C003_83f1d8b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C004",
+    "commit": "1600aa70920c9da852ded8c9b60df3510c2d3936",
+    "parents": [
+      "83f1d8b58ba59a2d6f8fc5c44a49e04c79cba0f3"
+    ],
+    "date": "2026-09-30T17:38:49+02:00",
+    "title": "Add fallback translation pushes, slower final push",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C004_1600aa7.diff",
+    "diff_sha256": "68286cdc08897a68e4f8e775080f209fa7dafc74620fe414aa9b50f7573217e1",
+    "events": [
+      {
+        "event": "E0154",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "2e970f597eab2408cefe8e6f0e6efff1f362c0dc459440f02d71353c4af186a1",
+    "version": "evidence/versions/C004_1600aa7_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "5192d01a3a970b9d23dabaa30578e33b0e8416a0",
+    "parents": [
+      "1600aa70920c9da852ded8c9b60df3510c2d3936"
+    ],
+    "date": "2026-09-30T17:41:14+02:00",
+    "title": "Wall-aware rotation choice, banning stuck prims, raw angle target",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C005_5192d01.diff",
+    "diff_sha256": "1c7b2050928f9ab91af63af84d5c1c48b9184a72b1d3988629e14e2a512887e6",
+    "events": [
+      {
+        "event": "E0183",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "317db2379748b6a4ff21b6c02c9f7d334074c4b58659b1a2f2981cf59a54b0cb",
+    "version": "evidence/versions/C005_5192d01_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C006",
+    "commit": "4422133536cce26b371f7408f99b16dfde46005e",
+    "parents": [
+      "5192d01a3a970b9d23dabaa30578e33b0e8416a0"
+    ],
+    "date": "2026-09-30T17:42:55+02:00",
+    "title": "Better escape near walls",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C006_4422133.diff",
+    "diff_sha256": "0755a8d6436202acaa86be853662774f93777f4cbc0fd57f2748c6eeb2dd3c5e",
+    "events": [
+      {
+        "event": "E0193",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "143bc7decad60ee4f435ca52bd3807982ce43733bd42223b3e3d79bc12627597",
+    "version": "evidence/versions/C006_4422133_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "85d33c6134634d495b70297ae344075ff412ed53",
+    "parents": [
+      "4422133536cce26b371f7408f99b16dfde46005e"
+    ],
+    "date": "2026-09-30T17:44:47+02:00",
+    "title": "Recenter when stuck near walls",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C007_85d33c6.diff",
+    "diff_sha256": "cc9931088330c4e67c10ed4566ffe1d1e1da60a7609c0337367b16e9e1513f0c",
+    "events": [
+      {
+        "event": "E0208",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1b64c5c488adf2db777c22152f6a8199fcd5b11bdfc8e9d7ba92139d384e58b1",
+    "version": "evidence/versions/C007_85d33c6_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C008",
+    "commit": "880c007eed8325cc9f4e00a92f884139ca3733ed",
+    "parents": [
+      "85d33c6134634d495b70297ae344075ff412ed53"
+    ],
+    "date": "2026-09-30T17:46:31+02:00",
+    "title": "wrap dth",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C008_880c007.diff",
+    "diff_sha256": "be17a9dfcf852d3e2a591fe6a45f798d7e23dd82776ffc0936d8ad6dda9e9e02",
+    "events": [
+      {
+        "event": "E0222",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a2cc249ddc8f0eae0cbb2b235ee12a7e550b2993736b848595f8f2a1c8f6b713",
+    "version": "evidence/versions/C008_880c007_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C009",
+    "commit": "fb4d330111fd1e18b407cdcf356befd97676f8ab",
+    "parents": [
+      "880c007eed8325cc9f4e00a92f884139ca3733ed"
+    ],
+    "date": "2026-09-30T17:48:15+02:00",
+    "title": "Fix translation push abort during recenter",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C009_fb4d330.diff",
+    "diff_sha256": "110e1c01a9062de2c59a3786971a0606e189c85eeddcfa8fa5d9f16d1bcd92fb",
+    "events": [
+      {
+        "event": "E0237",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "44650137a0b80cbfff058dac86e8cfd4074d1c87f37ffac6b1494f4e57b54584",
+    "version": "evidence/versions/C009_fb4d330_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C010",
+    "commit": "a82915046a99b66e0065209074e908343ffdcd89",
+    "parents": [
+      "fb4d330111fd1e18b407cdcf356befd97676f8ab"
+    ],
+    "date": "2026-09-30T17:52:44+02:00",
+    "title": "Path-length cost in primitive selection",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C010_a829150.diff",
+    "diff_sha256": "f708c27998c9d315e377f19c2857343d94ff9a265f0edcd838d3613befa525b9",
+    "events": [
+      {
+        "event": "E0266",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "fb1cc8d68e4292208387e00427a976f95d651dcfddd17d77433b9f3ff60102c3",
+    "version": "evidence/versions/C010_a829150_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C011",
+    "commit": "5cbb7aa25aca9ff5d49740f28e92642c4e39c42f",
+    "parents": [
+      "a82915046a99b66e0065209074e908343ffdcd89"
+    ],
+    "date": "2026-09-30T17:58:10+02:00",
+    "title": "Restricted path-length cost for translation choice",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C011_5cbb7aa.diff",
+    "diff_sha256": "1990cfe2cb6866c87ac251b8937f5729b60191fe1e5e58e402553c615ec9c8a4",
+    "events": [
+      {
+        "event": "E0307",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "399758bc62aaaa88602b29da4bc38b5217f9b0841e1e5bbe0d6f5a59e2cb0089",
+    "version": "evidence/versions/C011_5cbb7aa_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C012",
+    "commit": "5d8a809159989cfafcb1d739165cb6aea835f71e",
+    "parents": [
+      "5cbb7aa25aca9ff5d49740f28e92642c4e39c42f"
+    ],
+    "date": "2026-09-30T18:02:35+02:00",
+    "title": "Oblique stem-side pushes",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C012_5d8a809.diff",
+    "diff_sha256": "e6ad9970c0ea45fa80ac7efd24d09c4e1204759a83968628c2161316abb30036",
+    "events": [
+      {
+        "event": "E0380",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "2631f666a3ee0dc0b492f1353dad7aec01af616fea8318ca36e06b9faaa513c7",
+    "version": "evidence/versions/C012_5d8a809_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C013",
+    "commit": "c76610ab8cd161aea8d85614f405d10f55d19bda",
+    "parents": [
+      "5d8a809159989cfafcb1d739165cb6aea835f71e"
+    ],
+    "date": "2026-09-30T18:06:00+02:00",
+    "title": "Parametrize",
+    "files": [
+      "approach.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C013_c76610a.diff",
+    "diff_sha256": "e16491118a5a019a673823f7c7d53da28756d75859a975a44baff5ecb2270495",
+    "events": [
+      {
+        "event": "E0407",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "ca4773f70a0f85669716d568ac65acbf6292d32c95741a73c89fecc7ed33ed39",
+    "version": "evidence/versions/C013_c76610a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C014",
+    "commit": "ead4831fe0d6c1b5be2fff97d31df56d630f880a",
+    "parents": [
+      "c76610ab8cd161aea8d85614f405d10f55d19bda"
+    ],
+    "date": "2026-09-30T18:10:10+02:00",
+    "title": "COR-based rotation primitive selection",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C014_ead4831.diff",
+    "diff_sha256": "c71a6c75eeb5aeeaa14c5ccedf29e4e025853dc84955baae8496d54383c0c5ad",
+    "events": [
+      {
+        "event": "E0494",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "19ab108a09f0fe7f9ed5ab225b11551a35cf65aa0e1b72a18eb591922982dc45",
+    "version": "evidence/versions/C014_ead4831_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C015",
+    "commit": "d1804fa56dfeef6a6e6a6aec23a2e2f0c3fc7c19",
+    "parents": [
+      "ead4831fe0d6c1b5be2fff97d31df56d630f880a"
+    ],
+    "date": "2026-09-30T18:11:00+02:00",
+    "title": "Chunked rotation pushes, stricter wall margin",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C015_d1804fa.diff",
+    "diff_sha256": "26afb44a251e2a64ece120b3d64cb45924a6458f08ea4bf06418858414649c62",
+    "events": [
+      {
+        "event": "E0508",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "9b9ae4c55e6b5269875645806006a01e0b0171390021195e9e61556585de6985",
+    "version": "evidence/versions/C015_d1804fa_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C016",
+    "commit": "cf289e9f2e3a67758909c57afad5f79bc5bc2a73",
+    "parents": [
+      "d1804fa56dfeef6a6e6a6aec23a2e2f0c3fc7c19"
+    ],
+    "date": "2026-09-30T18:14:05+02:00",
+    "title": "rot_chunk 1.2",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C016_cf289e9.diff",
+    "diff_sha256": "4f130e3d415c85603e19621a96492f465c9c06a7f0db54af6323df34bdfd8c75",
+    "events": [
+      {
+        "event": "E0528",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "bb17071a6348cd7c9dcbc9aea7e832216a0718e57c1d1329686ec69310a6947c",
+    "version": "evidence/versions/C016_cf289e9_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C017",
+    "commit": "bf45934a75ef87e53836643f3587264e3b5b6879",
+    "parents": [
+      "cf289e9f2e3a67758909c57afad5f79bc5bc2a73"
+    ],
+    "date": "2026-09-30T18:17:04+02:00",
+    "title": "Clear bans after any successful push",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C017_bf45934.diff",
+    "diff_sha256": "b85f41a502d2191364f6b2b04836a65777c20411492b2f079829f1bc1877d20a",
+    "events": [
+      {
+        "event": "E0536",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "ed5fb78b153ceb0862c555e7d6d22e3d7539c8bc20199a2e403e04a761f19172",
+    "version": "evidence/versions/C017_bf45934_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C018",
+    "commit": "6949799a7688f0d45c1fda0162521e7831f029f3",
+    "parents": [
+      "bf45934a75ef87e53836643f3587264e3b5b6879"
+    ],
+    "date": "2026-09-30T18:17:24+02:00",
+    "title": "Goal-relative wall margins",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C018_6949799.diff",
+    "diff_sha256": "6811e48fa58e135688f4684ca6c50aa02dbb96069af506c97728e79af7bf6d23",
+    "events": [
+      {
+        "event": "E0542",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "9dcafc149d211c51bc076b397b41ee90503115771dc9d3bf20e90c0fc4abb59d",
+    "version": "evidence/versions/C018_6949799_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C019",
+    "commit": "1171fd69d1bc2e4ab8b4280903e14d933e914109",
+    "parents": [
+      "6949799a7688f0d45c1fda0162521e7831f029f3"
+    ],
+    "date": "2026-09-30T18:24:01+02:00",
+    "title": "Wall-aware translation push length",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C019_1171fd6.diff",
+    "diff_sha256": "c56161c4c381f2e8253c3cdd60b7467a48038efbe87ced15e9b3a29b962c8f99",
+    "events": [
+      {
+        "event": "E0589",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "64632548c7e645855a1fd79694cc4da11bfd0cd7e8d414ae26039904cb39af7b",
+    "version": "evidence/versions/C019_1171fd6_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C020",
+    "commit": "1b043cbc2a073e77a0f0eef740621bc8961770af",
+    "parents": [
+      "1171fd69d1bc2e4ab8b4280903e14d933e914109"
+    ],
+    "date": "2026-09-30T18:24:27+02:00",
+    "title": "Per-wall margin requirements",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C020_1b043cb.diff",
+    "diff_sha256": "5202433a4ef33f7913d5615da8b02c0e3a082ae3d73203450868d28c86302fcf",
+    "events": [
+      {
+        "event": "E0595",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "76a4f12c81a5bdb7dc0cea4e31133416c9657a39834dea8c7b58bae940defdcd",
+    "version": "evidence/versions/C020_1b043cb_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C021",
+    "commit": "e4358bf7332220519abd593da1e5f1a481646c23",
+    "parents": [
+      "1b043cbc2a073e77a0f0eef740621bc8961770af"
+    ],
+    "date": "2026-09-30T18:32:10+02:00",
+    "title": "Two-step lookahead for translation pushes",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C021_e4358bf.diff",
+    "diff_sha256": "529682958320da336d797cbc5f788d6d356dabf957f988bc9f84da135b0ec20f",
+    "events": [
+      {
+        "event": "E0667",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "75faba8c8b82c11a9b89a09056257e4855547b419cc6cdea930a1f3ad5eea2f2",
+    "version": "evidence/versions/C021_e4358bf_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C022",
+    "commit": "2ad804cf05972578ceec138a2e9c2cb8e51964f2",
+    "parents": [
+      "e4358bf7332220519abd593da1e5f1a481646c23"
+    ],
+    "date": "2026-09-30T18:35:38+02:00",
+    "title": "LA: prefer centered pushes",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C022_2ad804c.diff",
+    "diff_sha256": "ac120a0f7fa7e592b7a39c7bafe4eea445fc2d3129da050aa993668cffa0af01",
+    "events": [
+      {
+        "event": "E0687",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "18b5c589ffec82d88c065da848d9762e081017aa6427585717df22013267b71d",
+    "version": "evidence/versions/C022_2ad804c_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C023",
+    "commit": "fa454cd7220192102a0b7a3df7ae449748e0d87c",
+    "parents": [
+      "2ad804cf05972578ceec138a2e9c2cb8e51964f2"
+    ],
+    "date": "2026-09-30T18:36:07+02:00",
+    "title": "Rotation choice with translation lookahead cost",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C023_fa454cd.diff",
+    "diff_sha256": "14841196def055b315e3cb4c977a8ea57de3c1545df12cd196f3029d37108832",
+    "events": [
+      {
+        "event": "E0697",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "2ddfd333b817648f2446b7382ce35bf66122db4aa81cc9587abcbfbd138cc470",
+    "version": "evidence/versions/C023_fa454cd_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C024",
+    "commit": "b1de13a94244553c2600745fe31c006557500b44",
+    "parents": [
+      "fa454cd7220192102a0b7a3df7ae449748e0d87c"
+    ],
+    "date": "2026-09-30T18:43:28+02:00",
+    "title": "LA: fix f-exclusion rule and tiny pushes",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C024_b1de13a.diff",
+    "diff_sha256": "2a5ae18474940d63442783ac1baeb422dc7bc71e5e151679a4f175684b628b55",
+    "events": [
+      {
+        "event": "E0751",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "734d350a49ee9f07ebcc4af930100af1fab8a22cfacf42fdc03b0e883ea4a648",
+    "version": "evidence/versions/C024_b1de13a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C025",
+    "commit": "bb0497f1c116d11a77c853507224f35eaf4353f3",
+    "parents": [
+      "b1de13a94244553c2600745fe31c006557500b44"
+    ],
+    "date": "2026-09-30T18:43:40+02:00",
+    "title": "Stall detection toggles lookahead",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C025_bb0497f.diff",
+    "diff_sha256": "c4b21d0408a5e39421dd3a6d63dda2c19f1acda54df5f78f5075b8448af84c50",
+    "events": [
+      {
+        "event": "E0757",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "27be719c73a45d3285092f1b6dcf222b7f76f49d984140f5b2a754efefc09489",
+    "version": "evidence/versions/C025_bb0497f_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C026",
+    "commit": "1c675ad9d7f481adc2b4a9c26531eef2500a6a34",
+    "parents": [
+      "bb0497f1c116d11a77c853507224f35eaf4353f3"
+    ],
+    "date": "2026-09-30T18:53:28+02:00",
+    "title": "param pre_off",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C026_1c675ad.diff",
+    "diff_sha256": "0b717d9562cbcc46c3f13027641f290fca2090dc6248f64cb6f8d8556a160c10",
+    "events": [
+      {
+        "event": "E0844",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a46491240ebfa58f40cfc71ef850f712e37465eb06486a7a1be0ef668fe071f1",
+    "version": "evidence/versions/C026_1c675ad_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C027",
+    "commit": "cc040b037b71ef071461e326729e7052e89003ca",
+    "parents": [
+      "1c675ad9d7f481adc2b4a9c26531eef2500a6a34"
+    ],
+    "date": "2026-09-30T19:07:26+02:00",
+    "title": "Add optional extra rotation prims (Rslm/Rsrm, Rtopm) and rate-based cost, off by default",
+    "files": [
+      "approach.py",
+      "approach_v2.py",
+      "cor2_an.py",
+      "cor2_data.json",
+      "cor2_meas.py",
+      "cor_data.json",
+      "cor_log.py",
+      "dbg.py",
+      "dbg2.py",
+      "dbg3.py",
+      "obl_a.py",
+      "obl_b.py",
+      "prof.py",
+      "r_a.txt",
+      "r_b.txt",
+      "res_v2.txt",
+      "timing.py"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C027_cc040b0.diff",
+    "diff_sha256": "4415cb2141ad3eaa23bd6f1bb689ecb813e942d7ab769e338b467aaea80d1f38",
+    "events": [
+      {
+        "event": "E0959",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "0c0d26b06e14a7b287bb8cf036c1352910574cdebce29159a2b709fdfe2c8d5f",
+    "version": "evidence/versions/C027_cc040b0_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C028",
+    "commit": "5502b015907259c8ea4d16a207d8d12b313d3d8a",
+    "parents": [
+      "cc040b037b71ef071461e326729e7052e89003ca"
+    ],
+    "date": "2026-09-30T19:17:14+02:00",
+    "title": "Enable Rslm/Rsrm/Rtopm rotation prims + rate-based cost by default; optional Rend",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C028_5502b01.diff",
+    "diff_sha256": "92060792897fb431624ade02ebfb13ac94044268af3d0ed5526fbdb45cf8a21f",
+    "events": [
+      {
+        "event": "E0985",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6d04173f7abeb9b009e2176dea6acad9ad561e161c92fb83ad4162083ddc56cc",
+    "version": "evidence/versions/C028_5502b01_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C029",
+    "commit": "c4fe14c4cd4bb4ed2a33de48fec733b9edaa8b3d",
+    "parents": [
+      "5502b015907259c8ea4d16a207d8d12b313d3d8a"
+    ],
+    "date": "2026-09-30T19:23:12+02:00",
+    "title": "Rend prims default; optional geometry-dependent COR",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C029_c4fe14c.diff",
+    "diff_sha256": "a9f3b9b69f1e0c47d57aea802b4b250b56e2c8358007e694a73fe34828e4b237",
+    "events": [
+      {
+        "event": "E1008",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "3dfd5c6a6efc0e0e0e816448c6dbd5ec40cb4b21f21625946decd2ff346be894",
+    "version": "evidence/versions/C029_c4fe14c_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C030",
+    "commit": "b0d4acb0195ad5e9b69231870bfb329cb8c21bc0",
+    "parents": [
+      "c4fe14c4cd4bb4ed2a33de48fec733b9edaa8b3d"
+    ],
+    "date": "2026-09-30T19:27:48+02:00",
+    "title": "Enable geometry-dependent COR",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C030_b0d4acb.diff",
+    "diff_sha256": "a02e64971bab6465e67a41f99df0897501efae4f69dea346c8946812cbb527ad",
+    "events": [
+      {
+        "event": "E1035",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1daadafa795b6eee8fd3b80edf5ee7bdaa087c43e0bfa219d3328e1c7a28db21",
+    "version": "evidence/versions/C030_b0d4acb_approach.py",
+    "same_policy_as_earlier": []
+  }
+]

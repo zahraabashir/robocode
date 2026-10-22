@@ -1,0 +1,49 @@
+diff --git a/approach.py b/approach.py
+index e5dcd3c..1d39e81 100644
+--- a/approach.py
++++ b/approach.py
+@@ -83,13 +83,17 @@ class GeneratedApproach:
+     @staticmethod
+     def _safe(X, boxes, obstacles):
+         """Minimal robot y at each x in X such that boxes clear obstacles."""
+-        req = np.full(X.shape, -1.0)
+-        for bx0, bx1, boff in boxes:
+-            req = np.maximum(req, FLOOR_Y + MY - boff)
+-            for ox0, ox1, otop in obstacles:
+-                ov = (X + bx1 > ox0 - MX) & (X + bx0 < ox1 + MX)
+-                req = np.where(ov, np.maximum(req, otop + MY - boff), req)
+-        return req
++        B = np.asarray(boxes, dtype=float)
++        base = FLOOR_Y + MY - float(B[:, 2].min())
++        if len(obstacles) == 0:
++            return np.full(np.shape(X), base)
++        O = np.asarray(obstacles, dtype=float)
++        Xa = np.asarray(X, dtype=float)[:, None, None]
++        ov = ((Xa + B[None, :, 1:2] > O[None, None, :, 0] - MX) &
++              (Xa + B[None, :, 0:1] < O[None, None, :, 1] + MX))
++        val = O[None, None, :, 2] + MY - B[None, :, 2:3]
++        req = np.where(ov, val, -1.0).max(axis=(1, 2))
++        return np.maximum(req, base)
+ 
+     def _leg_cost(self, p0, p1, boxes, obstacles):
+         x0, y0 = p0
+diff --git a/prof.out b/prof.out
+new file mode 100644
+index 0000000..6d0ff4f
+Binary files /dev/null and b/prof.out differ
+diff --git a/prof.py b/prof.py
+new file mode 100644
+index 0000000..3575ac3
+--- /dev/null
++++ b/prof.py
+@@ -0,0 +1,7 @@
++import cProfile, pstats, sys
++from env_client import make_env
++from approach import GeneratedApproach
++env=make_env(); obs,info=env.reset(seed=int(sys.argv[1]))
++ap=GeneratedApproach(env.action_space, env.observation_space, {})
++cProfile.run('ap.reset(obs,info)','prof.out')
++pstats.Stats('prof.out').sort_stats('cumtime').print_stats(12)
+diff --git a/res_0_300_v3.txt b/res_0_300_v3.txt
+new file mode 100644
+index 0000000..e69de29

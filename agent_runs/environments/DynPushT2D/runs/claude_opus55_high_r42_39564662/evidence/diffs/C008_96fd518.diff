@@ -1,0 +1,78 @@
+diff --git a/approach.py b/approach.py
+index d12cec7..9633c75 100644
+--- a/approach.py
++++ b/approach.py
+@@ -318,6 +318,17 @@ class GeneratedApproach:
+         return acts
+ 
+     def get_action(self, state):
++        try:
++            a = self._get_action(state)
++            a = np.clip(np.asarray(a, dtype=np.float64).reshape(2), -AMAX, AMAX)
++            if not np.all(np.isfinite(a)):
++                a = np.zeros(2)
++            return a
++        except Exception:
++            self.queue = []
++            return np.zeros(2)
++
++    def _get_action(self, state):
+         obs = np.asarray(state, float)
+         pose = obs[0:3]
+         replan = not self.queue
+diff --git a/v_600_650.txt b/v_600_650.txt
+new file mode 100644
+index 0000000..4f1369a
+--- /dev/null
++++ b/v_600_650.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 108.08 tmax 5.0
+diff --git a/v_650_700.txt b/v_650_700.txt
+new file mode 100644
+index 0000000..64eba85
+--- /dev/null
++++ b/v_650_700.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 116.5 tmax 5.9
+diff --git a/v_700_750.txt b/v_700_750.txt
+new file mode 100644
+index 0000000..74d2458
+--- /dev/null
++++ b/v_700_750.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 105.4 tmax 6.2
+diff --git a/v_750_800.txt b/v_750_800.txt
+new file mode 100644
+index 0000000..78ca64a
+--- /dev/null
++++ b/v_750_800.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 104.86 tmax 6.5
+diff --git a/v_800_850.txt b/v_800_850.txt
+new file mode 100644
+index 0000000..388d972
+--- /dev/null
++++ b/v_800_850.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 112.04 tmax 8.3
+diff --git a/v_850_900.txt b/v_850_900.txt
+new file mode 100644
+index 0000000..530580f
+--- /dev/null
++++ b/v_850_900.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 103.76 tmax 6.5
+diff --git a/v_900_950.txt b/v_900_950.txt
+new file mode 100644
+index 0000000..6201a42
+--- /dev/null
++++ b/v_900_950.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 112.66 tmax 5.8
+diff --git a/v_950_1000.txt b/v_950_1000.txt
+new file mode 100644
+index 0000000..46f5a20
+--- /dev/null
++++ b/v_950_1000.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 96.1 tmax 5.6

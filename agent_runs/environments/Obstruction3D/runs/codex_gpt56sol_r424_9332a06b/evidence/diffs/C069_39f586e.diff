@@ -1,0 +1,15 @@
+diff --git a/approach.py b/approach.py
+index c07940a..cc09e53 100644
+--- a/approach.py
++++ b/approach.py
+@@ -52,8 +52,8 @@ class GeneratedApproach:
+         elif name!="target_block" and model_x>.25:
+             # The lower-shoulder variant can pinch medium-distance blocks so
+             # deeply that the fingers cannot reopen; prefer the centered pose.
+-            triples=[triples[1],triples[2],triples[3],triples[4],
+-                     triples[5],triples[6],triples[0]]
++            triples=[triples[2],triples[3],triples[4],triples[5],
++                     triples[6],triples[1],triples[0]]
+         if forward_retracted:
+             # The centered pose closes to finger_state ~= .1 on this branch and
+             # cannot reopen. Use offset grasps with useful finger clearance.

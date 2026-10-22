@@ -1,0 +1,27 @@
+diff --git a/approach.py b/approach.py
+index 9e2e916..9179de7 100644
+--- a/approach.py
++++ b/approach.py
+@@ -48,15 +48,19 @@ class GeneratedApproach:
+     def _radio_points(self,s,i):
+         land=self._get(s,"lander")[0]; q=(s.get(land,"x"),s.get(land,"y"))
+         if i==0:
+-            raw=[(x,y) for y in (.35,.55,.75,.95) for x in (1.0,.8,.6,.4)]
++            raw=[(x,y) for y in (.25,.45,.65,.85)
++                 for x in (.35,.55,.75,.95,1.15,1.35)]
+         else:
+             raw=[(-1.0,-1.75),(-1.0,-1.45),(-1.3,-1.6),(-1.5,-1.4),(-1.7,-1.2)]
+         rects=self._rects(s)[1:] # wall is low enough to radio over from right poses
+-        good=[]
++        free=[]; good=[]
+         for p in raw:
+             if math.dist(p,q)>=3.9 or not self._free(p,self._rects(s)): continue
++            free.append(p)
+             if not any(self._seg_rect(p,q,r,.07) for r in rects): good.append(p)
+-        return good or raw
++        # Try predicted-clear rays first, but retain every collision-free pose so
++        # silent failures can be escaped even when the crude 2-D LOS model is wrong.
++        return good+[p for p in free if p not in good]
+ 
+     def _radio(self,i):
+         pts=self.radio_choices[i]

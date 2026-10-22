@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 99bf6a7..70199e3 100644
+--- a/approach.py
++++ b/approach.py
+@@ -331,7 +331,7 @@ class GeneratedApproach:
+                     done = True
+                 speed = min(MAXS, max(0.6 * rem, 0.002))
+                 # stop to re-evaluate if angle drifts
+-                if abs(dth) > math.radians(6):
++                if abs(dth) > max(math.radians(6), abs(self.push_dth0) + math.radians(4)):
+                     done = True
+             else:
+                 rem = abs(dth)

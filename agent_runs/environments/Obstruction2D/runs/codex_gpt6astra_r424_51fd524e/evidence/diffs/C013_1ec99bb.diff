@@ -1,0 +1,27 @@
+diff --git a/approach.py b/approach.py
+index 7fb8b50..4468226 100644
+--- a/approach.py
++++ b/approach.py
+@@ -47,17 +47,19 @@ class GeneratedApproach:
+             if self.phase == 'above':
+                 if ry<.72: return self.action(s,y=.75)
+                 if abs(rx-(x+w/2))>.001: return self.action(s,x=x+w/2,y=.75)
+-                self.phase='down'; self.n=0
++                self.phase='down'; self.n=0; self.last_down=None
+             if self.phase == 'down':
+                 self.n+=1
+                 goal=y+h+.2+.006
+-                if ry>goal+.001:return self.action(s,y=goal,vac=1)
++                if ry>goal+.001 and (self.last_down is None or abs(ry-self.last_down)>.00001):
++                    self.last_down=ry
++                    return self.action(s,y=goal,vac=1)
+                 self.pick_y=y; self.phase='lift';self.n=0
+             if self.phase == 'lift':
+                 self.n+=1
+                 if ry<.749:return self.action(s,y=.75,vac=1)
+                 if y < self.pick_y+.02:
+-                    self.phase='down'
++                    self.phase='down'; self.last_down=None
+                     return self.action(s,y=y+h+.195,vac=1)
+                 self.offsetx=x-rx;self.offsety=y-ry
+                 if self.obj==self.block:

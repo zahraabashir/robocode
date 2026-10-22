@@ -1,0 +1,21 @@
+diff --git a/approach.py b/approach.py
+index 9b2cd70..daacd31 100644
+--- a/approach.py
++++ b/approach.py
+@@ -14,6 +14,7 @@ class GeneratedApproach:
+         self.J=np.zeros((6,5)); self.cal_i=0; self.cal_sign=1; self.last_pos=None
+         self.last_delta=0.; self.move_count=0; self.waypoint=0
+         rx,ry,_=self.region; rhx=self._v(state,"target_region","half_extent_x"); rhy=self._v(state,"target_region","half_extent_y")
++        self.region_hx,self.region_hy=rhx,rhy
+         blockers=[]
+         for n in state.get_object_names():
+             if not n.startswith("obstruction"): continue
+@@ -39,6 +40,8 @@ class GeneratedApproach:
+         self.pick_poses=[]
+         for q2,q4,q6 in triples:
+             self.pick_poses.append((np.array([0.,q2,-np.pi,q4,0.,q6,np.pi/2]),.00135,None))
++        if name=="target_block" and self.region_hx>self.region_hy:
++            for item in self.pick_poses: item[0][6]+=np.pi/2
+         if name!="target_block":
+             # A second, highly folded grasp family reaches the tiny obstructions.
+             q=np.array([-1.6368,2.41,-2.6184,2.66,-1.0464,2.23,-1.8828])

@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index c2ffcd8..a09d302 100644
+--- a/approach.py
++++ b/approach.py
+@@ -12,7 +12,7 @@ class GeneratedApproach:
+     def get_action(self,state):
+         self.t+=1;r=self.robot
+         x=state.get(self.block,'pose_x');y=state.get(self.block,'pose_y')
+-        z=.25 if self.t<10 else .11
++        z=max(.112,.25-max(0,self.t-10)*.002)
+         q=ik(x-state.get(r,'pos_base_x'),z)
+         a=np.zeros(11,dtype=np.float32)
+         a[1]=y-.001-state.get(r,'pos_base_y')

@@ -1,0 +1,242 @@
+diff --git a/approach.py b/approach.py
+index 26289a2..a532507 100644
+--- a/approach.py
++++ b/approach.py
+@@ -57,7 +57,8 @@ class GeneratedApproach:
+   for i in range(8):
+    a=poly[i];b=poly[(i+1)%8];t=b-a;length=np.linalg.norm(t);t/=length;n=np.array([-t[1],t[0]])
+    margin=min(.08,.4*length)
+-   for f in np.linspace(margin/length,1-margin/length,max(1,int(length/.15))):
++   fractions=np.linspace(margin/length,1-margin/length,int(length/.15)) if length>=.3 else [.5]
++   for f in fractions:
+     p=a+f*(b-a);yield p,n
+  def rate(self,s,p,n):
+   R=rot(s[2]);w,h,v=s[12:15]
+@@ -75,9 +76,33 @@ class GeneratedApproach:
+    d=-n+sign*.8*t;md=M@d
+    options.append(d*max(0.,np.dot(md,error)/np.dot(md,md)))
+   F=min(options,key=lambda f:np.linalg.norm(M@f-error))
++  # Prevent planned pushes from driving a nearby block vertex into a wall.
++  vertices=self.geometry(s,0)
++  world=vertices@R.T+s[:2]
++  constraints=[];bounds=[]
++  for axis in range(2):
++   for sign in [-1.,1.]:
++    i=int(np.argmax(sign*world[:,axis]));position=world[i,axis]
++    distance=(4.85-position) if sign>0 else (position-.15)
++    if distance<.30:
++     rr=vertices[i]-c
++     B=R@(np.eye(2)+np.outer(np.array([-rr[1],rr[0]]),z))
++     constraints.append(sign*B[axis]);bounds.append(max(0.,distance)*1.5)
++  if constraints:
++   A=np.array([t+.8*n,-t+.8*n]+constraints);b=np.array([0.,0.]+bounds)
++   H=M.T@M+.00001*np.eye(2);Hi=np.linalg.inv(H);f0=Hi@(M.T@error)
++   cand=[np.zeros(2),f0]
++   for aa,bb in zip(A,b):
++    h=Hi@aa;cand.append(f0-h*((np.dot(aa,f0)-bb)/max(np.dot(aa,h),1e-12)))
++   for i in range(len(A)):
++    for k in range(i):
++     det=A[i,0]*A[k,1]-A[i,1]*A[k,0]
++     if abs(det)>1e-9:cand.append(np.array([b[i]*A[k,1]-b[k]*A[i,1],A[i,0]*b[k]-A[k,0]*b[i]])/det)
++   cand=np.array(cand);cand=cand[np.all(cand@A.T<=b+1e-8,axis=1)]
++   F=min(cand,key=lambda f:np.linalg.norm(M@f-error))
+   twist=M@F;omega=np.dot(z,F)
+   u=F+omega*np.array([-r[1],r[0]])
+-  gain=np.linalg.norm(twist)
++  gain=math.sqrt(max(0.,np.dot(error,error)-np.dot(error-twist,error-twist)))
+   return gain,u,error
+  def choose(self,s):
+   R=rot(s[2]);choices=[]
+@@ -102,7 +127,7 @@ class GeneratedApproach:
+   if self.contact is None or (self.phase=='move' and self.age>130):self.choose(s)
+   p,n=self.contact;R=rot(s[2]);target=s[:2]+R@(p+n*.145)
+   if self.phase=='move':
+-   if np.linalg.norm(target-s[16:18])<.025:self.phase='push';self.age=0
++   if np.linalg.norm(target-s[16:18])<.01:self.phase='push';self.age=0
+    else:
+     route=self.path(s[16:18],target,s)
+     if route is None:
+diff --git a/approach_v2.py b/approach_v2.py
+new file mode 100644
+index 0000000..26289a2
+--- /dev/null
++++ b/approach_v2.py
+@@ -0,0 +1,134 @@
++"""Contact-aware closed-loop pushing with collision-free repositioning."""
++import numpy as np
++import math
++import heapq
++
++def rot(a):
++ c,s=math.cos(a),math.sin(a)
++ return np.array([[c,-s],[s,c]])
++def action(d):return d/max(1.,float(np.max(np.abs(d)))/.049)
++def wrap(a):return (a+math.pi)%(2*math.pi)-math.pi
++
++class GeneratedApproach:
++ def __init__(self, action_space, observation_space, primitives):self.reset(None,{})
++ def reset(self,state,info):
++  self.contact=None;self.phase='choose';self.age=0;self.last=None
++ def geometry(self,s,pad):
++  w,h,v=s[12:15];a=h/2+pad;b=w/2+pad;t=pad;m=-w-pad;bot=-w-v-pad
++  return np.array([[-a,t],[a,t],[a,m],[b,m],[b,bot],[-b,bot],[-b,m],[-a,m]])
++ def clear(self,a,b,s,pad=.112):
++  R=rot(s[2]);a=(a-s[:2])@R;b=(b-s[:2])@R;d=b-a;w,h,v=s[12:15]
++  for lo,hi in [(np.array([-h/2-pad,-w-pad]),np.array([h/2+pad,pad])),(np.array([-w/2-pad,-w-v-pad]),np.array([w/2+pad,-w+pad]))]:
++   low=0.;high=1.
++   for j in range(2):
++    if abs(d[j])<1e-10:
++     if a[j]<=lo[j] or a[j]>=hi[j]:low=2.;break
++    else:
++     x=(lo[j]-a[j])/d[j];y=(hi[j]-a[j])/d[j]
++     low=max(low,min(x,y));high=min(high,max(x,y))
++   if low<high:return False
++  return True
++ def path(self,start,end,s):
++  if self.clear(start,end,s):return [end]
++  nodes=[start,end]+list(self.geometry(s,.135)@rot(s[2]).T+s[:2])
++  n=len(nodes);ds=[float('inf')]*n;ds[0]=0.;prev=[-1]*n;queue=[(0.,0)]
++  while queue:
++   cost,i=heapq.heappop(queue)
++   if cost>ds[i]:continue
++   if i==1:break
++   for j in range(1,n):
++    if j==i or not np.all((nodes[j]>.105)&(nodes[j]<4.895)):continue
++    if not self.clear(nodes[i],nodes[j],s):continue
++    val=cost+float(np.linalg.norm(nodes[j]-nodes[i]))
++    if val<ds[j]:ds[j]=val;prev[j]=i;heapq.heappush(queue,(val,j))
++  if prev[1]<0:
++   if not self.clear(start,start,s):
++    poly=self.geometry(s,.14)@rot(s[2]).T+s[:2];candidates=[]
++    for a,b in zip(poly,np.roll(poly,-1,axis=0)):
++     d=b-a;q=a+np.clip(np.dot(start-a,d)/np.dot(d,d),0.,1.)*d
++     if np.all((q>.105)&(q<4.895)):candidates.append(q)
++    if candidates:return [min(candidates,key=lambda q:np.linalg.norm(q-start))]
++   return None
++  ids=[];j=1
++  while j:ids.append(j);j=prev[j]
++  return [nodes[i] for i in ids[::-1]]
++ def candidates(self,s):
++  poly=self.geometry(s,0);R=rot(s[2]);w,h,v=s[12:15]
++  for i in range(8):
++   a=poly[i];b=poly[(i+1)%8];t=b-a;length=np.linalg.norm(t);t/=length;n=np.array([-t[1],t[0]])
++   margin=min(.08,.4*length)
++   for f in np.linspace(margin/length,1-margin/length,max(1,int(length/.15))):
++    p=a+f*(b-a);yield p,n
++ def rate(self,s,p,n):
++  R=rot(s[2]);w,h,v=s[12:15]
++  cy=-(h*w/2+v*(w+v/2))/(h+v);c=np.array([0.,cy]);r=p-c
++  j=(h*((h*h+w*w)/12+(-w/2-cy)**2)+v*((w*w+v*v)/12+(-w-v/2-cy)**2))/(h+v)
++  z=np.array([-r[1],r[0]])/j
++  weight=.65
++  M=np.array([[1+cy*z[0],cy*z[1]],[0.,1.],weight*z])
++  ep=(s[29:31]-s[:2])@R;ea=wrap(s[31]-s[2]);error=np.r_[ep,weight*ea]
++  F=np.linalg.solve(M.T@M+.00001*np.eye(2),M.T@error)
++  t=np.array([-n[1],n[0]])
++  options=[]
++  if np.dot(F,-n)>0 and abs(np.dot(F,t))<.8*np.dot(F,-n):options.append(F)
++  for sign in [-1,1]:
++   d=-n+sign*.8*t;md=M@d
++   options.append(d*max(0.,np.dot(md,error)/np.dot(md,md)))
++  F=min(options,key=lambda f:np.linalg.norm(M@f-error))
++  twist=M@F;omega=np.dot(z,F)
++  u=F+omega*np.array([-r[1],r[0]])
++  gain=np.linalg.norm(twist)
++  return gain,u,error
++ def choose(self,s):
++  R=rot(s[2]);choices=[]
++  for p,n in self.candidates(s):
++   target=s[:2]+R@(p+n*.145)
++   if not np.all((target>.11)&(target<4.89)) or not self.clear(target,target,s):continue
++   gain,_,_=self.rate(s,p,n)
++   dist=np.linalg.norm(target-s[16:18]);score=gain/(1+.22*dist)
++   choices.append((score,p,n,target))
++  choices.sort(key=lambda x:-x[0]);choice=None
++  for score,p,n,target in choices:
++   route=self.path(s[16:18],target,s)
++   if route is not None:choice=(p,n);break
++  if choice is None:
++   choice=(choices[0][1],choices[0][2]) if choices else (np.zeros(2),np.array([0.,1.]))
++  self.contact=choice;self.phase='move';self.age=0
++ def get_action(self,state):
++  s=np.asarray(state);a=self.control(s)
++  return np.clip(s[16:18]+a,.105,4.895)-s[16:18]
++ def control(self,state):
++  s=np.asarray(state);self.age+=1
++  if self.contact is None or (self.phase=='move' and self.age>130):self.choose(s)
++  p,n=self.contact;R=rot(s[2]);target=s[:2]+R@(p+n*.145)
++  if self.phase=='move':
++   if np.linalg.norm(target-s[16:18])<.025:self.phase='push';self.age=0
++   else:
++    route=self.path(s[16:18],target,s)
++    if route is None:
++     self.contact=None
++     return np.zeros(2)
++    return action(route[0]-s[16:18])
++  # Track the contact point along its current face.
++  q=(s[16:18]-s[:2])@R;t=np.array([-n[1],n[0]])
++  poly=self.geometry(s,0)
++  for a,b in zip(poly,np.roll(poly,-1,axis=0)):
++   d=b-a;L=np.linalg.norm(d);tt=d/L;nn=np.array([-tt[1],tt[0]])
++   if np.dot(nn,n)>.99 and abs(np.dot(p-a,n))<1e-5 and -.001<=np.dot(p-a,tt)<=L+.001:
++    along=np.dot(q-a,tt)
++    if along<.035 or along>L-.035:
++     self.contact=None
++     return action(R@n*.05)
++    p=a+np.clip(along,.035,L-.035)*tt
++    self.contact=(p,n)
++    break
++  gain,u,error=self.rate(s,p,n)
++  if self.age%5==0:
++   best=max(self.rate(s,x,y)[0] for x,y in self.candidates(s))
++  else:best=gain
++  if (self.age>10 and gain<best*.78) or gain<.005 or self.age>150:
++   self.contact=None
++   return action(R@n*.05)
++  u*=min(.6,.037/max(np.linalg.norm(u),1e-9))
++  target=s[:2]+R@(p+n*.099+u)
++  return action(target-s[16:18])
+diff --git a/patch_walls.py b/patch_walls.py
+new file mode 100644
+index 0000000..466212a
+--- /dev/null
++++ b/patch_walls.py
+@@ -0,0 +1,30 @@
++p='approach.py';s=open(p).read()
++s=s.replace('for f in np.linspace(margin/length,1-margin/length,max(1,int(length/.15))):','fractions=np.linspace(margin/length,1-margin/length,int(length/.15)) if length>=.3 else [.5]\n   for f in fractions:')
++s=s.replace("if np.linalg.norm(target-s[16:18])<.025:","if np.linalg.norm(target-s[16:18])<.01:")
++s=s.replace('  twist=M@F;omega=np.dot(z,F)', '''  # Prevent planned pushes from driving a nearby block vertex into a wall.
++  vertices=self.geometry(s,0)
++  world=vertices@R.T+s[:2]
++  constraints=[];bounds=[]
++  for axis in range(2):
++   for sign in [-1.,1.]:
++    i=int(np.argmax(sign*world[:,axis]));position=world[i,axis]
++    distance=(4.85-position) if sign>0 else (position-.15)
++    if distance<.30:
++     rr=vertices[i]-c
++     B=R@(np.eye(2)+np.outer(np.array([-rr[1],rr[0]]),z))
++     constraints.append(sign*B[axis]);bounds.append(max(0.,distance)*1.5)
++  if constraints:
++   A=np.array([t+.8*n,-t+.8*n]+constraints);b=np.array([0.,0.]+bounds)
++   H=M.T@M+.00001*np.eye(2);Hi=np.linalg.inv(H);f0=Hi@(M.T@error)
++   cand=[np.zeros(2),f0]
++   for aa,bb in zip(A,b):
++    h=Hi@aa;cand.append(f0-h*((np.dot(aa,f0)-bb)/max(np.dot(aa,h),1e-12)))
++   for i in range(len(A)):
++    for k in range(i):
++     det=A[i,0]*A[k,1]-A[i,1]*A[k,0]
++     if abs(det)>1e-9:cand.append(np.array([b[i]*A[k,1]-b[k]*A[i,1],A[i,0]*b[k]-A[k,0]*b[i]])/det)
++   cand=np.array(cand);cand=cand[np.all(cand@A.T<=b+1e-8,axis=1)]
++   F=min(cand,key=lambda f:np.linalg.norm(M@f-error))
++  twist=M@F;omega=np.dot(z,F)''')
++s=s.replace('  gain=np.linalg.norm(twist)','  gain=math.sqrt(max(0.,np.dot(error,error)-np.dot(error-twist,error-twist)))')
++open(p,'w').write(s)
+diff --git a/validation_dynamics_v2_summary.json b/validation_dynamics_v2_summary.json
+new file mode 100644
+index 0000000..0715c0b
+--- /dev/null
++++ b/validation_dynamics_v2_summary.json
+@@ -0,0 +1 @@
++[{"seed": 200, "success": true, "steps": 141, "error": [0.012936895202971588, -0.016093655995500278, -0.008809040911986088], "seconds": 1.261216163635254}, {"seed": 201, "success": true, "steps": 87, "error": [-0.03393405308415254, -0.00483938529349448, -0.07666617677390075], "seconds": 0.6428353786468506}, {"seed": 202, "success": true, "steps": 149, "error": [0.0009227596865888366, 0.002798938053049982, 0.06038073870574845], "seconds": 1.3596611022949219}, {"seed": 203, "success": true, "steps": 146, "error": [-0.014627224829207641, 0.005643283407510191, -0.008173353365013902], "seconds": 1.4068737030029297}, {"seed": 204, "success": true, "steps": 116, "error": [-0.017091366560445298, -0.00019804397334421964, -0.028657685823070267], "seconds": 1.022730827331543}, {"seed": 205, "success": true, "steps": 170, "error": [-0.02632213455604182, -0.007301123159749512, -0.010771681531409172], "seconds": 1.5637354850769043}, {"seed": 206, "success": true, "steps": 111, "error": [-0.025425362815187924, -0.013830691255265037, 0.0004091262302110543], "seconds": 1.050731897354126}, {"seed": 207, "success": true, "steps": 171, "error": [0.005805553232058891, 0.018882477102980744, -0.007214569318005015], "seconds": 1.2564685344696045}, {"seed": 208, "success": true, "steps": 166, "error": [0.017362037710374922, 0.02073811595151387, -0.06507175670755938], "seconds": 1.247389554977417}, {"seed": 209, "success": true, "steps": 177, "error": [0.009672632678978221, 0.0058177049581851215, 0.01539792295551523], "seconds": 1.4547920227050781}, {"seed": 210, "success": true, "steps": 266, "error": [0.00617530288162671, 0.003877891545749579, 0.011934328013495588], "seconds": 2.6457786560058594}, {"seed": 211, "success": true, "steps": 93, "error": [-0.02234778610247279, -0.015733116938950964, 0.03780487602915095], "seconds": 0.6012070178985596}, {"seed": 212, "success": true, "steps": 138, "error": [0.008331792197374455, -0.015723868466115842, 0.0032763422026573785], "seconds": 1.330970287322998}, {"seed": 213, "success": true, "steps": 72, "error": [0.01718862507309793, 0.007367575360108791, -0.13567863833587612], "seconds": 0.7360889911651611}, {"seed": 214, "success": true, "steps": 181, "error": [-0.014819366190934158, 0.006523781340393775, 0.11122979228934904], "seconds": 1.6989076137542725}, {"seed": 215, "success": true, "steps": 168, "error": [-0.006992809839059699, 0.007632396348365322, 0.024744841199466183], "seconds": 1.6452748775482178}, {"seed": 216, "success": true, "steps": 195, "error": [-0.009004472802702557, 0.012853286281272247, 0.010919944491539102], "seconds": 1.7031123638153076}, {"seed": 217, "success": true, "steps": 184, "error": [-0.001468342239615783, -0.00012717299050679642, -0.01344046894566242], "seconds": 1.3591914176940918}, {"seed": 218, "success": true, "steps": 311, "error": [0.009971880231526065, -0.028547390816345164, 0.024319363777012715], "seconds": 3.0804131031036377}, {"seed": 219, "success": true, "steps": 118, "error": [-0.0008995497851937984, 0.00038845408391274816, 0.014593775385523866], "seconds": 1.130235195159912}, {"seed": 220, "success": true, "steps": 198, "error": [-0.003582645497986814, -0.010378392374501999, -0.021757252089258383], "seconds": 1.8630118370056152}, {"seed": 221, "success": true, "steps": 35, "error": [-3.29375203516058e-05, 0.0330248591293798, 0.054892889327683214], "seconds": 0.29251933097839355}, {"seed": 222, "success": true, "steps": 172, "error": [-0.02067807970120228, 0.0017263971384671173, 0.03223929390175906], "seconds": 1.7757999897003174}, {"seed": 223, "success": true, "steps": 174, "error": [-0.015676051053157725, -0.0049044227341576985, -0.06180429731581372], "seconds": 1.642089605331421}, {"seed": 224, "success": true, "steps": 141, "error": [-0.018637787140304507, 0.03511656848355327, 0.008989603995098072], "seconds": 1.218024492263794}, {"seed": 225, "success": true, "steps": 157, "error": [-0.005185785829034284, -0.008879183565395188, 0.01903316571909519], "seconds": 1.2463629245758057}, {"seed": 226, "success": true, "steps": 178, "error": [-0.003155829839002422, 0.012224458798404836, -0.008804665096538766], "seconds": 1.630530834197998}, {"seed": 227, "success": true, "steps": 149, "error": [0.033837148591343125, -0.002482830726080465, -0.033970064183094895], "seconds": 1.385359525680542}, {"seed": 228, "success": true, "steps": 153, "error": [0.03073091140593398, -0.023351996485381665, -0.0481329541386315], "seconds": 1.3331007957458496}, {"seed": 229, "success": true, "steps": 132, "error": [0.010286997380081875, -0.0022725263182903355, -0.0012391540941325552], "seconds": 0.8134887218475342}, {"seed": 230, "success": true, "steps": 171, "error": [-0.02135447109656541, 0.01569513616333973, 0.03212561983714801], "seconds": 1.2748773097991943}, {"seed": 231, "success": true, "steps": 108, "error": [0.0015756280050256422, 0.0028190272740546973, -0.0013351078374483905], "seconds": 1.1021795272827148}, {"seed": 232, "success": true, "steps": 216, "error": [0.016079695001868455, -0.013465113777578086, 0.028523768183019715], "seconds": 1.962557077407837}, {"seed": 233, "success": true, "steps": 103, "error": [0.001290425781282245, -0.020893241283782338, 0.02496667020230081], "seconds": 0.5903055667877197}, {"seed": 234, "success": true, "steps": 107, "error": [0.00030893444237456436, 0.008640567154659884, -0.019470242757310796], "seconds": 0.496143102645874}, {"seed": 235, "success": true, "steps": 148, "error": [0.025249755706234556, -0.0037126612353595156, -0.029920824450739403], "seconds": 0.9297542572021484}, {"seed": 236, "success": true, "steps": 162, "error": [0.01919162355236148, 0.002345960211787901, -0.02516602436945048], "seconds": 1.7611229419708252}, {"seed": 237, "success": true, "steps": 97, "error": [-0.03526810931056268, -0.013316799317243166, 0.08972805995501609], "seconds": 0.756932258605957}, {"seed": 238, "success": true, "steps": 223, "error": [-0.006184424011658862, 0.0023518672227722526, -0.04410753647036092], "seconds": 2.322359800338745}, {"seed": 239, "success": true, "steps": 114, "error": [-0.008698335109058153, 0.0037186216654090387, 0.03449204363756975], "seconds": 0.8247804641723633}, {"seed": 240, "success": true, "steps": 153, "error": [-0.012184914690556159, 0.0035964463819935233, 0.007762042658060242], "seconds": 1.0451648235321045}, {"seed": 241, "success": true, "steps": 150, "error": [0.0004920300219179996, 0.021483520834754355, -0.015635013373077822], "seconds": 1.2909936904907227}, {"seed": 242, "success": true, "steps": 117, "error": [0.019588898499521612, -0.0032594399830756515, 0.03906606991870998], "seconds": 1.0881872177124023}, {"seed": 243, "success": true, "steps": 202, "error": [0.011693857499089244, 0.015071540809244555, -0.020004617057603813], "seconds": 1.4434232711791992}, {"seed": 244, "success": true, "steps": 166, "error": [-0.02357980885995925, -0.020064185372793197, -0.03228450738358246], "seconds": 1.4747509956359863}, {"seed": 245, "success": true, "steps": 173, "error": [0.0010748686296917498, 0.0029977572946364717, -0.03226568686047804], "seconds": 1.579345703125}, {"seed": 246, "success": true, "steps": 100, "error": [0.005397068760727652, -0.01925745480312857, 0.03004270693975375], "seconds": 0.774566650390625}, {"seed": 247, "success": true, "steps": 241, "error": [0.014273592913807143, 0.0008352180418218502, 0.012639764660523412], "seconds": 2.2715203762054443}, {"seed": 248, "success": true, "steps": 191, "error": [-0.020460371777989206, -0.002295076170810706, -0.04114138957439817], "seconds": 1.2875933647155762}, {"seed": 249, "success": true, "steps": 234, "error": [-0.007637207496499876, 0.013595104713533424, -0.06739372404092325], "seconds": 2.204941987991333}, {"seed": 250, "success": true, "steps": 120, "error": [-0.017142451024523053, 0.011140528591915722, -0.006805695168418335], "seconds": 1.237283706665039}, {"seed": 251, "success": true, "steps": 104, "error": [-0.004142363939312332, -0.0002732080661598246, -0.02360496758108166], "seconds": 0.8499290943145752}, {"seed": 252, "success": true, "steps": 197, "error": [-0.0008381623090749635, -0.006841114525866665, 0.00032198496556956613], "seconds": 1.9015798568725586}, {"seed": 253, "success": true, "steps": 160, "error": [0.0015169858747574594, -0.0017977089499989773, -0.027291755513688454], "seconds": 1.571533441543579}, {"seed": 254, "success": true, "steps": 171, "error": [-0.013664634671168852, 0.009749918821115422, -0.0027743962179411774], "seconds": 1.688209056854248}, {"seed": 255, "success": true, "steps": 33, "error": [0.016334356174826148, 0.02045522623315099, -0.018826523246715965], "seconds": 0.15670013427734375}, {"seed": 256, "success": true, "steps": 238, "error": [0.018406333383250484, 0.0005609266590989037, 0.028419058435667832], "seconds": 2.3118996620178223}, {"seed": 257, "success": true, "steps": 128, "error": [0.00864214918872852, 0.005155648059953943, 0.07030371944000846], "seconds": 1.1206653118133545}, {"seed": 258, "success": true, "steps": 192, "error": [-0.0190975028690481, -0.000567112619310528, -0.009884087509230532], "seconds": 1.6867218017578125}, {"seed": 259, "success": true, "steps": 96, "error": [0.0011952576655986924, 0.013879906484778548, 0.08012664925430801], "seconds": 0.9281165599822998}, {"seed": 260, "success": true, "steps": 144, "error": [0.0003485662777027443, -0.0003955783362985521, -0.030714032230190647], "seconds": 1.3749127388000488}, {"seed": 261, "success": true, "steps": 150, "error": [-0.005997992893909787, -0.019495020469426638, -0.004647117541629164], "seconds": 1.4040770530700684}, {"seed": 262, "success": true, "steps": 160, "error": [0.009077851334204246, 0.014147563340213942, -0.05740232127053524], "seconds": 1.6232116222381592}, {"seed": 263, "success": true, "steps": 90, "error": [-0.025815504902241493, 0.022457060890017422, -0.015416656857605293], "seconds": 0.6050105094909668}, {"seed": 264, "success": true, "steps": 229, "error": [-0.002347633034259111, 0.010896601844988973, -0.010941310828344264], "seconds": 1.7987005710601807}, {"seed": 265, "success": true, "steps": 179, "error": [-0.007609324088613478, -0.011580782428624481, 0.030133043062717135], "seconds": 1.7611355781555176}, {"seed": 266, "success": true, "steps": 233, "error": [-0.023300090500977255, 0.008277221143003999, -0.029607983745538746], "seconds": 2.213192939758301}, {"seed": 267, "success": true, "steps": 158, "error": [0.0036798212562998422, 0.0028005133355806233, 0.0227774142155317], "seconds": 1.0838468074798584}, {"seed": 268, "success": true, "steps": 146, "error": [0.00859096760971978, -0.016546200549256262, 0.05405792766528261], "seconds": 1.6439878940582275}, {"seed": 269, "success": true, "steps": 206, "error": [-0.009346862151667246, 0.0003680026971819572, -0.044791303206833444], "seconds": 2.100571870803833}, {"seed": 270, "success": true, "steps": 199, "error": [-0.021442984308604807, 0.007577292708158545, -0.0051482026100670986], "seconds": 1.5713446140289307}, {"seed": 271, "success": true, "steps": 169, "error": [0.023594799437526515, 0.02754152540876298, 0.012392252675217375], "seconds": 1.569533348083496}, {"seed": 272, "success": true, "steps": 130, "error": [0.01219831139365235, 0.0012951147197881596, -0.018595691405530967], "seconds": 1.0713202953338623}, {"seed": 273, "success": true, "steps": 73, "error": [-0.0012026857052278572, -0.017337171205013657, -0.03241482492491565], "seconds": 0.7835719585418701}, {"seed": 274, "success": true, "steps": 214, "error": [-0.01680391751769017, 0.009701815838689232, 0.012054820086285556], "seconds": 1.2910916805267334}, {"seed": 275, "success": true, "steps": 78, "error": [-0.009664699664732712, 0.006923669936360621, 0.010678609361346236], "seconds": 0.5334153175354004}, {"seed": 276, "success": true, "steps": 303, "error": [-0.0055539715693204705, 0.0020546647282975172, -0.011665157983496321], "seconds": 2.629192590713501}, {"seed": 277, "success": true, "steps": 147, "error": [0.010493532316974585, 1.3076650766663533e-06, 0.004574546060946982], "seconds": 0.9631428718566895}, {"seed": 278, "success": true, "steps": 191, "error": [-0.00954825382154123, -0.013523898085123998, 0.012401233096012376], "seconds": 1.369725227355957}, {"seed": 279, "success": true, "steps": 179, "error": [-0.0075553819356311, 0.01995461078138039, -0.0400358987080196], "seconds": 1.0720765590667725}, {"seed": 280, "success": true, "steps": 153, "error": [0.010874095766379543, -0.004002444780593528, 0.01980486095222389], "seconds": 0.8443560600280762}, {"seed": 281, "success": true, "steps": 146, "error": [0.005574975860751952, -0.018016889269061753, 0.007351052427808646], "seconds": 0.6823067665100098}, {"seed": 282, "success": true, "steps": 215, "error": [-0.004144414271004315, -0.0013931790025396573, -0.06099602995079323], "seconds": 1.1281371116638184}, {"seed": 283, "success": true, "steps": 133, "error": [-0.00216237797457719, -0.00543902275231245, 0.07178241757418835], "seconds": 0.6127340793609619}, {"seed": 284, "success": true, "steps": 249, "error": [0.015599860316012126, -0.004601173870842246, 0.01225943590667633], "seconds": 0.6677148342132568}, {"seed": 285, "success": true, "steps": 104, "error": [0.005649752845021894, 0.023287672152079164, -0.01560878487834616], "seconds": 0.45090651512145996}, {"seed": 286, "success": true, "steps": 41, "error": [0.003694668273479973, -0.00287096243854279, -0.004247614762539431], "seconds": 0.19304656982421875}, {"seed": 287, "success": true, "steps": 184, "error": [0.0010854131479465234, 0.0238248892565589, -0.001723155545351407], "seconds": 0.39855313301086426}, {"seed": 288, "success": true, "steps": 141, "error": [-0.015754548751975017, 0.003501982887577082, -0.0021600956440437358], "seconds": 0.7016620635986328}, {"seed": 289, "success": true, "steps": 180, "error": [-0.014656836628899494, 0.018881285037107176, -0.00866160494708934], "seconds": 0.8644354343414307}, {"seed": 290, "success": true, "steps": 147, "error": [0.018481711273969026, -0.022709830088588845, 0.015885045528606145], "seconds": 0.7204101085662842}, {"seed": 291, "success": true, "steps": 201, "error": [-0.0035757861354901443, 0.0032037585674948854, 0.006933374942239556], "seconds": 0.6844444274902344}, {"seed": 292, "success": true, "steps": 132, "error": [-0.00043585042832927634, 0.008084766679444577, 0.0029073829004824248], "seconds": 0.7291052341461182}, {"seed": 293, "success": true, "steps": 160, "error": [0.008811690781598713, 0.011924640840663692, 0.023756664529414273], "seconds": 0.8915915489196777}, {"seed": 294, "success": true, "steps": 176, "error": [0.003779033408662702, -0.005400975222614068, 0.02240389693403877], "seconds": 0.41309332847595215}, {"seed": 295, "success": true, "steps": 155, "error": [-0.010054918535415514, 0.015760387401674736, -0.04571439964712187], "seconds": 0.7135765552520752}, {"seed": 296, "success": true, "steps": 121, "error": [-0.0019513562275608187, 0.0006462988877882214, 0.011316127608826498], "seconds": 0.38553428649902344}, {"seed": 297, "success": true, "steps": 62, "error": [0.009503265652468063, -0.0021833581538679425, -0.03277127849143158], "seconds": 0.17749452590942383}, {"seed": 298, "success": true, "steps": 117, "error": [-0.027429282786901155, 0.02521706940532198, 0.06700510294565465], "seconds": 0.5788512229919434}, {"seed": 299, "success": true, "steps": 165, "error": [0.00024621020000514804, 0.009818816422788146, -0.019074137332625085], "seconds": 0.8388001918792725}]
+\ No newline at end of file

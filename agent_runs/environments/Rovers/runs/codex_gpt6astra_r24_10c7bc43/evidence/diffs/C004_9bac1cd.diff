@@ -1,0 +1,27 @@
+diff --git a/probe_geometry.py b/probe_geometry.py
+index 073b9fa..35f88b2 100644
+--- a/probe_geometry.py
++++ b/probe_geometry.py
+@@ -2,9 +2,17 @@ from env_client import make_env
+ import numpy as np
+ 
+ e=make_env();s,i=e.reset(seed=0)
+-print('info',i,'max_steps',e.max_steps)
+-print('types',e.observation_space.type_features)
+-for n in s.get_object_names():
+- o=s.get_object_from_name(n)
+- print(n,[(f,s.get(o,f)) for f in e.observation_space.type_features[o.type]])
++print('action',e.action_space.low,e.action_space.high)
++def pos(j=0):
++ o=s.get_object_from_name('rover'+str(j));return tuple(round(float(s.get(o,f)),4) for f in ('x','y','theta','calibrated','at_home'))
++def act(dx=0,dy=0,op=0,j=0,dt=0):
++ global s
++ a=np.zeros(8,dtype=np.float32);a[4*j:4*j+4]=[dx,dy,dt,op]
++ s,r,t,tr,i=e.step(a);return pos(j)
++print('start',pos())
++print('x input .2',act(.2))
++print('x input 1',act(1))
++print('north',*[act(dy=1) for _ in range(13)])
++print('west',*[act(dx=-1) for _ in range(10)])
++print('north2',*[act(dy=1,op=-.5) for _ in range(8)])
+ e.close()

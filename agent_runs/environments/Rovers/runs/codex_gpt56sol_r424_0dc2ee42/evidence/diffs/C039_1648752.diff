@@ -1,0 +1,21 @@
+diff --git a/approach.py b/approach.py
+index b5aa980..4b79729 100644
+--- a/approach.py
++++ b/approach.py
+@@ -271,7 +271,15 @@ class GeneratedApproach:
+                 if self._dist(q, (sx, sy)) <= 0.245 and not self._blocked(q):
+                     # Strongly prefer a stance away from the collidable lander.
+                     lander_penalty = max(0.0, 0.55 - self._dist(q, self.lander_xy)) * 20.0
+-                    candidates.append((self._dist(q, rover_pos) + lander_penalty, q))
++                    target_d = self._dist(q, (sx, sy))
++                    conflict = 0.0
++                    for other in self._objs(state, "sample"):
++                        if other.name != sample.name:
++                            od = self._dist(q, self._xy(state, other))
++                            if od < 0.27 or od <= target_d + 0.02:
++                                conflict += 10.0
++                    candidates.append((self._dist(q, rover_pos) +
++                                       lander_penalty + conflict, q))
+         if candidates:
+             return min(candidates, key=lambda x: x[0])[1]
+         return self._same_side_goal((sx, sy), idx)

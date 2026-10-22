@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index b96faf3..46a8f2a 100644
+--- a/approach.py
++++ b/approach.py
+@@ -201,7 +201,7 @@ class GeneratedApproach:
+                 lift_limit = min(0.74, self.contact_robot_y + 0.15)
+             else:
+                 lift_limit = self.safe_y if is_target else 0.74
+-            if ry < lift_limit and not parked_high_enough:
++            if ry < lift_limit - 0.004 and not parked_high_enough:
+                 return self._action(dy=min(0.05, self.safe_y - ry), vac=1.0)
+             if not self.attached:
+                 self.retry += 1

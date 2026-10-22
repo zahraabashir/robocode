@@ -1,0 +1,36 @@
+diff --git a/kinematics_probe.py b/kinematics_probe.py
+new file mode 100644
+index 0000000..41ac332
+--- /dev/null
++++ b/kinematics_probe.py
+@@ -0,0 +1,10 @@
++import numpy as np
++from scipy.spatial.transform import Rotation as R
++q=[0,-.35,-np.pi,-2.5,0,-.87,np.pi/2]
++origins=[([0,0,.15643],np.pi),([0,.005375,-.12838],np.pi/2),([0,-.21038,-.006375],-np.pi/2),([0,.006375,-.21038],np.pi/2),([0,-.20843,-.006375],-np.pi/2),([0,0,-.10593],np.pi/2),([0,-.10593,0],-np.pi/2)]
++t=np.array([-.12,0,0.]);r=np.eye(3)
++for (p,a),j in zip(origins,q):
++ t+=r@p;r=r@R.from_euler('x',a).as_matrix()@R.from_euler('z',j).as_matrix()
++ print(t)
++print('orientation',r)
++for d in [.06,.12,.18]: print('ee',d,t+r@[0,0,-d])
+diff --git a/probe_limits.py b/probe_limits.py
+new file mode 100644
+index 0000000..e48d429
+--- /dev/null
++++ b/probe_limits.py
+@@ -0,0 +1,14 @@
++from env_client import make_env
++import numpy as np
++
++e=make_env()
++for j in [4,6,8]:
++ for delta in [-.2,.2]:
++  s,_=e.reset(seed=0);a=np.zeros(11,dtype=np.float32);a[0]=-.2
++  for _ in range(5):s=e.step(a)[0]
++  r=s.get_object_from_name('robot');f='joint_'+str(j-2)
++  for k in range(35):
++   old=s.get(r,f);a=np.zeros(11,dtype=np.float32);a[j]=delta;s=e.step(a)[0];new=s.get(r,f)
++   if old==new:break
++  print('LIMIT',j,delta,k,new,flush=True)
++e.close()

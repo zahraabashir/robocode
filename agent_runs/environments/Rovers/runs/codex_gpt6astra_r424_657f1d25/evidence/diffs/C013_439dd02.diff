@@ -1,0 +1,27 @@
+diff --git a/probe_rover_los.py b/probe_rover_los.py
+new file mode 100644
+index 0000000..c5ac47c
+--- /dev/null
++++ b/probe_rover_los.py
+@@ -0,0 +1,9 @@
++import numpy as np
++from env_client import make_env
++from probe_policy_old import GeneratedApproach
++e=make_env();s,info=e.reset(seed=3);p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,info)
++for _ in range(55):s,*_=e.step(p.get_action(s))
++for d in [(0,0),(0,-.1),(0,-.1),(.1,0),(.1,0)]:
++ a=np.zeros(8,np.float32);a[4:6]=d;a[3]=.5;s,*_=e.step(a)
++ print(p.xy(s,p.rovers[0]),p.xy(s,p.rovers[1]),'pending',p.pending(s,0))
++e.close()
+diff --git a/test_results_more.txt b/test_results_more.txt
+new file mode 100644
+index 0000000..e543dba
+--- /dev/null
++++ b/test_results_more.txt
+@@ -0,0 +1,6 @@
++RESULT 29 {'object_count': 3} True 34 0.645
++RESULT 30 {'object_count': 1} True 22 0.367
++RESULT 31 {'object_count': 2} True 32 0.92
++RESULT 32 {'object_count': 3} True 28 0.923
++RESULT 33 {'object_count': 3} True 34 1.012
++RESULT 34 {'object_count': 1} True 21 0.805

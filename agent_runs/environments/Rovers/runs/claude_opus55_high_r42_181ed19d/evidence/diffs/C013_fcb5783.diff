@@ -1,0 +1,17 @@
+diff --git a/approach.py b/approach.py
+index 4c6407f..ed5afb4 100644
+--- a/approach.py
++++ b/approach.py
+@@ -238,7 +238,11 @@ class GeneratedApproach:
+                 self.ovis[rn][k] = ml
+                 self.odist[rn][k] = dd
+             for k, (sx, sy) in enumerate(self.samp_xy):
+-                m = np.hypot(px - sx, py - sy) <= SAMPLE_RANGE
++                dk = np.hypot(px - sx, py - sy)
++                m = dk <= SAMPLE_RANGE
++                for j, (qx, qy) in enumerate(self.samp_xy):
++                    if j != k:
++                        m &= np.hypot(px - qx, py - qy) > dk + 0.02
+                 if m.any():
+                     reg[("S" if not self.samp_soil[k] else "T", k)] = m
+             oh = self.home[self.other[rn]]

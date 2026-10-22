@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 60a06a9..afddff0 100644
+--- a/approach.py
++++ b/approach.py
+@@ -19,7 +19,7 @@ class GeneratedApproach:
+             if not n.startswith("obstruction"): continue
+             x,y,_=self._xyz(state,n); hx=self._v(state,n,"half_extent_x"); hy=self._v(state,n,"half_extent_y")
+             if abs(x-rx)<hx+rhx and abs(y-ry)<hy+rhy: blockers.append(n)
+-        blockers.sort()
++        blockers.sort(key=lambda n:self._v(state,n,"pose_z")+self._v(state,n,"half_extent_z"),reverse=True)
+         self.tasks=blockers+["target_block"]; self.task_i=0
+         self._setup(state,self.tasks[0])
+ 

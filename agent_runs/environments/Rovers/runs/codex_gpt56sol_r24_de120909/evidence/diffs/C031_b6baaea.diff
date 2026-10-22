@@ -1,0 +1,14 @@
+diff --git a/approach.py b/approach.py
+index 7fc2b5e..ea59546 100644
+--- a/approach.py
++++ b/approach.py
+@@ -52,7 +52,8 @@ class GeneratedApproach:
+                          if state.get(p,"half_x")<.10]
+                 pinched=any(math.dist((x,y),(state.get(p,"x"),state.get(p,"y")))<.34
+                             for p in pillars)
+-                choices.append((int(trapped or edge or pinched),math.dist(self.home[owner],(x,y)),owner,o.name))
++                risk=2 if trapped else (1 if edge or pinched else 0)
++                choices.append((risk,math.dist(self.home[owner],(x,y)),owner,o.name))
+             if choices:
+                 _,_,owner,name=min(choices)
+                 self.sample_jobs[owner][soil]=name

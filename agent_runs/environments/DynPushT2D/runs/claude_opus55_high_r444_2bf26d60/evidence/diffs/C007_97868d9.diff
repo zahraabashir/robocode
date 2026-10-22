@@ -1,0 +1,1007 @@
+diff --git a/approach.py b/approach.py
+index 0304083..fa730d8 100644
+--- a/approach.py
++++ b/approach.py
+@@ -158,6 +158,9 @@ class TModel:
+ class GeneratedApproach:
+     def __init__(self, action_space, observation_space, primitives):
+         self.action_space = action_space
++        self.alpha = 50.0
++        self.H = 40
++        self.replan_every = 8
+         self.model = None
+ 
+     # ------------------------------------------------------------------
+@@ -214,38 +217,67 @@ class GeneratedApproach:
+ 
+     def plan_push(self, pose, robot):
+         sw, dw = self.candidates(pose)
+-        N = len(sw)
+-        # filter starts that are outside walls
++        # extra candidates: push from current robot position if close to block
++        dr = dist_to_T_local(to_local(robot[None], pose), self.model.rects)[0]
++        if dr < R_ROBOT + 0.06:
++            angs = np.linspace(0, 2 * np.pi, 24, endpoint=False)
++            sw = np.vstack([sw, np.repeat(robot[None], 24, 0)])
++            dw = np.vstack([dw, np.stack([np.cos(angs), np.sin(angs)], 1)])
++            here = np.zeros(len(sw), bool)
++            here[-24:] = True
++        else:
++            here = np.zeros(len(sw), bool)
+         ok = np.all((sw > WALL_LO + R_ROBOT + 0.01) & (sw < WALL_HI - R_ROBOT - 0.01), 1)
+-        # start point must not overlap block, staging point must be clear
+         pre = sw - dw * 0.12
+         ds = dist_to_T_local(to_local(sw, pose), self.model.rects)
+         dp = dist_to_T_local(to_local(pre, pose), self.model.rects)
+         ok &= (ds > R_ROBOT + 0.005) & (dp > R_ROBOT + 0.035)
+         ok &= np.all((pre > WALL_LO + R_ROBOT + 0.02) & (pre < WALL_HI - R_ROBOT - 0.02), 1)
+-        if np.any(ok):
+-            sw, dw = sw[ok], dw[ok]
+-        N = len(sw)
+-        poses = np.repeat(pose[None], N, 0)
+-        rob = sw.copy()
++        ok |= here
++        sw, dw, pre, here = sw[ok], dw[ok], pre[ok], here[ok]
+         c0 = self.cost(pose)[0]
+-        best = (np.inf, None)
+-        H = 40
+-        steplen = MAXD
+-        travel = np.hypot(*(sw - robot).T) / MAXD
+-        cur = poses
++        # speeds
++        speeds = [MAXD] if c0 > 0.35 else [MAXD, 0.02]
++        SW = np.vstack([sw] * len(speeds))
++        DW = np.vstack([dw] * len(speeds))
++        PRE = np.vstack([pre] * len(speeds))
++        HERE = np.concatenate([here] * len(speeds))
++        SP = np.repeat(np.array(speeds), len(sw))
++        N = len(SW)
++        # travel estimate
++        travel = np.where(HERE, 0.0, self.travel_est(robot, PRE, pose) + 0.12 / MAXD)
++        cur = np.repeat(pose[None], N, 0)
++        rob = SW.copy()
+         bestscore = np.full(N, np.inf)
+         bestk = np.zeros(N, int)
++        H = self.H
+         for k in range(1, H + 1):
+-            cur, rob = self.sim.step(cur, rob, dw * steplen)
++            cur, rob = self.sim.step(cur, rob, DW * SP[:, None])
+             cst = self.cost(cur)
+-            # score: resulting cost + time penalty
+-            score = cst + 0.004 * (k + travel)
++            done = self.in_goal(cur, 0.75)
++            score = np.where(done, 0.0, self.alpha * cst) + k + travel
+             m = score < bestscore
+             bestscore[m] = score[m]
+             bestk[m] = k
+         i = int(np.argmin(bestscore))
+-        return sw[i], dw[i], bestk[i], bestscore[i], c0
++        return SW[i], DW[i] * SP[i], bestk[i], bestscore[i], c0, HERE[i]
++
++    def in_goal(self, poses, frac=1.0):
++        dp = np.abs(poses[:, :2] - self.goal[:2])
++        da = np.abs(wrap_arr(poses[:, 2] - self.goal[2]))
++        return (dp[:, 0] < 0.03 * frac) & (dp[:, 1] < 0.03 * frac) & (da < math.radians(8) * frac)
++
++    def travel_est(self, robot, pts, pose):
++        """Approximate travel steps from robot to each pt, detouring around block."""
++        direct = np.hypot(*(pts - robot).T)
++        ts = np.linspace(0, 1, 12)
++        seg = robot[None, None, :] + ts[None, :, None] * (pts - robot)[:, None, :]
++        flat = seg.reshape(-1, 2)
++        dd = dist_to_T_local(to_local(flat, pose), self.model.rects).reshape(len(pts), -1)
++        blocked = dd.min(1) < R_ROBOT + 0.03
++        cen = to_world(np.array([[0.0, -(self.w + self.lv) / 2]]), pose)[0]
++        det = (np.hypot(*(robot - cen)) + np.hypot(*(pts - cen).T)) * 1.25
++        return np.where(blocked, np.maximum(det, direct), direct) / MAXD
+ 
+     # ------------------------------------------------------------------
+     def nav_path(self, robot, target, pose):
+@@ -339,10 +371,14 @@ class GeneratedApproach:
+     def _act(self, pose, robot):
+         for _ in range(4):
+             if self.mode == "plan":
+-                st, d, k, sc, c0 = self.plan_push(pose, robot)
++                st, d, k, sc, c0, here = self.plan_push(pose, robot)
+                 self.push = (st, d)
+-                self.push_left = k + 3
+-                self.path = self.nav_path(robot, st - d * 0.12, pose) + [st]
++                self.push_left = min(k, self.replan_every)
++                dn = d / np.linalg.norm(d)
++                if here:
++                    self.path = []
++                else:
++                    self.path = self.nav_path(robot, st - dn * 0.12, pose) + [st]
+                 self.plan_pose = pose.copy()
+                 self.mode = "nav"
+             if self.mode == "nav":
+@@ -364,11 +400,7 @@ class GeneratedApproach:
+                     self.mode = "plan"
+                     continue
+                 self.push_left -= 1
+-                d = self.push[1]
+-                # slow down near goal
+-                c = self.cost(pose)[0]
+-                sp = MAXD if c > 0.2 else max(0.01, MAXD * c / 0.2)
+-                return d * sp
++                return self.push[1]
+         return np.zeros(2)
+ 
+ 
+diff --git a/cmp_model.py b/cmp_model.py
+new file mode 100644
+index 0000000..db61209
+--- /dev/null
++++ b/cmp_model.py
+@@ -0,0 +1,12 @@
++import numpy as np
++from push_model import predict_step, geom_from_obs
++from model_v import VModel
++rng=np.random.default_rng(0)
++g=dict(w=0.13,Lh=1.1,Lv=1.1); m=VModel(0.13,1.1,1.1)
++P=[];Q=[]
++for i in range(500):
++    pose=np.array([2.5,2.5,rng.uniform(-3,3)]); rob=pose[:2]+rng.uniform(-0.8,0.8,2); a=rng.uniform(-0.049,0.049,2)
++    p1,r1=predict_step(pose,rob,a,g); P.append(p1)
++    Q.append((pose,rob,a))
++p2,r2=m.step(np.array([q[0] for q in Q]),np.array([q[1] for q in Q]),np.array([q[2] for q in Q]))
++print(np.abs(np.array(P)-p2).max(0))
+diff --git a/col_0.log b/col_0.log
+new file mode 100644
+index 0000000..b992ae5
+--- /dev/null
++++ b/col_0.log
+@@ -0,0 +1,25 @@
++navfail 100 0.5812486534949994 0.0
++navfail 100 0.8260996124397624 0.0
++100 84
++navfail 101 0.4125059289850408 0.0
++101 182
++102 294
++wall 103
++103 294
++104 406
++navfail 105 0.35173101563142156 0.0
++105 504
++wall 106
++106 504
++navfail 107 0.1849157932959263 0.0
++107 602
++108 714
++109 826
++110 938
++wall 111
++111 952
++wall 112
++112 952
++113 1064
++wall 114
++114 1148
+diff --git a/col_1.log b/col_1.log
+new file mode 100644
+index 0000000..b48adc0
+--- /dev/null
++++ b/col_1.log
+@@ -0,0 +1,38 @@
++115 112
++wall 116
++116 126
++navfail 117 1.1475651190146916 0.0
++navfail 117 0.4221659168517509 0.0
++117 210
++118 322
++navfail 119 0.8009230698237192 0.0
++wall 119
++119 350
++navfail 120 0.44146092687898025 0.0
++navfail 120 0.5110994394478386 0.0
++120 434
++navfail 121 0.20184872717827138 0.0
++121 532
++navfail 122 0.22226888605768383 0.0
++wall 122
++122 602
++navfail 123 2.543554076247497 0.0
++navfail 123 0.4880511236819359 0.0
++navfail 123 0.48919122114723657 0.0
++wall 123
++123 658
++wall 124
++124 714
++navfail 125 2.772794797365419 0.0
++125 812
++navfail 126 0.5098488783358021 0.0
++126 910
++navfail 127 2.645676784633295 0.0
++navfail 127 0.6436396121497455 0.0
++wall 127
++127 938
++wall 128
++128 938
++navfail 129 2.5889565039174904 0.0
++navfail 129 0.39896365549508395 0.0
++129 1022
+diff --git a/col_2.log b/col_2.log
+new file mode 100644
+index 0000000..f686c01
+--- /dev/null
++++ b/col_2.log
+@@ -0,0 +1,31 @@
++navfail 130 0.7684981325068745 0.0
++130 98
++wall 131
++131 98
++wall 132
++132 98
++133 210
++navfail 134 1.7010285408355144 0.0
++wall 134
++134 224
++wall 135
++135 308
++navfail 136 2.530304464706826 0.0
++136 406
++navfail 137 0.48880359791056727 0.0
++137 504
++navfail 138 2.6810269391732584 0.0
++navfail 138 2.6752274310495205 0.0
++wall 138
++138 518
++139 630
++navfail 140 0.9574091764623831 0.0
++140 728
++wall 141
++141 826
++wall 142
++142 882
++wall 143
++143 896
++wall 144
++144 994
+diff --git a/col_3.log b/col_3.log
+new file mode 100644
+index 0000000..23d3305
+--- /dev/null
++++ b/col_3.log
+@@ -0,0 +1,28 @@
++navfail 145 0.9266363970869294 0.0
++wall 145
++145 84
++146 196
++147 308
++wall 148
++148 392
++navfail 149 2.1717531628188653 0.0
++navfail 149 0.27348078805485265 0.0
++149 476
++navfail 150 0.12396852419825222 0.0
++150 574
++navfail 151 0.785037533710175 0.0
++151 672
++wall 152
++152 756
++153 868
++wall 154
++154 868
++wall 155
++155 910
++156 1022
++navfail 157 0.5908641531104925 0.0
++navfail 157 0.5558937147538678 0.0
++157 1106
++158 1218
++wall 159
++159 1274
+diff --git a/col_4.log b/col_4.log
+new file mode 100644
+index 0000000..1da5e19
+--- /dev/null
++++ b/col_4.log
+@@ -0,0 +1,28 @@
++160 112
++wall 161
++161 196
++162 308
++163 420
++navfail 164 0.41273393996105184 0.0
++164 518
++wall 165
++165 518
++wall 166
++166 532
++wall 167
++167 560
++navfail 168 0.6687350278082417 0.0
++168 658
++169 770
++navfail 170 1.9801773153957831 0.0
++navfail 170 2.2527226459936913 0.0
++170 854
++wall 171
++171 896
++navfail 172 0.7561475776272608 0.0
++172 994
++navfail 173 1.731745438611625 0.0
++navfail 173 1.7423290432203788 0.0
++173 1078
++wall 174
++174 1078
+diff --git a/col_5.log b/col_5.log
+new file mode 100644
+index 0000000..6348572
+--- /dev/null
++++ b/col_5.log
+@@ -0,0 +1,29 @@
++175 112
++wall 176
++176 168
++wall 177
++177 196
++navfail 178 0.655276635885516 0.0
++navfail 178 0.8000479293263496 0.0
++178 280
++wall 179
++179 294
++wall 180
++180 294
++181 406
++navfail 182 1.3021001737497 0.0
++wall 182
++182 490
++navfail 183 0.8530726565273796 0.0
++183 588
++navfail 184 0.2892128213053389 0.0
++184 686
++wall 185
++185 756
++wall 186
++186 812
++navfail 187 0.5531063377104662 0.0
++187 910
++188 1022
++navfail 189 0.5088085676215689 0.0
++189 1120
+diff --git a/col_6.log b/col_6.log
+new file mode 100644
+index 0000000..0451d50
+--- /dev/null
++++ b/col_6.log
+@@ -0,0 +1,29 @@
++navfail 190 0.7071264522101917 0.0
++190 98
++navfail 191 0.7448537136233812 0.0
++191 196
++wall 192
++192 224
++wall 193
++193 224
++navfail 194 0.6989158382540994 0.0
++194 322
++navfail 195 1.7790465773785253 0.0
++navfail 195 2.046819900411149 0.0
++wall 195
++195 336
++navfail 196 1.132132942169156 0.0
++196 434
++197 546
++198 658
++navfail 199 1.2705206958708566 0.0
++199 756
++200 868
++navfail 201 0.9475970762943132 0.0
++201 966
++wall 202
++202 980
++navfail 203 0.5222617492074764 0.0
++203 1078
++wall 204
++204 1078
+diff --git a/col_7.log b/col_7.log
+new file mode 100644
+index 0000000..7c8ae93
+--- /dev/null
++++ b/col_7.log
+@@ -0,0 +1,33 @@
++205 112
++wall 206
++206 112
++navfail 207 0.21234574365619477 0.0
++navfail 207 0.42752221094340304 0.0
++navfail 207 0.9578003135895781 0.0
++navfail 207 0.7535009862496855 0.0
++207 168
++wall 208
++208 224
++navfail 209 0.49679942946845557 0.0
++navfail 209 0.5096468444654819 0.0
++navfail 209 0.5220134861817278 0.0
++209 294
++wall 210
++210 294
++navfail 211 0.1556071448495736 0.0
++211 392
++navfail 212 0.22485633576501715 0.0
++212 490
++navfail 213 0.7724978177966451 0.0
++213 588
++wall 214
++214 588
++navfail 215 2.4230063364031142 0.0
++215 686
++wall 216
++216 784
++217 896
++navfail 218 1.0059030241486275 0.0
++218 994
++navfail 219 1.6751581782433222 0.0
++219 1092
+diff --git a/collect.py b/collect.py
+new file mode 100644
+index 0000000..6a35cbc
+--- /dev/null
++++ b/collect.py
+@@ -0,0 +1,34 @@
++import sys
++from plib import *
++seed0=int(sys.argv[1]); nseeds=int(sys.argv[2]); out=sys.argv[3]
++rng=np.random.default_rng(seed0)
++env=make_env()
++O,A,O2,META=[],[],[],[]
++def outline(w,Lh,Lv):
++    return np.array([(-Lh/2,0),(-Lh/2,-w),(-w/2,-w),(-w/2,-w-Lv),(w/2,-w-Lv),(w/2,-w),(Lh/2,-w),(Lh/2,0)])
++for seed in range(seed0,seed0+nseeds):
++    obs,_=env.reset(seed=seed); steps=0
++    for push in range(8):
++        pose=obs[0:3].copy(); w,Lh,Lv=obs[12:15]
++        V=outline(w,Lh,Lv); E=np.roll(V,-1,0)-V; L=np.linalg.norm(E,axis=1)
++        e=rng.choice(8,p=L/L.sum()); s=rng.uniform(0.01,L[e]-0.01)
++        d=E[e]/L[e]; nout=np.array([d[1],-d[0]]); p=V[e]+s*d
++        ang=rng.uniform(-0.9,0.9)
++        nin=-nout; c,sn=np.cos(ang),np.sin(ang); u=np.array([c*nin[0]-sn*nin[1],sn*nin[0]+c*nin[1]])
++        st=to_world(pose,p+nout*(R+0.02)); uw=rot(pose[2])@u
++        if st.min()<0.2 or st.max()>4.8: continue
++        # skip if block near wall
++        if np.min(to_world(pose,V))<0.4 or np.max(to_world(pose,V))>4.6:
++            print("wall",seed,flush=True); break
++        obs,ok=navigate(env,obs,to_world(pose,p+nout*(R+0.16)))
++        if ok: obs=goto(env,obs,st); ok=np.abs(obs[0:3]-pose).max()<1e-7
++        if not ok:
++            print("navfail",seed,np.linalg.norm(obs[16:18]-st),np.abs(obs[0:3]-pose).max(),flush=True); continue
++        sp=rng.uniform(0.01,0.0499)
++        for k in range(14):
++            a=uw*sp
++            o1,*_=env.step(a)
++            O.append(obs);A.append(a);O2.append(o1);META.append([seed,e,s,ang,sp,k]); obs=o1
++    print(seed,len(O),flush=True)
++np.savez(out,O=np.array(O),A=np.array(A),O2=np.array(O2),META=np.array(META))
++env.close()
+diff --git a/dbg.py b/dbg.py
+new file mode 100644
+index 0000000..0334dcf
+--- /dev/null
++++ b/dbg.py
+@@ -0,0 +1,14 @@
++import numpy as np, sys
++from env_client import make_env
++from approach import *
++np.set_printoptions(precision=3, suppress=True)
++env=make_env(); obs,_=env.reset(seed=int(sys.argv[1]))
++ap=GeneratedApproach(None,None,{}); ap.reset(obs,{})
++orig=ap.plan_push
++def pp(pose,robot):
++    r=orig(pose,robot); print("PLAN pose",pose,"cost %.3f pred %.3f k %d"%(r[4],r[3],r[2]), "start",r[0],"dir",r[1]); return r
++ap.plan_push=pp
++for i in range(int(sys.argv[2])):
++    a=ap.get_action(obs)
++    obs,r,te,tr,_=env.step(a)
++print(obs[[0,1,2,16,17]], ap.mode, ap.path)
+diff --git a/dbg2.py b/dbg2.py
+new file mode 100644
+index 0000000..22d9a90
+--- /dev/null
++++ b/dbg2.py
+@@ -0,0 +1,13 @@
++import numpy as np
++from env_client import make_env
++from approach import *
++np.set_printoptions(precision=3, suppress=True)
++env=make_env(); obs,_=env.reset(seed=1)
++m=TModel(obs[12],obs[13],obs[14])
++pose=obs[0:3].copy(); rob=obs[16:18].copy()
++for i in range(40):
++    a=np.array([0.049,0.0])
++    p2,r2=m.step(pose,rob,a)
++    obs,*_=env.step(a)
++    if i>=33: print(i, obs[[0,1,2,16,17]], p2[0], r2[0])
++    pose=obs[0:3].copy(); rob=obs[16:18].copy()
+diff --git a/dbg3.py b/dbg3.py
+new file mode 100644
+index 0000000..673ca60
+--- /dev/null
++++ b/dbg3.py
+@@ -0,0 +1,7 @@
++import numpy as np
++from env_client import make_env
++env=make_env(); obs,_=env.reset(seed=1)
++for a in [np.array([0.05,0.0]), np.array([0.049,0.0]), np.array([0.05,0.0],dtype=np.float32)]:
++    try: env.step(a); print("ok",a.dtype,a)
++    except Exception as e: print("fail",a, e)
++print(env.action_space.low, env.action_space.high, env.action_space.dtype)
+diff --git a/dbg4.py b/dbg4.py
+new file mode 100644
+index 0000000..89d9843
+--- /dev/null
++++ b/dbg4.py
+@@ -0,0 +1,5 @@
++import numpy as np
++from approach import *
++pose=np.array([3.846,1.935,-0.482]); 
++for rx in [3.277,3.326]:
++    pl=to_local(np.array([[rx,1.95]]),pose); print(pl, dist_to_T_local(pl, rects_local(0.141,1.102,1.137)))
+diff --git a/evalp.py b/evalp.py
+new file mode 100644
+index 0000000..85775a5
+--- /dev/null
++++ b/evalp.py
+@@ -0,0 +1,15 @@
++import numpy as np, glob, sys
++import push_model as pm
++O=[];A=[];O2=[]
++for f in sorted(glob.glob('data_*.npz')):
++    d=np.load(f); O.append(d['O']);A.append(d['A']);O2.append(d['O2'])
++O=np.concatenate(O);A=np.concatenate(A);O2=np.concatenate(O2)
++rng=np.random.default_rng(0); idx=rng.permutation(len(O)); te=idx[3000:4500]
++for ps in sys.argv[1:]:
++    params=eval(ps); E=[]
++    for i in te:
++        o=O[i]; p,rb=pm.predict_step(o[0:3],o[16:18],A[i],pm.geom_from_obs(o),params)
++        dt=(p[2]-O2[i,2]+np.pi)%(2*np.pi)-np.pi
++        E.append([np.linalg.norm(p[:2]-O2[i,:2]),abs(dt),np.linalg.norm(rb-O2[i,16:18])])
++    E=np.array(E)
++    print(ps,'pos %.5f p95 %.5f max %.4f th %.5f p95 %.5f max %.4f robot %.6f'%(E[:,0].mean(),np.percentile(E[:,0],95),E[:,0].max(),E[:,1].mean(),np.percentile(E[:,1],95),E[:,1].max(),E[:,2].max()),flush=True)
+diff --git a/fit.py b/fit.py
+new file mode 100644
+index 0000000..650d1a7
+--- /dev/null
++++ b/fit.py
+@@ -0,0 +1,35 @@
++import numpy as np, glob, sys
++from scipy.optimize import minimize
++import push_model as pm
++O=[];A=[];O2=[]
++for f in sorted(glob.glob('data_*.npz')):
++    d=np.load(f); O.append(d['O']);A.append(d['A']);O2.append(d['O2'])
++O=np.concatenate(O);A=np.concatenate(A);O2=np.concatenate(O2)
++dpos=np.linalg.norm(O2[:,0:2]-O[:,0:2],axis=1); dth=np.abs(O2[:,2]-O[:,2])
++print('N',len(O),'moved',(dpos>1e-7).sum())
++# robot tracking
++rerr=O2[:,16:18]-O[:,16:18]-A; print('robot track err max',np.abs(rerr).max(),'mean',np.abs(rerr).mean())
++# block near walls? use polygon
++ok=np.array([pm.t_polygon_world(o[0:3],pm.geom_from_obs(o)).min()>0.05 and pm.t_polygon_world(o2[0:3],pm.geom_from_obs(o)).max()<4.95 for o,o2 in zip(O,O2)])
++print('not near wall',ok.sum())
++rng=np.random.default_rng(0)
++idx=np.where(ok)[0]; rng.shuffle(idx)
++tr=idx[:int(sys.argv[1]) if len(sys.argv)>1 else 1500]; te=idx[3000:]
++def errs(params,ids):
++    E=[]
++    for i in ids:
++        o=O[i]; p,_=pm.predict_step(o[0:3],o[16:18],A[i],pm.geom_from_obs(o),params)
++        dt=(p[2]-O2[i,2]+np.pi)%(2*np.pi)-np.pi
++        E.append([np.linalg.norm(p[:2]-O2[i,:2]),abs(dt)])
++    return np.array(E)
++def loss(x,nsub):
++    params=dict(cx=x[0],cy=x[1],k2=abs(x[2])+1e-3,mu=abs(x[3]),nsub=nsub,r_eff=x[4])
++    E=errs(params,tr); return np.mean(E[:,0]**2+(0.4*E[:,1])**2)
++for nsub in [1,4]:
++    x0=np.array([0,-0.35,0.12,0.3,0.1])
++    r=minimize(loss,x0,args=(nsub,),method='Nelder-Mead',options=dict(maxfev=400,xatol=1e-4,fatol=1e-10))
++    print(nsub,r.x,r.fun)
++    params=dict(cx=r.x[0],cy=r.x[1],k2=abs(r.x[2])+1e-3,mu=abs(r.x[3]),nsub=nsub,r_eff=r.x[4])
++    E=errs(params,te[:2000]); mv=np.array([dpos[i]>1e-7 for i in te[:2000]])
++    print(' test pos err mean %.5f p95 %.5f  th err mean %.5f p95 %.5f; moved-only pos %.5f'%(E[:,0].mean(),np.percentile(E[:,0],95),E[:,1].mean(),np.percentile(E[:,1],95),E[mv,0].mean()))
++    print(' baseline (no motion) pos %.5f th %.5f'%(dpos[te[:2000]].mean(),dth[te[:2000]].mean()),flush=True)
+diff --git a/fit2.log b/fit2.log
+new file mode 100644
+index 0000000..21da0fc
+--- /dev/null
++++ b/fit2.log
+@@ -0,0 +1,4 @@
++full 0 nsub 1 [0.9843 0.1004 0.2584] test pos mean 0.00069 p95 0.00193 th mean 0.00090 p95 0.00213
++full 0 nsub 4 [0.9914 0.1015 0.2202] test pos mean 0.00055 p95 0.00110 th mean 0.00067 p95 0.00119
++full 1 nsub 1 [ 9.8040e-01  1.0040e-01  2.5820e-01 -1.0000e-04  1.0284e+00] test pos mean 0.00067 p95 0.00179 th mean 0.00088 p95 0.00194
++full 1 nsub 4 [9.945e-01 1.014e-01 2.213e-01 3.000e-04 1.003e+00] test pos mean 0.00054 p95 0.00107 th mean 0.00066 p95 0.00122
+diff --git a/fit2.py b/fit2.py
+new file mode 100644
+index 0000000..5f1bb51
+--- /dev/null
++++ b/fit2.py
+@@ -0,0 +1,29 @@
++import numpy as np, glob, sys
++from scipy.optimize import minimize
++import push_model as pm
++O=[];A=[];O2=[]
++for f in sorted(glob.glob('data_*.npz')):
++    d=np.load(f); O.append(d['O']);A.append(d['A']);O2.append(d['O2'])
++O=np.concatenate(O);A=np.concatenate(A);O2=np.concatenate(O2)
++rng=np.random.default_rng(0); idx=rng.permutation(len(O)); tr=idx[:700]; te=idx[3000:5000]
++def errs(fn,ids):
++    E=[]
++    for i in ids:
++        o=O[i]; g=pm.geom_from_obs(o); p,_=pm.predict_step(o[0:3],o[16:18],A[i],g,fn(g))
++        dt=(p[2]-O2[i,2]+np.pi)%(2*np.pi)-np.pi
++        E.append([np.linalg.norm(p[:2]-O2[i,:2]),abs(dt)])
++    return np.array(E)
++def mk(x,nsub,full):
++    def fn(g):
++        c,k2=pm.mass_props(g)
++        d=dict(mu=abs(x[0]),r_eff=x[1],beta=x[2],nsub=nsub)
++        if full: d.update(cx=0.0,cy=c[1]+x[3],k2=k2*abs(x[4]))
++        return d
++    return fn
++for full in [0,1]:
++  for nsub in [1,4]:
++    x0=np.array([1.0,0.1,0.25]+([0,1.0] if full else []))
++    loss=lambda x: np.mean((lambda E: E[:,0]**2+(0.4*E[:,1])**2)(errs(mk(x,nsub,full),tr)))
++    r=minimize(loss,x0,method='Nelder-Mead',options=dict(maxfev=300 if not full else 500,xatol=1e-4,fatol=1e-11))
++    E=errs(mk(r.x,nsub,full),te)
++    print('full',full,'nsub',nsub,np.round(r.x,4),'test pos mean %.5f p95 %.5f th mean %.5f p95 %.5f'%(E[:,0].mean(),np.percentile(E[:,0],95),E[:,1].mean(),np.percentile(E[:,1],95)),flush=True)
+diff --git a/geom_res.json b/geom_res.json
+new file mode 100644
+index 0000000..5b0743b
+--- /dev/null
++++ b/geom_res.json
+@@ -0,0 +1 @@
++[[0.0, "bartop", 0.130331788788359, 1.1823741402459995, 1.1359062478663557, 6.256129797744957e-08, 0.10168996336433249, 6.251038458553192e-08, 0.09968801025464573], [0.0, "stemend", 0.130331788788359, 1.1823741402459995, 1.1359062478663557, -1.5374565251908802e-05, -1.367662709648011, -1.5374514338503007e-05, -1.365660756538324], [0.0, "barbot", 0.130331788788359, 1.1823741402459995, 1.1359062478663557, 0.3500251663384142, -0.23174655057449253, 0.35002516638932757, -0.22974459746480577], [0.0, "barend", 0.130331788788359, 1.1823741402459995, 1.1359062478663557, 0.6929333750743614, -8.490150234078011e-06, 0.6909314219646746, -8.490099320708306e-06], [0.0, "stemside", 0.130331788788359, 1.1823741402459995, 1.1359062478663557, 0.16571095619979354, -0.7999820735755382, 0.16370900309010677, -0.7999820735246248], [0.0, "barbotL", 0.130331788788359, 1.1823741402459995, 1.1359062478663557, -0.349980287148902, -0.23173290190478932, -0.3499802870979886, -0.22973094879510259], [1.0, "bartop", 0.14138512969102207, 1.1022997840922903, 1.137398421918265, 1.9175619861523982e-05, 0.10167685402923113, 1.9175588475128563e-05, 0.09967490092191915], [1.0, "stemend", 0.14138512969102207, 1.1022997840922903, 1.137398421918265, 4.248928641211807e-06, -1.3811432440938198, 4.248960027634979e-06, -1.379141290986508], [1.0, "barend", 0.14138512969102207, 1.1022997840922903, 1.137398421918265, 0.6529276192566287, -3.819414918897448e-06, 0.6509256661493168, -3.819383532478232e-06], [1.0, "barbotL", 0.14138512969102207, 1.1022997840922903, 1.137398421918265, -0.349990284069863, -0.24371980228286852, -0.34999028403847654, -0.24171784917555653], [2.0, "bartop", 0.10939505366833017, 1.013786656833267, 1.0687423419765096, -1.8707485644785402e-05, 0.10165973194765368, -1.870746568614583e-05, 0.09965777873972034], [2.0, "stemend", 0.10939505366833017, 1.013786656833267, 1.0687423419765096, 9.287412142906452e-06, -1.2804620001600662, 9.287392184249536e-06, -1.2784600469521328], [2.0, "barend", 0.10939505366833017, 1.013786656833267, 1.0687423419765096, 0.6086732547190732, -7.8928359094285e-06, 0.6066713015111399, -7.89285586807176e-06], [2.0, "barbotL", 0.10939505366833017, 1.013786656833267, 1.0687423419765096, -0.3499946976700568, -0.21171422089273048, -0.3499946976900154, -0.20971226768479714], [3.0, "bartop", 0.1239525649070417, 1.0399347286592697, 1.1836442878523037, -5.2749369286868575e-06, 0.10167390907770914, -5.274940914580815e-06, 0.09967195589895206], [3.0, "barbot", 0.1239525649070417, 1.0399347286592697, 1.1836442878523037, 0.3499828312364468, -0.22573871750389302, 0.3499828312404327, -0.22373676432513595], [3.0, "barend", 0.1239525649070417, 1.0399347286592697, 1.1836442878523037, 0.6217376655253606, 2.0973843592436598e-06, 0.6197357123466035, 2.09738834514412e-06], [3.0, "stemside", 0.1239525649070417, 1.0399347286592697, 1.1836442878523037, 0.16372820781353428, -0.8000099145690672, 0.1617262546347772, -0.8000099145650813], [3.0, "barbotL", 0.1239525649070417, 1.0399347286592697, 1.1836442878523037, -0.35000179016208394, -0.22574730754930025, -0.35000179015809807, -0.2237453543705432], [4.0, "bartop", 0.14009506034929037, 1.043631954036007, 1.217908818546914, -2.452866385687701e-05, 0.10165605357568677, -2.45285948480214e-05, 0.09965410046315916], [4.0, "barbot", 0.14009506034929037, 1.043631954036007, 1.217908818546914, 0.35001526173439396, -0.24174867841363915, 0.3500152616653851, -0.23974672530111152], [4.0, "barend", 0.14009506034929037, 1.043631954036007, 1.217908818546914, 0.6235778526690577, -2.347841982840335e-05, 0.6215758995565301, -2.3478488837244746e-05], [4.0, "stemside", 0.14009506034929037, 1.043631954036007, 1.217908818546914, 0.17174272506513413, -0.7999799606789058, 0.16974077195260656, -0.7999799607479146], [5.0, "bartop", 0.12042366027099993, 1.0113187984756113, 1.012189427681792, -2.6345387706597498e-05, 0.10165984900030098, -2.634535860505091e-05, 0.09965789592016286], [5.0, "barbot", 0.12042366027099993, 1.0113187984756113, 1.012189427681792, 0.3500179693618875, -0.22174588537763065, 0.35001796933278595, -0.21974393229749253], [5.0, "barend", 0.12042366027099993, 1.0113187984756113, 1.012189427681792, 0.6074227415735126, 1.5606103679734424e-05, 0.6054207884933746, 1.560607457820167e-05], [5.0, "stemside", 0.12042366027099993, 1.0113187984756113, 1.012189427681792, 0.16171290905891772, -0.8000252567296778, 0.1597109559787796, -0.8000252567587793], [5.0, "barbotL", 0.12042366027099993, 1.0113187984756113, 1.012189427681792, -0.3500088444623168, -0.22174587878247146, -0.3500088444914184, -0.21974392570233334], [6.0, "bartop", 0.1424932815547606, 1.1081237029137576, 1.1568669834257685, 1.8562522905755653e-06, 0.10167238004325599, 1.8562656937322673e-06, 0.09967042693962706], [6.0, "stemend", 0.1424932815547606, 1.1081237029137576, 1.1568669834257685, 3.833657661132013e-06, -1.4006405613032813, 3.833644257944087e-06, -1.3986386081996525], [6.0, "barbot", 0.1424932815547606, 1.1081237029137576, 1.1568669834257685, 0.3499914744840949, -0.24375340891795821, 0.3499914744706918, -0.2417514558143293], [6.0, "barend", 0.1424932815547606, 1.1081237029137576, 1.1568669834257685, 0.6558322852251905, -1.0553277862090992e-05, 0.6538303321215616, -1.0553291265255337e-05], [6.0, "stemside", 0.1424932815547606, 1.1081237029137576, 1.1568669834257685, 0.17374414272204486, -0.8000118675781889, 0.17174218961841595, -0.8000118675915922], [6.0, "barbotL", 0.1424932815547606, 1.1081237029137576, 1.1568669834257685, -0.3499812122418582, -0.24376114601484375, -0.34998121225526135, -0.24175919291121487], [7.0, "bartop", 0.13110896147205814, 1.2472400369204713, 1.0538271745588998, -1.1087993335045856e-05, 0.10166867855995354, -1.1087994193247597e-05, 0.09966672539334373], [7.0, "stemend", 0.13110896147205814, 1.2472400369204713, 1.0538271745588998, 2.242879012361203e-05, -1.2855520751530827, 2.2428790981803364e-05, -1.283550121986473], [7.0, "barbot", 0.13110896147205814, 1.2472400369204713, 1.0538271745588998, 0.3499726594269342, -0.23175286059637742, 0.3499726594277924, -0.22975090742976761], [7.0, "barbotL", 0.13110896147205814, 1.2472400369204713, 1.0538271745588998, -0.35000006938453243, -0.2317455634860252, -0.35000006938367423, -0.2297436103194154], [8.0, "bartop", 0.12189409365613994, 1.0931872257723383, 1.0267383991181935, 2.8538912915791916e-05, 0.101658132028922, 2.8538900593349397e-05, 0.09965617891745959], [8.0, "stemend", 0.12189409365613994, 1.0931872257723383, 1.0267383991181935, 1.75421967533647e-05, -1.2504607183959575, 1.7542209075758645e-05, -1.2484587652844952], [8.0, "barbot", 0.12189409365613994, 1.0931872257723383, 1.0267383991181935, 0.34998003116213094, -0.22372229240396138, 0.3499800311744534, -0.22172033929249899], [8.0, "barend", 0.12189409365613994, 1.0931872257723383, 1.0267383991181935, 0.6483305499538514, -2.4267807163669725e-06, 0.646328596842389, -2.426768393895997e-06], [8.0, "stemside", 0.12189409365613994, 1.0931872257723383, 1.0267383991181935, 0.1617197234625319, -0.8000319320236504, 0.15971777035106952, -0.8000319320113279], [8.0, "barbotL", 0.12189409365613994, 1.0931872257723383, 1.0267383991181935, -0.350009584619981, -0.22372326089157585, -0.3500095846076585, -0.22172130778011342], [9.0, "bartop", 0.14301968245914423, 1.2295594072621907, 1.0066469336168993, -3.0301066066336196e-05, 0.10166661525875156, -3.03010547235438e-05, 0.09966466215876299], [9.0, "stemend", 0.14301968245914423, 1.2295594072621907, 1.0066469336168993, -5.469367579768846e-06, -1.2504211825498956, -5.4693789225820566e-06, -1.248419229449907], [9.0, "barbot", 0.14301968245914423, 1.2295594072621907, 1.0066469336168993, 0.34998474121797907, -0.24373441658951145, 0.34998474120663625, -0.24173246348952288], [9.0, "barend", 0.14301968245914423, 1.2295594072621907, 1.0066469336168993, 0.7165254474117877, -1.6524544473110447e-05, 0.7145234943117991, -1.652455581590333e-05], [9.0, "stemside", 0.14301968245914423, 1.2295594072621907, 1.0066469336168993, 0.1737083801365302, -0.7999981491092713, 0.17170642703654163, -0.7999981491206141], [9.0, "barbotL", 0.14301968245914423, 1.2295594072621907, 1.0066469336168993, -0.349995800842389, -0.24377408124655053, -0.3499958008537318, -0.24177212814656196], [10.0, "bartop", 0.13445182398905656, 1.2104369310780698, 1.1063772493512443, -1.3945488150359039e-05, 0.10165917707194413, -1.3945554073801318e-05, 0.09965722394509698], [10.0, "stemend", 0.13445182398905656, 1.2104369310780698, 1.1063772493512443, -1.4420397920935757e-05, -1.342125197559053, -1.4420331997486539e-05, -1.3401232444322058], [10.0, "barbot", 0.13445182398905656, 1.2104369310780698, 1.1063772493512443, 0.34997610020299197, -0.23575085635967352, 0.34997610026891546, -0.23374890323282638], [10.0, "barend", 0.13445182398905656, 1.2104369310780698, 1.1063772493512443, 0.7069931058827631, 4.682124048153875e-07, 0.704991152755916, 4.682783282391077e-07], [10.0, "stemside", 0.13445182398905656, 1.2104369310780698, 1.1063772493512443, 0.16972019761818763, -0.7999825296002748, 0.16771824449134048, -0.7999825295343513], [10.0, "barbotL", 0.13445182398905656, 1.2104369310780698, 1.1063772493512443, -0.3500139497896404, -0.2357292650906068, -0.35001394972371697, -0.23372731196375962], [11.0, "bartop", 0.1408368217984829, 1.1372688172175065, 1.2452284098243265, -2.4239817080990886e-06, 0.1016423745293377, -2.423981888982704e-06, 0.09964042133544608], [11.0, "stemend", 0.1408368217984829, 1.1372688172175065, 1.2452284098243265, 1.851947312303612e-05, -1.4869885308965798, 1.851947330392754e-05, -1.4849865777026883], [11.0, "barbotL", 0.1408368217984829, 1.1372688172175065, 1.2452284098243265, -0.3499762372119007, -0.2417466102601729, -0.34997623721171983, -0.23974465706628129]]
+\ No newline at end of file
+diff --git a/geom_res.npy b/geom_res.npy
+new file mode 100644
+index 0000000..5544230
+Binary files /dev/null and b/geom_res.npy differ
+diff --git a/look.py b/look.py
+new file mode 100644
+index 0000000..b90423d
+--- /dev/null
++++ b/look.py
+@@ -0,0 +1,17 @@
++import numpy as np, glob
++import push_model as pm
++O=[];A=[];O2=[];MT=[]
++for f in sorted(glob.glob('data_*.npz')):
++    d=np.load(f); O.append(d['O']);A.append(d['A']);O2.append(d['O2']);MT.append(d['META'])
++O=np.concatenate(O);A=np.concatenate(A);O2=np.concatenate(O2);MT=np.concatenate(MT)
++g=lambda o: pm.geom_from_obs(o)
++m=np.where((np.abs(MT[:,3])<0.25))[0]
++shown=0; last=None
++for i in m:
++    key=tuple(MT[i,:5])
++    if key!=last:
++        if shown>=4: break
++        shown+=1; last=key; print('push seed %d edge %d s %.3f ang %.2f sp %.4f'%tuple(MT[i,:5]))
++    o,o2=O[i],O2[i]
++    d_pre=pm.block_distance(o[0:3],g(o),o[16:18]); d_post=pm.block_distance(o2[0:3],g(o),o2[16:18]); d_mid=pm.block_distance(o[0:3],g(o),o2[16:18])
++    print('  k%2d dpre %.4f dnew_oldblock %.4f dpost %.4f  blk move %.4f dth %.4f  a %.4f'%(MT[i,5],d_pre,d_mid,d_post,np.linalg.norm(o2[:2]-o[:2]),o2[2]-o[2],np.linalg.norm(A[i])))
+diff --git a/outl.py b/outl.py
+new file mode 100644
+index 0000000..f9b72a5
+--- /dev/null
++++ b/outl.py
+@@ -0,0 +1,19 @@
++import numpy as np, glob
++import push_model as pm
++O=[];A=[];O2=[];MT=[]
++for f in sorted(glob.glob('data_*.npz')):
++    d=np.load(f); O.append(d['O']);A.append(d['A']);O2.append(d['O2']);MT.append(d['META'])
++O=np.concatenate(O);A=np.concatenate(A);O2=np.concatenate(O2);MT=np.concatenate(MT)
++P=dict(mu=0.99,r_eff=0.1015,beta=0.22,nsub=4)
++E=[]
++for i in range(len(O)):
++    o=O[i]; p,_=pm.predict_step(o[0:3],o[16:18],A[i],pm.geom_from_obs(o),P)
++    dt=(p[2]-O2[i,2]+np.pi)%(2*np.pi)-np.pi
++    E.append([np.linalg.norm(p[:2]-O2[i,:2]),abs(dt)])
++E=np.array(E); np.save('E_all.npy',E)
++print('ALL N=%d pos mean %.5f p50 %.5f p95 %.5f p99 %.5f | th mean %.5f p95 %.5f p99 %.5f'%(len(E),E[:,0].mean(),np.median(E[:,0]),*np.percentile(E[:,0],[95,99]),E[:,1].mean(),*np.percentile(E[:,1],[95,99])))
++for i in np.argsort(-E[:,0])[:12]:
++    o=O[i]; g=pm.geom_from_obs(o); pl=pm.to_local if hasattr(pm,'to_local') else None
++    poly=pm.t_polygon_world(o[0:3],g)
++    rl=(o[16:18]-o[:2])@pm._rot(o[2])
++    print('i%d err %.4f th %.4f meta %s rob_local %s dpre %.4f blkminmax %.2f %.2f true move %.4f %.4f'%(i,E[i,0],E[i,1],np.round(MT[i],3),np.round(rl,3),pm.block_distance(o[0:3],g,o[16:18]),poly.min(),poly.max(),np.linalg.norm(O2[i,:2]-o[:2]),O2[i,2]-o[2]))
+diff --git a/plib.py b/plib.py
+index 5bcd2d8..6017962 100644
+--- a/plib.py
++++ b/plib.py
+@@ -3,33 +3,24 @@ from env_client import make_env
+ M=0.0499
+ R=0.1
+ def rot(t): c,s=np.cos(t),np.sin(t); return np.array([[c,-s],[s,c]])
+-def t_polys_local(w,Lh,Lv,stem_end=None):
+-    # hypothesis: bar y in [-w/2,w/2], stem y in [stem_end,-w/2]
+-    if stem_end is None: stem_end=-Lv
+-    bar=np.array([[-Lh/2,-w/2],[Lh/2,-w/2],[Lh/2,w/2],[-Lh/2,w/2]])
+-    stem=np.array([[-w/2,stem_end],[w/2,stem_end],[w/2,-w/2],[-w/2,-w/2]])
+-    return [bar,stem]
+-def to_world(pose,P): return P@rot(pose[2]).T+pose[:2]
++def rects_local(w,Lh,Lv):
++    # (x0,x1,y0,y1): bar then stem; origin = top-center of bar
++    return [(-Lh/2,Lh/2,-w,0.0),(-w/2,w/2,-w-Lv,-w)]
++def to_world(pose,P): return np.asarray(P)@rot(pose[2]).T+pose[:2]
+ def to_local(pose,p): return (np.asarray(p)-pose[:2])@rot(pose[2])
+-def seg_dist(p,a,b):
+-    ab=b-a; t=np.clip(np.dot(p-a,ab)/np.dot(ab,ab),0,1); return np.linalg.norm(p-a-t*ab)
+-def poly_dist(p,P):
+-    # signed-ish: 0 if inside
+-    n=len(P); d=min(seg_dist(p,P[i],P[(i+1)%n]) for i in range(n))
+-    inside=all(np.cross(P[(i+1)%n]-P[i],p-P[i])>=0 for i in range(n))
+-    return 0.0 if inside else d
+-def block_dist(obs,p,stem_end=None,margin_local=0.0):
++def block_dist_many(obs,pts):
+     pose=obs[0:3]; w,Lh,Lv=obs[12],obs[13],obs[14]
+-    pl=to_local(pose,p)
+-    return min(poly_dist(pl,P) for P in t_polys_local(w,Lh,Lv,stem_end))
++    pl=to_local(pose,np.atleast_2d(pts))
++    ds=[]
++    for x0,x1,y0,y1 in rects_local(w,Lh,Lv):
++        dx=np.maximum(np.maximum(x0-pl[:,0],pl[:,0]-x1),0); dy=np.maximum(np.maximum(y0-pl[:,1],pl[:,1]-y1),0)
++        ds.append(np.hypot(dx,dy))
++    return np.min(ds,axis=0)
+ def plan(obs,goal,clear=0.2,h=0.05,lo=0.13,hi=4.87):
+-    # A* on grid avoiding block by clearance (robot center distance to polygon)
+     start=obs[16:18].copy(); goal=np.asarray(goal,float)
+     xs=np.arange(lo,hi+1e-9,h); n=len(xs)
+-    free=np.ones((n,n),bool)
+-    for i in range(n):
+-        for j in range(n):
+-            free[i,j]=block_dist(obs,np.array([xs[i],xs[j]]))>clear
++    X,Y=np.meshgrid(xs,xs,indexing='ij')
++    free=(block_dist_many(obs,np.stack([X.ravel(),Y.ravel()],1))>clear).reshape(n,n)
+     def idx(p): return (int(np.clip(round((p[0]-lo)/h),0,n-1)),int(np.clip(round((p[1]-lo)/h),0,n-1)))
+     s,g=idx(start),idx(goal)
+     free[s]=True; free[g]=True
+@@ -49,8 +40,17 @@ def plan(obs,goal,clear=0.2,h=0.05,lo=0.13,hi=4.87):
+     if g not in came: return None
+     path=[]; c=g
+     while c is not None: path.append(np.array([xs[c[0]],xs[c[1]]])); c=came[c]
+-    path=path[::-1][1:]+[goal]
+-    return path
++    path=path[::-1][1:]
++    # shortcut: prune waypoints whose straight segment is clear
++    pts=[start]+path+[goal]; out=[]; i=0
++    while i<len(pts)-1:
++        j=len(pts)-1
++        while j>i+1:
++            seg=pts[i]+np.linspace(0,1,40)[:,None]*(pts[j]-pts[i])
++            if (block_dist_many(obs,seg)>clear-0.03).all(): break
++            j-=1
++        out.append(pts[j]); i=j
++    return out
+ def goto(env,obs,pt,max_step=M):
+     for _ in range(400):
+         d=pt-obs[16:18]
+@@ -66,3 +66,20 @@ def navigate(env,obs,goal,clear=0.2):
+         obs=goto(env,obs,wp)
+     moved=np.abs(obs[0:3]-b0).max()>1e-6
+     return obs,(not moved) and np.linalg.norm(obs[16:18]-goal)<1e-3
++def backoff(env,obs,clear=0.2):
++    for _ in range(40):
++        p=obs[16:18]; d0=block_dist_many(obs,p)[0]
++        if d0>=clear+0.01: break
++        eps=1e-4
++        g=np.array([block_dist_many(obs,p+[eps,0])[0]-d0,block_dist_many(obs,p+[0,eps])[0]-d0])
++        g=g/(np.linalg.norm(g)+1e-12)
++        if p[0]<0.3: g[0]=max(g[0],0.3)
++        if p[1]<0.3: g[1]=max(g[1],0.3)
++        if p[0]>4.7: g[0]=min(g[0],-0.3)
++        if p[1]>4.7: g[1]=min(g[1],-0.3)
++        obs,*_=env.step(g/np.linalg.norm(g)*0.03)
++    return obs
++_nav_old=navigate
++def navigate(env,obs,goal,clear=0.2):
++    obs=backoff(env,obs,clear)
++    return _nav_old(env,obs,goal,clear)
+diff --git a/probe5.py b/probe5.py
+new file mode 100644
+index 0000000..64620c8
+--- /dev/null
++++ b/probe5.py
+@@ -0,0 +1,12 @@
++from plib import *
++np.set_printoptions(precision=5, suppress=True, linewidth=200)
++env=make_env(); obs,_=env.reset(seed=0)
++pose=obs[0:3].copy()
++st=to_world(pose,np.array([0,0.35]))
++obs,ok=navigate(env,obs,st); print(ok)
++dw=rot(pose[2])@np.array([0,-1.0])
++for k in range(12):
++    a=dw*M if k<6 else np.zeros(2)
++    o2,*_=env.step(a)
++    print(k, 'blk d', o2[0:3]-obs[0:3], 'dist', block_dist_many(o2,o2[16:18]), 'vel?',o2[3:6])
++    obs=o2
+diff --git a/push_model.py b/push_model.py
+new file mode 100644
+index 0000000..40a4703
+--- /dev/null
++++ b/push_model.py
+@@ -0,0 +1,157 @@
++"""Pure-numpy one-step model of the push-T block.
++
++Geometry (block local frame, origin = block pose (x, y), theta CCW):
++  bar : x in [-Lh/2, Lh/2], y in [-w, 0]         (origin = top-centre of the bar)
++  stem: x in [-w/2, w/2],   y in [-w-Lv, -w]
++Robot: disc of radius R=0.1, kinematic, moves exactly by the (clipped) action.
++
++Model: per sub-step, the robot moves action/NSUB; for every rectangle of the T that the
++robot disc penetrates, an inelastic point-contact impulse (with Coulomb friction) is
++applied to the block so the contact point is pushed out of the robot:
++    block COM displacement = P / m,  rotation = (r x P) / I   (m = 1, I = K2)
++Block velocity is not carried between env steps (quasi-static).
++"""
++import numpy as np
++
++R_ROBOT = 0.1
++ACT_MAX = 0.05
++WORLD_LO, WORLD_HI = 0.0, 5.0
++
++# fitted parameters (see fit.py)
++PARAMS = dict(cx=None, cy=None, k2=None, mu=0.99, nsub=4, r_eff=0.1015, beta=0.22)
++
++
++def mass_props(geom):
++    """Uniform-density COM (local) and I/m of the T about its COM."""
++    w, Lh, Lv = geom['w'], geom['Lh'], geom['Lv']
++    a1, a2 = Lh * w, Lv * w
++    y1, y2 = -w / 2, -w - Lv / 2
++    cy = (a1 * y1 + a2 * y2) / (a1 + a2)
++    I = a1 * ((Lh ** 2 + w ** 2) / 12 + (y1 - cy) ** 2) + a2 * ((w ** 2 + Lv ** 2) / 12 + (y2 - cy) ** 2)
++    return np.array([0.0, cy]), I / (a1 + a2)
++
++
++def geom_from_obs(obs):
++    """dict(w, Lh, Lv) from an env observation."""
++    return dict(w=float(obs[12]), Lh=float(obs[13]), Lv=float(obs[14]))
++
++
++def _rot(t):
++    c, s = np.cos(t), np.sin(t)
++    return np.array([[c, -s], [s, c]])
++
++
++def t_rects_local(geom):
++    """[(x0, x1, y0, y1), ...] for bar and stem in the block frame."""
++    w, Lh, Lv = geom['w'], geom['Lh'], geom['Lv']
++    return [(-Lh / 2, Lh / 2, -w, 0.0), (-w / 2, w / 2, -w - Lv, -w)]
++
++
++def t_outline_local(geom):
++    """8 vertices (CCW) of the T outline in the block frame."""
++    w, Lh, Lv = geom['w'], geom['Lh'], geom['Lv']
++    return np.array([(-Lh / 2, 0), (-Lh / 2, -w), (-w / 2, -w), (-w / 2, -w - Lv),
++                     (w / 2, -w - Lv), (w / 2, -w), (Lh / 2, -w), (Lh / 2, 0)])
++
++
++def t_polygon_world(pose, geom):
++    """8x2 outline vertices (CCW) in world frame for block pose (x, y, theta)."""
++    pose = np.asarray(pose, float)
++    return t_outline_local(geom) @ _rot(pose[2]).T + pose[:2]
++
++
++def t_rects_world(pose, geom):
++    """Two 4x2 convex rectangles (bar, stem) in world frame."""
++    pose = np.asarray(pose, float)
++    Rm = _rot(pose[2])
++    out = []
++    for x0, x1, y0, y1 in t_rects_local(geom):
++        P = np.array([(x0, y0), (x1, y0), (x1, y1), (x0, y1)])
++        out.append(P @ Rm.T + pose[:2])
++    return out
++
++
++def block_distance(pose, geom, p):
++    """Distance from world point p to the T (0 if inside)."""
++    pose = np.asarray(pose, float)
++    pl = (np.asarray(p, float) - pose[:2]) @ _rot(pose[2])
++    d = np.inf
++    for x0, x1, y0, y1 in t_rects_local(geom):
++        dx = max(x0 - pl[0], 0.0, pl[0] - x1)
++        dy = max(y0 - pl[1], 0.0, pl[1] - y1)
++        d = min(d, np.hypot(dx, dy))
++    return d
++
++
++def _rect_contact(pl, rect):
++    """Nearest point q on rect to local point pl, outward normal n, distance d."""
++    x0, x1, y0, y1 = rect
++    q = np.array([min(max(pl[0], x0), x1), min(max(pl[1], y0), y1)])
++    v = pl - q
++    d = np.hypot(v[0], v[1])
++    if d > 1e-9:
++        return q, v / d, d
++    # centre inside rectangle: push out through the nearest face
++    cand = [(pl[0] - x0, np.array([-1.0, 0])), (x1 - pl[0], np.array([1.0, 0])),
++            (pl[1] - y0, np.array([0, -1.0])), (y1 - pl[1], np.array([0, 1.0]))]
++    dd, n = min(cand, key=lambda c: c[0])
++    return pl + n * dd, n, -dd
++
++
++def predict_step(block_pose, robot_xy, action, geom, params=None):
++    """Predict (new_block_pose, new_robot_xy) after one env step.
++
++    block_pose: (x, y, theta); robot_xy: (x, y); action: (dx, dy) (clipped to +-0.05).
++    geom: dict(w, Lh, Lv) (see geom_from_obs).
++    """
++    p = PARAMS if params is None else params
++    cg, k2g = mass_props(geom)
++    cl = cg if p.get('cx') is None else np.array([p['cx'], p['cy']])
++    k2 = k2g if p.get('k2') is None else p['k2']
++    mu, nsub, reff0, beta = p['mu'], int(p['nsub']), p['r_eff'], p.get('beta', 0.0)
++    pose = np.array(block_pose, float)
++    rob = np.array(robot_xy, float)
++    a = np.clip(np.asarray(action, float), -ACT_MAX, ACT_MAX)
++    lo, hi = WORLD_LO + R_ROBOT, WORLD_HI - R_ROBOT
++    rects = t_rects_local(geom)
++    for _ in range(nsub):
++        new = np.clip(rob + a / nsub, lo, hi)
++        da = new - rob
++        rob = new
++        for rect in rects:
++            Rm = _rot(pose[2])
++            pl = (rob - pose[:2]) @ Rm
++            q, n, d = _rect_contact(pl, rect)
++            if d >= reff0:
++                continue
++            nw = Rm @ n                           # outward normal (towards robot), world
++            # block overshoots: ends ~beta*(normal push speed) beyond touching
++            delta = reff0 + beta * max(0.0, -np.dot(a, nw)) - d
++            tw = np.array([-nw[1], nw[0]])
++            com = pose[:2] + Rm @ cl
++            r = pose[:2] + Rm @ q - com           # contact point rel. COM
++            rp = np.array([-r[1], r[0]])
++            K = np.eye(2) + np.outer(rp, rp) / k2  # contact-point compliance
++            # desired contact-point displacement: -n*delta (into block), tangential follows robot
++            want = -nw * delta + tw * np.dot(da, tw)
++            P = np.linalg.solve(K, want)
++            Pn, Pt = -np.dot(P, nw), np.dot(P, tw)
++            if Pn <= 0:
++                continue
++            if abs(Pt) > mu * Pn:                 # sliding
++                s = np.sign(Pt)
++                dirv = -nw + mu * s * tw
++                Pn = delta / np.dot(-nw, K @ dirv)
++                P = Pn * dirv
++            dth = (r[0] * P[1] - r[1] * P[0]) / k2
++            com = com + P
++            pose[2] += dth
++            pose[:2] = com - _rot(pose[2]) @ cl
++    return pose, rob
++
++
++def near_wall(pose, geom, margin=0.02):
++    """True if the T is within `margin` of the world walls (x,y in [0,5]); the model
++    ignores block-wall contact, so predictions there are unreliable."""
++    P = t_polygon_world(pose, geom)
++    return bool(P.min() < WORLD_LO + margin or P.max() > WORLD_HI - margin)
+diff --git a/resid.py b/resid.py
+new file mode 100644
+index 0000000..cdf50fc
+--- /dev/null
++++ b/resid.py
+@@ -0,0 +1,21 @@
++import numpy as np, glob, sys
++import push_model as pm
++O=[];A=[];O2=[];MT=[]
++for f in sorted(glob.glob('data_*.npz')):
++    d=np.load(f); O.append(d['O']);A.append(d['A']);O2.append(d['O2']);MT.append(d['META'])
++O=np.concatenate(O);A=np.concatenate(A);O2=np.concatenate(O2);MT=np.concatenate(MT)
++rng=np.random.default_rng(1); idx=rng.choice(len(O),1500,replace=False)
++params=eval(sys.argv[1]) if len(sys.argv)>1 else None
++E=[]
++for i in idx:
++    o=O[i]; p,_=pm.predict_step(o[0:3],o[16:18],A[i],pm.geom_from_obs(o),params)
++    dt=(p[2]-O2[i,2]+np.pi)%(2*np.pi)-np.pi
++    E.append([np.linalg.norm(p[:2]-O2[i,:2]),abs(dt),np.linalg.norm(O2[i,:2]-o[:2]),abs(O2[i,2]-o[2])])
++E=np.array(E); M=MT[idx]
++print('all: pos %.5f th %.5f | motion pos %.5f th %.5f'%tuple(E.mean(0)))
++for k in [0,1,2,5,13]:
++    m=M[:,5]==k; print(' k=%d pos %.5f th %.5f | mot %.5f %.5f'%((k,)+tuple(E[m].mean(0))))
++for e in range(8):
++    m=M[:,1]==e; print(' edge=%d pos %.5f th %.5f | mot %.5f %.5f'%((e,)+tuple(E[m].mean(0))))
++for lo,hi in [(0,0.3),(0.3,0.6),(0.6,0.9)]:
++    m=(np.abs(M[:,3])>=lo)&(np.abs(M[:,3])<hi); print(' |ang| %.1f-%.1f pos %.5f th %.5f | mot %.5f %.5f'%((lo,hi)+tuple(E[m].mean(0))))

@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index b72fad0..9497113 100644
+--- a/approach.py
++++ b/approach.py
+@@ -111,7 +111,7 @@ class GeneratedApproach:
+         if self.mode == "choose":
+             branch_mismatch = pd < 0.06 and abs(goal_theta-theta) > 0.14
+             boundary_recover = min(obj) < 0.92 or max(obj) > 4.08
+-            if (abs(ae) > 0.11 or branch_mismatch) and not boundary_recover and not self.force_move:
++            if (abs(ae) > 0.12 or branch_mismatch) and not boundary_recover and not self.force_move:
+                 self.turn_sign = 1.0 if ae > 0.0 else -1.0
+                 self.mode = "rot_far"
+                 side = -self.turn_sign

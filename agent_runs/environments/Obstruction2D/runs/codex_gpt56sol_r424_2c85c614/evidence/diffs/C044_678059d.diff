@@ -1,0 +1,30 @@
+diff --git a/test_approach.py b/test_approach.py
+index 3d70199..e9e6b94 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -7,9 +7,10 @@ from env_client import make_env
+ from approach import GeneratedApproach
+ 
+ 
+-def run(seed, verbose=False):
++def run(seed, verbose=False, object_count=None):
+     env = make_env()
+-    state, info = env.reset(seed=seed)
++    options = {"object_count": object_count} if object_count is not None else None
++    state, info = env.reset(seed=seed, options=options)
+     approach = GeneratedApproach(env.action_space, env.observation_space, {})
+     approach.reset(state, info)
+     t0 = time.monotonic()
+@@ -34,10 +35,11 @@ if __name__ == "__main__":
+     ap.add_argument("--start", type=int, default=0)
+     ap.add_argument("--n", type=int, default=10)
+     ap.add_argument("--verbose", action="store_true")
++    ap.add_argument("--count", type=int, default=None)
+     args = ap.parse_args()
+     results = []
+     for seed in range(args.start, args.start + args.n):
+-        result = run(seed, args.verbose)
++        result = run(seed, args.verbose, args.count)
+         results.append(result)
+         print(seed, result)
+     print("success", sum(r[0] for r in results), "/", len(results), "by_count", Counter((r[2], r[0]) for r in results))

@@ -1,0 +1,11 @@
+from probe_ops_lib import *
+reset(14)
+for wp in [(-1.0,-1.2),(-1.5,-1.2),(-1.47,-0.65)]: goto(1,*wp)
+step(1,op='sample'); goto(1,-1.5,-1.2); step(1,op='send'); step(1,op='drop'); goto(1,-1.0,-1.75,tol=0.001)
+r,term,tr=step(1); print('r1 home',pos(1),r,term,S.n)
+for wp in [(1.0,0.0),(1.3,1.2),(1.78,1.45)]: goto(0,*wp)
+step(0,op='sample'); step(0,op='calibrate'); step(0,op='image')
+for wp in [(1.3,1.2),(1.0,0.0),(1.0,-0.5)]: goto(0,*wp)
+r,term,tr=step(0,op='send'); print('sent',r,term,dump('objective'),get('sample5'))
+r,term,tr=step(0,op='drop'); print('drop',r,term)
+goto(0,1.0,-1.75,tol=0.001); r,term,tr=step(0); print('home',r,term,tr,pos(0),pos(1),S.n,S.info)

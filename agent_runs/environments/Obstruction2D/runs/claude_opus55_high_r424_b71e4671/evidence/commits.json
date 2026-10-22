@@ -1,0 +1,510 @@
+[
+  {
+    "id": "C001",
+    "commit": "e21245a82a0e66cd5e463e9456f82fb44354b551",
+    "parents": [],
+    "date": "2026-09-30T11:03:14+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".claude/settings.json",
+      ".claude/validate_sandbox.py",
+      ".gitignore",
+      "CLAUDE.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_e21245a.diff",
+    "diff_sha256": "55c3491052352793f97fed611c7cd2d956b8850f80b6c848226e82c938857fd2",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "281b2bbaf0828fe1409529f0aa9275a53f8ad2fb",
+    "parents": [
+      "e21245a82a0e66cd5e463e9456f82fb44354b551"
+    ],
+    "date": "2026-09-30T11:05:08+02:00",
+    "title": "initial state-machine approach",
+    "files": [
+      "approach.py",
+      "dump.py",
+      "probe0.py",
+      "probe1.py",
+      "probe2.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C002_281b2bb.diff",
+    "diff_sha256": "a516d311c33bb11b81c547a58547a3eab55db63dc4bc10de173103587123bc67",
+    "events": [
+      {
+        "event": "E0033",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1eaf1739361eb210dc8b44c7456c43598d81c0e44b89c04c090be2f918a5dd63",
+    "version": "evidence/versions/C002_281b2bb_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "a81561e31ca29f98c34066c8b929a8f7847659ca",
+    "parents": [
+      "281b2bbaf0828fe1409529f0aa9275a53f8ad2fb"
+    ],
+    "date": "2026-09-30T11:10:22+02:00",
+    "title": "reach-aware grasp offsets and drop positions",
+    "files": [
+      "approach.py",
+      "dbg.py",
+      "probe3.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C003_a81561e.diff",
+    "diff_sha256": "e145d240258cf5675577cdcba22a1fdde1a90ebceba3c273c15ee7e684e385be",
+    "events": [
+      {
+        "event": "E0082",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "87752529636489e4164af148df3699940cdff46c768cc973436e465acb611e3a",
+    "version": "evidence/versions/C003_a81561e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C004",
+    "commit": "f47aa672e8c0272618651a4d939ddf722b8e820e",
+    "parents": [
+      "a81561e31ca29f98c34066c8b929a8f7847659ca"
+    ],
+    "date": "2026-09-30T11:36:30+02:00",
+    "title": "planner with Chebyshev controller, minimal obstruction removal",
+    "files": [
+      "approach.py",
+      "approach_v1.py",
+      "probe4.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C004_f47aa67.diff",
+    "diff_sha256": "a01bf1a2fa9707153e410186dd4d17f6acf239379ec18c43b6e7a4fdf5af4d73",
+    "events": [
+      {
+        "event": "E0215",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6cf1f63f17f55fab481f2c45ed041a02b1d08a87612d46c4cb2cb6e9085e7553",
+    "version": "evidence/versions/C004_f47aa67_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "1599f2acb4e64550e1bb359f49880d876e8ce0c0",
+    "parents": [
+      "f47aa672e8c0272618651a4d939ddf722b8e820e"
+    ],
+    "date": "2026-09-30T11:42:31+02:00",
+    "title": "check pick-pose feasibility",
+    "files": [
+      "approach.py",
+      "dbg.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C005_1599f2a.diff",
+    "diff_sha256": "22100c8a10e2b573a83115f5de315a3bd6f65c51cb1f34ffd0d25112b5208210",
+    "events": [
+      {
+        "event": "E0241",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "3bd5747034d28cd9031918324cda6985060f48af08f84a1f93e10b2ef7fcbfb5",
+    "version": "evidence/versions/C005_1599f2a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C006",
+    "commit": "46e7fc6d23d059f45e7d435ff31b7c4ffdbfc95d",
+    "parents": [
+      "1599f2acb4e64550e1bb359f49880d876e8ce0c0"
+    ],
+    "date": "2026-09-30T11:46:19+02:00",
+    "title": "consistent drop feasibility, circular base approx",
+    "files": [
+      "approach.py",
+      "dbg2.py",
+      "dbgplan.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C006_46e7fc6.diff",
+    "diff_sha256": "7f855f9dea870ae73871b16358e6399d0b39c084b9f28ae47fac0d0b4ce9e2ae",
+    "events": [
+      {
+        "event": "E0288",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "e290f6cf655f4942c0b65dbb82c0ef209a5240b789dd6a1364c1d3a353b9e7e5",
+    "version": "evidence/versions/C006_46e7fc6_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "6cc748506989de85a8d08ac688dcf4e5a8727ffe",
+    "parents": [
+      "46e7fc6d23d059f45e7d435ff31b7c4ffdbfc95d"
+    ],
+    "date": "2026-09-30T11:53:10+02:00",
+    "title": "check drop pose feasibility",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C007_6cc7485.diff",
+    "diff_sha256": "2a9002a354d91e68d4fd3f36e447497e1abafb078d721966a4ac3b96d4f5df04",
+    "events": [
+      {
+        "event": "E0302",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "29b61ac538941b19d45040aeb482390be387119a0dda281a376b3e47c6537278",
+    "version": "evidence/versions/C007_6cc7485_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C008",
+    "commit": "b19eb46b9e5c0724cec804ed0ff37f6752430359",
+    "parents": [
+      "6cc748506989de85a8d08ac688dcf4e5a8727ffe"
+    ],
+    "date": "2026-09-30T12:18:47+02:00",
+    "title": "stuck recovery via replanning; robust test harness",
+    "files": [
+      "approach.py",
+      "res_100_300.txt",
+      "test_approach.py",
+      "timing.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C008_b19eb46.diff",
+    "diff_sha256": "0b7ce04c4a9a5c8bacbb6d9bf2a69a55d6024370d6639e428da77dc1ba2faad9",
+    "events": [
+      {
+        "event": "E0391",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "bde860045ae160784d2c96bf4a39db71b5f54f5415259877efa364faad516699",
+    "version": "evidence/versions/C008_b19eb46_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C009",
+    "commit": "41e922c079b0273549ae0b017969e9e367eabbeb",
+    "parents": [
+      "b19eb46b9e5c0724cec804ed0ff37f6752430359"
+    ],
+    "date": "2026-09-30T12:29:22+02:00",
+    "title": "avoid grasp poses where vacuum could grab neighbours",
+    "files": [
+      "approach.py",
+      "dbg3.py",
+      "legeff.py",
+      "res_300_600.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C009_41e922c.diff",
+    "diff_sha256": "42c30b7c2ea4d9b0f83a701c3b5583949a9b2fe228c77f66935891a318c5bf9a",
+    "events": [
+      {
+        "event": "E0443",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "8b1c2b6041b7c8fbd9533197fb2f6b9bebd56e2344b10aca04abdd1c9a85cc30",
+    "version": "evidence/versions/C009_41e922c_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C010",
+    "commit": "878bb40c4339333b2b135b440fe71a0da2650273",
+    "parents": [
+      "41e922c079b0273549ae0b017969e9e367eabbeb"
+    ],
+    "date": "2026-09-30T12:39:35+02:00",
+    "title": "multi-candidate plans chosen by offline controller simulation",
+    "files": [
+      "approach.py",
+      "res_600_1000.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C010_878bb40.diff",
+    "diff_sha256": "780f7dd886b3677c137e0b1a3163f8482c7d56d84be16501405205421777faa2",
+    "events": [
+      {
+        "event": "E0491",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "21a194ea098e6b8198956374b5a5341f53b33980295336c3ebbb16d295625506",
+    "version": "evidence/versions/C010_878bb40_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C011",
+    "commit": "e7045740ccbdcd8224b813f85e0b3ad236e214c4",
+    "parents": [
+      "878bb40c4339333b2b135b440fe71a0da2650273"
+    ],
+    "date": "2026-09-30T12:39:55+02:00",
+    "title": "wider candidate search (k_drop=3,k_place=3,n_sim=20)",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C011_e704574.diff",
+    "diff_sha256": "11ad6101d9f4d53005dd6be5c350ec849075275972c11c3f56fbf940d0d16f15",
+    "events": [
+      {
+        "event": "E0494",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "ee8b6edac05b9990aa03823ba2968b6b13fc583067e1905ac1d10b33cb2cb178",
+    "version": "evidence/versions/C011_e704574_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C012",
+    "commit": "c115fb949d928be57c5b481f64da1f7e46227aba",
+    "parents": [
+      "e7045740ccbdcd8224b813f85e0b3ad236e214c4"
+    ],
+    "date": "2026-09-30T12:40:30+02:00",
+    "title": "vectorize clearance computation",
+    "files": [
+      "approach.py",
+      "prof.out",
+      "prof.py",
+      "res_0_300_v3.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C012_c115fb9.diff",
+    "diff_sha256": "8b10213ab779afa3fa4da946bec47622ac1f7c79d026da5db8746286572dae05",
+    "events": [
+      {
+        "event": "E0557",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "bd74ea57e31464823fd5b5f6afe28683c238532c6468fce567d33b7d3bb61bca",
+    "version": "evidence/versions/C012_c115fb9_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C013",
+    "commit": "6be1f9052b0c2c44ca3efe269485cf21eeb38110",
+    "parents": [
+      "c115fb949d928be57c5b481f64da1f7e46227aba"
+    ],
+    "date": "2026-09-30T12:52:49+02:00",
+    "title": "Controller uses arm joint as extra vertical DOF; vacuum clearance margin while carrying",
+    "files": [
+      "approach.py",
+      "dbg4.py",
+      "res_0_300_v3.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C013_6be1f90.diff",
+    "diff_sha256": "dbd99126160ebab59e41a7b1c6a2fc47cf382f59331070cfde85472a8a726ba6",
+    "events": [
+      {
+        "event": "E0608",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a48b0ac3fe4ed5e418012136fdd54c7aa0c9087b0244aa4e9cc36c91f8c4a149",
+    "version": "evidence/versions/C013_6be1f90_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C014",
+    "commit": "5131e04542fbf51671b306632b6339c45c9969d3",
+    "parents": [
+      "6be1f9052b0c2c44ca3efe269485cf21eeb38110"
+    ],
+    "date": "2026-09-30T13:09:08+02:00",
+    "title": "wider plan search (n_sim 60, k 5)",
+    "files": [
+      "approach.py",
+      "cmpcfg.py",
+      "res_0_300_v4.txt",
+      "res_300_1000_v4.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C014_5131e04.diff",
+    "diff_sha256": "f78a85ec2933ac05c425956320168013799fb6451c35c971d1839c7bcb710c93",
+    "events": [
+      {
+        "event": "E0680",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "59d3dc8fe53e8288e0bf5a49109f922f9b5de01cf0a3628740b8e601826cecc2",
+    "version": "evidence/versions/C014_5131e04_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C015",
+    "commit": "39d1e55fdc14dbe2741b48fbc1051564c640d550",
+    "parents": [
+      "5131e04542fbf51671b306632b6339c45c9969d3"
+    ],
+    "date": "2026-09-30T13:18:08+02:00",
+    "title": "time guard in planner",
+    "files": [
+      "approach.py",
+      "res_0_300_v5.txt",
+      "resettime.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C015_39d1e55.diff",
+    "diff_sha256": "f0cfb1eb97f0bd12dfc745fb2abed1e9d0abd4cba7321b6b5225a93839419f14",
+    "events": [
+      {
+        "event": "E0701",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "43fe0b31a7e25c6267a606e71ceeae4ac6f465bbf7eb82e96e5033090f48ff5d",
+    "version": "evidence/versions/C015_39d1e55_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C016",
+    "commit": "7ab5ce61881b366b9179d5dc99fc6bbab9ab5878",
+    "parents": [
+      "39d1e55fdc14dbe2741b48fbc1051564c640d550"
+    ],
+    "date": "2026-09-30T13:18:29+02:00",
+    "title": "soft deadline limits drop branching",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C016_7ab5ce6.diff",
+    "diff_sha256": "1f77e940029c16e5820b702b891b15557bf1fba1dd510c44996cb314d731a7e5",
+    "events": [
+      {
+        "event": "E0708",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "cd62d78098e622f07ce2e20fc9892468ff5bb23d3912af5610db7b444e58b38a",
+    "version": "evidence/versions/C016_7ab5ce6_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C017",
+    "commit": "394a6f0b22ad3e77326d9aa878362109d91b8990",
+    "parents": [
+      "7ab5ce61881b366b9179d5dc99fc6bbab9ab5878"
+    ],
+    "date": "2026-09-30T13:40:57+02:00",
+    "title": "test results for v5, tester prints slowest seeds",
+    "files": [
+      "res_300_1000_v5.txt"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C017_394a6f0.diff",
+    "diff_sha256": "20e6eeb5c1f83f9b18b2a1b7e38b183b9477c783308675684b0b654317516290",
+    "events": [
+      {
+        "event": "E0772",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  }
+]

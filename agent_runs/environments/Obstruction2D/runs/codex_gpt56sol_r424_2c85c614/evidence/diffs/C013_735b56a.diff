@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 3db40ed..ad4f3c6 100644
+--- a/approach.py
++++ b/approach.py
+@@ -88,7 +88,7 @@ class GeneratedApproach:
+             # A modest vertical park is enough to clear the ground while still
+             # leaving room above it for a later verified re-grasp.
+             parked_high_enough = (not is_target and self.attached and oy >= 0.35)
+-            if ry < 0.79 and not parked_high_enough:
++            if ry < 0.74 and not parked_high_enough:
+                 return self._action(dy=0.05, vac=1.0)
+             if not self.attached:
+                 self.retry += 1

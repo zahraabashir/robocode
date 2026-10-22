@@ -1,0 +1,27 @@
+diff --git a/probe_close.py b/probe_close.py
+new file mode 100644
+index 0000000..fa29e5e
+--- /dev/null
++++ b/probe_close.py
+@@ -0,0 +1,10 @@
++from env_client import make_env
++from approach import ik,fk
++import numpy as np
++E=make_env();s,info=E.reset(seed=2,options={'object_count':0});print(info)
++r=s.get_object_from_name('robot')
++for t in E.observation_space.types:
++ for o in s.get_objects(t):print(o.name,{f:s.get(o,f) for f in E.observation_space.type_features[t]})
++for v in [-1,1,-1,1]:
++ a=np.zeros(11);a[10]=v;s,*_=E.step(a);print(v,[(f,s.get(r,f)) for f in ['finger_state','grasp_active']])
++E.close()
+diff --git a/probe_stationary.log b/probe_stationary.log
+new file mode 100644
+index 0000000..079ff9e
+--- /dev/null
++++ b/probe_stationary.log
+@@ -0,0 +1,5 @@
++FAIL 0 0 FK [0.48000001 0.00100004 0.23000001]
++FAIL -0.06 0 FK [0.48000001 0.00100004 0.23000001]
++FAIL 0.06 0 FK [0.48000002 0.00100004 0.18500003]
++FAIL 0 -0.06 FK [0.48000001 0.00100004 0.23000001]
++FAIL -0.06 -0.06 FK [0.48000001 0.00100004 0.23000001]

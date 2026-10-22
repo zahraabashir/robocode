@@ -1,0 +1,18 @@
+diff --git a/approach.py b/approach.py
+index 8b86c74..538aa64 100644
+--- a/approach.py
++++ b/approach.py
+@@ -251,6 +251,13 @@ class GeneratedApproach:
+                     self.radio_idx[i]+=1; self.paths[i]=[]; self.targets[i]=None
+             task,target=self._choose_task(state,i,pos)
+             op=task if task in self.OPS else "noop"
++            if task=="nav_sample" and math.dist(pos,target)<.34:
++                # Nudge into the exact pickup disk while attempting the operator;
++                # this is especially important for samples beside the divider.
++                op="sample"
++                a[4*i]=max(-.04,min(.04,target[0]-pos[0]))
++                a[4*i+1]=max(-.04,min(.04,target[1]-pos[1]))
++                task="near_sample"
+             if task.startswith("nav") or task=="home":
+                 key=(task,round(target[0],2),round(target[1],2))
+                 if self.targets[i]!=key or not self.paths[i] or self.stalls[i]>=2:

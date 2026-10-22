@@ -1,0 +1,54 @@
+diff --git a/count_fast_results.txt b/count_fast_results.txt
+index d30d21e..fddd9a6 100644
+--- a/count_fast_results.txt
++++ b/count_fast_results.txt
+@@ -1,3 +1,5 @@
+ {"seed": 0, "count": 10, "success": true, "steps": 199, "seconds": 23.99, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "index": 6, "todo": 7, "stall": 1, "attempt": 0, "pos": [0.14442715048789978, 0.23301441967487335, 0.11100000888109207], "dest": [0.14442715048789978, 0.23301441967487335, 0.11099999847263098]}
+ {"seed": 1, "count": 10, "success": true, "steps": 186, "seconds": 22.3, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "index": 6, "todo": 7, "stall": 1, "attempt": 0, "pos": [0.44773608446121216, -0.132277250289917, 0.11100002378225327], "dest": [0.44773608446121216, -0.132277250289917, 0.11099999847263098]}
+ {"seed": 2, "count": 10, "success": true, "steps": 169, "seconds": 23.67, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "index": 4, "todo": 5, "stall": 1, "attempt": 0, "pos": [0.15949538350105286, 0.0742836594581604, 0.11100000143051147], "dest": [0.15949532389640808, 0.0742836520075798, 0.11099999847263098]}
++{"seed": 3, "count": 10, "success": true, "steps": 134, "seconds": 28.68, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "index": 4, "todo": 5, "stall": 1, "attempt": 0, "pos": [0.3291561007499695, -0.3026953637599945, 0.11099997907876968], "dest": [0.3291561007499695, -0.3026953637599945, 0.11099999847263098]}
++{"seed": 0, "count": 20, "success": true, "steps": 203, "seconds": 35.23, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "index": 6, "todo": 7, "stall": 1, "attempt": 0, "pos": [0.14442716538906097, 0.23301441967487335, 0.11100000143051147], "dest": [0.14442715048789978, 0.23301441967487335, 0.11099999847263098]}
+diff --git a/test_one.py b/test_one.py
+new file mode 100644
+index 0000000..a16fcf3
+--- /dev/null
++++ b/test_one.py
+@@ -0,0 +1,12 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import sys,time,json,numpy as np
++seed=int(sys.argv[1]);count=int(sys.argv[2])
++e=make_env();s,info=e.reset(seed=seed,options={'object_count':count});p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,info);start=time.monotonic();compute=0;term=False
++for t in range(e.max_steps):
++ st=time.monotonic();a=p.get_action(s);compute+=time.monotonic()-st
++ s,r,term,trunc,info=e.step(a)
++ if t%50==0:print('progress',t,p.phase,str(p.obj),p.index,len(p.todo),p.stall,p.attempt,round(time.monotonic()-start,2),flush=True)
++ if term or trunc or time.monotonic()-start>58:break
++print(json.dumps(dict(seed=seed,count=count,success=term,steps=t+1,seconds=round(time.monotonic()-start,2),compute=round(compute,3),phase=p.phase,obj=str(p.obj),stall=p.stall,attempt=p.attempt)),flush=True)
++e.close()
+diff --git a/test_sweep_current.out b/test_sweep_current.out
+new file mode 100644
+index 0000000..a11cb2c
+--- /dev/null
++++ b/test_sweep_current.out
+@@ -0,0 +1,11 @@
++{"seed": 61, "count": 1, "success": true, "steps": 57, "sec": 4.76}
++{"seed": 62, "count": 1, "success": true, "steps": 58, "sec": 2.8}
++{"seed": 63, "count": 1, "success": true, "steps": 57, "sec": 3.81}
++{"seed": 64, "count": 1, "success": true, "steps": 56, "sec": 7.64}
++{"seed": 65, "count": 0, "success": true, "steps": 32, "sec": 2.8}
++{"seed": 66, "count": 2, "success": true, "steps": 80, "sec": 6.37}
++{"seed": 67, "count": 2, "success": true, "steps": 118, "sec": 12.0}
++{"seed": 68, "count": 1, "success": true, "steps": 29, "sec": 6.04}
++{"seed": 69, "count": 0, "success": true, "steps": 30, "sec": 1.56}
++{"seed": 70, "count": 1, "success": true, "steps": 59, "sec": 4.24}
++{"seed": 71, "count": 2, "success": true, "steps": 83, "sec": 5.49}
+diff --git a/test_sweep_extended.out b/test_sweep_extended.out
+index 8f7dd5f..c5058d9 100644
+--- a/test_sweep_extended.out
++++ b/test_sweep_extended.out
+@@ -19,3 +19,4 @@
+ {"seed": 58, "count": 1, "success": true, "steps": 42, "sec": 5.51}
+ {"seed": 59, "count": 2, "success": true, "steps": 128, "sec": 9.12}
+ {"seed": 60, "count": 0, "success": true, "steps": 41, "sec": 2.96}
++{"seed": 61, "count": 1, "success": true, "steps": 86, "sec": 7.81}

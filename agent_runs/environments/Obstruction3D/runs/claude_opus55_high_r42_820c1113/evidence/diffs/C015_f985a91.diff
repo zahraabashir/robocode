@@ -1,0 +1,117 @@
+diff --git a/approach.py b/approach.py
+index 963c6f0..a0b054d 100644
+--- a/approach.py
++++ b/approach.py
+@@ -357,7 +357,7 @@ class GeneratedApproach:
+             pos, yaw = self.path[0]
+             M = fk(self.base, self.q)
+             final = len(self.path) == 1
+-            tol = 5e-4 if final else 0.03
++            tol = 5e-4 if final else 0.01
+             e = np.linalg.norm(M[:3, 3] - pos)
+             eo = np.linalg.norm(rot_err(M[:3, :3], self._Rot(yaw)))
+             if e < tol and (eo < (0.01 if final else 0.1)):
+diff --git a/d55.txt b/d55.txt
+new file mode 100644
+index 0000000..5239ee2
+--- /dev/null
++++ b/d55.txt
+@@ -0,0 +1,64 @@
++target_block [0.367 0.325 0.1  ] [0.036 0.037 0.025]
++obstruction1 [ 0.21  -0.003  0.115] [0.016 0.015 0.03 ]
++target_region [ 0.216 -0.005  0.08 ] [0.045 0.046 0.005]
++obstruction0 [ 0.201 -0.047  0.107] [0.015 0.013 0.022]
++0 to_pic ction1 [0.154 0.001 0.217] sc 1.0 g 0 gr 0.0 np 3 dq 0.2
++1 to_pic ction1 [0.154 0.001 0.247] sc 1.0 g 0 gr 0.0 np 2 dq 0.2
++2 grasp_ ction1 [ 0.201 -0.002  0.217] sc 1.0 g 0 gr -1.0 np 0 dq 0.19
++3 to_pla ction1 [ 0.21  -0.003  0.175] sc 1.0 g 1 gr 0.0 np 6 dq 0.16
++4 to_pla ction1 [ 0.21  -0.003  0.21 ] sc 1.0 g 1 gr 0.0 np 4 dq 0.2
++5 to_pla ction1 [ 0.21  -0.003  0.21 ] sc 0.5 g 1 gr 0.0 np 4 dq 0.08
++6 to_pla ction1 [ 0.21  -0.003  0.21 ] sc 0.25 g 1 gr 0.0 np 4 dq 0.04
++7 to_pla ction1 [ 0.21  -0.012  0.213] sc 0.5 g 1 gr 0.0 np 4 dq 0.08
++8 to_pla ction1 [ 0.21  -0.012  0.213] sc 0.25 g 1 gr 0.0 np 4 dq 0.04
++9 to_pla ction1 [ 0.21  -0.012  0.213] sc 0.125 g 1 gr 0.0 np 4 dq 0.02
++10 to_pla ction1 [ 0.21  -0.017  0.215] sc 0.25 g 1 gr 0.0 np 4 dq 0.04
++11 to_pla ction1 [ 0.21  -0.017  0.215] sc 0.125 g 1 gr 0.0 np 4 dq 0.02
++12 to_pla ction1 [ 0.21  -0.017  0.215] sc 0.0625 g 1 gr 0.0 np 4 dq 0.01
++13 releas ction1 [ 0.21  -0.017  0.215] sc 1.0 g 1 gr 1.0 np 4 dq 0.0
++14 releas ction1 [ 0.21  -0.017  0.215] sc 1.0 g 1 gr 1.0 np 4 dq 0.0
++15 releas ction1 [ 0.21  -0.017  0.215] sc 1.0 g 1 gr 1.0 np 1 dq 0.01
++16 releas ction1 [ 0.21  -0.017  0.212] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++17 releas ction1 [ 0.21  -0.017  0.212] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++18 releas ction1 [ 0.21  -0.017  0.212] sc 1.0 g 1 gr 1.0 np 1 dq 0.01
++19 releas ction1 [ 0.21  -0.017  0.209] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++20 releas ction1 [ 0.21  -0.017  0.209] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++21 releas ction1 [ 0.21  -0.017  0.209] sc 1.0 g 1 gr 1.0 np 1 dq 0.01
++22 releas ction1 [ 0.21  -0.017  0.206] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++23 releas ction1 [ 0.21  -0.017  0.206] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++24 releas ction1 [ 0.21  -0.017  0.206] sc 1.0 g 1 gr 1.0 np 1 dq 0.01
++25 releas ction1 [ 0.21  -0.017  0.203] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++26 releas ction1 [ 0.21  -0.017  0.203] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++27 releas ction1 [ 0.21  -0.017  0.203] sc 1.0 g 1 gr 1.0 np 1 dq 0.01
++28 releas ction1 [ 0.21  -0.017  0.2  ] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++29 releas ction1 [ 0.21  -0.017  0.2  ] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++30 releas ction1 [ 0.21  -0.017  0.2  ] sc 1.0 g 1 gr 1.0 np 1 dq 0.01
++31 releas ction1 [ 0.21  -0.017  0.197] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++32 releas ction1 [ 0.21  -0.017  0.197] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++33 releas ction1 [ 0.21  -0.017  0.197] sc 1.0 g 1 gr 1.0 np 1 dq 0.01
++34 releas ction1 [ 0.21  -0.017  0.194] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++35 releas ction1 [ 0.21  -0.017  0.194] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++36 releas ction1 [ 0.21  -0.017  0.194] sc 1.0 g 1 gr 1.0 np 1 dq 0.01
++37 releas ction1 [ 0.21  -0.017  0.191] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++38 releas ction1 [ 0.21  -0.017  0.191] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++39 releas ction1 [ 0.21  -0.017  0.191] sc 1.0 g 1 gr 1.0 np 1 dq 0.01
++40 releas ction1 [ 0.21  -0.017  0.188] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++41 releas ction1 [ 0.21  -0.017  0.188] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++42 releas ction1 [ 0.21  -0.017  0.188] sc 1.0 g 1 gr 1.0 np 1 dq 0.01
++43 releas ction1 [ 0.21  -0.017  0.185] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++44 releas ction1 [ 0.21  -0.017  0.185] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++45 releas ction1 [ 0.21  -0.017  0.185] sc 1.0 g 1 gr 1.0 np 1 dq 0.01
++46 releas ction1 [ 0.21  -0.017  0.182] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++47 releas ction1 [ 0.21  -0.017  0.182] sc 1.0 g 1 gr 1.0 np 1 dq 0.0
++48 releas ction1 [ 0.21  -0.017  0.182] sc 1.0 g 1 gr 1.0 np 1 dq 0.01
++49 to_pic ction1 [ 0.21  -0.017  0.179] sc 1.0 g 0 gr 0.0 np 3 dq 0.16
++50 grasp_ ction1 [ 0.21  -0.017  0.214] sc 1.0 g 0 gr -1.0 np 0 dq 0.16
++51 to_pla ction1 [ 0.21  -0.017  0.179] sc 1.0 g 1 gr 0.0 np 6 dq 0.16
++52 to_pla ction1 [ 0.21  -0.017  0.214] sc 1.0 g 1 gr 0.0 np 4 dq 0.2
++53 to_pla ction1 [ 0.21  -0.017  0.214] sc 0.5 g 1 gr 0.0 np 4 dq 0.08
++54 to_pla ction1 [ 0.21  -0.017  0.214] sc 0.25 g 1 gr 0.0 np 4 dq 0.04
++55 to_pla ction1 [ 0.21  -0.017  0.214] sc 0.125 g 1 gr 0.0 np 4 dq 0.02
++56 to_pla ction1 [ 0.21  -0.017  0.214] sc 0.0625 g 1 gr 0.0 np 4 dq 0.01
++57 releas ction1 [ 0.21  -0.017  0.214] sc 1.0 g 1 gr 1.0 np 4 dq 0.0
++58 releas ction1 [ 0.21  -0.017  0.214] sc 1.0 g 1 gr 1.0 np 4 dq 0.0
++59 releas ction1 [ 0.21  -0.017  0.214] sc 1.0 g 1 gr 1.0 np 1 dq 0.01
+diff --git a/p55.py b/p55.py
+new file mode 100644
+index 0000000..ed227e6
+--- /dev/null
++++ b/p55.py
+@@ -0,0 +1,18 @@
++import numpy as np
++from th import H
++from approach import GeneratedApproach
++h=H(55)
++ap=GeneratedApproach(None,None,{}); ap.reset(h.obs,{})
++for t in range(4):
++    a=ap.get_action(h.obs); h.step(a)
++    print(t, ap.phase, h.tool()[:3,3].round(3), [ (np.round(w[0],3)) for w in ap.path])
++print(ap.task, ap.grasp_off)
++from kin import ik, fk
++q=h.q(); print('q',q.round(2))
++for z in [0.215,0.225,0.239]:
++    qt,e=ap._ik(np.array([0.21,-0.003,z]),ap.task['yaw']); print(z,'err',e, 'qt',qt.round(2), 'fk',fk(ap.base,qt)[:3,3].round(3))
++print('obj', h.pose('obstruction1')[:3].round(3), 'grasped', h.grasped())
++for z in [0.239,0.225,0.215]:
++    q=h.q(); qt,e=ap._ik(np.array([0.21,-0.003,z]),ap.task['yaw'])
++    a=np.zeros(11); a[3:10]=qt-q; h.step(a); print(z,'moved', not np.allclose(h.q(),q), h.tool()[:3,3].round(3))
++a=np.zeros(11); a[10]=1; h.step(a); print('open ->grasped', h.grasped(), h.pose('obstruction1')[:3].round(3))
+diff --git a/sweep3.txt b/sweep3.txt
+index a09d07f..cd03d2c 100644
+--- a/sweep3.txt
++++ b/sweep3.txt
+@@ -1 +1,5 @@
+ success 100/100  mean steps(success) 26.1  max compute 0.3s
++success 40/40  mean steps(success) 63.2  max compute 1.1s
++FAIL (434, False, 1000, 1.7, 143, 'release', 'obstruction0', 8)
++FAIL (417, False, 1000, 3.9, 344, 'to_place', 'obstruction6', 8)
++success 38/40  mean steps(success) 78.3  max compute 3.9s

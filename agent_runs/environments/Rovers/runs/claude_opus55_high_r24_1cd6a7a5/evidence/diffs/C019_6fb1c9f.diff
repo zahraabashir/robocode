@@ -1,0 +1,47 @@
+diff --git a/approach.py b/approach.py
+index 9b0d875..05fa21a 100644
+--- a/approach.py
++++ b/approach.py
+@@ -1,4 +1,5 @@
+ """Rovers: per-rover time-expanded BFS over (cell, done-set, calibrated, store, sent)."""
++import time as _t
+ import numpy as np
+ 
+ H = 0.1            # lattice spacing; a step moves up to 2 cells per axis (0.2m)
+@@ -315,6 +316,8 @@ class GeneratedApproach:
+ 
+     # ------------------------------------------------------------------
+     def reset(self, state, info):
++        self.t_used = 0.0
++        _t0 = _t.time()
+         self.sc = Scene(state, self.space)
+         sc = self.sc
+         g = state.get
+@@ -376,6 +379,7 @@ class GeneratedApproach:
+                 if st and len(st) <= len(orig) + pen:
+                     self.plans[i] = {"steps": st, "k": 0, "fail": 0}
+         self.done_flag = False
++        self.t_used = _t.time() - _t0
+ 
+     def _sends_feasible(self, B, steps):
+         """Check each planned SEND can happen with LOS given B.other_traj before the next acquisition."""
+@@ -543,7 +547,10 @@ class GeneratedApproach:
+         req = self.my_req[i] | S
+         B.other_traj = self._traj(1 - i)
+         B._send_t_cache = {}
+-        fin = B.run(c, L0, wanted=[req], tmax=TMAX, time_budget=5.0)
++        t0 = _t.time()
++        budget = min(5.0, max(0.3, 35.0 - self.t_used))
++        fin = B.run(c, L0, wanted=[req], tmax=TMAX, time_budget=budget)
++        self.t_used += _t.time() - t0
+         bt = None
+         for S2, (t, L) in fin.items():
+             if (S2 & req) == req and (bt is None or t < bt[0]):
+diff --git a/res_approach_i.json b/res_approach_i.json
+new file mode 100644
+index 0000000..a18da89
+--- /dev/null
++++ b/res_approach_i.json
+@@ -0,0 +1 @@
++{"0": 25, "1": 20, "2": 19, "3": 21, "4": 21, "5": 25, "6": 20, "7": 21, "8": 21, "9": 22, "10": 22, "11": 19, "12": 23, "13": 23, "14": 29, "15": 23, "16": 22, "17": 21, "18": 21, "19": 25, "20": 27, "21": 20, "22": 23, "23": 18, "24": 19, "25": 20, "26": 21, "27": 21, "28": 22, "29": 21, "30": 22, "31": 25, "32": 20, "33": 23, "34": 19, "35": 18, "36": 21, "37": 18, "38": 23, "39": 22, "40": 21, "41": 19, "42": 22, "43": 25, "44": 20, "45": 21, "46": 20, "47": 19}
+\ No newline at end of file

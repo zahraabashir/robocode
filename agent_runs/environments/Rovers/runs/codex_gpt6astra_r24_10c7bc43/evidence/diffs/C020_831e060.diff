@@ -1,0 +1,135 @@
+diff --git a/approach.py b/approach.py
+index 8ae1622..697f75c 100644
+--- a/approach.py
++++ b/approach.py
+@@ -23,6 +23,10 @@ class GeneratedApproach:
+         self.send_bad=np.zeros((2,len(self.points)),dtype=bool)
+         self.prev=None; self.step=0
+         self.make_graph()
++        self.image_masks=[self.visible(self.points,self.xy(state,o),2) for o in self.objs]
++        self.sample_masks=[np.linalg.norm(self.points-self.xy(state,o),axis=1)<.245 for o in self.samples]
++        self.radio_mask=self.visible(self.points,self.lander,4)
++        self.home_dist=[dijkstra(self.graph,indices=self.nearest(h)) for h in self.homes]
+     def free(self,p):
+         p=np.atleast_2d(p)
+         d=np.abs(p[:,None,:]-self.boxes[None,:,:2])-self.boxes[None,:,2:]
+@@ -84,19 +88,19 @@ class GeneratedApproach:
+             candidates=[]
+             for k in [0,1]:
+                 if not acquired[k] and k not in kinds and not s.get(r,'store_full'):
+-                    for o in self.samples:
++                    for oi,o in enumerate(self.samples):
+                         if int(s.get(o,'is_soil'))==k:
+-                            mask=np.linalg.norm(self.points-self.xy(s,o),axis=1)<.24
++                            mask=self.sample_masks[oi]
+                             candidates.append((mask,'sample',o,k))
+             for j,o in enumerate(self.objs):
+                 if not s.get(o,'received_image') and not any(s.get(o,'have_image_rover'+str(a)) for a in [0,1]) and j not in assigned:
+-                    mask=self.visible(self.points,self.xy(s,o),2)&~self.bad[i,:,j]
++                    mask=self.image_masks[j]&~self.bad[i,:,j]
+                     candidates.append((mask,'image',o,j))
+             pending=any(s.get(o,'have_image_rover'+str(i)) and not s.get(o,'received_image') for o in self.objs) or any(s.get(o,'analyzed_rover'+str(i)) and not received[int(s.get(o,'is_soil'))] for o in self.samples)
+-            if pending: candidates.append((self.visible(self.points,self.lander,4)&~self.send_bad[i],'send',None,None))
++            if pending: candidates.append((self.radio_mask&~self.send_bad[i],'send',None,None))
+             best=None; score=np.inf
+             for mask,task,o,j in candidates:
+-                dd=dist.copy();dd[~mask]=np.inf
++                dd=dist+.001*np.minimum(self.home_dist[i],1e4);dd[~mask]=np.inf
+                 target=int(np.argmin(dd)); cost=dd[target]
+                 if task=='send': cost+=5 if any(c[1]!='send' for c in candidates) else 0
+                 if cost<score: score=cost;best=(target,task,o,j)
+@@ -123,10 +127,13 @@ class GeneratedApproach:
+             if np.linalg.norm(p+move-pos[1-i])<.43:move=np.zeros(2)
+             q=p+move; op=0.;idx=None
+             if task=='sample' and np.linalg.norm(q-self.xy(s,o))<.249:op=-5/6
+-            elif task=='image' and self.visible(q,self.xy(s,o),2)[0]:
+-                op=-1/6 if s.get(r,'calibrated') else -.5;idx=j
+-            elif pending and self.visible(q,self.lander,4)[0] and not self.send_bad[i,self.nearest(q)]:op=.5
+-            elif s.get(r,'store_full'):op=5/6
++            else:
++                useful=[jj for jj,oo in enumerate(self.objs) if not s.get(oo,'received_image') and not any(s.get(oo,'have_image_rover'+str(a)) for a in [0,1]) and self.visible(q,self.xy(s,oo),2)[0]]
++                if useful:
++                    idx=min(useful,key=lambda jj:np.linalg.norm(q-self.xy(s,self.objs[jj])))
++                    op=-1/6 if s.get(r,'calibrated') else -.5
++            if op==0 and pending and self.visible(q,self.lander,4)[0] and not self.send_bad[i,self.nearest(q)]:op=.5
++            elif op==0 and s.get(r,'store_full'):op=5/6
+             action[4*i:4*i+2]=move;action[4*i+3]=op
+             records.append((p,move,op,idx,self.pending_count(s,i)))
+         self.prev=records
+diff --git a/stress_default.jsonl b/stress_default.jsonl
+index a8c888b..30fec34 100644
+--- a/stress_default.jsonl
++++ b/stress_default.jsonl
+@@ -9,3 +9,42 @@
+ {"seed": 38, "n": 1, "steps": 23, "success": true, "sec": 0.817}
+ {"seed": 39, "n": 3, "steps": 25, "success": true, "sec": 1.287}
+ {"seed": 40, "n": 2, "steps": 25, "success": true, "sec": 1.107}
++{"seed": 41, "n": 2, "steps": 21, "success": true, "sec": 1.193}
++{"seed": 42, "n": 1, "steps": 33, "success": true, "sec": 1.779}
++{"seed": 43, "n": 2, "steps": 33, "success": true, "sec": 1.447}
++{"seed": 44, "n": 3, "steps": 29, "success": true, "sec": 1.143}
++{"seed": 45, "n": 3, "steps": 32, "success": true, "sec": 2.087}
++{"seed": 46, "n": 2, "steps": 24, "success": true, "sec": 1.693}
++{"seed": 47, "n": 1, "steps": 26, "success": true, "sec": 1.765}
++{"seed": 48, "n": 1, "steps": 22, "success": true, "sec": 1.379}
++{"seed": 49, "n": 1, "steps": 23, "success": true, "sec": 1.139}
++{"seed": 50, "n": 3, "steps": 32, "success": true, "sec": 2.393}
++{"seed": 51, "n": 2, "steps": 24, "success": true, "sec": 1.367}
++{"seed": 52, "n": 3, "steps": 27, "success": true, "sec": 1.297}
++{"seed": 53, "n": 3, "steps": 30, "success": true, "sec": 0.81}
++{"seed": 54, "n": 1, "steps": 23, "success": true, "sec": 0.907}
++{"seed": 55, "n": 3, "steps": 30, "success": true, "sec": 1.286}
++{"seed": 56, "n": 2, "steps": 29, "success": true, "sec": 1.243}
++{"seed": 57, "n": 1, "steps": 20, "success": true, "sec": 0.611}
++{"seed": 58, "n": 2, "steps": 36, "success": true, "sec": 1.384}
++{"seed": 59, "n": 3, "steps": 27, "success": true, "sec": 1.322}
++{"seed": 60, "n": 1, "steps": 32, "success": true, "sec": 1.351}
++{"seed": 61, "n": 2, "steps": 28, "success": true, "sec": 1.138}
++{"seed": 62, "n": 2, "steps": 28, "success": true, "sec": 0.736}
++{"seed": 63, "n": 2, "steps": 30, "success": true, "sec": 0.901}
++{"seed": 64, "n": 2, "steps": 28, "success": true, "sec": 0.986}
++{"seed": 65, "n": 1, "steps": 21, "success": true, "sec": 1.007}
++{"seed": 66, "n": 3, "steps": 26, "success": true, "sec": 0.743}
++{"seed": 67, "n": 3, "steps": 28, "success": true, "sec": 1.346}
++{"seed": 68, "n": 2, "steps": 24, "success": true, "sec": 1.198}
++{"seed": 69, "n": 1, "steps": 25, "success": true, "sec": 0.645}
++{"seed": 70, "n": 2, "steps": 24, "success": true, "sec": 0.482}
++{"seed": 71, "n": 3, "steps": 25, "success": true, "sec": 0.559}
++{"seed": 72, "n": 3, "steps": 32, "success": true, "sec": 0.729}
++{"seed": 73, "n": 3, "steps": 31, "success": true, "sec": 0.665}
++{"seed": 74, "n": 1, "steps": 24, "success": true, "sec": 0.359}
++{"seed": 75, "n": 2, "steps": 27, "success": true, "sec": 0.527}
++{"seed": 76, "n": 2, "steps": 25, "success": true, "sec": 0.415}
++{"seed": 77, "n": 1, "steps": 25, "success": true, "sec": 0.417}
++{"seed": 78, "n": 3, "steps": 28, "success": true, "sec": 0.612}
++{"seed": 79, "n": 1, "steps": 29, "success": true, "sec": 0.479}
+diff --git a/stress_four.jsonl b/stress_four.jsonl
+index fb74f2e..2bcd274 100644
+--- a/stress_four.jsonl
++++ b/stress_four.jsonl
+@@ -1,2 +1,25 @@
+ {"seed": 0, "n": 4, "steps": 29, "success": true, "sec": 1.062}
+ {"seed": 1, "n": 4, "steps": 35, "success": true, "sec": 1.504}
++{"seed": 2, "n": 4, "steps": 32, "success": true, "sec": 1.865}
++{"seed": 3, "n": 4, "steps": 34, "success": true, "sec": 2.204}
++{"seed": 4, "n": 4, "steps": 32, "success": true, "sec": 1.912}
++{"seed": 5, "n": 4, "steps": 37, "success": true, "sec": 1.784}
++{"seed": 6, "n": 4, "steps": 29, "success": true, "sec": 1.867}
++{"seed": 7, "n": 4, "steps": 33, "success": true, "sec": 2.001}
++{"seed": 8, "n": 4, "steps": 31, "success": true, "sec": 2.028}
++{"seed": 9, "n": 4, "steps": 33, "success": true, "sec": 2.627}
++{"seed": 10, "n": 4, "steps": 28, "success": true, "sec": 1.788}
++{"seed": 11, "n": 4, "steps": 32, "success": true, "sec": 1.704}
++{"seed": 12, "n": 4, "steps": 37, "success": true, "sec": 1.876}
++{"seed": 13, "n": 4, "steps": 32, "success": true, "sec": 0.982}
++{"seed": 14, "n": 4, "steps": 35, "success": true, "sec": 1.471}
++{"seed": 15, "n": 4, "steps": 32, "success": true, "sec": 1.925}
++{"seed": 16, "n": 4, "steps": 25, "success": true, "sec": 1.0}
++{"seed": 17, "n": 4, "steps": 38, "success": true, "sec": 1.564}
++{"seed": 18, "n": 4, "steps": 32, "success": true, "sec": 1.297}
++{"seed": 19, "n": 4, "steps": 38, "success": true, "sec": 1.513}
++{"seed": 20, "n": 4, "steps": 36, "success": true, "sec": 1.683}
++{"seed": 21, "n": 4, "steps": 35, "success": true, "sec": 1.383}
++{"seed": 22, "n": 4, "steps": 36, "success": true, "sec": 1.592}
++{"seed": 23, "n": 4, "steps": 33, "success": true, "sec": 1.546}
++{"seed": 24, "n": 4, "steps": 33, "success": true, "sec": 2.163}

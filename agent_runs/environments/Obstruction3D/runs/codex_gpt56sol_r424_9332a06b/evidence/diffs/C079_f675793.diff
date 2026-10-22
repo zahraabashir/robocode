@@ -1,0 +1,15 @@
+diff --git a/approach.py b/approach.py
+index 7d419a1..4e3f492 100644
+--- a/approach.py
++++ b/approach.py
+@@ -53,7 +53,9 @@ class GeneratedApproach:
+             # The centered pose closes to finger_state ~= .1 on this branch and
+             # cannot reopen. Use offset grasps with useful finger clearance.
+             triples=[triples[2],triples[3],triples[4],triples[5],triples[6],triples[0]]
+-        if model_x<.23:
++        if model_x<.23 or (name!="target_block" and model_x<.30):
++            # Small blocks are less tolerant of the analytic reach estimate;
++            # retain a bounded dense grid through the medium-distance band.
+             for q2 in (.10,.20,.30,.40):
+                 for q4 in (-2.50,-2.35,-2.20):
+                     for q6 in (-.90,-.75,-.60): triples.append((q2,q4,q6))

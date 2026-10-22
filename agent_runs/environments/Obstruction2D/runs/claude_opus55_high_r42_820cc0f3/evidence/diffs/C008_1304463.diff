@@ -1,0 +1,167 @@
+diff --git a/approach.py b/approach.py
+index 6956765..2fec6ed 100644
+--- a/approach.py
++++ b/approach.py
+@@ -70,7 +70,7 @@ class GeneratedApproach:
+         return self.robot["arm_max"] + self.robot["gw"] / 2.0
+ 
+     # --------------------------------------------------------- collision check
+-    def _collides(self, pts, obstacles, carried, margin_map, default_margin):
++    def _collides(self, pts, obstacles, carried, margin_map, default_margin, check_bounds=True):
+         """pts: (N,2) base positions. carried: (dx0, dx1, dy0, dy1) rel to base or None.
+         obstacles: list of boxes. Returns True if any sample collides."""
+         X = pts[:, 0]
+@@ -78,7 +78,7 @@ class GeneratedApproach:
+         r = self.robot["r"]
+         half = self.robot["gh"] / 2.0
+         go = self._grip_off()
+-        if np.any(X < X_MIN - 1e-6) or np.any(X > X_MAX + 1e-6) or np.any(Y > Y_MAX + 1e-6):
++        if check_bounds and np.any(X < X_MIN - 1e-6) or np.any(X > X_MAX + 1e-6) or np.any(Y > Y_MAX + 1e-6):
+             return True
+         # boxes attached to robot: gripper/arm, carried
+         att = [(X - half, X + half, Y - go, Y)]
+@@ -164,14 +164,22 @@ class GeneratedApproach:
+         self.block_dest = None
+         self.attempts = {}
+ 
+-    def _grasp_x(self, b, others):
++    def _grasp_x(self, b, others, rng=None, pref=None):
+         half = self.robot["gh"] / 2.0
+-        lo, hi = b["x"] + half + 0.003, b["x"] + b["w"] - half - 0.003
++        lo, hi = b["x"] + 0.006, b["x"] + b["w"] - 0.006
++        if rng is not None:
++            lo, hi = max(lo, rng[0]), min(hi, rng[1])
++        lo, hi = max(lo, X_MIN), min(hi, X_MAX)
+         if hi < lo:
+-            lo = hi = b["x"] + b["w"] / 2
++            lo = hi = min(max(b["x"] + b["w"] / 2, X_MIN), X_MAX)
+         by = b["y"] + b["h"] + self._grip_off() + GAP
+-        c = b["x"] + b["w"] / 2
+-        cands = sorted(np.linspace(lo, hi, 21), key=lambda x: abs(x - c))
++        c = b["x"] + b["w"] / 2 if pref is None else pref
++        ilo, ihi = b["x"] + half + 0.003, b["x"] + b["w"] - half - 0.003
++
++        def key(x):
++            over = 0.0 if ilo <= x <= ihi else min(abs(x - ilo), abs(x - ihi))
++            return (round(over, 4) > 0, abs(x - c))
++        cands = sorted(np.linspace(lo, hi, 41), key=key)
+         R = self.robot["r"] + 0.005
+         btop = b["y"] + b["h"]
+         self.grasp_conflict = None
+@@ -236,9 +244,9 @@ class GeneratedApproach:
+             return best[1], best[0]
+         return None
+ 
+-    def _column_info(self, dest_x):
++    def _column_info(self, dest_x, grel=None):
+         b = self.block
+-        gx_rel = b["w"] / 2
++        gx_rel = self.block_grel if grel is None else grel
+         gy_rel = b["h"] + self._grip_off() + GAP
+         bx = dest_x + gx_rel
+         py = FLOOR + 0.012 + gy_rel
+@@ -246,11 +254,12 @@ class GeneratedApproach:
+         carried = (-gx_rel, b["w"] - gx_rel, -gy_rel, b["h"] - gy_rel)
+         return pts, carried
+ 
+-    def _column_hit(self, o, extra=0.0, dest_x=None):
++    def _column_hit(self, o, extra=0.0, dest_x=None, grel=None):
+         if dest_x is None:
+             dest_x = self.block_dest
+-        pts, carried = self._column_info(dest_x)
+-        return self._collides(pts, [o], carried, {"__floor__": -1.0}, 0.01 + extra)
++        pts, carried = self._column_info(dest_x, grel)
++        return self._collides(pts, [o], carried, {"__floor__": -1.0}, 0.002 + extra,
++                              check_bounds=False)
+ 
+     def _choose_block_dest(self):
+         s = self.surface
+@@ -259,17 +268,25 @@ class GeneratedApproach:
+         hi = s["x"] + s["w"] - b["w"] - 0.003
+         center = s["x"] + (s["w"] - b["w"]) / 2
+         if hi <= lo:
+-            return center
++            lo = hi = center
+         best = None
+         for dx in np.linspace(lo, hi, 25):
++            glo = max(0.006, X_MIN - dx)
++            ghi = min(b["w"] - 0.006, X_MAX - dx)
++            if ghi < glo:
++                continue
++            grel = min(max(b["w"] / 2, glo), ghi)
+             nb = 0
+             for o in self.obst.values():
+-                if self._column_hit(o, dest_x=dx):
+-                    nb += 1
++                if self._column_hit(o, dest_x=dx, grel=grel):
++                    reach = o["x"] + 0.006 <= X_MAX and o["x"] + o["w"] - 0.006 >= X_MIN
++                    nb += 1 if reach else 100
+             cost = nb * 100 + abs(dx - center) * 0.1
+             if best is None or cost < best[0]:
+-                best = (cost, dx)
+-        return best[1]
++                best = (cost, dx, grel)
++        if best is None:
++            return center, b["w"] / 2
++        return best[1], best[2]
+ 
+     def _make_plan(self):
+         """Returns list of segments: each (waypoint list, vac, kind)."""
+@@ -277,7 +294,7 @@ class GeneratedApproach:
+         s0, s1 = s["x"], s["x"] + s["w"]
+         movable = self._all_movable()
+         if self.block_dest is None:
+-            self.block_dest = self._choose_block_dest()
++            self.block_dest, self.block_grel = self._choose_block_dest()
+         blockers = [o for o in self.obst.values() if self._column_hit(o)]
+         rx, ry = self.robot["x"], self.robot["y"]
+         if blockers:
+@@ -287,7 +304,12 @@ class GeneratedApproach:
+         gx = None
+         for _ in range(10):
+             others = [b for n, b in movable.items() if n != tgt["name"]]
+-            gx = self._grasp_x(tgt, others)
++            if tgt["name"] == self.block["name"]:
++                bb = self.block
++                rng = (bb["x"] + X_MIN - self.block_dest, bb["x"] + X_MAX - self.block_dest)
++                gx = self._grasp_x(tgt, others, rng=rng, pref=bb["x"] + self.block_grel)
++            else:
++                gx = self._grasp_x(tgt, others)
+             if gx is not None or self.grasp_conflict is None:
+                 break
+             tgt = self.grasp_conflict
+diff --git a/dbg.py b/dbg.py
+index 84d9cf1..06c95dd 100644
+--- a/dbg.py
++++ b/dbg.py
+@@ -4,7 +4,7 @@ from env_client import make_env
+ from approach import GeneratedApproach
+ seed, count = int(sys.argv[1]), int(sys.argv[2])
+ env = make_env()
+-obs, info = env.reset(seed=seed, options={'object_count': count})
++obs, info = env.reset(seed=seed, options=({'object_count': count} if count>0 else None))
+ ap = GeneratedApproach(env.action_space, env.observation_space, {})
+ ap.reset(obs, info)
+ ap._parse(obs)
+diff --git a/dbg3.py b/dbg3.py
+new file mode 100644
+index 0000000..41ec382
+--- /dev/null
++++ b/dbg3.py
+@@ -0,0 +1,16 @@
++import sys
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++import approach as A
++seed, count = int(sys.argv[1]), int(sys.argv[2])
++env = make_env()
++obs, info = env.reset(seed=seed, options=({'object_count': count} if count>0 else None))
++ap = GeneratedApproach(env.action_space, env.observation_space, {})
++ap.reset(obs, info); ap._parse(obs)
++s=ap.surface; b=ap.block
++lo = s["x"] + 0.003; hi = s["x"] + s["w"] - b["w"] - 0.003
++for dx in np.linspace(lo, hi, 7):
++    glo = max(0.006, A.X_MIN - dx); ghi = min(b["w"] - 0.006, A.X_MAX - dx)
++    grel = min(max(b["w"] / 2, glo), ghi)
++    print(round(dx,4), round(grel,4), [o['name'] for o in ap.obst.values() if ap._column_hit(o, dest_x=dx, grel=grel)])

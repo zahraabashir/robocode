@@ -1,0 +1,31 @@
+diff --git a/approach.py b/approach.py
+new file mode 100644
+index 0000000..b703a9d
+--- /dev/null
++++ b/approach.py
+@@ -0,0 +1,11 @@
++import numpy as np
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.action_space = action_space
++        self.observation_space = observation_space
++    def reset(self, state, info):
++        self.steps = 0
++    def get_action(self, state):
++        self.steps += 1
++        return np.zeros(11, dtype=np.float32)
+diff --git a/probe_initial.py b/probe_initial.py
+new file mode 100644
+index 0000000..181fa93
+--- /dev/null
++++ b/probe_initial.py
+@@ -0,0 +1,8 @@
++from env_client import make_env
++import numpy as np
++E=make_env(); s,info=E.reset(seed=0)
++print('info',info,'max',E.max_steps)
++for t in E.observation_space.types:
++ for o in s.get_objects(t):
++  print(o.name,{f:round(s.get(o,f),6) for f in E.observation_space.type_features[t]})
++E.close()

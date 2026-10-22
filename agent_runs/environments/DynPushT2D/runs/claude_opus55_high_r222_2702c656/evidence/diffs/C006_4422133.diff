@@ -1,0 +1,22 @@
+diff --git a/approach.py b/approach.py
+index 55a3907..a224ff2 100644
+--- a/approach.py
++++ b/approach.py
+@@ -282,7 +282,7 @@ class GeneratedApproach:
+             else:
+                 d = B.dist(rp)
+                 wp = None
+-                if d > R_ROBOT + 0.004:
++                if d > R_ROBOT - 0.01:
+                     wp = self.nav_step(B, rp, pre)
+                 if wp is None:
+                     self.nav_fail += 1
+@@ -292,7 +292,7 @@ class GeneratedApproach:
+                     # push outward along the direction from nearest point
+                     best = None
+                     for ang in np.linspace(0, 2 * math.pi, 16, endpoint=False):
+-                        cand = rp + 0.03 * np.array([math.cos(ang), math.sin(ang)])
++                        cand = np.clip(rp + 0.03 * np.array([math.cos(ang), math.sin(ang)]), 0.105, 4.88)
+                         dd = B.dist(cand)
+                         if best is None or dd > best[0]:
+                             best = (dd, cand)

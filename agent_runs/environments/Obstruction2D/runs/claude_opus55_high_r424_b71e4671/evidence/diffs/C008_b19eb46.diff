@@ -1,0 +1,134 @@
+diff --git a/approach.py b/approach.py
+index cc4a540..fe0b8aa 100644
+--- a/approach.py
++++ b/approach.py
+@@ -110,6 +110,9 @@ class GeneratedApproach:
+         self.leg = 0
+         self.last = None
+         self.stuck = 0
++        self.noprog = 0
++        self.replan = False
++        self.replans = 0
+         try:
+             self.legs = self._plan(state)
+         except Exception:
+@@ -321,10 +324,36 @@ class GeneratedApproach:
+             else:
+                 self.stuck = 0
+ 
++        if self.last is not None and abs(self.last[0] - rx) < 1e-6 and abs(self.last[1] - ry) < 1e-6:
++            self.noprog += 1
++        else:
++            self.noprog = 0
++
++        if self.replan and vac < 0.5:
++            self.replan = False
++            self.replans += 1
++            try:
++                legs = self._plan(state)
++            except Exception:
++                legs = None
++            self.legs = legs if legs else self._fallback_plan(state)
++            self.leg = 0
++            self.noprog = 0
++
+         if self.leg >= len(self.legs):
+             self.last = None
+             return self._act(0, 0.0, dth, darm, vac)
+ 
++        if self.noprog >= 6 and self.replans < 5:
++            kind = self.legs[self.leg][0]
++            self.noprog = 0
++            self.replan = True
++            self.last = (rx, ry, 0.0, 0.0)
++            if kind == "drop":
++                return self._act(0, 0, dth, darm, 0.0)
++            if kind == "pick":
++                return self._act(0, 0, dth, darm, 0.0)
++
+         leg = self.legs[self.leg]
+         kind, name = leg[0], leg[1]
+         allr = {o.name: _rect(state, o) for o in obst + [block]}
+diff --git a/res_100_300.txt b/res_100_300.txt
+new file mode 100644
+index 0000000..7d5a37d
+--- /dev/null
++++ b/res_100_300.txt
+@@ -0,0 +1 @@
++solved 200/200  mean steps 31.6 max time 49.2s
+diff --git a/test_approach.py b/test_approach.py
+index f575ff3..1d45dff 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -3,26 +3,35 @@ import numpy as np
+ from env_client import make_env
+ from approach import GeneratedApproach
+ OC=None
+-def run(seed, verbose=False):
++def run_once(seed):
+     env = make_env()
+-    ap = GeneratedApproach(env.action_space, env.observation_space, {})
+-    obs, info = env.reset(seed=seed, options={'object_count':OC} if OC is not None else None)
+-    ap.reset(obs, info)
+-    t=time.time()
+-    for t_ in range(env.max_steps):
+-        a = ap.get_action(obs)
+-        obs, r, te, tr, _ = env.step(a)
+-        if te or tr: break
+-    env.close()
+-    return te, t_+1, info.get('object_count'), getattr(ap,'leg',None)
++    try:
++        ap = GeneratedApproach(env.action_space, env.observation_space, {})
++        obs, info = env.reset(seed=seed, options={'object_count':OC} if OC is not None else None)
++        t0=time.time(); ap.reset(obs, info)
++        te=False
++        for t_ in range(env.max_steps):
++            a = ap.get_action(obs)
++            obs, r, te, tr, _ = env.step(a)
++            if te or tr: break
++        return te, t_+1, info.get('object_count'), getattr(ap,'leg',None), time.time()-t0
++    finally:
++        try: env.close()
++        except Exception: pass
++def run(seed):
++    for k in range(3):
++        try: return run_once(seed)
++        except Exception as e:
++            err=e; time.sleep(2)
++    return None, 0, None, repr(err)[:80], 0
+ if __name__ == "__main__":
+     if len(sys.argv)>3: OC=int(sys.argv[3])
+     seeds = range(int(sys.argv[1]), int(sys.argv[2]))
+     from concurrent.futures import ThreadPoolExecutor
+-    with ThreadPoolExecutor(16) as ex:
++    with ThreadPoolExecutor(6) as ex:
+         res = list(ex.map(run, seeds))
+     ok = 0
+-    for s, (te, n, c, ph) in zip(seeds, res):
+-        ok += te
+-        if not te: print("FAIL seed", s, "n_obj", c, "phase", ph)
+-    print(f"solved {ok}/{len(res)}  mean steps {np.mean([r[1] for r in res if r[0]]) if ok else 0:.1f}")
++    for s, (te, n, c, ph, dt) in zip(seeds, res):
++        ok += bool(te)
++        if not te: print("FAIL seed", s, "n_obj", c, "leg", ph, flush=True)
++    print(f"solved {ok}/{len(res)}  mean steps {np.mean([r[1] for r in res if r[0]]) if ok else 0:.1f} max time {max(r[4] for r in res):.1f}s")
+diff --git a/timing.py b/timing.py
+new file mode 100644
+index 0000000..cbd0ffa
+--- /dev/null
++++ b/timing.py
+@@ -0,0 +1,14 @@
++import sys, time
++from env_client import make_env
++from approach import GeneratedApproach
++env = make_env()
++for seed in range(int(sys.argv[1]), int(sys.argv[2])):
++    ap = GeneratedApproach(env.action_space, env.observation_space, {})
++    obs, info = env.reset(seed=seed)
++    t0=time.time(); ap.reset(obs, info); tr=time.time()-t0
++    ta=0; tenv=0; n=0
++    for _ in range(1000):
++        t0=time.time(); a=ap.get_action(obs); ta+=time.time()-t0
++        t0=time.time(); obs,r,te,trr,_=env.step(a); tenv+=time.time()-t0; n+=1
++        if te: break
++    print(seed, info['object_count'], "reset %.3f act %.3f (%.4f/step) env %.2f steps %d"%(tr,ta,ta/n,tenv,n), flush=True)

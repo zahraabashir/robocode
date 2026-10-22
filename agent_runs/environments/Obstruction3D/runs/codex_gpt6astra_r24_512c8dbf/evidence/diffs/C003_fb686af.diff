@@ -1,0 +1,22 @@
+diff --git a/probe_controls.py b/probe_controls.py
+new file mode 100644
+index 0000000..2d1d6ee
+--- /dev/null
++++ b/probe_controls.py
+@@ -0,0 +1,16 @@
++from env_client import make_env
++import numpy as np
++
++def dump(e,s):
++ for t in e.observation_space.types:
++  for o in s.get_objects(t):
++   print(o.name,{f:round(float(s.get(o,f)),6) for f in e.observation_space.type_features[t]},flush=True)
++e=make_env();s,i=e.reset(seed=0);print('INITIAL',i);dump(e,s)
++for j in range(11):
++ s,i=e.reset(seed=0);a=np.zeros(11,dtype=np.float32);a[j]=.2 if j<10 else -1
++ t,r,d,tr,i=e.step(a);print('ACTION',j,'r',r,'done',d,i,flush=True)
++ for ty in e.observation_space.types:
++  for o in t.get_objects(ty):
++   changed={f:(round(float(s.get(o,f)),5),round(float(t.get(o,f)),5)) for f in e.observation_space.type_features[ty] if abs(s.get(o,f)-t.get(o,f))>1e-7}
++   if changed:print(o.name,changed,flush=True)
++e.close()

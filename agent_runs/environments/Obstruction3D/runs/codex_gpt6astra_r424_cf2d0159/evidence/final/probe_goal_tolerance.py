@@ -1,0 +1,24 @@
+from env_client import make_env
+from approach import GeneratedApproach
+import numpy as np
+for eps in [.01,.005,.002,.001,.0001,.00001,0,-.0001]:
+ e=make_env();s,info=e.reset(seed=0,options={'object_count':0});p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,info);changed=False;last=None;stuck=0
+ for step in range(260):
+  a=p.get_action(s)
+  if p.phase=='lower' and not changed:
+   # Set actual requested target center height independently of policy epsilon.
+   obj=s.get_object_from_name('target_block');ro=s.get_object_from_name('robot');from kinematics_fit import fk
+   q=np.array([s.get(ro,'joint_'+str(j)) for j in range(1,8)]);ee,_=fk(q)
+   p.finalheight=ee[2]+.11+eps-s.get(obj,'pose_z');p.height=max(p.finalheight,p.height);changed=True
+  s,r,term,tr,info=e.step(a)
+  obj=s.get_object_from_name('target_block');z=float(s.get(obj,'pose_z'))
+  if p.phase=='lower':
+   if last is not None and abs(last-z)<1e-8:stuck+=1
+   else:stuck=0
+   if stuck>8:
+    a=np.zeros(11);a[-1]=1;s,r,term,tr,info=e.step(a);print('FORCED_OPEN',eps,z,'success',term,flush=True);break
+   last=z
+  if term or p.phase=='release':
+   print('RESULT',eps,'step',step,'z',z,'success',term,'phase',p.phase,flush=True);break
+ else:print('TIMEOUT',eps,p.phase,flush=True)
+ e.close()

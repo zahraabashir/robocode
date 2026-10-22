@@ -1,0 +1,74 @@
+diff --git a/probe_ops.py b/probe_ops.py
+index a988884..f3d4c79 100644
+--- a/probe_ops.py
++++ b/probe_ops.py
+@@ -82,9 +82,59 @@ def drive_and_operate(seed, rover_index, target_name, op_value, stop=0.12):
+     env.close()
+ 
+ 
++def move(env, state, rover_index, tx, ty, stop=0.12, limit=100):
++    rover_name = f"rover{rover_index}"
++    for n in range(limit):
++        r = state.get_object_from_name(rover_name)
++        dx, dy = tx - state.get(r, "x"), ty - state.get(r, "y")
++        dist = math.hypot(dx, dy)
++        if dist <= stop:
++            return state, n, False
++        scale = min(1.0, max(0.0, (dist - stop) / max(abs(dx), abs(dy), 1e-9)))
++        cmd = (max(-.2, min(.2, dx * scale)), max(-.2, min(.2, dy * scale)), 0, CENTERS[3])
++        a = action(cmd, (0, 0, 0, CENTERS[3])) if rover_index == 0 else action((0, 0, 0, CENTERS[3]), cmd)
++        nxt, _, _, _, _ = env.step(a)
++        oldr, newr = state.get_object_from_name(rover_name), nxt.get_object_from_name(rover_name)
++        stuck = (state.get(oldr, "x") == nxt.get(newr, "x") and state.get(oldr, "y") == nxt.get(newr, "y"))
++        state = nxt
++        if stuck:
++            return state, n + 1, True
++    return state, limit, True
++
++
++def op(env, state, rover_index, op_index, motion=(0, 0, 0)):
++    cmd = (*motion, CENTERS[op_index])
++    a = action(cmd, (0, 0, 0, CENTERS[3])) if rover_index == 0 else action((0, 0, 0, CENTERS[3]), cmd)
++    nxt, rew, term, trunc, info = env.step(a)
++    print("op", op_index, "r", rover_index, "motion", motion, "changed", changed(state, nxt), "done", term, trunc)
++    return nxt
++
++
++def scenario(seed):
++    env = make_env()
++    state, _ = env.reset(seed=seed)
++    # Seed 0 has a conveniently accessible soil sample near rover1.
++    sample = state.get_object_from_name("sample4")
++    state, n, stuck = move(env, state, 1, state.get(sample, "x"), state.get(sample, "y"))
++    print("move to sample", n, stuck)
++    state = op(env, state, 1, 0)
++    state = op(env, state, 1, 4)
++    state = op(env, state, 1, 5)
++    # Approach an objective until its mound rejects further motion.
++    objective = state.get_object_from_name("objective2")
++    state, n, stuck = move(env, state, 1, state.get(objective, "x"), state.get(objective, "y"))
++    print("move to objective", n, stuck)
++    state = op(env, state, 1, 2)  # image without calibration: refused
++    state = op(env, state, 1, 1)
++    state = op(env, state, 1, 2)
++    state = op(env, state, 1, 2)  # calibration was spent: refused
++    state = op(env, state, 1, 4)  # expected out of lander range / occluded
++    env.close()
++
++
+ if __name__ == "__main__":
+     p = argparse.ArgumentParser()
+-    p.add_argument("mode", choices=["dump", "selector", "operate"])
++    p.add_argument("mode", choices=["dump", "selector", "operate", "scenario"])
+     p.add_argument("--seed", type=int, default=0)
+     p.add_argument("--rover", type=int, default=0)
+     p.add_argument("--target", default="sample0")
+@@ -94,5 +144,7 @@ if __name__ == "__main__":
+         dump(args.seed)
+     elif args.mode == "selector":
+         selector(args.seed)
+-    else:
++    elif args.mode == "operate":
+         drive_and_operate(args.seed, args.rover, args.target, args.op)
++    else:
++        scenario(args.seed)

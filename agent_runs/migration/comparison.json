@@ -1,0 +1,75 @@
+{
+  "annotation_rules": "v0.1",
+  "records": [
+    {
+      "sample_id": "obstruction2d_generalized_replicate_424",
+      "status": "existing reference",
+      "phase_decomposition": "supported",
+      "geometric_multistep_lookahead": "not found in inspected final code",
+      "anticipatory_constraints": "supported",
+      "evidence": "../run_424_sequence_map/model_based_deep_dive.md"
+    },
+    {
+      "sample_id": "obstruction3d_generalized_replicate_424",
+      "status": "not annotated",
+      "phase_decomposition": null,
+      "geometric_multistep_lookahead": null,
+      "dynamics_multistep_lookahead": null,
+      "task_sequence_search": null,
+      "evidence": null
+    },
+    {
+      "sample_id": "obstruction3d_generalized_replicate_24",
+      "status": "not annotated",
+      "phase_decomposition": null,
+      "geometric_multistep_lookahead": null,
+      "dynamics_multistep_lookahead": null,
+      "task_sequence_search": null,
+      "evidence": null
+    },
+    {
+      "sample_id": "dynpusht2d_replicate_424",
+      "status": "manual annotation for review",
+      "phase_decomposition": "supported",
+      "geometric_multistep_lookahead": "supported",
+      "dynamics_multistep_lookahead": "not found in inspected final code",
+      "task_sequence_search": "not found in inspected final code",
+      "evidence": "runs/dynpusht2d_replicate_424/analysis.md",
+      "contact_control": "mechanics-informed geometric rules with observed-outcome feedback",
+      "interpretation": "Model-based geometric navigation coexists with heuristic contact control; not classified as model-free reinforcement learning.",
+      "anticipatory_constraints": "supported: centerward prepositioning before rotation near walls",
+      "planner_bypass": "supported: direct goal fallback on search failure"
+    },
+    {
+      "sample_id": "dynpusht2d_replicate_24",
+      "status": "manual annotation for review",
+      "phase_decomposition": "supported",
+      "geometric_multistep_lookahead": "supported",
+      "dynamics_multistep_lookahead": "not found in inspected final code",
+      "task_sequence_search": "not found in inspected final code",
+      "evidence": "runs/dynpusht2d_replicate_24/analysis.md",
+      "contact_control": "mechanics-informed geometric rules with observed-outcome feedback",
+      "interpretation": "Model-based geometric navigation coexists with heuristic contact control; not classified as model-free reinforcement learning.",
+      "adaptive_contact_offset": "supported: observed rotation updates contact offset within an episode",
+      "planner_bypass": "supported: translation approach route discarded when position error < 0.15"
+    },
+    {
+      "sample_id": "rovers_generalized_replicate_424",
+      "status": "manual annotation for review",
+      "phase_decomposition": "supported",
+      "geometric_multistep_lookahead": "supported",
+      "dynamics_multistep_lookahead": "not found in inspected final code",
+      "task_sequence_search": "not found in inspected final code",
+      "evidence": "runs/rovers_generalized_replicate_424/analysis.md"
+    },
+    {
+      "sample_id": "rovers_generalized_replicate_24",
+      "status": "not annotated",
+      "phase_decomposition": null,
+      "geometric_multistep_lookahead": null,
+      "dynamics_multistep_lookahead": null,
+      "task_sequence_search": null,
+      "evidence": null
+    }
+  ]
+}

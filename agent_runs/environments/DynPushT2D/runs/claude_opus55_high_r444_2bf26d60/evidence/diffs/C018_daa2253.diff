@@ -1,0 +1,146 @@
+diff --git a/approach.py b/approach.py
+index c7575e8..1528ee2 100644
+--- a/approach.py
++++ b/approach.py
+@@ -166,6 +166,8 @@ class GeneratedApproach:
+         self.M = 0
+         self.infl = R_ROBOT + 0.015
+         self.wall_margin = 0.01
++        self.stuck_rate = 1e-3
++        self.sub_clear = 1.0
+         self.H2 = 30
+         self.H = 40
+         self.replan_every = 8
+@@ -185,6 +187,9 @@ class GeneratedApproach:
+         hi = min(self.goal[2] + tol, math.pi)
+         self.gc = 0.5 * (lo + hi)   # centre of the valid (wrapped) angle interval
+         self.ghw = 0.5 * (hi - lo)
++        self.real_tgt = np.array([self.goal[0], self.goal[1], self.gc, self.ghw, 0.03])
++        self.tgt = self.real_tgt.copy()
++        self.sub_active = False
+         self.mode = "plan"
+         self.path = []
+         self.push = None
+@@ -192,12 +197,15 @@ class GeneratedApproach:
+         self.stall = 0
+         self.last_cmd = None
+         self.last_robot = None
++        self.last_pose = None
++        self.blacklist = []
++        self.bl_pose = None
+ 
+     # ------------------------------------------------------------------
+     def cost(self, pose):
+         pose = np.atleast_2d(pose)
+-        dp = pose[:, :2] - self.goal[:2]
+-        da = np.abs(wrap_arr(pose[:, 2] - self.gc))
++        dp = pose[:, :2] - self.tgt[:2]
++        da = np.abs(wrap_arr(pose[:, 2] - self.tgt[2]))
+         if self.cost_mode == 1:
+             return np.sqrt(dp[:, 0] ** 2 + dp[:, 1] ** 2 + (self.wa * da) ** 2)
+         return np.hypot(dp[:, 0], dp[:, 1]) + self.wa * da
+@@ -261,6 +269,14 @@ class GeneratedApproach:
+         ok &= (ds > R_ROBOT + 0.005) & (dp > R_ROBOT + 0.035)
+         ok &= np.all((pre > WALL_LO + R_ROBOT + 0.02) & (pre < WALL_HI - R_ROBOT - 0.02), 1)
+         ok |= here
++        if self.blacklist:
++            sl = to_local(sw, pose)
++            dl = to_local(dw, (0, 0, pose[2]))
++            for (bp, bd) in self.blacklist:
++                bdn = bd / (np.linalg.norm(bd) + 1e-9)
++                near = np.hypot(*(sl - bp).T) < 0.12
++                same = (dl @ bdn) > 0.8
++                ok &= ~(near & same)
+         sw, dw, pre, here = sw[ok], dw[ok], pre[ok], here[ok]
+         c0 = self.cost(pose[None])[0]
+         speeds = [MAXD] if (c0 > 0.35 or coarse) else [MAXD, 0.02]
+@@ -335,10 +351,30 @@ class GeneratedApproach:
+         i = best_i
+         return E["start"][i], E["act"][i], E["k"][i], E["rate"][i], E["c0"], E["here"][i]
+ 
++    def make_subgoal(self, pose):
++        """Goal orientation at a position with the COM clamped away from the walls."""
++        th = self.gc
++        c, s_ = math.cos(th), math.sin(th)
++        com = self.sim.com
++        gcom = self.goal[:2] + np.array([c * com[0] - s_ * com[1], s_ * com[0] + c * com[1]])
++        m = self.sub_clear
++        ncom = np.clip(gcom, m, 5.0 - m)
++        if np.linalg.norm(ncom - gcom) < 0.05:
++            # goal is interior: use current COM pulled toward centre
++            cc, sc_ = math.cos(pose[2]), math.sin(pose[2])
++            pcom = pose[:2] + np.array([cc * com[0] - sc_ * com[1], sc_ * com[0] + cc * com[1]])
++            ncom = np.clip(pcom, m, 5.0 - m)
++            if np.linalg.norm(ncom - pcom) < 0.05:
++                return None
++            xy = ncom - np.array([cc * com[0] - sc_ * com[1], sc_ * com[0] + cc * com[1]])
++            return np.array([xy[0], xy[1], pose[2], 0.3, 0.08])
++        xy = self.goal[:2] + (ncom - gcom)
++        return np.array([xy[0], xy[1], th, 0.1, 0.1])
++
+     def in_goal(self, poses, frac=1.0):
+-        dp = np.abs(poses[:, :2] - self.goal[:2])
+-        da = np.abs(wrap_arr(poses[:, 2] - self.gc))
+-        return (dp[:, 0] < 0.03 * frac) & (dp[:, 1] < 0.03 * frac) & (da < self.ghw * frac)
++        dp = np.abs(poses[:, :2] - self.tgt[:2])
++        da = np.abs(wrap_arr(poses[:, 2] - self.tgt[2]))
++        return (dp[:, 0] < self.tgt[4] * frac) & (dp[:, 1] < self.tgt[4] * frac) & (da < self.tgt[3] * frac)
+ 
+     def _nodes(self, pose):
+         infl = self.infl
+@@ -467,10 +503,21 @@ class GeneratedApproach:
+         robot = s[16:18].copy()
+         if self.model is None:
+             self.reset(state, {})
++        # clear blacklist once block moved noticeably
++        if self.bl_pose is not None and (np.linalg.norm(pose[:2] - self.bl_pose[:2]) > 0.03
++                                         or abs(wrap(pose[2] - self.bl_pose[2])) > 0.05):
++            self.blacklist = []
++            self.bl_pose = None
+         if self.last_cmd is not None and self.mode == "push":
+             moved = np.linalg.norm(robot - self.last_robot)
+-            if moved < 0.3 * np.linalg.norm(self.last_cmd):
++            pred_pose, _ = self.sim.step(self.last_pose, self.last_robot, self.last_cmd)
++            perr = np.linalg.norm(pred_pose[0, :2] - pose[:2]) + 0.5 * abs(wrap(pred_pose[0, 2] - pose[2]))
++            if moved < 0.3 * np.linalg.norm(self.last_cmd) or perr > 0.01:
+                 self.mode = "plan"
++                self.blacklist.append((to_local(self.last_robot[None], pose)[0],
++                                       to_local(self.last_cmd[None], (0, 0, pose[2]))[0]))
++                if self.bl_pose is None:
++                    self.bl_pose = pose.copy()
+         if self.last_cmd is not None and self.mode == "nav":
+             moved = np.linalg.norm(robot - self.last_robot)
+             if moved < 0.3 * np.linalg.norm(self.last_cmd) and np.linalg.norm(self.last_cmd) > 1e-3:
+@@ -481,9 +528,14 @@ class GeneratedApproach:
+                 self.stall = 0
+                 self.mode = "plan"
+         self.last_robot = robot
+-        if self.in_goal(pose[None])[0]:
++        self.last_pose = pose.copy()
++        if self.solved(pose):
+             self.last_cmd = None
+             return np.zeros(2)
++        if self.sub_active and self.in_goal(pose[None])[0]:
++            self.sub_active = False
++            self.tgt = self.real_tgt.copy()
++            self.mode = "plan"
+         a = self._act(pose, robot)
+         a = np.clip(np.asarray(a, float), -MAXD, MAXD)
+         self.last_cmd = a
+@@ -493,6 +545,16 @@ class GeneratedApproach:
+         for _ in range(4):
+             if self.mode == "plan":
+                 st, d, k, sc, c0, here = self.plan_push(pose, robot)
++                if sc < self.stuck_rate and not self.sub_active:
++                    sub = self.make_subgoal(pose)
++                    if sub is not None:
++                        self.sub_active = True
++                        self.tgt = sub
++                        st, d, k, sc, c0, here = self.plan_push(pose, robot)
++                elif sc < self.stuck_rate and self.sub_active:
++                    self.sub_active = False
++                    self.tgt = self.real_tgt.copy()
++                    st, d, k, sc, c0, here = self.plan_push(pose, robot)
+                 self.push = (st, d)
+                 self.push_left = min(k, self.replan_every)
+                 dn = d / np.linalg.norm(d)

@@ -1,0 +1,76 @@
+diff --git a/approach.py b/approach.py
+new file mode 100644
+index 0000000..7b387f0
+--- /dev/null
++++ b/approach.py
+@@ -0,0 +1,32 @@
++import math
++import numpy as np
++
++
++class GeneratedApproach:
++    """Fast reactive baseline: get behind the block and push its centre to goal."""
++
++    def __init__(self, action_space, observation_space, primitives):
++        self.low = np.asarray(action_space.low, dtype=float)
++        self.high = np.asarray(action_space.high, dtype=float)
++        self.step = 0
++
++    def reset(self, state, info):
++        self.step = 0
++
++    def get_action(self, state):
++        s = np.asarray(state, dtype=float)
++        block = s[0:2]
++        robot = s[16:18]
++        goal = s[29:31]
++        delta = goal - block
++        distance = float(np.linalg.norm(delta))
++        if distance < 1e-9:
++            direction = np.array([1.0, 0.0])
++        else:
++            direction = delta / distance
++        # Conservative clearance for the initial positioning phase.
++        staging = block - direction * 0.13
++        target = staging if np.linalg.norm(robot - staging) > 0.035 else block + direction * 0.08
++        move = np.clip(target - robot, self.low, self.high)
++        self.step += 1
++        return move.astype(float)
+diff --git a/test_approach.py b/test_approach.py
+new file mode 100644
+index 0000000..d107f07
+--- /dev/null
++++ b/test_approach.py
+@@ -0,0 +1,32 @@
++import argparse
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++
++
++def run(seed, verbose=False):
++    env = make_env()
++    obs, info = env.reset(seed=seed)
++    policy = GeneratedApproach(env.action_space, env.observation_space, env.make_primitives())
++    policy.reset(obs, info)
++    initial = obs.copy()
++    terminated = truncated = False
++    steps = 0
++    while not (terminated or truncated):
++        obs, reward, terminated, truncated, info = env.step(policy.get_action(obs))
++        steps += 1
++    poserr = float(np.linalg.norm(obs[:2] - obs[29:31]))
++    angerr = abs(float((obs[2] - obs[31] + np.pi) % (2*np.pi) - np.pi))
++    env.close()
++    if verbose:
++        print(seed, terminated, steps, "init", np.round(initial[[0,1,2,16,17,29,30,31]],3),
++              "finalerr", round(poserr,3), round(angerr,3))
++    return terminated, steps, poserr, angerr
++
++
++if __name__ == "__main__":
++    ap = argparse.ArgumentParser()
++    ap.add_argument("seeds", nargs="*", type=int, default=list(range(10)))
++    args = ap.parse_args()
++    results = [run(seed, True) for seed in args.seeds]
++    print("success", sum(x[0] for x in results), "/", len(results))

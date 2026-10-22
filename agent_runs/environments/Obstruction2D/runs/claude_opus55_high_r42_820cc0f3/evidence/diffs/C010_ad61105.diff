@@ -1,0 +1,86 @@
+diff --git a/approach.py b/approach.py
+index 4ca92f1..7e94b75 100644
+--- a/approach.py
++++ b/approach.py
+@@ -168,7 +168,7 @@ class GeneratedApproach:
+ 
+     def _grasp_x(self, b, others, rng=None, pref=None):
+         half = self.robot["gh"] / 2.0
+-        lo, hi = b["x"] + 0.006, b["x"] + b["w"] - 0.006
++        lo, hi = b["x"] + 0.012 - half, b["x"] + b["w"] - 0.012 + half
+         if rng is not None:
+             lo, hi = max(lo, rng[0]), min(hi, rng[1])
+         lo, hi = max(lo, X_MIN), min(hi, X_MAX)
+@@ -273,19 +273,27 @@ class GeneratedApproach:
+             lo = hi = center
+         best = None
+         for dx in np.linspace(lo, hi, 25):
+-            glo = max(0.006, X_MIN - dx, X_MIN - b["x"])
+-            ghi = min(b["w"] - 0.006, X_MAX - dx, X_MAX - b["x"])
++            half = self.robot["gh"] / 2.0
++            glo = max(0.012 - half, X_MIN - dx, X_MIN - b["x"])
++            ghi = min(b["w"] - 0.012 + half, X_MAX - dx, X_MAX - b["x"])
++            if ghi >= glo:
++                # prefer no gripper overhang
++                ilo, ihi = max(glo, half + 0.003), min(ghi, b["w"] - half - 0.003)
+             if ghi < glo:
+                 continue
+-            grel = min(max(b["w"] / 2, glo), ghi)
+-            nb = 0
+-            for o in self.obst.values():
+-                if self._column_hit(o, dest_x=dx, grel=grel):
+-                    reach = o["x"] + 0.006 <= X_MAX and o["x"] + o["w"] - 0.006 >= X_MIN
+-                    nb += 1 if reach else 100
+-            cost = nb * 100 + abs(dx - center) * 0.1
+-            if best is None or cost < best[0]:
+-                best = (cost, dx, grel)
++            if ilo <= ihi:
++                pref = min(max(b["w"] / 2, ilo), ihi)
++            else:
++                pref = min(max(b["w"] / 2, glo), ghi)
++            for grel in (pref, glo, ghi, 0.5 * (pref + glo), 0.5 * (pref + ghi)):
++                nb = 0
++                for o in self.obst.values():
++                    if self._column_hit(o, dest_x=dx, grel=grel):
++                        reach = o["x"] + 0.012 - half <= X_MAX and o["x"] + o["w"] - 0.012 + half >= X_MIN
++                        nb += 1 if reach else 100
++                cost = nb * 100 + abs(dx - center) * 0.1 + abs(grel - pref) * 0.5
++                if best is None or cost < best[0]:
++                    best = (cost, dx, grel)
+         if best is None:
+             return center, b["w"] / 2
+         return best[1], best[2]
+diff --git a/run_many.sh b/run_many.sh
+index 6f5ae4a..3ad5121 100755
+--- a/run_many.sh
++++ b/run_many.sh
+@@ -4,5 +4,5 @@ c=$1; s=$2; e=$3; p=$4
+ step=$(( (e - s + p - 1) / p ))
+ for ((i=s; i<e; i+=step)); do
+   j=$((i+step)); [ $j -gt $e ] && j=$e
+-  timeout 1500 /opt/robocode-strict/bin/python test_approach.py $i $j $c 2>&1 | grep -E "FAIL|success|Error" &
++  timeout 1500 /opt/robocode-strict/bin/python test_approach.py $i $j ${c/none/} 2>&1 | grep -E "FAIL|success|Error" &
+ done; wait
+diff --git a/scan.py b/scan.py
+new file mode 100644
+index 0000000..8f9d750
+--- /dev/null
++++ b/scan.py
+@@ -0,0 +1,17 @@
++import sys
++from env_client import make_env
++from approach import GeneratedApproach, X_MIN, X_MAX
++env = make_env()
++ap = GeneratedApproach(env.action_space, env.observation_space, {})
++s0,s1=int(sys.argv[1]),int(sys.argv[2]); c=int(sys.argv[3]) if len(sys.argv)>3 else None
++nb=nu=0
++for seed in range(s0,s1):
++    obs,info=env.reset(seed=seed, options=({'object_count':c} if c is not None else None))
++    ap.reset(obs,info); ap._parse(obs)
++    b=ap.block
++    reach=lambda o: o["x"] + 0.006 <= X_MAX and o["x"] + o["w"] - 0.006 >= X_MIN
++    if not reach(b): nb+=1; print('block unreachable', seed, b)
++    d,g=ap._choose_block_dest(); ap.block_dest, ap.block_grel = d,g
++    for o in ap.obst.values():
++        if ap._column_hit(o) and not reach(o): nu+=1; print('unreach blocker', seed, o)
++print('done', nb, nu)

@@ -1,0 +1,14 @@
+diff --git a/approach.py b/approach.py
+index 55e6e74..2d485cf 100644
+--- a/approach.py
++++ b/approach.py
+@@ -75,7 +75,8 @@ class GeneratedApproach:
+             k=self.task_i
+             # Keep edge drops distinct without extending beyond the arm's
+             # reliable descent band.
+-            self.dest=np.array([min(.22,.16+.03*k),-.36 if k%2==0 else .36])
++            lane=.36-.06*((k//2)%2)
++            self.dest=np.array([min(.22,.16+.03*k),-lane if k%2==0 else lane])
+             self.rest_z=.075+self._v(state,name,"half_extent_z")
+     def _held(self,s): return self._v(s,self.object_name,"grasp_active")>.5
+     def _feat(self,s):

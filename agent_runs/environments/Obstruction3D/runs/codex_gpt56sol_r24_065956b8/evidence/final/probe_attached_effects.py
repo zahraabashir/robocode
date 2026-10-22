@@ -1,0 +1,48 @@
+"""Use a held target as an observable proxy for end-effector motion."""
+
+import numpy as np
+from env_client import make_env
+
+
+Q_GRASP = np.array([
+    -.40352596, .61178776, -3.23371948, -2.0778396,
+    .1132004, -.45664564, 1.57079633,
+])
+
+
+def get(state, obj, feature):
+    return float(state.get(state.get_object_from_name(obj), feature))
+
+
+def object_pose(state):
+    return np.array([get(state, "target_block", "pose_" + f)
+                     for f in ("x", "y", "z", "qx", "qy", "qz", "qw")])
+
+
+def main():
+    env = make_env()
+    state, _ = env.reset(seed=0)
+    for _ in range(20):
+        robot = state.get_object_from_name("robot")
+        current = np.array([state.get(robot, "joint_" + str(i)) for i in range(1, 8)])
+        action = np.zeros(11, np.float32)
+        action[3:10] = np.clip(Q_GRASP - current, -.2, .2)
+        action[10] = 1
+        state, _, _, _, _ = env.step(action)
+        if np.max(np.abs(Q_GRASP - current)) < .01:
+            break
+    action = np.zeros(11, np.float32); action[10] = -1
+    state, _, _, _, _ = env.step(action)
+    print("attached", get(state, "robot", "grasp_active"), object_pose(state))
+    for index in range(10):
+        before = object_pose(state)
+        action = np.zeros(11, np.float32); action[index] = .05
+        state, _, _, _, _ = env.step(action)
+        print("action", index, "object_delta", object_pose(state) - before)
+        action[index] = -.05
+        state, _, _, _, _ = env.step(action)
+    env.close()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,121 @@
+diff --git a/approach.py b/approach.py
+index caa8a81..031ef40 100644
+--- a/approach.py
++++ b/approach.py
+@@ -127,6 +127,7 @@ class GeneratedApproach:
+     NAV_OVER = 3.0
+     LOOK = 10
+     GRIDNAV = True
++    CURVS = (0.0,)
+     def __init__(self, action_space, observation_space, primitives):
+         self.action_space = action_space
+         self.rng = np.random.default_rng(0)
+@@ -195,7 +196,7 @@ class GeneratedApproach:
+         et = np.abs(_wrap(th - self.goal[2])) / self.th_tol
+         return np.maximum(np.maximum(ex, ey), et)
+ 
+-    def _rollout(self, pos0, th0, rob0, steps_opts=None):
++    def _rollout(self, pos0, th0, rob0, steps_opts=None, curvs=(0.0,)):
+         """Evaluate all candidate pushes from block pose (pos0, th0), robot rob0.
+         Returns dict of arrays over (candidate x stepsize): score, start, a, k, pos, th, rob, cost."""
+         m = self.model
+@@ -218,6 +219,11 @@ class GeneratedApproach:
+         dstart = m.world_dist(np.repeat(pos0[None], len(starts), 0), np.full(len(starts), th0), starts)
+         ok &= (dstart > r + 0.02) | (np.arange(len(starts)) >= len(start))
+         starts, dirs = starts[ok], dirs[ok]
++        nc = len(curvs)
++        starts = np.tile(starts, (nc, 1))
++        dirs = np.tile(dirs, (nc, 1))
++        kap = np.repeat(np.asarray(curvs, float), len(starts) // nc)
++        ck, sk = np.cos(kap), np.sin(kap)
+         eu = np.linalg.norm(starts - rob0, axis=1)
+         if self.GRIDNAV:
+             g = NavGrid(m, pos0, th0, r + 0.015)
+@@ -246,7 +252,10 @@ class GeneratedApproach:
+             a = dirs * ss
+             out_a[si] = a
+             alive = np.ones(N, bool)
++            a = a.copy()
+             for k in range(1, self.KMAX + 1):
++                if k > 1 and nc > 1:
++                    a = np.stack([ck * a[:, 0] - sk * a[:, 1], sk * a[:, 0] + ck * a[:, 1]], 1)
+                 nrob = rob + a
+                 inb = (nrob[:, 0] >= LO) & (nrob[:, 0] <= HI) & (nrob[:, 1] >= LO) & (nrob[:, 1] <= HI)
+                 alive &= inb
+@@ -277,7 +286,7 @@ class GeneratedApproach:
+                     break
+         return dict(score=out_score.ravel(), k=out_k.ravel(), pos=out_pos.reshape(-1, 2),
+                     th=out_th.ravel(), rob=out_rob.reshape(-1, 2), cost=out_cost.ravel(),
+-                    a=out_a.reshape(-1, 2), start=np.tile(starts, (S, 1)),
++                    a=out_a.reshape(-1, 2), start=np.tile(starts, (S, 1)), kap=np.tile(kap, S),
+                     nav=np.tile(nav, S))
+ 
+     def _plan_push(self, obs):
+@@ -285,7 +294,7 @@ class GeneratedApproach:
+         th0 = float(obs[2])
+         rob0 = np.array(obs[16:18], float)
+         cost0 = float(self._cost(pos0, th0))
+-        R1 = self._rollout(pos0, th0, rob0)
++        R1 = self._rollout(pos0, th0, rob0, curvs=self.CURVS)
+         order = np.argsort(R1["score"])
+         i0 = int(order[0])
+         best_i = i0
+@@ -310,7 +319,7 @@ class GeneratedApproach:
+                     best_tot, best_i = tot, i
+         i = best_i
+         best = (float(R1["score"][i]), R1["start"][i].copy(), R1["a"][i].copy(), int(R1["k"][i]),
+-                float(R1["cost"][i]))
++                float(R1["cost"][i]), float(R1["kap"][i]))
+         return best, cost0
+ 
+     # ------------------------------------------------------------------
+@@ -467,11 +476,18 @@ class GeneratedApproach:
+             best, cost0 = self._plan_push(obs)
+             if best is None:
+                 return np.zeros(2)
+-            _, start, a, k, cst = best
++            _, start, a, k, cst, kap = best
+             acts = self._navigate(obs, start) if np.linalg.norm(start - obs[16:18]) > 1e-9 else []
+             self.expect_block = obs[0:3].copy()
+             self.nav_len = len(acts)
+-            self.plan = acts + [a.copy() for _ in range(k)]
++            pushes = []
++            ck, sk = math.cos(kap), math.sin(kap)
++            a = a.copy()
++            for j in range(k):
++                if j > 0:
++                    a = np.array([ck * a[0] - sk * a[1], sk * a[0] + ck * a[1]])
++                pushes.append(a.copy())
++            self.plan = acts + pushes
+         act = self.plan.pop(0)
+         if self.nav_len > 0:
+             self.nav_len -= 1
+diff --git a/breakdown2.py b/breakdown2.py
+new file mode 100644
+index 0000000..acfe59f
+--- /dev/null
++++ b/breakdown2.py
+@@ -0,0 +1,23 @@
++import numpy as np, sys, json
++from multiprocessing import Pool
++from env_client import make_env
++import approach
++params=json.loads(sys.argv[1]) if len(sys.argv)>1 else {}
++def run(seed):
++    for k,v in params.items(): setattr(approach.GeneratedApproach,k,v)
++    env=make_env(); obs,info=env.reset(seed=seed)
++    ap=approach.GeneratedApproach(None,None,{}); ap.reset(obs,info)
++    first=None; nav=0; push=0; small=0
++    for t in range(1000):
++        a=ap.get_action(obs)
++        obs2,r,term,trunc,_=env.step(a)
++        moved = np.abs(obs2[0:3]-obs[0:3]).max()>1e-6
++        if moved and first is None: first=t
++        if moved:
++            push+=1; small += np.abs(a).max()<0.03
++        else: nav+=1
++        obs=obs2
++        if term: break
++    return t+1, first, nav-first, push, small
++with Pool(10) as p: res=np.array(p.map(run, range(200,260)))
++print(params, "steps %.1f initial_nav %.1f later_nav %.1f push %.1f smallpush %.1f"%tuple(res.mean(0)))

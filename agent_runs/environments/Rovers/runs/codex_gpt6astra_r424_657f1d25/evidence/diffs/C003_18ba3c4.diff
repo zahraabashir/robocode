@@ -1,0 +1,24 @@
+diff --git a/probe_crosslos.py b/probe_crosslos.py
+new file mode 100644
+index 0000000..b227ce0
+--- /dev/null
++++ b/probe_crosslos.py
+@@ -0,0 +1,18 @@
++import numpy as np
++from env_client import make_env
++e=make_env();s,_=e.reset(seed=0);rs=[s.get_object_from_name('rover'+str(i)) for i in range(2)]
++def xy(i):return np.array([s.get(rs[i],f) for f in ('x','y')])
++def st(i,op=0,d=(0,0)):
++ global s
++ a=np.zeros(8,np.float32);a[4*i:4*i+2]=d;a[4*i+3]=op;s,*_=e.step(a)
++def go(i,p):
++ for t in range(40):
++  d=np.clip(np.array(p)-xy(i),-.2,.2)
++  if np.max(abs(d))<1e-5:return
++  old=xy(i);st(i,d=d)
++  if np.linalg.norm(xy(i)-old)<1e-5:print('blocked',old,p);return
++for p in [(-1.5,-.3),(-1.8,.8),(-1.1,1.2),(-.4,1.2)]:go(1,p)
++for j in range(5):
++ st(1,-.5);st(1,-1/6)
++ print('cross photos',xy(1),[(o.name,s.get(o,'have_image_rover1')) for o in s.get_objects(e.observation_space.get_type('objective'))])
++e.close()

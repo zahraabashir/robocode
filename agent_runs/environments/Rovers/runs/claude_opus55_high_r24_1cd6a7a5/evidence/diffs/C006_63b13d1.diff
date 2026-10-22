@@ -1,0 +1,27 @@
+diff --git a/approach.py b/approach.py
+index 21944a2..ac1cb1b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -388,12 +388,18 @@ class GeneratedApproach:
+         me = "rover%d" % i
+         holding = any(g(o, "have_image_" + me) > 0.5 and g(o, "received_image") < 0.5 for o in sc.objectives) or \
+             any(g(s, "analyzed_" + me) > 0.5 and g(s, "received_analysis") < 0.5 for s in sc.samples)
+-        if holding and k >= len(plan["path"]) - 1:
++        if holding:
+             v = p - sc.lpos
+             away = np.arctan2(v[1], v[0])
+-            # heading within the send cone (+-60 deg of away) closest to home heading
+-            dlt = float(np.clip(_wrap(self.home_th[i] - away), -np.radians(60), np.radians(60)))
+-            return away + dlt
++            th = g(sc.rovers[i], "theta")
++            hth = self.home_th[i]
++            best, bc = None, None
++            for c in np.linspace(-np.radians(60), np.radians(60), 25):
++                h = away + c
++                cost = abs(_wrap(h - th)) + abs(_wrap(hth - h)) + 0.01 * abs(_wrap(h - th))
++                if best is None or cost < best:
++                    best, bc = cost, h
++            return bc
+         return self.home_th[i]
+ 
+     def _rover_action(self, state, i):

@@ -1,0 +1,144 @@
+diff --git a/approach.py b/approach.py
+index 6841ad0..631df04 100644
+--- a/approach.py
++++ b/approach.py
+@@ -97,34 +97,38 @@ class GeneratedApproach:
+         return dict(name=o['name'], dx0=o['x0'] - r['x'], dx1=o['x1'] - r['x'],
+                     dy0=o['y0'] - r['y'], dy1=o['y1'] - r['y'])
+ 
+-    def _grasp_x(self, o, rects):
+-        """Choose robot x to grasp object o from above, minimizing needed height."""
++    def _grasp_xs(self, o, rects):
++        """Candidate robot x's to grasp object o from above, best first (only collision-free ones if any)."""
+         r = self.r
+         top = o['y1']
+-        cands = np.linspace(o['x0'] + 0.01, o['x1'] - 0.01, 15)
+-        best, bestv = None, None
++        cands = np.linspace(o['x0'] + 0.008, o['x1'] - 0.008, 21)
+         centre = (o['x0'] + o['x1']) / 2
++        out = []
+         for cx in cands:
+             if cx < WORLD_X[0] + r['R'] + 1e-3 or cx > WORLD_X[1] - r['R'] - 1e-3:
+                 continue
+             need = self._clear_y_at(cx, rects, None, ARM_MAX, exclude=(o['name'],))
+             goal = top + ARM_MAX + r['gw'] + self.grasp_eps
+             bad = max(0.0, need - goal)
+-            v = (round(bad, 4), abs(cx - centre))
+-            if bestv is None or v < bestv:
+-                best, bestv = cx, v
+-        if best is None:
+-            best = float(np.clip(centre, WORLD_X[0] + r['R'] + 1e-3, WORLD_X[1] - r['R'] - 1e-3))
+-        return best
++            out.append((round(bad, 4), abs(cx - centre), float(cx)))
++        out.sort()
++        if not out:
++            return [float(np.clip(centre, WORLD_X[0] + r['R'] + 1e-3, WORLD_X[1] - r['R'] - 1e-3))]
++        good = [c[2] for c in out if c[0] == 0]
++        return good if good else [out[0][2]]
++
++    def _grasp_x(self, o, rects):
++        return self._grasp_xs(o, rects)[0]
+ 
+     def _place_candidates_target(self, blk, surf, rects):
+-        """Return list of (n_blockers, cost, rx, ry, blockers)."""
++        """Return (list of (n_blockers, cost, rx, ry, blockers), held, gx, gy)."""
+         r = self.r
+-        gx = self._grasp_x(blk, rects)
+-        held = dict(name=blk['name'], dx0=blk['x0'] - gx, dx1=blk['x1'] - gx)
+-        gy = blk['y1'] + ARM_MAX + r['gw'] + self.grasp_eps
+-        held['dy0'] = blk['y0'] - gy
+-        held['dy1'] = blk['y1'] - gy
++        gxs = self._grasp_xs(blk, rects)
++        centre_g = (blk['x0'] + blk['x1']) / 2
++        # a handful of grasp offsets: best one, then spread
++        if len(gxs) > 5:
++            idx = np.linspace(0, len(gxs) - 1, 5).astype(int)
++            gxs = [gxs[0]] + [gxs[i] for i in idx]
+         bw = blk['x1'] - blk['x0']
+         m = 0.004
+         lo = surf['x0'] + m
+@@ -132,25 +136,40 @@ class GeneratedApproach:
+         if hi < lo:
+             lo = hi = (surf['x0'] + surf['x1']) / 2 - bw / 2
+         xs = np.linspace(lo, hi, max(2, int((hi - lo) / 0.004) + 2))
+-        bottom = surf['y1'] + 0.008
+-        ry = bottom - held['dy0']
+-        res = []
+         centre = (surf['x0'] + surf['x1']) / 2 - bw / 2
+-        for px in xs:
+-            rx = px - held['dx0']
+-            if rx < WORLD_X[0] + r['R'] + 1e-3 or rx > WORLD_X[1] - r['R'] - 1e-3:
+-                continue
+-            blockers = []
+-            for name, o in rects.items():
+-                if o['type'] == 'target_surface' or name == blk['name']:
++        best = None
++        others = [(n, o) for n, o in rects.items()
++                  if o['type'] != 'target_surface' and n != blk['name']]
++        for gi, gx in enumerate(gxs):
++            gy = blk['y1'] + ARM_MAX + r['gw'] + self.grasp_eps
++            held = dict(name=blk['name'], dx0=blk['x0'] - gx, dx1=blk['x1'] - gx,
++                        dy0=blk['y0'] - gy, dy1=blk['y1'] - gy)
++            bottom = surf['y1'] + 0.008
++            ry = bottom - held['dy0']
++            res = []
++            for px in xs:
++                rx = px - held['dx0']
++                if rx < WORLD_X[0] + r['R'] + 1e-3 or rx > WORLD_X[1] - r['R'] - 1e-3:
+                     continue
+-                need = self._clear_y_at(rx, {name: o}, held, ARM_MAX)
+-                if need > ry - 1e-4:
+-                    blockers.append(name)
+-            cost = abs(px - centre) * 0.1 + abs(rx - blk['x0'] + held['dx0']) * 0.0
+-            res.append((len(blockers), cost, rx, ry, blockers))
+-        res.sort(key=lambda t: (t[0], t[1]))
+-        return res, held, gx, gy
++                blockers = []
++                for name, o in others:
++                    need = self._clear_y_at(rx, {name: o}, held, ARM_MAX)
++                    if need > ry - 1e-4:
++                        blockers.append(name)
++                cost = abs(px - centre) * 0.1 + 0.001 * gi
++                res.append((len(blockers), cost, rx, ry, blockers))
++            if not res:
++                continue
++            res.sort(key=lambda t: (t[0], t[1]))
++            if best is None or (res[0][0], res[0][1]) < (best[0][0][0], best[0][0][1]):
++                best = (res, held, gx, gy)
++        if best is None:
++            gx = gxs[0]
++            gy = blk['y1'] + ARM_MAX + r['gw'] + self.grasp_eps
++            held = dict(name=blk['name'], dx0=blk['x0'] - gx, dx1=blk['x1'] - gx,
++                        dy0=blk['y0'] - gy, dy1=blk['y1'] - gy)
++            return [], held, gx, gy
++        return best
+ 
+     def _drop_spot(self, o, rects, surf, blk):
+         r = self.r
+diff --git a/dbg.py b/dbg.py
+new file mode 100644
+index 0000000..96529e2
+--- /dev/null
++++ b/dbg.py
+@@ -0,0 +1,21 @@
++import sys, time
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++seed=int(sys.argv[1]); opts = {'object_count': int(sys.argv[2])} if len(sys.argv)>2 else None
++env = make_env()
++ap = GeneratedApproach(env.action_space, env.observation_space, {})
++obs, info = env.reset(seed=seed, options=opts)
++print(info)
++ap.reset(obs, info)
++r,rects = ap._parse(obs)
++for k,v in sorted(rects.items()): print(k, {q: round(v[q],3) for q in ['x0','x1','y0','y1']})
++print('robot', r)
++tt=0
++for t in range(300):
++    t0=time.time(); a = ap.get_action(obs); tt+=time.time()-t0
++    obs, rew, term, trunc, _ = env.step(a)
++    rr,_ = ap._parse(obs)
++    if t<300 and (t%5==0 or ap.phase!='to_grasp'): print(t, ap.phase, ap.task['obj'], np.round(a,3), round(rr['x'],3), round(rr['y'],3), ap.stuck)
++    if term: print('done', t); break
++print('compute', tt)

@@ -1,0 +1,12 @@
+diff --git a/test_batch.py b/test_batch.py
+index 83fb6f6..74f8e72 100644
+--- a/test_batch.py
++++ b/test_batch.py
+@@ -19,6 +19,7 @@ def run(seed):
+   out=dict(seed=seed,count=count,done=d,steps=t+1,seconds=round(time.time()-st,3),policy_seconds=round(policy_seconds,4))
+   if not d:out['trace']=trace[-4:];out['state']={o.name:{f:s.get(o,f) for f in ('x','y','width','height')} for o in s.get_objects(p.ot)}
+   print(seed, "OK" if d else "FAIL", t+1, flush=True)
++  if not d:print(out,flush=True)
+   return out
+  except Exception as ex:return dict(seed=seed,count=count,error=str(ex))
+  finally:e.close()

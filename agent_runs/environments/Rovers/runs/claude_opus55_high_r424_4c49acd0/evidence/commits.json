@@ -1,0 +1,640 @@
+[
+  {
+    "id": "C001",
+    "commit": "8e3fd00f1bf0811683206feb4bde7e6c41be2fcf",
+    "parents": [],
+    "date": "2026-10-01T10:39:36+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".claude/settings.json",
+      ".claude/validate_sandbox.py",
+      ".gitignore",
+      "CLAUDE.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_8e3fd00.diff",
+    "diff_sha256": "54f80e48e7db7159c8058433fc3c1342c249c14ce505316e2c3d31cc5b3627c0",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "30855cc21299a16a785ac46c13ddfe16b20ca409",
+    "parents": [
+      "8e3fd00f1bf0811683206feb4bde7e6c41be2fcf"
+    ],
+    "date": "2026-10-01T10:57:09+02:00",
+    "title": "First planner approach: grid BFS fields, Held-Karp assignment, stage execution",
+    "files": [
+      "approach.py",
+      "dump.py",
+      "pA_dump.py",
+      "pA_lib.py",
+      "pA_t.py",
+      "pA_t2.py",
+      "pA_t3.py",
+      "pA_t4.py",
+      "pA_t5.py",
+      "pB_geo.py",
+      "pB_lib.py",
+      "pB_send.py",
+      "pB_send2.py",
+      "pB_size.py",
+      "pB_t1.py",
+      "pB_t10.py",
+      "pB_t11.py",
+      "pB_t12.py",
+      "pB_t13.py",
+      "pB_t2.py",
+      "pB_t3.py",
+      "pB_t4.json",
+      "pB_t4.py",
+      "pB_t5.py",
+      "pB_t6.py",
+      "pB_t7.py",
+      "pB_t8.py",
+      "pB_t8b.py",
+      "pB_t9.py",
+      "pB_wall.py",
+      "pC_d.py",
+      "pC_lib.py",
+      "pC_seeds.py",
+      "pC_t1.py",
+      "pC_t10.out",
+      "pC_t10.py",
+      "pC_t11.py",
+      "pC_t2.py",
+      "pC_t3.py",
+      "pC_t4.py",
+      "pC_t5.py",
+      "pC_t6.py",
+      "pC_t7.py",
+      "pC_t8.py",
+      "pC_t9.py",
+      "probe1.py",
+      "test_approach.py",
+      "util.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C002_30855cc.diff",
+    "diff_sha256": "e15086947356dd31f60a685e0a2fda6fe36a4f462b01826f880ffd60969655d3",
+    "events": [
+      {
+        "event": "E0524",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "0bdf4e8129abe02ef1ad8c8fbc331a8b919b2f11b5cb9b68ce55d4e03e9295ac",
+    "version": "evidence/versions/C002_30855cc_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "8e239e86ed1542c16fbaf814c942735ea57985d2",
+    "parents": [
+      "30855cc21299a16a785ac46c13ddfe16b20ca409"
+    ],
+    "date": "2026-10-01T11:01:21+02:00",
+    "title": "Simulation-based selection among top-K assignments",
+    "files": [
+      "approach.py",
+      "dbg.py",
+      "pD_dump.py",
+      "pD_lib.py",
+      "pD_scan.py",
+      "pD_t1.py",
+      "pD_t2.py",
+      "trace.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C003_8e239e8.diff",
+    "diff_sha256": "f0a3c2b7e5b298fe3fc87b174884be20030f7440dccfcbd588cdd2b83ed2dd77",
+    "events": [
+      {
+        "event": "E0620",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "95ce1ab8b87094507603c8e2af7a4b0e938b182924fc3ab15501455a6875609a",
+    "version": "evidence/versions/C003_8e239e8_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C004",
+    "commit": "475b86f4c9190c0697b78f6443fa434b7bb65d2b",
+    "parents": [
+      "8e239e86ed1542c16fbaf814c942735ea57985d2"
+    ],
+    "date": "2026-10-01T11:06:02+02:00",
+    "title": "Time-aware final send for rover0 avoiding rover1 occlusion (predicted trajectory)",
+    "files": [
+      "approach.py",
+      "pD_t3.out",
+      "pD_t3.py",
+      "timing.py"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C004_475b86f.diff",
+    "diff_sha256": "020f6fa0528be23e04e28ddc69a5ad9d4d60b6384fbe8cc427f1cb7526f141e6",
+    "events": [
+      {
+        "event": "E0699",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "d5c6281b73c886aaa0bc080271784d420070d762ee2a656eac45b3668846c2b6",
+    "version": "evidence/versions/C004_475b86f_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "6874d19a5130eee5db74217c40ee7aff1d0c0ee9",
+    "parents": [
+      "475b86f4c9190c0697b78f6443fa434b7bb65d2b"
+    ],
+    "date": "2026-10-01T11:08:39+02:00",
+    "title": "Choose non-occluding home cell for the other rover",
+    "files": [
+      "approach.py",
+      "batch.py",
+      "pC_t12.out",
+      "pC_t12.py",
+      "pD_t3.out",
+      "pD_t4.py"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C005_6874d19.diff",
+    "diff_sha256": "916e58f2ae1340889e4cd9f69e299472658737e26a5971d5960ef13e1363dee5",
+    "events": [
+      {
+        "event": "E0735",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "c2f652d6d5a543fe74c5805c805de470582a244189928e6fe6792b09f7ce51f6",
+    "version": "evidence/versions/C005_6874d19_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C006",
+    "commit": "c28c2fab68ed03055192b0fc6c36af00d058ab9e",
+    "parents": [
+      "6874d19a5130eee5db74217c40ee7aff1d0c0ee9"
+    ],
+    "date": "2026-10-01T11:23:23+02:00",
+    "title": "Tighter range margins, sample range 0.24, separate true-model constants",
+    "files": [
+      "approach.py",
+      "cache_states.py",
+      "offline.py",
+      "pD_scan2.py",
+      "pD_scan2_A.out",
+      "pD_scan2_B.out",
+      "pD_scan2_C.out",
+      "pD_t5.py",
+      "pD_t5_0.out",
+      "pD_t6.py",
+      "pD_time.py",
+      "pD_time2.py",
+      "states_0_200.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C006_c28c2fa.diff",
+    "diff_sha256": "eaacd39972e6ee4365d7d8eb1a10e2b6b2abde229a68f9cb4efeb5e270ed935a",
+    "events": [
+      {
+        "event": "E0897",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "def5b9f936bb4a371793a05f81e930519ea48138b13f38e899d518f8e70b3b7c",
+    "version": "evidence/versions/C006_c28c2fa_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "46855b7852a4bdd629dbc2e8c938531d7a8c0e73",
+    "parents": [
+      "c28c2fab68ed03055192b0fc6c36af00d058ab9e"
+    ],
+    "date": "2026-10-01T11:25:28+02:00",
+    "title": "14 candidates per region",
+    "files": [
+      "approach.py",
+      "real_batch1.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C007_46855b7.diff",
+    "diff_sha256": "d3f605f07580720ec3ad8876c09f1468cc5d204dea8430f9bd0c55f22df109b8",
+    "events": [
+      {
+        "event": "E0930",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1c4b41d5258a38f59bac8dd1d19dcd6f268012db0f1978f33ded21aa6dd63021",
+    "version": "evidence/versions/C007_46855b7_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C008",
+    "commit": "5fc545376ae437d7d77da719c4d6523066035409",
+    "parents": [
+      "46855b7852a4bdd629dbc2e8c938531d7a8c0e73"
+    ],
+    "date": "2026-10-01T11:29:09+02:00",
+    "title": "Layered DP over (stage, calibrated, store_full, sent) accounting for operator slots; LOS_ROVER 0.24",
+    "files": [
+      "approach.py",
+      "dbg2.py",
+      "simtrace.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C008_5fc5453.diff",
+    "diff_sha256": "451c46f95b69aff219f89e29ca93fb71a4bd738ee0254c918e67f3ff40bc4bf7",
+    "events": [
+      {
+        "event": "E0975",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "87dbc1b7e0b3f2bf4f17f0752083306c5063aa7df999f3a23d07c977594e2c1d",
+    "version": "evidence/versions/C008_5fc5453_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C009",
+    "commit": "657f53bac24674a36097724f04d6e70b8ef4d1d6",
+    "parents": [
+      "5fc545376ae437d7d77da719c4d6523066035409"
+    ],
+    "date": "2026-10-01T11:31:00+02:00",
+    "title": "Rounded-box pillar clearance, larger home disk",
+    "files": [
+      "approach.py",
+      "real_batch2.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C009_657f53b.diff",
+    "diff_sha256": "d244d3c50a9d84033506319ce4b98bb87fdb5a0fe12800d429caae39acaad8d0",
+    "events": [
+      {
+        "event": "E0996",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "f9dbbbab8173ad9fade3651c80027ede902bf26c258969ae27cbf75be67dcde0",
+    "version": "evidence/versions/C009_657f53b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C010",
+    "commit": "7e3dfe3e2b9ef25b0861a8bc87a2b984822ad795",
+    "parents": [
+      "657f53bac24674a36097724f04d6e70b8ef4d1d6"
+    ],
+    "date": "2026-10-01T11:34:17+02:00",
+    "title": "Stuck detection: mark rejected target cells",
+    "files": [
+      "a.txt",
+      "approach.py",
+      "b.txt",
+      "off3.txt",
+      "pE_d.py",
+      "pE_f.py",
+      "real_batch3.txt",
+      "st2.txt",
+      "tr2.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C010_7e3dfe3.diff",
+    "diff_sha256": "f63ebb7abbe0f5befcc4b80afd97736ccadab63c7e2d2a68c43fb6a2c1173534",
+    "events": [
+      {
+        "event": "E1059",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "0de0605302ff77730754ba530c971cbe9821293440cb17677b051077058cb4cf",
+    "version": "evidence/versions/C010_7e3dfe3_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C011",
+    "commit": "60d3a0d7ae714d3408fa4f059661923330ec16d8",
+    "parents": [
+      "7e3dfe3e2b9ef25b0861a8bc87a2b984822ad795"
+    ],
+    "date": "2026-10-01T11:53:00+02:00",
+    "title": "Image target: nearest not-held in-range objective ignoring occlusion (probe E finding)",
+    "files": [
+      "approach.py",
+      "approach_rot.py",
+      "offline_rot.py",
+      "pE_an.py",
+      "pE_an2.py",
+      "pE_an3.py",
+      "pE_col.py",
+      "pE_data.json",
+      "pE_data.py",
+      "pE_fit.py",
+      "pE_h.py",
+      "pE_lib.py",
+      "pE_rep.py",
+      "pE_s4.py",
+      "pE_scan.py",
+      "pE_scan2.py",
+      "pE_scan3.py",
+      "pE_search.py",
+      "pE_sel.py",
+      "pE_sel2.py",
+      "pE_sel3.py",
+      "pE_sel4.py",
+      "pE_t1.py",
+      "pE_t2.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C011_60d3a0d.diff",
+    "diff_sha256": "5f277a67ee796cfd943ce57e820f37dbb85ac4041638e794de60ce31975732e9",
+    "events": [
+      {
+        "event": "E1301",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "5ce65cb47ed8344d92812ed00567e191a95c0b76890797cd38ef7a93f49ec4b7",
+    "version": "evidence/versions/C011_60d3a0d_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C012",
+    "commit": "74919a75a372cd0089c9769ca29b2dddca502536",
+    "parents": [
+      "60d3a0d7ae714d3408fa4f059661923330ec16d8"
+    ],
+    "date": "2026-10-01T11:54:45+02:00",
+    "title": "Heading plan: choose per-rover heading (home or -pi/2) by simulation; rotate back for home; guard ops",
+    "files": [
+      "approach.py",
+      "real_batch4.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C012_74919a7.diff",
+    "diff_sha256": "a68062db4d9dcb50e58324360f8640d7a6ddbf28a48c7dab5496f29d218518c5",
+    "events": [
+      {
+        "event": "E1344",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "eebfb4606259be7dae7977ccbb30ac16693e93dd5426b5a3e946852107f52c5f",
+    "version": "evidence/versions/C012_74919a7_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C013",
+    "commit": "b88173bd6b7ed7917899a4676b1bceddfc91a322",
+    "parents": [
+      "74919a75a372cd0089c9769ca29b2dddca502536"
+    ],
+    "date": "2026-10-01T12:00:05+02:00",
+    "title": "Speed: point-field cache, fast state copy, sim early cutoff at best steps",
+    "files": [
+      "approach.py",
+      "p.out",
+      "prof81.py"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C013_b88173b.diff",
+    "diff_sha256": "eb5ce5bd75f367c0c6470f995ddde6df580463c2477295a28025c2c471687296",
+    "events": [
+      {
+        "event": "E1394",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "64e7f41630175ec999ad0be8f13be41c7e2d8fc4f521cab8e07be488262a9cef",
+    "version": "evidence/versions/C013_b88173b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C014",
+    "commit": "b180f3e85f8aa5397646ba00b21cf194a0479408",
+    "parents": [
+      "b88173bd6b7ed7917899a4676b1bceddfc91a322"
+    ],
+    "date": "2026-10-01T12:04:30+02:00",
+    "title": "Parametrize heading candidates (default -pi/2 only); offline HC env var",
+    "files": [
+      "approach.py",
+      "off_head.txt",
+      "offline.py",
+      "real_batch5.txt",
+      "real_batch6.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C014_b180f3e.diff",
+    "diff_sha256": "aabca67c2e277c0123103c057747e3a3332e5da7221e1068655bc76afa176bb6",
+    "events": [
+      {
+        "event": "E1422",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "f011ffcd8479c938aff80c254763046183b8d9c96688939774df05f4058c440f",
+    "version": "evidence/versions/C014_b180f3e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C015",
+    "commit": "c68a1d75dc10fbbbb5f978001f8a963fff35ff05",
+    "parents": [
+      "b180f3e85f8aa5397646ba00b21cf194a0479408"
+    ],
+    "date": "2026-10-01T12:35:20+02:00",
+    "title": "Heading-aware pillar collision (3-part rover footprint, pillar circumradius) in model, executor mask and rotation reduction",
+    "files": [
+      "approach.py",
+      "pF_A.txt",
+      "pF_B.txt",
+      "pF_C.txt",
+      "pF_bnd.py",
+      "pF_bnd1.txt",
+      "pF_bnd2.txt",
+      "pF_find.py",
+      "pF_fit.py",
+      "pF_lib.py",
+      "pF_meas.py",
+      "pF_model.py",
+      "pF_out_A.json",
+      "pF_out_B.json",
+      "pF_out_C.json",
+      "pF_pf0.txt",
+      "pF_pf45.txt",
+      "pF_pr0.txt",
+      "pF_prof.py",
+      "pF_prof_f0.json",
+      "pF_prof_f45.json",
+      "pF_prof_r0.json",
+      "pF_prof_s0.json",
+      "pF_prof_x45.json",
+      "pF_ps0.txt",
+      "pF_px45.txt",
+      "pF_t1.py",
+      "pF_t1b.py",
+      "pF_t1c.py",
+      "pF_worst.py",
+      "real_batch6.txt",
+      "st78.txt",
+      "tr78.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C015_c68a1d7.diff",
+    "diff_sha256": "c9a9f1f31454402a1044283b3130998518b20da47393e2fc21f482b1303da4eb",
+    "events": [
+      {
+        "event": "E1650",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "af7c4176a7156a755fc82a3cff8a4c0b76601b08871a2690ecb39aa564a6f3ba",
+    "version": "evidence/versions/C015_c68a1d7_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C016",
+    "commit": "c9b7f8ea9191dc05dc3b1ff70cfd08a09a848d35",
+    "parents": [
+      "c68a1d75dc10fbbbb5f978001f8a963fff35ff05"
+    ],
+    "date": "2026-10-01T12:43:07+02:00",
+    "title": "Fast scalar pillar check; adaptive time cutoff for heading combos",
+    "files": [
+      "approach.py",
+      "off_fp.txt",
+      "off_fp2.txt",
+      "p.out",
+      "prof81.py",
+      "tim.py"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C016_c9b7f8e.diff",
+    "diff_sha256": "b768cee021f0ad9b62a2ed29250b74b85135851ed2b95f2bcd0325e16855a12c",
+    "events": [
+      {
+        "event": "E1707",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "b8d2c1ede11e4d2630b1eef8852efc0e3728aae2319a80986e4a7f28d02ab4a9",
+    "version": "evidence/versions/C016_c9b7f8e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C017",
+    "commit": "ff66920573d4190a29dee40e68bf48fac945a1c7",
+    "parents": [
+      "c9b7f8ea9191dc05dc3b1ff70cfd08a09a848d35"
+    ],
+    "date": "2026-10-01T12:47:20+02:00",
+    "title": "Add object_count=4 test script and real batch results (all success, sim matches real)",
+    "files": [
+      "oc_test.py",
+      "real_batch7.txt",
+      "real_batch8.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C017_ff66920.diff",
+    "diff_sha256": "1544960f557c24770a2f542458fd4130667d8dc5f0ccfde4b4a60bb47e02fbb3",
+    "events": [
+      {
+        "event": "E1762",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  }
+]

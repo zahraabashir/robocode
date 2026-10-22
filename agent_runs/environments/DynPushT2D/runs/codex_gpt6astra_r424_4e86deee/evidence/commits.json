@@ -1,0 +1,922 @@
+[
+  {
+    "id": "C001",
+    "commit": "b69a66468e8c1f5464241060a931006c5f352121",
+    "parents": [],
+    "date": "2026-09-21T22:16:34+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".gitignore",
+      "AGENTS.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_b69a664.diff",
+    "diff_sha256": "e2053ea0053bb5f7d0e6db97528011aa368f8c25edabf9dfabe2b0deba284d8b",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "965ef36865a5d1017fe4f1fc915c18086840f45f",
+    "parents": [
+      "b69a66468e8c1f5464241060a931006c5f352121"
+    ],
+    "date": "2026-09-21T22:17:19+02:00",
+    "title": "Add geometry and robot kinematics probe",
+    "files": [
+      "probe_geometry.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C002_965ef36.diff",
+    "diff_sha256": "d2aabe761f39f52ff2acf4de9aa76b77be1313514c715468eee37ac899bd8489",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C003",
+    "commit": "621097a621bb72da11f01757d72b135d494b8f45",
+    "parents": [
+      "965ef36865a5d1017fe4f1fc915c18086840f45f"
+    ],
+    "date": "2026-09-21T22:17:28+02:00",
+    "title": "Use numpy actions in geometry probe",
+    "files": [
+      "probe_geometry.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C003_621097a.diff",
+    "diff_sha256": "47060887deec1d29063c430cb3ee1226069a484086f39bbe9780f6c5f5c65d06",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C004",
+    "commit": "09e84d7f6e5d89e4c91c940b2236e101ae452a54",
+    "parents": [
+      "621097a621bb72da11f01757d72b135d494b8f45"
+    ],
+    "date": "2026-09-21T22:17:33+02:00",
+    "title": "Keep probe actions inside numerical bounds",
+    "files": [
+      "probe_geometry.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C004_09e84d7.diff",
+    "diff_sha256": "bb695d23c10e53a78abb8cfc73db73f6c13ca81145ebd1e37f64cf8e2e9d4aac",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C005",
+    "commit": "5b8d76572f0def05b22159a6f27a9af43f01b045",
+    "parents": [
+      "09e84d7f6e5d89e4c91c940b2236e101ae452a54"
+    ],
+    "date": "2026-09-21T22:18:14+02:00",
+    "title": "Add initial feedback policy and live environment test harness",
+    "files": [
+      "approach.py",
+      "canonical_state.json",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C005_5b8d765.diff",
+    "diff_sha256": "8a1a94b9743d043ae4e4f96e56031d09db0bdeb62079548feecbd6c43a9bedfc",
+    "events": [
+      {
+        "event": "E0023",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "30d1d0b41a719dc1fa413cb0f153edc80088f63daae93fcd3b91cf8a634cdcf0",
+    "version": "evidence/versions/C005_5b8d765_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C006",
+    "commit": "56a563958df635eea2ad8f0963f404e5e9af37f6",
+    "parents": [
+      "5b8d76572f0def05b22159a6f27a9af43f01b045"
+    ],
+    "date": "2026-09-21T22:18:26+02:00",
+    "title": "Add independent radial contact dynamics probe",
+    "files": [
+      "probe_dynamics.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C006_56a5639.diff",
+    "diff_sha256": "2b4d25d9dbc25a75a486251640470124389f5c056748efaa1cacb5eb8c76e0be",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C007",
+    "commit": "35f168d352c721bb384494b3ea973d0449c68abf",
+    "parents": [
+      "56a563958df635eea2ad8f0963f404e5e9af37f6"
+    ],
+    "date": "2026-09-21T22:18:56+02:00",
+    "title": "Probe centered and off-center pushes on known T surfaces",
+    "files": [
+      "probe_dynamics.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C007_35f168d.diff",
+    "diff_sha256": "3d1e30f6262ba7a5efd8ef3e71f1d259d5ef439bfd2645d1c1f396b8db7e97a5",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C008",
+    "commit": "74a76d26ac2b1ad0373853a0bfbb015af1dac943",
+    "parents": [
+      "35f168d352c721bb384494b3ea973d0449c68abf"
+    ],
+    "date": "2026-09-21T22:19:40+02:00",
+    "title": "Implement geometry-aware contact selection and obstacle routing",
+    "files": [
+      "approach.py",
+      "dynamics_results.json",
+      "dynamics_stdout.jsonl"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C008_74a76d2.diff",
+    "diff_sha256": "6d5a4393ea4e1908c4f2e8e376f218a308cc1e397bc409d4fddb223f5cdcc4cf",
+    "events": [
+      {
+        "event": "E0026",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "f9cabc44efb018fff2e17890bcbaeb56eb5d3b1e07601359cfb876204b61b2d3",
+    "version": "evidence/versions/C008_74a76d2_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C009",
+    "commit": "75504aa3ac726e8f74ff57efe58f1aefdb2c3233",
+    "parents": [
+      "74a76d26ac2b1ad0373853a0bfbb015af1dac943"
+    ],
+    "date": "2026-09-21T22:20:21+02:00",
+    "title": "Add oblique contact friction probe and save empirical dynamics",
+    "files": [
+      "probe_friction.py",
+      "trace_0.json",
+      "trace_1.json",
+      "trace_2.json",
+      "trace_3.json",
+      "trace_4.json"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C009_75504aa.diff",
+    "diff_sha256": "4f398c145a32980ed5e965e79d0df07e85a4fb4e65ea3a27dc370f82bb79de78",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C010",
+    "commit": "1eb5ad8e6c49e27e928d88ea0538054c27e636d4",
+    "parents": [
+      "75504aa3ac726e8f74ff57efe58f1aefdb2c3233"
+    ],
+    "date": "2026-09-21T22:20:36+02:00",
+    "title": "Preserve navigation direction and calibrate rotational response from probes",
+    "files": [
+      "friction_results.json",
+      "friction_stdout.jsonl"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C010_1eb5ad8.diff",
+    "diff_sha256": "2a3087abef1c2e4e31112e85d82a7364d3bee840d3ceb14267ad3c5f90bda04b",
+    "events": [
+      {
+        "event": "E0035",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C011",
+    "commit": "17985b10b12ef2c1f2394827e403e5c11d451062",
+    "parents": [
+      "1eb5ad8e6c49e27e928d88ea0538054c27e636d4"
+    ],
+    "date": "2026-09-21T22:20:50+02:00",
+    "title": "Fix clipped navigation vectors and use measured moment model",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C011_17985b1.diff",
+    "diff_sha256": "d49d74701080ddc84d000f8705135de077d1a6f65e596ebf4436ddd2e3ce6818",
+    "events": [
+      {
+        "event": "E0039",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "cf1aa2941fab3b5298a893c1ffa57494df61d6f5114964864b00ae41f9a22196",
+    "version": "evidence/versions/C011_17985b1_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C012",
+    "commit": "b39808d55dc172b04e0ea9c2d26daba0a1cbeb22",
+    "parents": [
+      "17985b10b12ef2c1f2394827e403e5c11d451062"
+    ],
+    "date": "2026-09-21T22:21:31+02:00",
+    "title": "Exclude unreachable contacts near the concave T corners",
+    "files": [
+      "approach.py",
+      "trace_0.json",
+      "trace_1.json",
+      "trace_2.json",
+      "trace_3.json",
+      "trace_4.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C012_b39808d.diff",
+    "diff_sha256": "d07885dae7cb5152ee34db9d69cfd6d3ac852f8baa1db8045d85ddfe47bfaa2b",
+    "events": [
+      {
+        "event": "E0042",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "396abaffc6daf356e6f0dbf7dcdbe4488ea2355f424f1beabbcbd63d211da6b2",
+    "version": "evidence/versions/C012_b39808d_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C013",
+    "commit": "86f9508eb119cff4f6f04a1ea53ac56a42a10f0b",
+    "parents": [
+      "b39808d55dc172b04e0ea9c2d26daba0a1cbeb22"
+    ],
+    "date": "2026-09-21T22:22:12+02:00",
+    "title": "Use fitted sticking-contact dynamics and optimize angled pushes",
+    "files": [
+      "approach.py",
+      "trace_0.json",
+      "trace_1.json",
+      "trace_3.json",
+      "trace_4.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C013_86f9508.diff",
+    "diff_sha256": "05fab022b0067d43a0736d38bc0b8941583e0bfcde005390ec74bddc1c0d2fc5",
+    "events": [
+      {
+        "event": "E0045",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "2920c2661ee2d3b2c475f3cf2af1dca6de62ec191616ae961eab58449b16e03e",
+    "version": "evidence/versions/C013_86f9508_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C014",
+    "commit": "e9812bd50b92a0152c40a22c8f3843b74ef54649",
+    "parents": [
+      "86f9508eb119cff4f6f04a1ea53ac56a42a10f0b"
+    ],
+    "date": "2026-09-21T22:22:52+02:00",
+    "title": "Add independent fifty-seed policy validation",
+    "files": [
+      "validation_geometry.py"
+    ],
+    "file_roles": [
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C014_e9812bd.diff",
+    "diff_sha256": "5816e91b72b61dcc57c1a90d21c9c49b0e0ba1310b6f8fd64789b0b59d2270c1",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C015",
+    "commit": "ac0cc653f7b3d94d588001d926efc477190514db",
+    "parents": [
+      "e9812bd50b92a0152c40a22c8f3843b74ef54649"
+    ],
+    "date": "2026-09-21T22:22:58+02:00",
+    "title": "Add independent validation of fifty unseen seeds",
+    "files": [
+      "geometry_fail_100.json",
+      "trace_0.json",
+      "trace_1.json",
+      "trace_10.json",
+      "trace_11.json",
+      "trace_12.json",
+      "trace_13.json",
+      "trace_14.json",
+      "trace_15.json",
+      "trace_16.json",
+      "trace_17.json",
+      "trace_18.json",
+      "trace_19.json",
+      "trace_2.json",
+      "trace_20.json",
+      "trace_21.json",
+      "trace_22.json",
+      "trace_23.json",
+      "trace_24.json",
+      "trace_25.json",
+      "trace_26.json",
+      "trace_27.json",
+      "trace_28.json",
+      "trace_29.json",
+      "trace_3.json",
+      "trace_30.json",
+      "trace_31.json",
+      "trace_32.json",
+      "trace_4.json",
+      "trace_5.json",
+      "trace_6.json",
+      "trace_7.json",
+      "trace_8.json",
+      "trace_9.json",
+      "validation_dynamics.py",
+      "validation_geometry.log",
+      "validation_main.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C015_ac0cc65.diff",
+    "diff_sha256": "323bb2b1e562e8017f61761c9e5b03e21d801e85fce879d608c3a7a7bb46f4c8",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C016",
+    "commit": "ccfe8758c36ceb66b157ed33fc0b79368c044d55",
+    "parents": [
+      "ac0cc653f7b3d94d588001d926efc477190514db"
+    ],
+    "date": "2026-09-21T22:24:43+02:00",
+    "title": "Track actual contacts and reject wall-isolated navigation targets",
+    "files": [
+      "approach.py",
+      "geometry_fail_122.json",
+      "geometry_fail_144.json",
+      "geometry_fail_148.json",
+      "patch_policy.py",
+      "trace_33.json",
+      "trace_34.json",
+      "trace_35.json",
+      "trace_36.json",
+      "trace_37.json",
+      "trace_38.json",
+      "trace_39.json",
+      "trace_40.json",
+      "trace_41.json",
+      "trace_42.json",
+      "trace_43.json",
+      "trace_44.json",
+      "trace_45.json",
+      "trace_46.json",
+      "trace_47.json",
+      "trace_48.json",
+      "trace_49.json",
+      "trace_50.json",
+      "trace_51.json",
+      "trace_52.json",
+      "trace_53.json",
+      "trace_54.json",
+      "trace_55.json",
+      "trace_56.json",
+      "trace_57.json",
+      "trace_58.json",
+      "trace_59.json",
+      "validation_dynamics.log",
+      "validation_dynamics_failure_215.json",
+      "validation_dynamics_failure_216.json",
+      "validation_dynamics_failure_234.json",
+      "validation_dynamics_failure_246.json",
+      "validation_dynamics_summary.json",
+      "validation_geometry.log",
+      "validation_geometry_results.json",
+      "validation_main.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C016_ccfe875.diff",
+    "diff_sha256": "4d5347dd4b72f5ff1545a58516e7dbff87b89ae9594fc68ebbc59b1ec7762e72",
+    "events": [
+      {
+        "event": "E0057",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "acd2f28e7fd97cd58c2e752f46b3299c46e98e4986f9efd4e729e48d6ac7da39",
+    "version": "evidence/versions/C016_ccfe875_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C017",
+    "commit": "487ebdb85fca585845a8326eff1af03037e824f0",
+    "parents": [
+      "ccfe8758c36ceb66b157ed33fc0b79368c044d55"
+    ],
+    "date": "2026-09-21T22:25:14+02:00",
+    "title": "Keep robot action endpoints inside arena bounds",
+    "files": [
+      "approach.py",
+      "trace_0.json",
+      "trace_1.json",
+      "trace_100.json",
+      "trace_2.json",
+      "trace_206.json",
+      "trace_215.json",
+      "trace_3.json",
+      "trace_4.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C017_487ebdb.diff",
+    "diff_sha256": "045e1e4ca30a7361c29a49907a129a44859d101299f5e66cdc43be3ca197c816",
+    "events": [
+      {
+        "event": "E0066",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1a774ce684dcccc70a8e987a312a59142fdc97e30c84d819520b3e971613d70e",
+    "version": "evidence/versions/C017_487ebdb_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C018",
+    "commit": "75de3c221b4b6f26d3988017af08f764f64c8162",
+    "parents": [
+      "487ebdb85fca585845a8326eff1af03037e824f0"
+    ],
+    "date": "2026-09-21T22:26:07+02:00",
+    "title": "Keep sampled contact points away from short-edge corners",
+    "files": [
+      "approach.py",
+      "trace_122.json",
+      "trace_144.json",
+      "trace_148.json",
+      "trace_216.json",
+      "trace_234.json",
+      "trace_246.json",
+      "trace_35.json",
+      "trace_60.json",
+      "trace_61.json",
+      "trace_62.json",
+      "trace_63.json",
+      "trace_64.json",
+      "trace_65.json",
+      "trace_66.json",
+      "trace_67.json",
+      "trace_68.json",
+      "trace_69.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C018_75de3c2.diff",
+    "diff_sha256": "319c3e2a6be0c6422a6ec470b771767b02260c35e094c4304a9b21bfe8e9e640",
+    "events": [
+      {
+        "event": "E0068",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "c6079aeb013dd225914623cafa6b3beb6ea1f98d663b18b603b5a63a4b4b749e",
+    "version": "evidence/versions/C018_75de3c2_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C019",
+    "commit": "8c5a3e484fa7414ad7541d09c01d83ac086e6985",
+    "parents": [
+      "75de3c221b4b6f26d3988017af08f764f64c8162"
+    ],
+    "date": "2026-09-21T22:26:30+02:00",
+    "title": "Validate updated contact controller on one hundred seeds",
+    "files": [
+      "validation_geometry_v2.py"
+    ],
+    "file_roles": [
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C019_8c5a3e4.diff",
+    "diff_sha256": "37268844e269adf98be9bf1732014a071b1e3ca71edb17676c330fb5a4eb27d6",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C020",
+    "commit": "277a64a44590551912c8a0901b95fd02480f11be",
+    "parents": [
+      "8c5a3e484fa7414ad7541d09c01d83ac086e6985"
+    ],
+    "date": "2026-09-21T22:26:50+02:00",
+    "title": "Validate corrected contact controller on one hundred seeds",
+    "files": [
+      "trace_0.json",
+      "trace_1.json",
+      "trace_10.json",
+      "trace_11.json",
+      "trace_12.json",
+      "trace_122.json",
+      "trace_13.json",
+      "trace_14.json",
+      "trace_144.json",
+      "trace_148.json",
+      "trace_15.json",
+      "trace_2.json",
+      "trace_216.json",
+      "trace_234.json",
+      "trace_246.json",
+      "trace_3.json",
+      "trace_35.json",
+      "trace_4.json",
+      "trace_5.json",
+      "trace_6.json",
+      "trace_7.json",
+      "trace_8.json",
+      "trace_9.json",
+      "validation_dynamics_v2.py",
+      "validation_geometry_v2.log",
+      "validation_main_v2.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C020_277a64a.diff",
+    "diff_sha256": "e0daee8a124682c21c51e6664d7e22d4179560e8c3bbf10258d300f105526ec1",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C021",
+    "commit": "79d040138201f96f52ad2f729a0877716dbc6e2e",
+    "parents": [
+      "277a64a44590551912c8a0901b95fd02480f11be"
+    ],
+    "date": "2026-09-21T22:27:26+02:00",
+    "title": "Ignore generated validation traces and logs",
+    "files": [
+      ".gitignore"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C021_79d0401.diff",
+    "diff_sha256": "7c2c4560d153ebbeebdde1a0a440c05934b027c6c255bebf08b6b811bf363c22",
+    "events": [
+      {
+        "event": "E0079",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C022",
+    "commit": "4ed519a67512a92e4720b5eb4520137d4c3e6dd1",
+    "parents": [
+      "79d040138201f96f52ad2f729a0877716dbc6e2e"
+    ],
+    "date": "2026-09-21T22:28:59+02:00",
+    "title": "Add compact large-batch validation with failure-only diagnostics",
+    "files": [
+      "test_batch.py",
+      "trace_16.json",
+      "trace_17.json",
+      "trace_18.json",
+      "trace_19.json",
+      "trace_20.json",
+      "trace_21.json",
+      "trace_22.json",
+      "trace_23.json",
+      "trace_24.json",
+      "trace_25.json",
+      "trace_26.json",
+      "trace_27.json",
+      "trace_28.json",
+      "trace_29.json",
+      "trace_30.json",
+      "trace_31.json",
+      "trace_32.json",
+      "trace_33.json",
+      "trace_34.json",
+      "trace_36.json",
+      "trace_37.json",
+      "trace_38.json",
+      "trace_39.json",
+      "trace_40.json",
+      "trace_41.json",
+      "trace_42.json",
+      "trace_43.json",
+      "trace_44.json",
+      "trace_45.json",
+      "trace_46.json",
+      "trace_47.json",
+      "trace_48.json",
+      "trace_49.json",
+      "trace_50.json",
+      "trace_51.json",
+      "trace_52.json",
+      "trace_53.json",
+      "trace_54.json",
+      "trace_55.json",
+      "trace_56.json",
+      "trace_57.json",
+      "trace_58.json",
+      "trace_59.json",
+      "trace_60.json",
+      "trace_61.json",
+      "trace_62.json",
+      "trace_63.json",
+      "trace_64.json",
+      "trace_65.json",
+      "trace_66.json",
+      "trace_67.json",
+      "trace_68.json",
+      "trace_69.json",
+      "validation_geometry_v2.log",
+      "validation_geometry_v2_results.json",
+      "validation_main_v2.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C022_4ed519a.diff",
+    "diff_sha256": "8883ff03009aeaf22c8190844ac976d5c47f3b685eddf5bc766d03b58f816224",
+    "events": [
+      {
+        "event": "E0089",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C023",
+    "commit": "945163a3260536c08592f01b9702da2b59409c87",
+    "parents": [
+      "4ed519a67512a92e4720b5eb4520137d4c3e6dd1"
+    ],
+    "date": "2026-09-21T22:31:13+02:00",
+    "title": "Constrain pushes near walls and center contacts on short faces",
+    "files": [
+      "approach.py",
+      "approach_v2.py",
+      "patch_walls.py",
+      "validation_dynamics_v2_summary.json"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C023_945163a.diff",
+    "diff_sha256": "50fc14fde432c2acccdf2cb9f0246e68e83aa5175e1948d356e82ab1bbe95909",
+    "events": [
+      {
+        "event": "E0101",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "5ff412f83da516eb33083d3eb07b1f061d0c88e603cdb2f9b021648e7b798a15",
+    "version": "evidence/versions/C023_945163a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C024",
+    "commit": "d11f3752c1abd7e234522438f8f6dfa5ad417be4",
+    "parents": [
+      "945163a3260536c08592f01b9702da2b59409c87"
+    ],
+    "date": "2026-09-21T22:33:51+02:00",
+    "title": "Adapt wall clearance to valid goals close to arena edges",
+    "files": [
+      "approach.py",
+      "trace_0.json",
+      "trace_122.json",
+      "trace_144.json",
+      "trace_234.json",
+      "trace_246.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C024_d11f375.diff",
+    "diff_sha256": "0cc9ab4066fe1375226fc9ba7811cfa7eab6725f8ab6f45affbd2c12e60887b2",
+    "events": [
+      {
+        "event": "E0119",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1ea4e922e582d867c6d6a7426a35dbd8aa8922d91fb47cac3152e21e56174f8d",
+    "version": "evidence/versions/C024_d11f375_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C025",
+    "commit": "c829e462f4527ab4b9716da3fcc5a1958aadf0e5",
+    "parents": [
+      "d11f3752c1abd7e234522438f8f6dfa5ad417be4"
+    ],
+    "date": "2026-09-21T22:37:40+02:00",
+    "title": "Remove obsolete policy backups and successful rollout snapshots",
+    "files": [
+      "approach_v2.py",
+      "canonical_state.json",
+      "dynamics_target516_summary.json",
+      "dynamics_v3_summary.json",
+      "geometry_v3_summary.json",
+      "main_v3_summary.json",
+      "main_v4_summary.json",
+      "patch_policy.py",
+      "patch_walls.py",
+      "trace_0.json",
+      "trace_1.json",
+      "trace_10.json",
+      "trace_100.json",
+      "trace_11.json",
+      "trace_12.json",
+      "trace_122.json",
+      "trace_13.json",
+      "trace_14.json",
+      "trace_144.json",
+      "trace_148.json",
+      "trace_15.json",
+      "trace_16.json",
+      "trace_17.json",
+      "trace_18.json",
+      "trace_19.json",
+      "trace_2.json",
+      "trace_20.json",
+      "trace_206.json",
+      "trace_21.json",
+      "trace_215.json",
+      "trace_216.json",
+      "trace_22.json",
+      "trace_23.json",
+      "trace_234.json",
+      "trace_24.json",
+      "trace_246.json",
+      "trace_25.json",
+      "trace_26.json",
+      "trace_27.json",
+      "trace_28.json",
+      "trace_29.json",
+      "trace_3.json",
+      "trace_30.json",
+      "trace_31.json",
+      "trace_32.json",
+      "trace_33.json",
+      "trace_34.json",
+      "trace_35.json",
+      "trace_36.json",
+      "trace_37.json",
+      "trace_38.json",
+      "trace_39.json",
+      "trace_4.json",
+      "trace_40.json",
+      "trace_41.json",
+      "trace_42.json",
+      "trace_43.json",
+      "trace_44.json",
+      "trace_45.json",
+      "trace_46.json",
+      "trace_47.json",
+      "trace_48.json",
+      "trace_49.json",
+      "trace_5.json",
+      "trace_50.json",
+      "trace_51.json",
+      "trace_52.json",
+      "trace_53.json",
+      "trace_54.json",
+      "trace_55.json",
+      "trace_56.json",
+      "trace_57.json",
+      "trace_58.json",
+      "trace_59.json",
+      "trace_6.json",
+      "trace_60.json",
+      "trace_61.json",
+      "trace_62.json",
+      "trace_63.json",
+      "trace_64.json",
+      "trace_65.json",
+      "trace_66.json",
+      "trace_67.json",
+      "trace_68.json",
+      "trace_69.json",
+      "trace_7.json",
+      "trace_8.json",
+      "trace_9.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C025_c829e46.diff",
+    "diff_sha256": "7b23d01ba5f6095008c646c766ea593e6954f05d981bd274a2990ac2c3a49f24",
+    "events": [
+      {
+        "event": "E0137",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C026",
+    "commit": "f187e282ec91e95453532024c60912b9a1e0286b",
+    "parents": [
+      "c829e462f4527ab4b9716da3fcc5a1958aadf0e5"
+    ],
+    "date": "2026-09-21T22:44:24+02:00",
+    "title": "Record final 1000-seed validation with zero failures",
+    "files": [
+      "dynamics_final_summary.json",
+      "geometry_final_summary.json",
+      "main_final_low_summary.json",
+      "main_final_summary.json",
+      "validation_summary.json"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C026_f187e28.diff",
+    "diff_sha256": "a4ae1420b59045e74f859d0af018d3194ad26071fc1166b931a2ff40635be61d",
+    "events": [
+      {
+        "event": "E0162",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  }
+]

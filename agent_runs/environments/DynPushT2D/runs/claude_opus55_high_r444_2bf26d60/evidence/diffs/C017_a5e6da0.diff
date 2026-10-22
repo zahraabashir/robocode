@@ -1,0 +1,44 @@
+diff --git a/approach.py b/approach.py
+index 8328960..c7575e8 100644
+--- a/approach.py
++++ b/approach.py
+@@ -180,6 +180,11 @@ class GeneratedApproach:
+         self.model = TModel(self.w, self.lh, self.lv)
+         self.sim = VModel(self.w, self.lh, self.lv)
+         self.goal = s[29:32].copy()
++        tol = math.radians(8) - 0.004
++        lo = max(self.goal[2] - tol, -math.pi)
++        hi = min(self.goal[2] + tol, math.pi)
++        self.gc = 0.5 * (lo + hi)   # centre of the valid (wrapped) angle interval
++        self.ghw = 0.5 * (hi - lo)
+         self.mode = "plan"
+         self.path = []
+         self.push = None
+@@ -192,14 +197,14 @@ class GeneratedApproach:
+     def cost(self, pose):
+         pose = np.atleast_2d(pose)
+         dp = pose[:, :2] - self.goal[:2]
+-        da = np.abs(pose[:, 2] - self.goal[2])
++        da = np.abs(wrap_arr(pose[:, 2] - self.gc))
+         if self.cost_mode == 1:
+             return np.sqrt(dp[:, 0] ** 2 + dp[:, 1] ** 2 + (self.wa * da) ** 2)
+         return np.hypot(dp[:, 0], dp[:, 1]) + self.wa * da
+ 
+     def solved(self, pose):
+         return (abs(pose[0] - self.goal[0]) < 0.03 and abs(pose[1] - self.goal[1]) < 0.03
+-                and abs(pose[2] - self.goal[2]) < math.radians(8))
++                and abs(wrap(pose[2] - self.gc)) < self.ghw)
+ 
+     # ------------------------------------------------------------------
+     def local_candidates(self, spacing, angs):
+@@ -332,8 +337,8 @@ class GeneratedApproach:
+ 
+     def in_goal(self, poses, frac=1.0):
+         dp = np.abs(poses[:, :2] - self.goal[:2])
+-        da = np.abs(poses[:, 2] - self.goal[2])
+-        return (dp[:, 0] < 0.03 * frac) & (dp[:, 1] < 0.03 * frac) & (da < math.radians(8) * frac)
++        da = np.abs(wrap_arr(poses[:, 2] - self.gc))
++        return (dp[:, 0] < 0.03 * frac) & (dp[:, 1] < 0.03 * frac) & (da < self.ghw * frac)
+ 
+     def _nodes(self, pose):
+         infl = self.infl

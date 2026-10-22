@@ -1,0 +1,698 @@
+[
+  {
+    "id": "C001",
+    "commit": "dc861b52bad675da4bbca31bbccc5db79c5bce08",
+    "parents": [],
+    "date": "2026-10-01T10:20:51+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".claude/settings.json",
+      ".claude/validate_sandbox.py",
+      ".gitignore",
+      "CLAUDE.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_dc861b5.diff",
+    "diff_sha256": "7074674d8ed2866f35a4d1c9b08a4789603a98d833e44e985a0ee9ad7bd256fb",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "6fd490bb568b26e35f424be4251c0dd08ed71e2b",
+    "parents": [
+      "dc861b52bad675da4bbca31bbccc5db79c5bce08"
+    ],
+    "date": "2026-10-01T10:33:36+02:00",
+    "title": "Initial lattice+subset-DP planner approach",
+    "files": [
+      "approach.py",
+      "probe.py",
+      "probe_motion_1.py",
+      "probe_motion_2.py",
+      "probe_motion_3.py",
+      "probe_motion_4.py",
+      "probe_motion_5.py",
+      "probe_motion_6.py",
+      "probe_motion_lib.py",
+      "probe_ops_1.py",
+      "probe_ops_10.py",
+      "probe_ops_11.py",
+      "probe_ops_12.py",
+      "probe_ops_13.py",
+      "probe_ops_14.py",
+      "probe_ops_15.py",
+      "probe_ops_16.py",
+      "probe_ops_17.py",
+      "probe_ops_18.py",
+      "probe_ops_2.py",
+      "probe_ops_3.py",
+      "probe_ops_4.py",
+      "probe_ops_5.py",
+      "probe_ops_6.py",
+      "probe_ops_7.py",
+      "probe_ops_8.py",
+      "probe_ops_9.py",
+      "probe_ops_layout.py",
+      "probe_ops_lib.py",
+      "probe_order.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C002_6fd490b.diff",
+    "diff_sha256": "1ffa1cda4a5323cc267e47eca24af206a476d046db342114a7d3903d82af3d83",
+    "events": [
+      {
+        "event": "E0255",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "78d7d0d85bfb16f94a5e80642e4be9f82222af9e84d741db362a9c4102670c5e",
+    "version": "evidence/versions/C002_6fd490b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "8832f94b338244b74be1135de4f7938ea705af57",
+    "parents": [
+      "6fd490bb568b26e35f424be4251c0dd08ed71e2b"
+    ],
+    "date": "2026-10-01T10:35:22+02:00",
+    "title": "Conservative image radius 1.85; all 8 seeds solved",
+    "files": [
+      "approach.py",
+      "dbg.py",
+      "probe_img.py",
+      "probe_img2.py",
+      "probe_vis_0.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C003_8832f94.diff",
+    "diff_sha256": "d263f74ebf4f788a21c51de66aef75cc32d5485b6c8fed2f824b5b8d8d6e6d3d",
+    "events": [
+      {
+        "event": "E0299",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "b41389a01603f2baf3319e9f82c98a90b40e8d82ec3b971ff48dd2c193df004a",
+    "version": "evidence/versions/C003_8832f94_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C004",
+    "commit": "4351d31ae2a09db536407d6f1ffb5525ffc7b5ab",
+    "parents": [
+      "8832f94b338244b74be1135de4f7938ea705af57"
+    ],
+    "date": "2026-10-01T11:03:51+02:00",
+    "title": "Heading control (face away from target), exact camera visibility model, send LOS model",
+    "files": [
+      "approach.py",
+      "dbg.py",
+      "eval_many.py",
+      "probe_s21.py",
+      "probe_send_0.py",
+      "probe_send_1.py",
+      "probe_send_10.py",
+      "probe_send_11.py",
+      "probe_send_12.py",
+      "probe_send_13.py",
+      "probe_send_14.py",
+      "probe_send_15.py",
+      "probe_send_16.py",
+      "probe_send_17.py",
+      "probe_send_2.py",
+      "probe_send_3.py",
+      "probe_send_4.py",
+      "probe_send_5.py",
+      "probe_send_6.py",
+      "probe_send_7.py",
+      "probe_send_8.py",
+      "probe_send_9.py",
+      "probe_send_lib.py",
+      "probe_vis_1.py",
+      "probe_vis_10.py",
+      "probe_vis_11.py",
+      "probe_vis_12.py",
+      "probe_vis_13.py",
+      "probe_vis_14.py",
+      "probe_vis_15.py",
+      "probe_vis_16.py",
+      "probe_vis_2.py",
+      "probe_vis_3.py",
+      "probe_vis_4.py",
+      "probe_vis_5.py",
+      "probe_vis_6.py",
+      "probe_vis_7.py",
+      "probe_vis_8.py",
+      "probe_vis_9.py",
+      "probe_vis_data_r0_-90.json",
+      "probe_vis_data_r0_0.json",
+      "probe_vis_data_r0_180.json",
+      "probe_vis_data_r0_90.json",
+      "probe_vis_data_row_1.8.json",
+      "probe_vis_fit.py",
+      "probe_vis_fit2.py",
+      "probe_vis_fit3.py",
+      "probe_vis_geo.py",
+      "probe_vis_geo2.py",
+      "probe_vis_lib.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C004_4351d31.diff",
+    "diff_sha256": "88a95b86548e819c39e6d48d253298aa0bc6c20af024b6602f388f3ba6e89693",
+    "events": [
+      {
+        "event": "E0803",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "17126ba6083e476f35e35179c0b46c4cbfb299033ef936173bbb702ff20cc906",
+    "version": "evidence/versions/C004_4351d31_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "f480a81455d49199342c0f6a136d5cc611ab8985",
+    "parents": [
+      "4351d31ae2a09db536407d6f1ffb5525ffc7b5ab"
+    ],
+    "date": "2026-10-01T11:07:35+02:00",
+    "title": "Return to home heading (at_home needs theta), send cone fallback",
+    "files": [
+      "approach.py",
+      "dbg2.py",
+      "probe_home.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C005_f480a81.diff",
+    "diff_sha256": "15058e654f07090747d069261f8d03ed6565d5c676da4a8cb0e01d14a7755252",
+    "events": [
+      {
+        "event": "E0827",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "13f6b84c1a431b97094c469c8aa92a4052eb66d3efbdadd4b708195632efcc9e",
+    "version": "evidence/versions/C005_f480a81_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C006",
+    "commit": "63b13d162448a8061f4438aa35dc0f37bdc35b81",
+    "parents": [
+      "f480a81455d49199342c0f6a136d5cc611ab8985"
+    ],
+    "date": "2026-10-01T11:08:49+02:00",
+    "title": "Send-cone heading chosen to minimise total rotation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C006_63b13d1.diff",
+    "diff_sha256": "ab999b1849f3be32eca4c46da7198738f1a6b0706ad05453fb5c6b62271d5e36",
+    "events": [
+      {
+        "event": "E0839",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "19ffc49f9df9757821e20039820f163b61f3f5a9aa49836319477ce0a8acab42",
+    "version": "evidence/versions/C006_63b13d1_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "6945310af04ec102ffc25767a20a168086a7c004",
+    "parents": [
+      "63b13d162448a8061f4438aa35dc0f37bdc35b81"
+    ],
+    "date": "2026-10-01T11:10:36+02:00",
+    "title": "Send whenever possible; keep home heading if future LOS send is predicted",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C007_6945310.diff",
+    "diff_sha256": "124a3a256e0d15cf85d2e797120c0f95a2d451e3c2658be4964577165bc315e1",
+    "events": [
+      {
+        "event": "E0850",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "ee7479195f5a46da0c2813536ac994aa967aa30b9d05363724b370b371d8210a",
+    "version": "evidence/versions/C007_6945310_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C008",
+    "commit": "340d14811a3f9f90c5f06ff9c8c1876a43250d83",
+    "parents": [
+      "6945310af04ec102ffc25767a20a168086a7c004"
+    ],
+    "date": "2026-10-01T11:14:14+02:00",
+    "title": "approach2: time-expanded BFS planner (wip)",
+    "files": [
+      "approach2.py",
+      "eval_many.py"
+    ],
+    "file_roles": [
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C008_340d148.diff",
+    "diff_sha256": "5e2f3df57b901ff68dcc651ec18eac0151c06325ab611e193f9bcee9fa9e7ac6",
+    "events": [
+      {
+        "event": "E0865",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C009",
+    "commit": "4524e2b774eed119ec14408dc98892844b7b30a0",
+    "parents": [
+      "340d14811a3f9f90c5f06ff9c8c1876a43250d83"
+    ],
+    "date": "2026-10-01T11:15:42+02:00",
+    "title": "approach2: send mask respects LOS/heading",
+    "files": [
+      "approach2.py",
+      "dbg2.py"
+    ],
+    "file_roles": [
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C009_4524e2b.diff",
+    "diff_sha256": "6d116253bd4d98fb1344291a1653f09de0792895159db837f8f21f79ad47867b",
+    "events": [
+      {
+        "event": "E0884",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C010",
+    "commit": "617ca9f129760e7fe93b3631ea1ea3e52b698fa7",
+    "parents": [
+      "4524e2b774eed119ec14408dc98892844b7b30a0"
+    ],
+    "date": "2026-10-01T11:19:09+02:00",
+    "title": "approach2: time-dependent send mask using other rover trajectory",
+    "files": [
+      "approach2.py",
+      "approach2_old.py",
+      "cmp.py",
+      "eval_many.py",
+      "res_approach2_a.json",
+      "res_approach2_old_a.json"
+    ],
+    "file_roles": [
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C010_617ca9f.diff",
+    "diff_sha256": "f7db3cf1ea391ac7159c21c0528cd5fd3a94df251e98470caccf639ff89e7dae",
+    "events": [
+      {
+        "event": "E0907",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C011",
+    "commit": "c8236a81c37f9062b9a8b27b35c1caf2a2f9c578",
+    "parents": [
+      "617ca9f129760e7fe93b3631ea1ea3e52b698fa7"
+    ],
+    "date": "2026-10-01T11:21:39+02:00",
+    "title": "approach2: keep refined plan only if not longer",
+    "files": [
+      "approach2.py",
+      "res_approach2_b.json"
+    ],
+    "file_roles": [
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C011_c8236a8.diff",
+    "diff_sha256": "9aaa35d4c2ef225d3126b832a42ed3eb0f80c81245df6bd55020fe604af1069c",
+    "events": [
+      {
+        "event": "E0927",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C012",
+    "commit": "3e4a72a89c3d5c9832537741d4028de12f4e70c8",
+    "parents": [
+      "c8236a81c37f9062b9a8b27b35c1caf2a2f9c578"
+    ],
+    "date": "2026-10-01T11:22:55+02:00",
+    "title": "approach2: replan immediately when failed op changed state unexpectedly",
+    "files": [
+      "approach2.py",
+      "res_approach2_d.json"
+    ],
+    "file_roles": [
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C012_3e4a72a.diff",
+    "diff_sha256": "2b5e3079ce7986d2d87a65a372182efaa8712c78b7f939a68cfb84759f612b3b",
+    "events": [
+      {
+        "event": "E0941",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C013",
+    "commit": "86fe1c7be532017d992ba4365b1aaa941885666d",
+    "parents": [
+      "3e4a72a89c3d5c9832537741d4028de12f4e70c8"
+    ],
+    "date": "2026-10-01T11:23:55+02:00",
+    "title": "Adopt time-expanded BFS planner (approach2) as approach.py; mean 21.52 on seeds 0-47",
+    "files": [
+      "approach.py",
+      "approach_v1.py",
+      "res_approach2_e.json"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C013_86fe1c7.diff",
+    "diff_sha256": "d9e0718b917aeaa54e682515a1fae8913ad4e6546d8d6a12e616ff16ffe23a72",
+    "events": [
+      {
+        "event": "E0952",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "8bf10e6af1e7a2c6967605e9768c7599a3f5e458394b3772bab070679413c974",
+    "version": "evidence/versions/C013_86fe1c7_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C014",
+    "commit": "97c75ea38b8eb8312aed16e10edf91b60f1fc6d4",
+    "parents": [
+      "86fe1c7be532017d992ba4365b1aaa941885666d"
+    ],
+    "date": "2026-10-01T11:28:58+02:00",
+    "title": "Refinement: penalize original plan when its sends lack LOS",
+    "files": [
+      "approach.py",
+      "eval_many.py",
+      "res_approach_oc1.json",
+      "res_approach_oc2.json",
+      "res_approach_oc3.json",
+      "res_approach_oc4.json",
+      "res_approach_w.json"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C014_97c75ea.diff",
+    "diff_sha256": "d045c77b2c700af8d88e5bdec7e199b9abb431af13e03495d7d2d142b8b9b4d2",
+    "events": [
+      {
+        "event": "E0991",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6f21710cb42cf89c4b8d56cbddcb4b6779cb48c8de2fb615a147e40fe07892af",
+    "version": "evidence/versions/C014_97c75ea_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C015",
+    "commit": "5b692fc93b62e56f5e6cd393ffb22a5ff9be0cb4",
+    "parents": [
+      "97c75ea38b8eb8312aed16e10edf91b60f1fc6d4"
+    ],
+    "date": "2026-10-01T11:30:11+02:00",
+    "title": "SEND_PEN=0 (penalty hurt)",
+    "files": [
+      "approach.py",
+      "res_approach_f.json"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C015_5b692fc.diff",
+    "diff_sha256": "c7a2628da1c35a017e36e6df66bc85bbc434fb0e222354935354676527fc4e71",
+    "events": [
+      {
+        "event": "E0995",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "347f412fee79b051ca71d8fc5c5b6a79c888245bb5e5fcfbf4afe66041033c6b",
+    "version": "evidence/versions/C015_5b692fc_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C016",
+    "commit": "ece46124314ee79c002785a0e3c6174dce4628cb",
+    "parents": [
+      "5b692fc93b62e56f5e6cd393ffb22a5ff9be0cb4"
+    ],
+    "date": "2026-10-01T11:30:22+02:00",
+    "title": "Pre-rotate to send cone before planned sample when no LOS predicted",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C016_ece4612.diff",
+    "diff_sha256": "220da190b53afa695469edbce8392fd56f9978b8eda15d280e34f63ae2f63b18",
+    "events": [
+      {
+        "event": "E1002",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "d6278ffbe06ffc436ac11f8fb18cf6f95a13f767ee0022d6912cfd0a51ef0128",
+    "version": "evidence/versions/C016_ece4612_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C017",
+    "commit": "5776b80095ee11d7114d7097b3156db114e6c44b",
+    "parents": [
+      "ece46124314ee79c002785a0e3c6174dce4628cb"
+    ],
+    "date": "2026-10-01T11:33:08+02:00",
+    "title": "Allow finishing at cells within HOME_TOL of home",
+    "files": [
+      "approach.py",
+      "res_approach_g.json",
+      "res_approach_wg.json"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C017_5776b80.diff",
+    "diff_sha256": "f3a2c30e1b35c9ee280304bd3cd8ff38e1f60aa774d1bfeae79f7bbade1caec8",
+    "events": [
+      {
+        "event": "E1023",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "3618427d6b211208acae0f69d2c79064db4ce78879b5c357bd4498bcf720d8c8",
+    "version": "evidence/versions/C017_5776b80_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C018",
+    "commit": "c6089abc4487953a9cb9296c4b28c2fe196f817e",
+    "parents": [
+      "5776b80095ee11d7114d7097b3156db114e6c44b"
+    ],
+    "date": "2026-10-01T11:33:47+02:00",
+    "title": "HOME_TOL=0 (near-home finish hurt)",
+    "files": [
+      "approach.py",
+      "res_approach_h.json"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C018_c6089ab.diff",
+    "diff_sha256": "5b4589aa4f232a17fbcd3af0bfb4334b5ccfdc9ba38363bc145fc1df39b6fa1d",
+    "events": [
+      {
+        "event": "E1030",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "2879c49cce1b589ac4b58eb84946fcd0669a7f49be93c00463be729a97d3178f",
+    "version": "evidence/versions/C018_c6089ab_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C019",
+    "commit": "6fb1c9f3794af85443dc3a7c0f9fc9ee8704de6b",
+    "parents": [
+      "c6089abc4487953a9cb9296c4b28c2fe196f817e"
+    ],
+    "date": "2026-10-01T11:34:29+02:00",
+    "title": "Global time cap on replanning",
+    "files": [
+      "approach.py",
+      "res_approach_i.json"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C019_6fb1c9f.diff",
+    "diff_sha256": "0ab4e0ef7efa1268caa6f2963c9d8b65cb186b4b3c6ba056299ce300d7fff7e5",
+    "events": [
+      {
+        "event": "E1039",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "8d0d1302b8482813c10bb296606618d8d25527b68ded920f80be6c73c120aea5",
+    "version": "evidence/versions/C019_6fb1c9f_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C020",
+    "commit": "cf0ca467430d9248c01f08d1df9615be87686d0c",
+    "parents": [
+      "6fb1c9f3794af85443dc3a7c0f9fc9ee8704de6b"
+    ],
+    "date": "2026-10-01T11:35:17+02:00",
+    "title": "Tighter reset time budgets",
+    "files": [
+      "approach.py",
+      "res_approach_j.json"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C020_cf0ca46.diff",
+    "diff_sha256": "9bce4060bb68a205ccdde287278af731c1d73b2414c0bb02b360da2fb41bd1b4",
+    "events": [
+      {
+        "event": "E1042",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "b443819ca29d0469c88e8129504688a2ffd6f669cdf708d031c8a90d4dca3eeb",
+    "version": "evidence/versions/C020_cf0ca46_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C021",
+    "commit": "4b16eec721cc1a3f9b5aa3106c02e635e07873f9",
+    "parents": [
+      "cf0ca467430d9248c01f08d1df9615be87686d0c"
+    ],
+    "date": "2026-10-01T11:35:42+02:00",
+    "title": "test script update",
+    "files": [
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C021_4b16eec.diff",
+    "diff_sha256": "f95ff6f98398484354bdd97b0ed0896c4a0a52fd8d6f7d39985e27984cc170cc",
+    "events": [
+      {
+        "event": "E1055",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C022",
+    "commit": "a010326ad1d8164ef0eea61ce7410b6d82c804e1",
+    "parents": [
+      "4b16eec721cc1a3f9b5aa3106c02e635e07873f9"
+    ],
+    "date": "2026-10-01T11:37:27+02:00",
+    "title": "eval results",
+    "files": [
+      "res_approach_oc4b.json"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C022_a010326.diff",
+    "diff_sha256": "37af40a7ac0f1bb6c7d30fea44bfbac03f24393ef42790c810c3d81f3a4ac4f0",
+    "events": [
+      {
+        "event": "E1060",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  }
+]

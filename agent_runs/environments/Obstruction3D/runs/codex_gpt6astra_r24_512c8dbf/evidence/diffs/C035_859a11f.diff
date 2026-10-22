@@ -1,0 +1,86 @@
+diff --git a/approach.py b/approach.py
+index 6b8d102..776945a 100644
+--- a/approach.py
++++ b/approach.py
+@@ -19,7 +19,7 @@ class GeneratedApproach:
+         obs=[o for o in self.objects if o not in [self.block,self.region] and np.all(np.abs(self.pos(state,o)[:2]-rp[:2]) < self.size(state,o)[:2]+rs[:2]+.012)]
+         obs.sort(key=lambda o:-self.pos(state,o)[2])
+         self.todo=obs+[self.block];self.index=0;self.phase='above';self.t=0;self.stall=0;self.last=None
+-        self.attempt=0;self.wrist=np.pi/2;self.obj=self.todo[0];self.destination=self.choose_destination(state)
++        self.attempt=0;self.wrist=np.pi/2;self.failed_places=[];self.obj=self.todo[0];self.destination=self.choose_destination(state)
+     def choose_destination(self,state):
+         if self.obj==self.block:
+             p=self.pos(state,self.region).copy();p[2]+=self.size(state,self.region)[2]+self.size(state,self.obj)[2]+.001
+@@ -33,10 +33,25 @@ class GeneratedApproach:
+                     if other==self.obj:continue
+                     op=self.pos(state,other);oh=self.size(state,other)
+                     if np.all(np.abs(p[:2]-op[:2]) < h[:2]+oh[:2]+.009):free=False;break
+-                if free:candidates.append(p)
++                if free:
++                    if all(np.linalg.norm(p[:2]-bad)>.025 for bad in self.failed_places):candidates.append(p)
+         if candidates:
+             start=self.pos(state,self.obj)
+             return min(candidates,key=lambda p:np.linalg.norm(p[:2]-start[:2]))
++        # Rectangle-edge candidates provide finer packing as the object count grows.
++        xs=[.103+h[0],.497-h[0]];ys=[-.397+h[1],.397-h[1]]
++        for other in self.objects:
++            if other==self.obj:continue
++            op=self.pos(state,other);oh=self.size(state,other)
++            xs.extend([op[0]-oh[0]-h[0]-.005,op[0]+oh[0]+h[0]+.005])
++            ys.extend([op[1]-oh[1]-h[1]-.005,op[1]+oh[1]+h[1]+.005])
++        for x in xs:
++            if not .1+h[0]<x<.5-h[0]:continue
++            for y in ys:
++                if not -.4+h[1]<y<.4-h[1]:continue
++                p=np.array([x,y,.076+h[2]])
++                if any(np.linalg.norm(p[:2]-bad)<.025 for bad in self.failed_places):continue
++                if all(other==self.obj or np.any(np.abs(p[:2]-self.pos(state,other)[:2])>=h[:2]+self.size(state,other)[:2]+.003) for other in self.objects):return p
+         return np.array([.135,-.36,.076+h[2]])
+     def get_action(self,state):
+         self.t+=1;r=self.robot
+@@ -54,12 +69,17 @@ class GeneratedApproach:
+         if held and self.phase in ['above','align','grasp']:
+             grabbed=[o for o in self.objects if state.get(o,'grasp_active')>0]
+             if grabbed and grabbed[0]!=self.obj:
+-                self.obj=grabbed[0];self.destination=self.choose_destination(state);bp=self.pos(state,self.obj)
++                actual=grabbed[0]
++                self.todo=[o for j,o in enumerate(self.todo) if o!=actual or j<self.index]
++                self.todo.insert(self.index,actual)
++                self.obj=actual;self.destination=self.choose_destination(state);bp=self.pos(state,self.obj)
+             self.phase='lift';self.lift_xy=bp[:2].copy()
+         if self.phase=='release' and not held:
+             self.index+=1
+             if self.index>=len(self.todo):self.index=len(self.todo)-1
+-            self.attempt=0;self.wrist=np.pi/2;self.obj=self.todo[self.index];self.destination=self.choose_destination(state);self.phase='above';bp=self.pos(state,self.obj)
++            self.attempt=0;self.wrist=np.pi/2;self.failed_places=[];self.obj=self.todo[self.index];self.destination=self.choose_destination(state);self.phase='above';bp=self.pos(state,self.obj)
++        if held and self.phase=='lower' and self.obj!=self.block and self.stall>=3:
++            self.failed_places.append(self.destination[:2].copy());self.destination=self.choose_destination(state);self.phase='lift';self.lift_xy=bp[:2].copy();self.stall=0
+         grip=0
+         if self.phase=='above':dest=np.r_[model[:2],.34]
+         elif self.phase=='align':dest=np.r_[bp[:2],.34]
+diff --git a/count_results.txt b/count_results.txt
+new file mode 100644
+index 0000000..9c44a2a
+--- /dev/null
++++ b/count_results.txt
+@@ -0,0 +1,3 @@
++{"seed": 0, "count": 5, "success": true, "steps": 216, "seconds": 19.16, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "index": 4, "todo": 5, "stall": 1, "attempt": 0, "pos": [0.1444271355867386, 0.23301441967487335, 0.11099999397993088], "dest": [0.14442715048789978, 0.23301441967487335, 0.11099999847263098]}
++{"seed": 1, "count": 5, "success": true, "steps": 209, "seconds": 25.18, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "index": 4, "todo": 5, "stall": 1, "attempt": 0, "pos": [0.44773608446121216, -0.132277250289917, 0.11100000143051147], "dest": [0.44773608446121216, -0.132277250289917, 0.11099999847263098]}
++{"seed": 2, "count": 5, "success": true, "steps": 211, "seconds": 25.47, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "index": 3, "todo": 4, "stall": 1, "attempt": 0, "pos": [0.15949536859989166, 0.0742836520075798, 0.11100000143051147], "dest": [0.15949532389640808, 0.0742836520075798, 0.11099999847263098]}
+diff --git a/test_sweep_fast.out b/test_sweep_fast.out
+index 48206c9..02e927b 100644
+--- a/test_sweep_fast.out
++++ b/test_sweep_fast.out
+@@ -5,3 +5,12 @@
+ {"seed": 28, "count": 1, "success": true, "steps": 87, "sec": 1.44}
+ {"seed": 29, "count": 2, "success": true, "steps": 41, "sec": 0.74}
+ {"seed": 30, "count": 0, "success": true, "steps": 42, "sec": 0.86}
++{"seed": 31, "count": 1, "success": true, "steps": 83, "sec": 8.48}
++{"seed": 32, "count": 2, "success": true, "steps": 130, "sec": 6.93}
++{"seed": 33, "count": 2, "success": true, "steps": 129, "sec": 13.26}
++{"seed": 34, "count": 0, "success": true, "steps": 41, "sec": 1.73}
++{"seed": 35, "count": 0, "success": true, "steps": 43, "sec": 2.18}
++{"seed": 36, "count": 1, "success": true, "steps": 84, "sec": 10.49}
++{"seed": 37, "count": 0, "success": true, "steps": 41, "sec": 1.79}
++{"seed": 38, "count": 0, "success": true, "steps": 41, "sec": 2.7}
++{"seed": 39, "count": 2, "success": true, "steps": 123, "sec": 8.7}

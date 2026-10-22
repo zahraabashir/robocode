@@ -1,0 +1,50 @@
+diff --git a/approach.py b/approach.py
+index c81f023..7433fff 100644
+--- a/approach.py
++++ b/approach.py
+@@ -19,7 +19,7 @@ class GeneratedApproach:
+         obs=[o for o in self.objects if o not in [self.block,self.region] and np.all(np.abs(self.pos(state,o)[:2]-rp[:2]) < self.size(state,o)[:2]+rs[:2]+.012)]
+         obs.sort(key=lambda o:-self.pos(state,o)[2])
+         self.todo=obs+[self.block];self.index=0;self.phase='above';self.t=0;self.stall=0;self.last=None
+-        self.bad_places={};self.last_released=None;self.attempts={};self.attempt=0;self.wrist=np.pi/2;self.failed_places=[];self.obj=self.todo[0];self.destination=self.choose_destination(state)
++        self.lift_step=.04;self.bad_places={};self.last_released=None;self.attempts={};self.attempt=0;self.wrist=np.pi/2;self.failed_places=[];self.obj=self.todo[0];self.destination=self.choose_destination(state)
+     def choose_destination(self,state):
+         self.failed_places=self.bad_places.setdefault(self.obj,[])
+         self.placing_goal=self.obj==self.block and not any(o!=self.block for o in self.todo[self.index+1:])
+@@ -88,7 +88,7 @@ class GeneratedApproach:
+                 self.todo.insert(self.index,actual)
+                 if actual==self.block and any(o!=self.block for o in self.todo[self.index+1:]):self.todo.append(self.block)
+                 self.obj=actual;self.destination=self.choose_destination(state);bp=self.pos(state,self.obj)
+-            self.phase='lift';self.lift_xy=bp[:2].copy()
++            self.phase='lift';self.lift_xy=bp[:2].copy();self.lift_step=.04
+         if self.phase=='release' and not held:
+             self.last_released=self.obj
+             self.index+=1
+@@ -106,6 +106,8 @@ class GeneratedApproach:
+                 return a
+         if held and self.phase=='lower' and not self.placing_goal and self.stall>=3:
+             self.failed_places.append(self.destination[:2].copy());self.destination=self.choose_destination(state);self.phase='lift';self.lift_xy=bp[:2].copy();self.stall=0
++        if held and self.phase=='lift' and self.stall>=2:
++            self.lift_step=max(.001,self.lift_step/4)
+         for _ in range(4):
+             grip=0
+             if self.phase=='above':dest=np.r_[model[:2],.30]
+@@ -118,7 +120,7 @@ class GeneratedApproach:
+             if held:dest=dest+model-bp
+             if self.phase=='above':dest[2]=.30
+             # Preserve a vertical wrist throughout travel and use the mobile base for XY.
+-            dz=np.clip(dest[2]-model[2],-.008 if self.phase=='grasp' and model[2]-bp[2]<.09 else -.04,.04)
++            dz=np.clip(dest[2]-model[2],-.008 if self.phase=='grasp' and model[2]-bp[2]<.09 else -.04,self.lift_step if self.phase=='lift' else .04)
+             z=model[2]+dz
+             key=round(float(z),7)
+             if key not in self.cache:self.cache[key]=ik(.50,z)
+diff --git a/probe_lift.out b/probe_lift.out
+new file mode 100644
+index 0000000..0cb65a0
+--- /dev/null
++++ b/probe_lift.out
+@@ -0,0 +1,4 @@
++STUCK 33 obstruction43:Kinematic3DCuboid [0.17988294 0.10726094 0.10831118] q [ 0.          0.60139829 -3.14159274 -1.55526185  0.         -0.98493248
++  0.        ] model [0.50000001 0.00100004 0.17199994] base [-0.44011706  0.10626096] wrist 0
++TRY 0.005 0 0 CHANGE 0.01314634084701538
++END False 499 lift obstruction43:Kinematic3DCuboid 499

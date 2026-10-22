@@ -1,0 +1,69 @@
+diff --git a/approach.py b/approach.py
+index 2e3486b..e7901a6 100644
+--- a/approach.py
++++ b/approach.py
+@@ -45,8 +45,6 @@ class GeneratedApproach:
+         self.grasp_fail = 0
+         self.place_yaw = None
+         self.bad_spots = []
+-        self.fail_count = {}
+-        self.last_target = None
+         self.cur_spot = None
+ 
+     def _robot(self, s):
+@@ -125,11 +123,8 @@ class GeneratedApproach:
+             if span > 0.041:
+                 continue
+             clr = self._finger_clearance(s, obj, yaw, others)
+-            aligned = abs(np.sin(2 * rel)) < 1e-6
+             score = min(clr, 0.02) - 0.002 * abs(_wrap(yaw - cy)) - 0.01 * span \
+-                - (0.0 if aligned else 0.01)
+-            if not aligned and clr < 0.004:
+-                continue
++                - (0.0 if abs(np.sin(2 * rel)) < 1e-6 else 0.005)
+             cands.append((score, _wrap(yaw)))
+         if not cands:
+             yaw = oyaw if h[0] <= h[1] else oyaw + np.pi / 2
+@@ -144,7 +139,7 @@ class GeneratedApproach:
+         h = _he(s, obj)
+         yaw = self._grasp_yaw(s, obj, q, base, others, place_yaw is not None)
+         self.place_yaw = place_yaw
+-        gz = p[2] + 0.04  # TCP height for grasp: object centre 4cm below TCP is most reliable
++        gz = p[2] + 0.035  # TCP height for grasp (object centre 2-5 cm below TCP works)
+         place_center = np.array([place_xy[0], place_xy[1], support_top + h[2] + 0.002])
+         return [
+             ('move', np.array([p[0], p[1], max(SAFE_Z, gz + 0.05)]), yaw, False),
+@@ -196,23 +191,8 @@ class GeneratedApproach:
+             return self._plan_place(s, o, spot, TABLE_Z, None)
+         blocking = [o for o in cubes if self._overlaps(s, o, reg)]
+         if blocking:
+-            # remove the most accessible first (best finger clearance), penalise failures
+-            def access(c):
+-                oth = [x for x in cubes if x.name != c.name] + [tb]
+-                oy = self._obj_yaw(s, c)
+-                h = _he(s, c)
+-                best = -1e9
+-                for k in range(4):
+-                    yaw = oy + k * np.pi / 2
+-                    span = h[0] if k % 2 == 0 else h[1]
+-                    if span > 0.041:
+-                        continue
+-                    best = max(best, self._finger_clearance(s, c, yaw, oth))
+-                return min(best, 0.03) - 0.05 * self.fail_count.get(c.name, 0)
+-            o = max(blocking, key=access)
+-            if o.name != self.last_target:
+-                self.grasp_fail = 0
+-            self.last_target = o.name
++            # remove the tallest (top-most) first
++            o = max(blocking, key=lambda c: _pose(s, c)[2] + _he(s, c)[2])
+             others = [c for c in cubes if c.name != o.name] + [reg, tb]
+             spot = self._free_spot(s, o, others, cur)
+             self.cur_spot = spot
+@@ -272,7 +252,6 @@ class GeneratedApproach:
+                 # failed grasp: replan from scratch with another yaw
+                 self.retries = 0
+                 self.grasp_fail += 1
+-                self.fail_count[cmd[1]] = self.fail_count.get(cmd[1], 0) + 1
+                 self.queue = [('move_rel_up', SAFE_Z, None)]
+                 return None
+             a[10] = -1.0

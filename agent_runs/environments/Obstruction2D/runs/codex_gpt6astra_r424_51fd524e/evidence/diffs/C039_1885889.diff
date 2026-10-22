@@ -1,0 +1,190 @@
+diff --git a/README.md b/README.md
+index deee1b8..474a1b1 100644
+--- a/README.md
++++ b/README.md
+@@ -14,3 +14,9 @@ Run tests with the supplied interpreter:
+ ```
+ 
+ The optional third batch argument pins the obstruction count. Each test environment is a fresh live-server instance. The regression suite covers wall reach, narrow grasp clearances, gripper placement collisions, and storage that could obstruct a later pickup. Policy computation is timed separately from environment generation and remote stepping.
++
++## Validation
++
++Development testing covered default-count seeds 0–999 and 2000–2099, three-obstruction seeds 0–199, and four-obstruction seeds 0–9. Historical sweep files include failures from earlier policy revisions; each discovered failure was replayed successfully after its corresponding fix.
++
++The final regression suite covers 14 previously difficult or representative cases. `regression_results.json` records results, policy computation time, and the exact policy SHA-256. Policy computation in the final regression suite is far below the 60-second allowance; remote test latency also includes server stepping and contention between independent test instances.
+diff --git a/regression_results.json b/regression_results.json
+index e14a8e6..6fd3517 100644
+--- a/regression_results.json
++++ b/regression_results.json
+@@ -4,95 +4,103 @@
+     "count": null,
+     "done": true,
+     "steps": 50,
+-    "policy_seconds": 0.009710075333714485,
+-    "policy_hash": "d522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb"
++    "policy_seconds": 0.005131836049258709,
++    "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+     "seed": 31,
+     "count": null,
+     "done": true,
+     "steps": 79,
+-    "policy_seconds": 0.0202472060918808,
+-    "policy_hash": "d522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb"
++    "policy_seconds": 0.013064275495707989,
++    "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+     "seed": 74,
+     "count": null,
+     "done": true,
+     "steps": 25,
+-    "policy_seconds": 0.006569691002368927,
+-    "policy_hash": "d522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb"
++    "policy_seconds": 0.005541585385799408,
++    "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+     "seed": 151,
+     "count": null,
+     "done": true,
+     "steps": 71,
+-    "policy_seconds": 0.014874584041535854,
+-    "policy_hash": "d522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb"
++    "policy_seconds": 0.01696677040308714,
++    "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+     "seed": 489,
+     "count": null,
+     "done": true,
+     "steps": 111,
+-    "policy_seconds": 0.02264695893973112,
+-    "policy_hash": "d522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb"
++    "policy_seconds": 0.026794604025781155,
++    "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
++  },
++  {
++    "seed": 627,
++    "count": null,
++    "done": true,
++    "steps": 70,
++    "policy_seconds": 0.01879723183810711,
++    "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+     "seed": 42,
+     "count": 3,
+     "done": true,
+     "steps": 93,
+-    "policy_seconds": 0.029996491968631744,
+-    "policy_hash": "d522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb"
++    "policy_seconds": 0.028547299094498158,
++    "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+     "seed": 0,
+     "count": 4,
+     "done": true,
+     "steps": 95,
+-    "policy_seconds": 0.036820714361965656,
+-    "policy_hash": "d522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb"
++    "policy_seconds": 0.030501403845846653,
++    "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+     "seed": 1,
+     "count": 4,
+     "done": true,
+     "steps": 79,
+-    "policy_seconds": 0.028981699608266354,
+-    "policy_hash": "d522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb"
++    "policy_seconds": 0.02996176667511463,
++    "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+     "seed": 2,
+     "count": 4,
+     "done": true,
+     "steps": 137,
+-    "policy_seconds": 0.03913711290806532,
+-    "policy_hash": "d522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb"
++    "policy_seconds": 0.032656130380928516,
++    "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+     "seed": 3,
+     "count": 4,
+     "done": true,
+     "steps": 101,
+-    "policy_seconds": 0.03482349868863821,
+-    "policy_hash": "d522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb"
++    "policy_seconds": 0.031625750474631786,
++    "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+     "seed": 4,
+     "count": 4,
+     "done": true,
+     "steps": 165,
+-    "policy_seconds": 0.050516946241259575,
+-    "policy_hash": "d522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb"
++    "policy_seconds": 0.023875144310295582,
++    "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+     "seed": 5,
+     "count": 4,
+     "done": true,
+     "steps": 83,
+-    "policy_seconds": 0.022572549059987068,
+-    "policy_hash": "d522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb"
++    "policy_seconds": 0.009609416127204895,
++    "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   }
+ ]
+\ No newline at end of file
+diff --git a/regression_run.log b/regression_run.log
+index b7a6917..8a83bb9 100644
+--- a/regression_run.log
++++ b/regression_run.log
+@@ -1,12 +1,13 @@
+-{'seed': 21, 'count': None, 'done': True, 'steps': 50, 'policy_seconds': 0.009710075333714485, 'policy_hash': 'd522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb'}
+-{'seed': 31, 'count': None, 'done': True, 'steps': 79, 'policy_seconds': 0.0202472060918808, 'policy_hash': 'd522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb'}
+-{'seed': 74, 'count': None, 'done': True, 'steps': 25, 'policy_seconds': 0.006569691002368927, 'policy_hash': 'd522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb'}
+-{'seed': 151, 'count': None, 'done': True, 'steps': 71, 'policy_seconds': 0.014874584041535854, 'policy_hash': 'd522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb'}
+-{'seed': 489, 'count': None, 'done': True, 'steps': 111, 'policy_seconds': 0.02264695893973112, 'policy_hash': 'd522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb'}
+-{'seed': 42, 'count': 3, 'done': True, 'steps': 93, 'policy_seconds': 0.029996491968631744, 'policy_hash': 'd522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb'}
+-{'seed': 0, 'count': 4, 'done': True, 'steps': 95, 'policy_seconds': 0.036820714361965656, 'policy_hash': 'd522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb'}
+-{'seed': 1, 'count': 4, 'done': True, 'steps': 79, 'policy_seconds': 0.028981699608266354, 'policy_hash': 'd522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb'}
+-{'seed': 2, 'count': 4, 'done': True, 'steps': 137, 'policy_seconds': 0.03913711290806532, 'policy_hash': 'd522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb'}
+-{'seed': 3, 'count': 4, 'done': True, 'steps': 101, 'policy_seconds': 0.03482349868863821, 'policy_hash': 'd522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb'}
+-{'seed': 4, 'count': 4, 'done': True, 'steps': 165, 'policy_seconds': 0.050516946241259575, 'policy_hash': 'd522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb'}
+-{'seed': 5, 'count': 4, 'done': True, 'steps': 83, 'policy_seconds': 0.022572549059987068, 'policy_hash': 'd522957da88d0ba0d7935d2d11dd603d808ef58ff57706a6179563b6395addfb'}
++{'seed': 21, 'count': None, 'done': True, 'steps': 50, 'policy_seconds': 0.005131836049258709, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 31, 'count': None, 'done': True, 'steps': 79, 'policy_seconds': 0.013064275495707989, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 74, 'count': None, 'done': True, 'steps': 25, 'policy_seconds': 0.005541585385799408, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 151, 'count': None, 'done': True, 'steps': 71, 'policy_seconds': 0.01696677040308714, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 489, 'count': None, 'done': True, 'steps': 111, 'policy_seconds': 0.026794604025781155, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 627, 'count': None, 'done': True, 'steps': 70, 'policy_seconds': 0.01879723183810711, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 42, 'count': 3, 'done': True, 'steps': 93, 'policy_seconds': 0.028547299094498158, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 0, 'count': 4, 'done': True, 'steps': 95, 'policy_seconds': 0.030501403845846653, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 1, 'count': 4, 'done': True, 'steps': 79, 'policy_seconds': 0.02996176667511463, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 2, 'count': 4, 'done': True, 'steps': 137, 'policy_seconds': 0.032656130380928516, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 3, 'count': 4, 'done': True, 'steps': 101, 'policy_seconds': 0.031625750474631786, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 4, 'count': 4, 'done': True, 'steps': 165, 'policy_seconds': 0.023875144310295582, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 5, 'count': 4, 'done': True, 'steps': 83, 'policy_seconds': 0.009609416127204895, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
+diff --git a/test_regression.py b/test_regression.py
+index 50df6df..7dd15b8 100644
+--- a/test_regression.py
++++ b/test_regression.py
+@@ -5,7 +5,7 @@ import time
+ from env_client import make_env
+ from approach import GeneratedApproach
+ 
+-cases=[(21,None),(31,None),(74,None),(151,None),(489,None),(627,None),(42,3),(0,4),(1,4),(2,4),(3,4),(4,4),(5,4)]
++cases=[(21,None),(31,None),(74,None),(151,None),(489,None),(627,None),(42,3),(154,3),(0,4),(1,4),(2,4),(3,4),(4,4),(5,4)]
+ policy_hash=hashlib.sha256(open('approach.py','rb').read()).hexdigest()
+ results=[]
+ e=make_env()

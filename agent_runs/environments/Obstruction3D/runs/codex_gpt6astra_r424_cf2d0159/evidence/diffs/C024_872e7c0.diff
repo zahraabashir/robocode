@@ -1,0 +1,33 @@
+diff --git a/fk_corrections.json b/fk_corrections.json
+new file mode 100644
+index 0000000..def841c
+--- /dev/null
++++ b/fk_corrections.json
+@@ -0,0 +1 @@
++[[0.1199005860960526, -9.073880356917641e-07, -0.0026002215710976776], [-1.990512484117237e-06, 9.143554473475806e-07, 0.0026002215710977223], [1.4400040560260508e-06, -3.3367338613131567e-07, -9.143554472964063e-07], [-1.019220001863516e-06, 2.3345164623236523e-07, -3.3367338613271455e-07], [2.598576067376259e-06, -9.061543700283831e-07, -2.3345164624113668e-07], [-2.9810186999644064e-06, 0.00017659770530487678, -9.061543699505585e-07], [1.6292873314208571e-06, -0.059998207345579584, -0.0001765977053049272], [-3.370817175313639e-06, 2.3852501408416588e-06, 0.059998207345579584]]
+\ No newline at end of file
+diff --git a/probe_lift_drop.py b/probe_lift_drop.py
+new file mode 100644
+index 0000000..b15483a
+--- /dev/null
++++ b/probe_lift_drop.py
+@@ -0,0 +1,19 @@
++from env_client import make_env
++from probe_fk import fk
++import numpy as np
++q=np.array([0,.44754084944725037,-np.pi,-2.120941162109375,0,.009999980218708515,.6907963752746582]);base=np.array([-.4509332478046417,-.3362736999988556])
++e=make_env();s,_=e.reset(seed=2,options={'object_count':0});ro=s.get_object_from_name('robot')
++for k in range(70):
++ a=np.zeros(11);a[:2]=np.clip(base-[s.get(ro,'pos_base_x'),s.get(ro,'pos_base_y')],-.1,.1);a[3:10]=np.clip(q-[s.get(ro,'joint_'+str(j)) for j in range(1,8)],-.08,.08);a[-1]=1;s,*_=e.step(a)
++a=np.zeros(11);a[-1]=-1;s,*_=e.step(a)
++ob=s.get_object_from_name('target_block');reg=s.get_object_from_name('target_region')
++for k in range(10):
++ a=np.zeros(11);a[4]=-.02;a[8]=.02;s,*_=e.step(a)
++ print('LIFT',k,[s.get(ob,'pose_'+v) for v in 'xyz'],flush=True)
++for k in range(10):
++ a=np.zeros(11);a[:2]=np.clip([s.get(reg,'pose_'+v)-s.get(ob,'pose_'+v) for v in 'xy'],-.1,.1);s,*_=e.step(a)
++ print('MOVE',k,[s.get(ob,'pose_'+v) for v in 'xyz'],flush=True)
++a=np.zeros(11);a[-1]=1;s,r,t,tr,i=e.step(a);print('RELEASE',r,t,tr,i,[s.get(ob,'pose_'+v) for v in 'xyz'],flush=True)
++for k in range(3):
++ s,r,t,tr,i=e.step(np.zeros(11));print('POST',r,t,tr,i,[s.get(ob,'pose_'+v) for v in 'xyz'],flush=True)
++e.close()

@@ -1,0 +1,74 @@
+diff --git a/approach.py b/approach.py
+index 6a538b5..1a8cedf 100644
+--- a/approach.py
++++ b/approach.py
+@@ -44,7 +44,7 @@ class GeneratedApproach:
+ 
+     def _blocked(self, s, world, margin=0.14):
+         xw, yw = world
+-        if xw < 0.105 or xw > 4.895 or yw < 0.105 or yw > 4.895:
++        if xw < 0.125 or xw > 4.875 or yw < 0.125 or yw > 4.875:
+             return True
+         x, y = self._world_to_local(s, world)
+         w, lh, lv = float(s[12]), float(s[13]), float(s[14])
+@@ -162,7 +162,7 @@ class GeneratedApproach:
+             contact = com + q * self._ray_exit(com, q, rects)
+             stage = contact + q * 0.19
+             sw = self._local_to_world(s, stage)
+-            accessible = (0.11 <= sw[0] <= 4.89 and 0.11 <= sw[1] <= 4.89)
++            accessible = (0.13 <= sw[0] <= 4.87 and 0.13 <= sw[1] <= 4.87)
+             if accessible:
+                 score = float(np.dot(dw, delta_world / max(1e-9, np.linalg.norm(delta_world))))
+                 if best is None or score > best[0]:
+@@ -186,21 +186,29 @@ class GeneratedApproach:
+         # If equivalent poses straddle that branch cut, deliberately cross it.
+         branch_mismatch = abs(raw_angle_error) > math.pi
+         should_orient = (not self.has_oriented) or distance < 0.15
++        preposition_delta = None
+         if should_orient and (abs(angle_error) > 0.11 or branch_mismatch):
+-            self.pair_sign = 1.0 if angle_error > 0 else -1.0
+-            if abs(angle_error) < 1e-4:
+-                self.pair_sign = 1.0 if raw_angle_error < 0 else -1.0
+-            self.pair_start_theta = float(s[2])
+-            wanted = abs(angle_error) + (0.055 if branch_mismatch else 0.0)
+-            self.pair_amount = min(0.70, wanted)
+-            target = [self.pair_sign * 0.40 * lh, -w - 0.20]
+-            self._start_nav(s, target, "rot1", [0.0, 0.049])
+-            return
++            # First ensure the full stem can sweep without striking a wall.
++            clearance = min(1.55, lv + w + 0.20)
++            anchor = np.clip(s[0:2], clearance, 5.0 - clearance)
++            if np.linalg.norm(anchor - s[0:2]) > 0.055:
++                preposition_delta = anchor - s[0:2]
++            else:
++                self.pair_sign = 1.0 if angle_error > 0 else -1.0
++                if abs(angle_error) < 1e-4:
++                    self.pair_sign = 1.0 if raw_angle_error < 0 else -1.0
++                self.pair_start_theta = float(s[2])
++                wanted = abs(angle_error) + (0.055 if branch_mismatch else 0.0)
++                self.pair_amount = min(0.70, wanted)
++                target = [self.pair_sign * 0.40 * lh, -w - 0.20]
++                self._start_nav(s, target, "rot1", [0.0, 0.049])
++                return
+ 
+         if abs(angle_error) <= 0.125 and not branch_mismatch:
+             self.has_oriented = True
+ 
+-        delta_world = s[29:31] - s[0:2]
++        delta_world = (preposition_delta if preposition_delta is not None
++                       else s[29:31] - s[0:2])
+         self.translate_amount = max(0.0, min(0.75, distance - 0.012))
+         if self.translate_amount <= 0.002:
+             self.mode = "idle"
+@@ -241,9 +249,10 @@ class GeneratedApproach:
+                 # Walls and residual contact can make a geometrically exact
+                 # waypoint unreachable; accept the closest physical point.
+                 if self.nav_stall >= 7:
+-                    self.path.pop(0)
++                    self.path = []
+                     self.nav_last_distance = None
+                     self.nav_stall = 0
++                    self.mode = "idle"
+                     return np.zeros(2, dtype=float)
+                 return self._action(self.path[0] - robot)
+             self.mode = self.next_mode

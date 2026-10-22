@@ -1,0 +1,40 @@
+diff --git a/approach.py b/approach.py
+index 8023419..6956765 100644
+--- a/approach.py
++++ b/approach.py
+@@ -162,6 +162,7 @@ class GeneratedApproach:
+         self.last_pos = None
+         self.target_name = None
+         self.block_dest = None
++        self.attempts = {}
+ 
+     def _grasp_x(self, b, others):
+         half = self.robot["gh"] / 2.0
+@@ -194,6 +195,8 @@ class GeneratedApproach:
+                     continue
+                 if o["y"] + o["h"] > by - math.sqrt(R * R - d * d):
+                     ok = False
++                    if self.grasp_conflict is None:
++                        self.grasp_conflict = o
+                     break
+             if ok:
+                 return x
+@@ -288,6 +291,18 @@ class GeneratedApproach:
+             if gx is not None or self.grasp_conflict is None:
+                 break
+             tgt = self.grasp_conflict
++        n_att = self.attempts.get(tgt["name"], 0)
++        self.attempts[tgt["name"]] = n_att + 1
++        if n_att >= 3:
++            # repeated failure: move the tallest nearby object instead
++            near = [o for o in movable.values() if o["name"] != tgt["name"]
++                    and o["name"] != self.block["name"]
++                    and abs((o["x"] + o["w"] / 2) - (tgt["x"] + tgt["w"] / 2)) < 0.3
++                    and self.attempts.get(o["name"], 0) < 3]
++            if near:
++                tgt = max(near, key=lambda o: o["y"] + o["h"])
++                others = [b for n, b in movable.items() if n != tgt["name"]]
++                gx = self._grasp_x(tgt, others)
+         if gx is None:
+             gx = min(max(tgt["x"] + tgt["w"] / 2, X_MIN), X_MAX)
+         others = [b for n, b in movable.items() if n != tgt["name"]]

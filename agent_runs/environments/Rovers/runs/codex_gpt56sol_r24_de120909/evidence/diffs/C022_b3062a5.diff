@@ -1,0 +1,15 @@
+diff --git a/approach.py b/approach.py
+index 538aa64..3b30b1b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -227,7 +227,9 @@ class GeneratedApproach:
+                 q=(s.get(o,"x"),s.get(o,"y"))
+                 candidates.append((math.dist(pos,q),q))
+             q=min(candidates)[1]
+-            if math.dist(pos,q)<=.249: return ("sample",pos)
++            # Aim well inside the inclusive .25 m server cutoff; stopping near its
++            # floating-point boundary proved brittle on diagonals.
++            if math.dist(pos,q)<=.18: return ("sample",pos)
+             return ("nav_sample",q)
+         # No pending work of our nominal class: help with anything globally missing.
+         return ("home",self.home[i])

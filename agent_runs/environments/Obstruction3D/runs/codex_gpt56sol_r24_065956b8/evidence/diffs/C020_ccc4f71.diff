@@ -1,0 +1,56 @@
+diff --git a/probe_grasp.py b/probe_grasp.py
+index d36c5aa..6e07967 100644
+--- a/probe_grasp.py
++++ b/probe_grasp.py
+@@ -203,6 +203,42 @@ def exact_sequence(seed=0):
+     env.close()
+ 
+ 
++def perturb_grasp(seed=0):
++    """Measure one-step carried-object deltas about the successful grasp."""
++    for index in range(10):
++        for amount in (-0.1, 0.1):
++            env = make_env()
++            state, _ = env.reset(seed=seed)
++            ss = snapshot(state)
++            block0 = tuple(ss["target_block"]["pose_" + c] for c in "xyz")
++            # Reach exact successful pose in three bounded moves.
++            for k in range(3):
++                a = np.zeros(11, dtype=np.float32)
++                if k == 0:
++                    a[1] = np.clip(block0[1], -0.2, 0.2)
++                a[4] = 0.2
++                a[6] = 0.2 if k == 0 else 0.0
++                a[8] = 0.2 if k < 2 else 0.0
++                state, *_ = env.step(a)
++            a = np.zeros(11, dtype=np.float32)
++            a[10] = -1.0
++            state, *_ = env.step(a)
++            before = snapshot(state)
++            a = np.zeros(11, dtype=np.float32)
++            a[index] = amount
++            state, reward, term, trunc, _ = env.step(a)
++            after = snapshot(state)
++            delta = tuple(after["target_block"]["pose_" + c] -
++                          before["target_block"]["pose_" + c] for c in "xyz")
++            robot_delta = after["robot"].get(
++                ["pos_base_x", "pos_base_y", "pos_base_rot"] +
++                ["joint_" + str(i) for i in range(1, 8)][max(0, index - 3)], 0)
++            print("PERTURB", index, amount, "delta", delta,
++                  "still_held", after["robot"]["grasp_active"],
++                  "robot", after["robot"], "done", term, trunc)
++            env.close()
++
++
+ if __name__ == "__main__":
+     import argparse
+     parser = argparse.ArgumentParser()
+@@ -210,6 +246,7 @@ if __name__ == "__main__":
+     parser.add_argument("--grid", action="store_true")
+     parser.add_argument("--triple", action="store_true")
+     parser.add_argument("--exact", action="store_true")
++    parser.add_argument("--perturb", action="store_true")
+     parser.add_argument("--seed", type=int, default=0)
+     args = parser.parse_args()
+-    exact_sequence(args.seed) if args.exact else (triple_grid(args.seed) if args.triple else (joint_grid(args.seed) if args.grid else (random_search(args.seed) if args.random else main())))
++    perturb_grasp(args.seed) if args.perturb else (exact_sequence(args.seed) if args.exact else (triple_grid(args.seed) if args.triple else (joint_grid(args.seed) if args.grid else (random_search(args.seed) if args.random else main()))))

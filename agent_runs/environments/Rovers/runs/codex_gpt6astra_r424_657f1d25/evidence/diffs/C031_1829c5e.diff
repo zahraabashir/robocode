@@ -1,0 +1,37 @@
+diff --git a/approach.py b/approach.py
+index 1d07d65..adf6019 100644
+--- a/approach.py
++++ b/approach.py
+@@ -181,6 +181,14 @@ class GeneratedApproach:
+                 if s.get(self.rovers[r],'at_home')>.5:path=[]
+         self.tasks[r]=best;self.paths[r]=path
+ 
++    def radio_evidence(self,s,r):
++        evidence=[]
++        for objects,own,received in ((self.objectives,'have_image_rover','received_image'),(self.samples,'analyzed_rover','received_analysis')):
++            for o in objects:
++                if s.get(o,own+str(r))>.5 and s.get(o,own+str(1-r))<.5 and s.get(o,received)<.5:
++                    evidence.append((o,received))
++        return evidence
++
+     def result_count(self, s, r):
+         return sum(s.get(o, 'have_image_rover%d'%r) for o in self.objectives) + sum(s.get(o, 'analyzed_rover%d'%r) for o in self.samples)
+ 
+@@ -221,8 +229,8 @@ class GeneratedApproach:
+             task=self.tasks[r]
+             last=self.last_op[r]
+             if last is not None:
+-                old_task, old_p, old_op, old_count, old_pending = last
+-                if old_op==.5 and old_pending and not self.pending(s,r):
++                old_task, old_p, old_op, old_count, old_evidence = last
++                if old_op==.5 and any(s.get(obj,feature)>.5 for obj,feature in old_evidence):
+                     if all(np.linalg.norm(p-v)>.1 for v in self.good_radio[r]):self.good_radio[r].append(p.copy())
+                 failed = ((old_task[0]=='image' and old_op == -.5 and s.get(rob,'calibrated')<.5) or
+                           (old_task[0]=='image' and old_op == -1/6 and self.result_count(s,r)<=old_count) or
+@@ -284,5 +292,5 @@ class GeneratedApproach:
+                     if not self.have(s,j):op=-1/6 if s.get(rob,'calibrated')>.5 else -.5
+             action[r*4:r*4+2]=d;action[r*4+3]=op
+             self.previous[r]=(p.copy(),d.copy())
+-            self.last_op[r]=(task,q.copy(),op,self.result_count(s,r),self.pending(s,r))
++            self.last_op[r]=(task,q.copy(),op,self.result_count(s,r),self.radio_evidence(s,r) if op==.5 else [])
+         return action

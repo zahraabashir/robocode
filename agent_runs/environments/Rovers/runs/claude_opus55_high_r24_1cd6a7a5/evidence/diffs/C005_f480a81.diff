@@ -1,0 +1,80 @@
+diff --git a/approach.py b/approach.py
+index 5526419..21944a2 100644
+--- a/approach.py
++++ b/approach.py
+@@ -217,6 +217,7 @@ class GeneratedApproach:
+         sc = self.sc
+         g = state.get
+         self.homes = [np.array([g(r, "x"), g(r, "y")]) for r in sc.rovers]
++        self.home_th = [g(r, "theta") for r in sc.rovers]
+         self.planners = [RoverPlanner(sc, i, self.homes[i]) for i in range(2)]
+         nobj = len(sc.objectives)
+         tasks = [("obj", k) for k in range(nobj)] + [("stone", 0), ("soil", 0)]
+@@ -382,8 +383,18 @@ class GeneratedApproach:
+             if t[0] == "obj" and not self._task_done(state, t):
+                 v = p - sc.opos[t[1]]
+                 return np.arctan2(v[1], v[0])
+-        v = p - sc.lpos
+-        return np.arctan2(v[1], v[0])
++        # images done: head back to home heading unless stuck at home without having sent
++        g = state.get
++        me = "rover%d" % i
++        holding = any(g(o, "have_image_" + me) > 0.5 and g(o, "received_image") < 0.5 for o in sc.objectives) or \
++            any(g(s, "analyzed_" + me) > 0.5 and g(s, "received_analysis") < 0.5 for s in sc.samples)
++        if holding and k >= len(plan["path"]) - 1:
++            v = p - sc.lpos
++            away = np.arctan2(v[1], v[0])
++            # heading within the send cone (+-60 deg of away) closest to home heading
++            dlt = float(np.clip(_wrap(self.home_th[i] - away), -np.radians(60), np.radians(60)))
++            return away + dlt
++        return self.home_th[i]
+ 
+     def _rover_action(self, state, i):
+         sc = self.sc
+diff --git a/dbg2.py b/dbg2.py
+new file mode 100644
+index 0000000..98f9cc5
+--- /dev/null
++++ b/dbg2.py
+@@ -0,0 +1,22 @@
++import sys
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++seed = int(sys.argv[1]); N = int(sys.argv[2])
++env = make_env()
++obs, info = env.reset(seed=seed)
++ap = GeneratedApproach(env.action_space, env.observation_space, {})
++ap.reset(obs, info)
++print("mytasks", ap.my_tasks)
++for i in range(2): print(i, "visits", ap.plans[i]['visits'], "len", len(ap.plans[i]['path']))
++names = {v:k for k,v in {"sample": -5/6, "calibrate": -0.5, "image": -1/6, "noop": 1/6, "send": 0.5, "drop": 5/6}.items()}
++for step in range(N):
++    a = ap.get_action(obs)
++    obs, r, term, trunc, info = env.step(a)
++    g = obs.get
++    rs = [(round(g(rv,'x'),2), round(g(rv,'y'),2), round(g(rv,'theta'),2), int(g(rv,'at_home')), int(g(rv,'store_full')), int(g(rv,'calibrated'))) for rv in ap.sc.rovers]
++    ops = [min(names, key=lambda b: abs(b-a[3])), min(names, key=lambda b: abs(b-a[7]))]
++    objs = ''.join('%d%d%d ' % (g(o,'have_image_rover0'), g(o,'have_image_rover1'), g(o,'received_image')) for o in ap.sc.objectives)
++    sm = ''.join('%d%d%d ' % (g(s,'analyzed_rover0'), g(s,'analyzed_rover1'), g(s,'received_analysis')) for s in ap.sc.samples)
++    print(step, [names[o] for o in ops], rs, objs, '|', sm, term)
++    if term: break
+diff --git a/probe_home.py b/probe_home.py
+new file mode 100644
+index 0000000..df858d8
+--- /dev/null
++++ b/probe_home.py
+@@ -0,0 +1,13 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=0)
++r1 = obs.get_object_from_name('rover1')
++for k in range(12):
++    obs,*_ = env.step(np.array([0,0,0,1/6, 0,0,0.1,1/6],dtype=np.float32))
++    print(round(obs.get(r1,'theta'),2), obs.get(r1,'at_home'), end='; ')
++print()
++obs, info = env.reset(seed=0)
++for k in range(12):
++    obs,*_ = env.step(np.array([0,0,0,1/6, 0,0,-0.1,1/6],dtype=np.float32))
++    print(round(obs.get(r1,'theta'),2), obs.get(r1,'at_home'), end='; ')

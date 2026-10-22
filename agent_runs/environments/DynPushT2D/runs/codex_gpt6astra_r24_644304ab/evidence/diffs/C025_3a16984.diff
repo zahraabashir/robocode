@@ -1,0 +1,352 @@
+diff --git a/approach.py b/approach.py
+index 1522961..135bd0a 100644
+--- a/approach.py
++++ b/approach.py
+@@ -105,6 +105,19 @@ class GeneratedApproach:
+         self.R=R
+         robot=(s[16:18]-s[:2])@R
+         delta=(s[29:31]-s[:2])@R; angle=wrap(s[31]-s[2])
++        # Keep room around the block for the robot, relaxing toward goal clearance.
++        corners=np.array([[r[x],r[y]] for r in self.rects for x in [0,1] for y in [2,3]])
++        world=corners@R.T+s[:2]
++        cg,sg=math.cos(s[31]),math.sin(s[31]); rg=np.array([[cg,-sg],[sg,cg]])
++        goal_world=corners@rg.T+s[29:31]
++        near=max(0.,1.-np.linalg.norm(delta)/.6)
++        lo_margin=.20*(1-near)+np.minimum(.20,np.maximum(.005,goal_world.min(axis=0)))*near
++        hi_margin=.20*(1-near)+np.minimum(.20,np.maximum(.005,5-goal_world.max(axis=0)))*near
++        force=np.maximum(0.,lo_margin-world)-np.maximum(0.,world-(5-hi_margin))
++        force*=3.
++        delta+=np.sum(force,axis=0)@R
++        spin=np.column_stack((-corners[:,1],corners[:,0]))@R.T
++        angle+=np.sum(force*spin)/.35
+         # Approximate generalized displacement due to unit normal force.
+         w,h,v=s[12:15]
+         cy=-(h*w/2+v*(w+v/2))/(h+v)
+diff --git a/candidate_recovery.py b/candidate_recovery.py
+new file mode 100644
+index 0000000..1522961
+--- /dev/null
++++ b/candidate_recovery.py
+@@ -0,0 +1,168 @@
++import numpy as np
++import math
++import heapq
++
++def wrap(a):
++    return (a+math.pi)%(2*math.pi)-math.pi
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.reset(None, {})
++
++    def reset(self, state, info):
++        self.steps=0
++        self.contact=None
++        self.age=0
++        self.last=None
++        self.history=[]
++        self.cooldown=None
++        self.pushing=False
++
++    def geometry(self,s):
++        w,h,v=s[12:15]
++        self.rects=[np.array([-h/2,h/2,-w,0]),np.array([-w/2,w/2,-v-w,-w])]
++        # Sample exposed surfaces with inward normals.
++        points=[]; normals=[]
++        def edge(a,b,n,count):
++            for t in np.linspace(.04,.96,count):
++                points.append(np.array(a)*(1-t)+np.array(b)*t); normals.append(n)
++        edge([-h/2,0],[h/2,0],[0,-1],15)
++        edge([-h/2,-w],[-h/2,0],[1,0],3)
++        edge([h/2,-w],[h/2,0],[-1,0],3)
++        edge([-h/2,-w],[-w/2,-w],[0,1],6)
++        edge([w/2,-w],[h/2,-w],[0,1],6)
++        edge([-w/2,-v-w],[-w/2,-w],[1,0],13)
++        edge([w/2,-v-w],[w/2,-w],[-1,0],13)
++        edge([-w/2,-v-w],[w/2,-v-w],[0,1],3)
++        self.pts=np.array(points); self.normals=np.array(normals)
++
++    def free(self,a,b,margin):
++        for rect in self.rects:
++            lo=rect[[0,2]]-margin; hi=rect[[1,3]]+margin
++            dd=b-a; t0=0.; t1=1.
++            for j in range(2):
++                if abs(dd[j])<1e-10:
++                    if a[j]<=lo[j] or a[j]>=hi[j]: t1=-1.; break
++                else:
++                    z=(lo[j]-a[j])/dd[j]; zz=(hi[j]-a[j])/dd[j]
++                    t0=max(t0,min(z,zz)); t1=min(t1,max(z,zz))
++            if t0<t1-1e-7: return False
++        return True
++
++    def navigate(self,a,b,radius):
++        margin=radius+.009
++        if self.free(a,b,margin): return b
++        # Axis-aligned expanded rectangles give a small visibility graph.
++        vertices=[a,b]
++        for rect in self.rects:
++            x0,x1,y0,y1=rect+np.array([-1,1,-1,1])*(margin+.006)
++            for x,y in [(x0,y0),(x0,y1),(x1,y0),(x1,y1)]:
++                p=np.array([x,y])
++                if self.free(p,p,margin) and np.all((p@self.R.T+self.origin>.105)&(p@self.R.T+self.origin<4.895)): vertices.append(p)
++        # If touching, first move out along the nearest boundary.
++        if not self.free(a,a,margin):
++            choices=[]
++            for rect in self.rects:
++                lo=rect[[0,2]]-margin-.008; hi=rect[[1,3]]+margin+.008
++                for j in range(2):
++                    for v in [lo[j],hi[j]]:
++                        p=a.copy(); p[j]=v
++                        if self.free(p,p,margin) and np.all((p@self.R.T+self.origin>.105)&(p@self.R.T+self.origin<4.895)): choices.append(p)
++            if choices: return min(choices,key=lambda p:np.linalg.norm(p-a))
++        n=len(vertices); dist=[1e9]*n; prev=[-1]*n; dist[0]=0; heap=[(0,0)]
++        while heap:
++            d,i=heapq.heappop(heap)
++            if d>dist[i]+1e-8: continue
++            if i==1: break
++            for j in range(1,n):
++                if i!=j and self.free(vertices[i],vertices[j],margin):
++                    nd=d+np.linalg.norm(vertices[i]-vertices[j])
++                    if nd<dist[j]: dist[j]=nd;prev[j]=i;heapq.heappush(heap,(nd,j))
++        j=1
++        if prev[j]<0:return b
++        while prev[j]>0:j=prev[j]
++        return vertices[j]
++
++    def get_action(self,state):
++        s=np.asarray(state); self.steps+=1
++        self.geometry(s)
++        if self.cooldown is None: self.cooldown=np.zeros(len(self.pts))
++        self.cooldown=np.maximum(self.cooldown-1,0)
++        error=s[29:31]-s[:2]
++        cost=np.dot(error,error)+.35*wrap(s[31]-s[2])**2
++        moved=self.last is not None and (np.linalg.norm(s[:2]-self.last[:2])>.002 or abs(wrap(s[2]-self.last[2]))>.004)
++        self.history.append((cost,self.pushing or moved))
++        if len(self.history)>35: self.history.pop(0)
++        if len(self.history)==35 and sum(h[1] for h in self.history)>10 and cost>self.history[0][0]-.005:
++            if self.contact is not None:
++                nearby=np.linalg.norm(self.pts-self.pts[self.contact],axis=1)<.35
++                self.cooldown[nearby]=140
++            self.contact=None
++            self.history=[]
++        self.pushing=False
++        self.origin=s[:2]
++        c,ss=math.cos(s[2]),math.sin(s[2]); R=np.array([[c,-ss],[ss,c]])
++        self.R=R
++        robot=(s[16:18]-s[:2])@R
++        delta=(s[29:31]-s[:2])@R; angle=wrap(s[31]-s[2])
++        # Approximate generalized displacement due to unit normal force.
++        w,h,v=s[12:15]
++        cy=-(h*w/2+v*(w+v/2))/(h+v)
++        com=np.array([0.,cy])
++        inertia=(h*((h*h+w*w)/12+(-w/2-cy)**2)+v*((w*w+v*v)/12+(-w-v/2-cy)**2))/(h+v)
++        rr=self.pts-com
++        tangent=np.column_stack((-self.normals[:,1],self.normals[:,0]))
++        omega_n=(rr[:,0]*self.normals[:,1]-rr[:,1]*self.normals[:,0])/(inertia+np.sum(rr*rr,axis=1))
++        omega_t=(rr[:,0]*tangent[:,1]-rr[:,1]*tangent[:,0])/(inertia+np.sum(rr*rr,axis=1))
++        cross=np.column_stack((-self.pts[:,1],self.pts[:,0]))
++        jn=np.column_stack((self.normals-omega_n[:,None]*cross,omega_n))
++        jt=np.column_stack((tangent-omega_t[:,None]*cross,omega_t))
++        weights=np.array([1.,1.,.35]); desired=np.r_[delta,angle]
++        dn=(jn*weights)@desired; dt=(jt*weights)@desired
++        nn=np.sum(jn*jn*weights,axis=1); nt=np.sum(jn*jt*weights,axis=1); tt=np.sum(jt*jt*weights,axis=1)
++        denom=dn*tt-dt*nt
++        optimum=np.divide(dt*nn-dn*nt,denom,out=np.zeros(len(dn)),where=np.abs(denom)>1e-10)
++        fs=np.column_stack((np.full(len(dn),-.4),np.clip(optimum,-.4,.4),np.full(len(dn),.4)))
++        gains=np.maximum(0,dn[:,None]+fs*dt[:,None])**2/(nn[:,None]+2*fs*nt[:,None]+fs*fs*tt[:,None])
++        f=fs[np.arange(len(dn)),np.argmax(gains,axis=1)]
++        self.dirs=self.normals+f[:,None]*tangent
++        self.dirs/=np.linalg.norm(self.dirs,axis=1)[:,None]
++        torque=rr[:,0]*self.dirs[:,1]-rr[:,1]*self.dirs[:,0]
++        omega=torque/(inertia+np.sum(rr*rr,axis=1))
++        vel=self.dirs-omega[:,None]*np.column_stack((-self.pts[:,1],self.pts[:,0]))
++        desired=np.r_[delta,angle]
++        J=np.column_stack((vel,omega))
++        weights=np.array([1.,1.,.35])
++        dot=(J*weights)@desired
++        norm=np.sum(J*J*weights,axis=1)
++        gain=np.maximum(0,dot)**2/norm
++        staging=self.pts-self.normals*(s[28]+.045)
++        distances=np.linalg.norm(staging-robot,axis=1)
++        score=gain/(.20+distances*.28)
++        world_stage=staging@R.T+s[:2]
++        score[np.any((world_stage<.115)|(world_stage>4.885),axis=1)]=0.
++        for i in range(len(score)):
++            cp=self.pts[i]-self.normals[i]*(s[28]+.002)
++            if not self.free(cp,cp,s[28]-.001) or not self.free(staging[i],staging[i],s[28]+.009): score[i]=0.
++        score[self.cooldown>0]=0.
++        best=int(np.argmax(score))
++        if self.contact is None:
++            self.contact=best; self.age=0
++        else:
++            self.age+=1
++            cur=self.contact
++            if score[cur]<=0 or dot[cur]<=0 or (self.age>8 and score[best]>score[cur]*1.5) or self.age>70:
++                self.contact=best; self.age=0
++        k=self.contact; n=self.normals[k]; p=self.pts[k]
++        stage=staging[k]
++        along=np.dot(robot-p,n); lateral=np.linalg.norm(robot-p-along*n)
++        if lateral<.035 and along<-.06 and along>-(s[28]+.10):
++            self.pushing=True
++            step=min(.045,max(.004,dot[k]/norm[k]*.45))
++            target=p-n*(s[28]-.008)+self.dirs[k]*step
++        else:
++            target=self.navigate(robot,stage,s[28])
++        a=(target-robot)@R.T
++        a*=min(1.,.049/max(np.max(np.abs(a)),1e-9))
++        self.last=s.copy()
++        return a
+diff --git a/results_optimized400.txt b/results_optimized400.txt
+index f77209c..cf85a10 100644
+--- a/results_optimized400.txt
++++ b/results_optimized400.txt
+@@ -321,3 +321,80 @@
+ 320 success True steps 59 err [-0.0055, -0.0, 0.0569] time 0.124
+ 321 success True steps 188 err [0.0121, -0.0049, 0.0812] time 0.444
+ 322 success True steps 95 err [-0.0142, -0.0098, 0.0055] time 0.204
++323 success True steps 218 err [-0.0183, -0.0223, -0.0196] time 0.62
++324 success True steps 239 err [0.0001, -0.0008, -0.0257] time 0.671
++325 success True steps 135 err [-0.0277, 0.0009, 0.0119] time 0.342
++326 success True steps 214 err [0.0133, 0.0055, -0.0125] time 0.613
++327 success True steps 190 err [0.029, 0.0125, -0.0228] time 0.502
++328 success True steps 282 err [0.0048, 0.0078, -0.0041] time 0.806
++329 success True steps 143 err [0.0021, 0.0176, 0.0069] time 0.431
++330 success True steps 189 err [0.0029, -0.0023, -0.012] time 0.578
++331 success True steps 115 err [-0.0427, -0.0174, -0.0224] time 0.333
++332 success True steps 123 err [0.0082, 0.011, 0.0387] time 0.357
++333 success True steps 187 err [-0.0236, -0.0231, 0.0786] time 0.533
++334 success True steps 251 err [0.0028, 0.0018, 0.0089] time 0.69
++335 success True steps 115 err [0.0279, -0.0196, -0.0361] time 0.353
++336 success True steps 214 err [-0.0111, 0.0093, 0.0031] time 0.635
++337 success True steps 238 err [-0.0026, -0.0063, 0.0262] time 0.623
++338 success True steps 161 err [-0.0067, 0.0215, -0.0085] time 0.384
++339 success True steps 168 err [0.0114, 0.0062, -0.0259] time 0.454
++340 success True steps 153 err [0.0035, 0.0128, 0.0283] time 0.459
++341 success True steps 113 err [-0.0009, -0.0299, -0.0507] time 0.322
++342 success True steps 134 err [0.0085, 0.0078, 0.0034] time 0.407
++343 success True steps 88 err [0.0121, 0.0209, 0.0109] time 0.263
++344 success True steps 138 err [0.0206, -0.0234, -0.0287] time 0.419
++345 success True steps 210 err [0.0056, 0.0197, -0.0379] time 0.66
++346 success True steps 147 err [0.0092, -0.0079, 0.0115] time 0.429
++347 success True steps 177 err [0.0113, 0.0082, 0.1251] time 0.542
++348 success True steps 137 err [0.0269, -0.0048, -0.0093] time 0.361
++349 success True steps 132 err [0.0081, -0.0242, -0.0497] time 0.373
++350 success True steps 215 err [-0.0044, 0.0007, -0.0827] time 0.626
++351 success True steps 135 err [0.0031, 0.0176, -0.0219] time 0.404
++352 success True steps 138 err [0.0192, 0.0016, 0.0517] time 0.368
++353 success True steps 159 err [-0.0077, 0.0061, -0.0303] time 0.424
++354 success True steps 169 err [0.0, 0.0365, -0.0051] time 0.457
++355 success True steps 110 err [0.0313, -0.0013, -0.0032] time 0.283
++356 success True steps 165 err [0.0158, -0.02, -0.0044] time 0.455
++357 success True steps 149 err [-0.0006, -0.005, -0.0026] time 0.386
++358 success True steps 182 err [-0.0196, 0.0028, -0.0217] time 0.523
++359 success True steps 186 err [-0.036, 0.0065, -0.0287] time 0.525
++360 success True steps 110 err [-0.0174, -0.0214, -0.0204] time 0.322
++361 success True steps 103 err [0.019, 0.0011, -0.0834] time 0.275
++362 success True steps 58 err [0.0107, -0.0213, 0.0481] time 0.15
++363 success True steps 167 err [0.0175, -0.003, 0.0091] time 0.472
++364 success True steps 77 err [-0.0105, -0.0276, -0.0324] time 0.208
++365 success True steps 170 err [-0.05, -0.0056, 0.0672] time 0.454
++366 success True steps 148 err [-0.0035, -0.0411, -0.0516] time 0.43
++367 success True steps 179 err [-0.019, -0.0247, 0.0792] time 0.523
++368 success True steps 116 err [-0.017, 0.0016, 0.0592] time 0.335
++369 success True steps 91 err [0.001, 0.0176, 0.0015] time 0.241
++370 success True steps 174 err [0.0114, -0.0074, 0.0192] time 0.495
++371 success True steps 125 err [-0.044, -0.0012, -0.0228] time 0.374
++372 success True steps 117 err [0.0194, -0.0107, 0.0222] time 0.3
++373 success True steps 138 err [-0.0275, -0.027, 0.0239] time 0.387
++374 success True steps 178 err [0.02, 0.0126, -0.0209] time 0.48
++375 success True steps 124 err [-0.0098, 0.0006, -0.0444] time 0.321
++376 success True steps 225 err [-0.0011, 0.0183, 0.0061] time 0.625
++377 success True steps 153 err [-0.0053, -0.0312, -0.0497] time 0.495
++378 success True steps 145 err [-0.0086, 0.0284, -0.0063] time 0.409
++379 success True steps 141 err [-0.0262, 0.0126, -0.0072] time 0.357
++380 success True steps 150 err [0.0168, 0.0016, 0.0533] time 0.422
++381 success True steps 159 err [0.0133, 0.0085, -0.0279] time 0.465
++382 success True steps 206 err [-0.0051, -0.0079, -0.0278] time 0.592
++383 success True steps 163 err [0.0219, 0.0254, 0.011] time 0.459
++384 success True steps 102 err [-0.0296, -0.0153, 0.0875] time 0.312
++385 success True steps 125 err [-0.0346, 0.0004, -0.0065] time 0.324
++386 success True steps 164 err [0.0261, -0.0028, 0.034] time 0.466
++387 success True steps 121 err [0.0032, 0.0084, 0.0002] time 0.312
++388 success True steps 144 err [-0.0059, 0.0023, 0.0168] time 0.461
++389 success True steps 134 err [0.0231, -0.0251, 0.007] time 0.352
++390 success True steps 115 err [0.0283, -0.0017, 0.0482] time 0.327
++391 success True steps 125 err [-0.0216, 0.0024, -0.0563] time 0.354
++392 success True steps 147 err [0.012, -0.0055, -0.0144] time 0.418
++393 success True steps 184 err [0.0061, -0.0143, -0.0171] time 0.451
++394 success True steps 116 err [0.032, 0.0036, -0.0428] time 0.372
++395 success True steps 171 err [-0.0052, -0.0141, -0.0341] time 0.503
++396 success True steps 167 err [-0.0013, -0.001, -0.034] time 0.444
++397 success True steps 101 err [-0.0337, 0.0016, 0.0205] time 0.314
++398 success True steps 52 err [0.0054, 0.0337, 0.0264] time 0.178
++399 success True steps 197 err [-0.0273, -0.0098, 0.0313] time 0.508
+diff --git a/results_stress.txt b/results_stress.txt
+new file mode 100644
+index 0000000..391903c
+--- /dev/null
++++ b/results_stress.txt
+@@ -0,0 +1,63 @@
++2009 success True steps 85 err [-0.0039, -0.0046, 0.0136] time 0.27
++2025 success True steps 121 err [0.0134, -0.0137, 0.011] time 0.344
++2035 success True steps 165 err [-0.0209, -0.0043, -0.035] time 0.479
++2052 success True steps 85 err [0.0474, -0.0199, 0.0036] time 0.272
++2053 success True steps 184 err [0.0137, 0.0005, 0.009] time 0.514
++2088 success True steps 119 err [-0.0185, 0.0108, -0.0686] time 0.345
++2111 success True steps 125 err [0.0191, 0.0143, -0.0531] time 0.317
++2117 success True steps 177 err [-0.021, 0.046, 0.0176] time 0.637
++2178 success True steps 159 err [0.0147, -0.0064, -0.079] time 0.429
++2236 success True steps 237 err [0.0082, 0.0005, -0.0495] time 0.636
++2321 success True steps 184 err [0.0196, 0.0079, 0.089] time 0.544
++2371 success True steps 182 err [0.0223, -0.0145, 0.002] time 0.528
++2387 success False steps 1000 err [0.1425, 0.5467, 0.5112] time 3.106
++2390 success True steps 132 err [-0.0122, -0.0103, 0.0293] time 0.373
++2397 success True steps 123 err [0.0034, 0.009, -0.0206] time 0.365
++2413 success True steps 331 err [-0.0273, -0.0182, 0.041] time 1.018
++2414 success True steps 264 err [-0.0085, -0.0162, -0.0028] time 0.781
++2538 success True steps 162 err [0.0077, -0.0137, 0.0121] time 0.458
++2614 success True steps 135 err [0.0096, 0.0057, -0.0629] time 0.404
++2636 success True steps 124 err [0.0083, -0.0135, -0.018] time 0.375
++2679 success True steps 175 err [0.0009, 0.0111, -0.0032] time 0.558
++2686 success True steps 190 err [-0.0012, -0.008, -0.0072] time 0.58
++2749 success True steps 861 err [-0.0145, 0.0192, -0.0017] time 2.675
++2813 success True steps 69 err [0.0224, 0.0036, 0.0419] time 0.169
++2817 success True steps 222 err [-0.027, 0.0003, 0.0114] time 0.625
++2857 success True steps 237 err [-0.0041, 0.0009, 0.023] time 0.743
++2896 success True steps 154 err [0.0251, 0.0151, -0.0636] time 0.459
++2898 success True steps 180 err [-0.0027, 0.0296, 0.0087] time 0.519
++2954 success True steps 95 err [0.0515, 0.0036, -0.0021] time 0.29
++2979 success True steps 225 err [0.0124, -0.0015, -0.0151] time 0.633
++3008 success True steps 276 err [0.008, 0.0294, 0.0345] time 0.835
++3135 success True steps 149 err [0.0034, -0.0171, 0.0417] time 0.488
++3151 success True steps 106 err [0.0211, -0.0288, -0.0033] time 0.25
++3254 success True steps 159 err [-0.0035, -0.0098, 0.0486] time 0.516
++3279 success True steps 197 err [-0.0063, -0.0236, -0.0169] time 0.564
++3296 success True steps 162 err [-0.0106, -0.0081, 0.0143] time 0.455
++3326 success True steps 192 err [-0.0119, -0.0261, 0.0925] time 0.58
++3381 success True steps 107 err [-0.0255, 0.0242, -0.011] time 0.26
++3392 success True steps 165 err [0.0151, 0.002, 0.0293] time 0.453
++3393 success True steps 191 err [-0.0006, -0.007, -0.01] time 0.599
++3425 success True steps 124 err [0.0125, 0.0138, 0.0583] time 0.38
++3426 success True steps 221 err [0.0189, 0.0407, 0.0282] time 0.633
++3459 success True steps 194 err [0.01, -0.0043, -0.0329] time 0.442
++3603 success True steps 142 err [-0.0017, -0.0159, -0.0382] time 0.337
++3608 success True steps 129 err [-0.0077, 0.0144, -0.0319] time 0.296
++3610 success True steps 218 err [-0.0057, -0.0019, -0.0153] time 0.527
++3617 success True steps 74 err [0.0092, -0.0174, 0.0951] time 0.175
++3621 success True steps 205 err [-0.0096, -0.0211, 0.0513] time 0.5
++3633 success True steps 157 err [-0.0281, -0.016, -0.0051] time 0.42
++3637 success True steps 294 err [0.0219, -0.0085, 0.0149] time 0.727
++3645 success True steps 199 err [0.0246, 0.0317, -0.0073] time 0.481
++3647 success True steps 172 err [0.0014, 0.004, -0.012] time 0.395
++3737 success True steps 165 err [-0.0238, -0.025, 0.0934] time 0.362
++3780 success True steps 61 err [-0.0197, -0.0161, 0.0024] time 0.149
++3799 success True steps 198 err [0.0076, 0.0037, -0.0423] time 0.464
++3803 success True steps 249 err [0.0038, -0.0033, 0.0268] time 0.654
++3815 success True steps 127 err [-0.0086, -0.0355, 0.0581] time 0.292
++3846 success True steps 139 err [-0.0045, 0.0042, -0.0219] time 0.316
++3854 success True steps 134 err [-0.0262, 0.0014, -0.0807] time 0.294
++3860 success True steps 285 err [0.0092, 0.0109, 0.0213] time 0.671
++3867 success True steps 83 err [0.0231, -0.0114, 0.0218] time 0.185
++3964 success True steps 95 err [-0.0007, 0.0114, 0.0318] time 0.227
++3996 success True steps 126 err [-0.0074, -0.0008, 0.0375] time 0.286

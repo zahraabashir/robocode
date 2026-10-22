@@ -1,0 +1,25 @@
+diff --git a/approach.py b/approach.py
+index f6208e8..fb8e528 100644
+--- a/approach.py
++++ b/approach.py
+@@ -34,7 +34,8 @@ class GeneratedApproach:
+         x=self._v(state,name,"pose_x"); self.start_x=x
+         pick_bx=-.12
+         model_x=x
+-        if name=="target_block" and self.region[0]>x+.15:
++        forward_retracted=(name=="target_block" and self.region[0]>x+.15)
++        if forward_retracted:
+             # Pick with the base retracted and the arm extended.  The stored base
+             # travel then supplies forward workspace during transport.
+             pick_bx=-.30; model_x=x+.18
+@@ -43,6 +44,10 @@ class GeneratedApproach:
+         triples=[(base[0]-.10,base[1],base[2]),base,(base[0]+.08,base[1],base[2]),
+                  (base[0],base[1]-.10,base[2]-.10),(base[0],base[1]+.10,base[2]+.10),
+                  (base[0],base[1],base[2]-.18),(base[0],base[1],base[2]+.18)]
++        if forward_retracted:
++            # The centered pose closes to finger_state ~= .1 on this branch and
++            # cannot reopen. Use offset grasps with useful finger clearance.
++            triples=[triples[2],triples[3],triples[4],triples[5],triples[6],triples[0]]
+         if model_x<.23:
+             for q2 in (.10,.20,.30,.40):
+                 for q4 in (-2.50,-2.35,-2.20):

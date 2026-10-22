@@ -1,0 +1,32 @@
+diff --git a/approach.py b/approach.py
+index 79896a0..40f3211 100644
+--- a/approach.py
++++ b/approach.py
+@@ -86,6 +86,7 @@ class GeneratedApproach:
+         self.plan = []
+         self.last_pose = None
+         self.margin = (0.012, 0.03, 0.07)
++        self.t_used = 0.0
+         self.push_count = 0
+         self.t_used = 0.0
+ 
+@@ -414,7 +415,6 @@ class GeneratedApproach:
+             self.plan = []
+         if not self.plan:
+             self.push_count = 0
+-        self.t_used = 0.0
+             t0 = time.time()
+             look = self.LOOK if self.t_used < 25.0 else 0
+             try:
+diff --git a/res_1000.txt b/res_1000.txt
+new file mode 100644
+index 0000000..1ce7722
+--- /dev/null
++++ b/res_1000.txt
+@@ -0,0 +1,6 @@
++Traceback (most recent call last):
++  File "/sandbox/test_approach.py", line 3, in <module>
++    from approach import GeneratedApproach
++  File "/sandbox/approach.py", line 418
++    t0 = time.time()
++IndentationError: unexpected indent

@@ -1,0 +1,48 @@
+diff --git a/approach.py b/approach.py
+index c88fb43..945dc26 100644
+--- a/approach.py
++++ b/approach.py
+@@ -12,10 +12,22 @@ class GeneratedApproach:
+         rects = state.get_objects(self.types["rectangle"])
+         target_name = state.get_objects(self.types["target_block"])[0].name
+         target = state.get_object_from_name(target_name)
+-        obstacles = [o for o in rects if o.type.name == "rectangle" and state.get(o, "static") < 0.5]
++        surface = state.get_objects(self.types["target_surface"])[0]
++        sx, sw = state.get(surface, "x"), state.get(surface, "width")
++        tx, tw = state.get(target, "x"), state.get(target, "width")
++        target_angle = state.get(target, "theta")
++        target_hx = 0.5 * (abs(math.cos(target_angle)) * tw +
++                           abs(math.sin(target_angle)) * state.get(target, "height"))
++        all_obstacles = [o for o in rects
++                         if o.type.name == "rectangle" and state.get(o, "static") < 0.5]
++        def blocks_goal(o):
++            angle = state.get(o, "theta")
++            hx = 0.5 * (abs(math.cos(angle)) * state.get(o, "width") +
++                        abs(math.sin(angle)) * state.get(o, "height"))
++            return abs(state.get(o, "x") - sx) < target_hx + hx + 0.025
++        obstacles = [o for o in all_obstacles if blocks_goal(o)]
+         obstacles.sort(key=lambda o: -state.get(o, "height"))
+         # Temporarily lift the target only when it crowds an obstacle's access.
+-        tx, tw = state.get(target, "x"), state.get(target, "width")
+         crowded = any(abs(tx - state.get(o, "x")) <
+                       0.5 * (tw + state.get(o, "width")) + 0.14 for o in obstacles)
+         def top_y(o):
+@@ -26,9 +38,6 @@ class GeneratedApproach:
+         tasks = sorted(obstacles, key=top_y, reverse=True)
+         if crowded:
+             target_top = top_y(target)
+-            target_angle = state.get(target, "theta")
+-            target_hx = 0.5 * (abs(math.cos(target_angle)) * tw +
+-                               abs(math.sin(target_angle)) * state.get(target, "height"))
+             def must_precede_target(o):
+                 angle = state.get(o, "theta")
+                 hx = 0.5 * (abs(math.cos(angle)) * state.get(o, "width") +
+@@ -41,8 +50,6 @@ class GeneratedApproach:
+             tasks.insert(insert_at, target)
+         self.todo = [o.name for o in tasks]
+         self.todo.append(target_name)  # retrieve it last for the actual placement
+-        surface = state.get_objects(self.types["target_surface"])[0]
+-        sx, sw = state.get(surface, "x"), state.get(surface, "width")
+         # Greedily reserve floor-clear parking columns, preferring positions far
+         # from both the pickup and goal.  The grid is count-independent.
+         # Keep parking poses one base radius away from both side walls.

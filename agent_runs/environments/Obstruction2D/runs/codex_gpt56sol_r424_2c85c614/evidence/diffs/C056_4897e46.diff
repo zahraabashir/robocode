@@ -1,0 +1,26 @@
+diff --git a/approach.py b/approach.py
+index 0167393..0d50efd 100644
+--- a/approach.py
++++ b/approach.py
+@@ -141,6 +141,21 @@ class GeneratedApproach:
+         ox, oy = state.get(obj, "x"), state.get(obj, "y")
+         width = state.get(obj, "width")
+ 
++        if not is_target and obj.type.name == "rectangle" and self.phase in ("rise", "align"):
++            angle = state.get(obj, "theta")
++            obstacle_hx = 0.5 * (abs(math.cos(angle)) * width +
++                                 abs(math.sin(angle)) * state.get(obj, "height"))
++            target = state.get_objects(self.types["target_block"])[0]
++            target_angle = state.get(target, "theta")
++            target_hx = 0.5 * (abs(math.cos(target_angle)) * state.get(target, "width") +
++                               abs(math.sin(target_angle)) * state.get(target, "height"))
++            if abs(ox - state.get(surface, "x")) >= obstacle_hx + target_hx + 0.12:
++                self.index += 1
++                self.retry, self.attached = 0, False
++                self.phase = "rise"
++                self.last_robot_x = None
++                return self._action()
++
+         if self.phase == "orient":
+             err = (-math.pi / 2 - theta + math.pi) % (2 * math.pi) - math.pi
+             if abs(err) < 0.025:

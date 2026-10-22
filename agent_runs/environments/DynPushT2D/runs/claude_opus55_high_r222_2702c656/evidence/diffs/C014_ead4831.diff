@@ -1,0 +1,82 @@
+diff --git a/approach.py b/approach.py
+index 9f56a2c..e43c919 100644
+--- a/approach.py
++++ b/approach.py
+@@ -16,6 +16,14 @@ def rot(th):
+     return np.array([[c, -s], [s, c]])
+ 
+ 
++# empirical centers of rotation (block local frame) for rotation pushes
++COR = {
++    'Rsl': (0.232, -0.151), 'Rsr': (-0.23, -0.124),
++    'Rbot+': (-0.8, 0.406), 'Rbot-': (0.847, 0.413),
++    'Rtop+': (-0.268, -0.565), 'Rtop-': (0.276, -0.562),
++}
++
++
+ class Block:
+     def __init__(self, obs):
+         self.x, self.y, self.th = obs[0], obs[1], obs[2]
+@@ -80,6 +88,8 @@ class GeneratedApproach:
+         self.pos_tol = 0.012
+         self.ang_tol = math.radians(3.5)
+         self.lam = 0.3
++        self.kres = 1.2
++        self.kpush = 20.0
+         self.obl = 0.0
+         self.tk = 0.6
+         self.rot_end = math.radians(1.0)
+@@ -134,6 +144,15 @@ class GeneratedApproach:
+             out.append((name, p, n, k, torque))
+         return out
+ 
++    def wall_margin_pose(self, B, p, th):
++        Rm = rot(th)
++        m = 1e9
++        for (x0, x1, y0, y1) in B.rects:
++            for c in ((x0, y0), (x0, y1), (x1, y0), (x1, y1)):
++                wp = p + Rm @ np.array(c)
++                m = min(m, wp[0], wp[1], 5.0 - wp[0], 5.0 - wp[1])
++        return m
++
+     def wall_margin(self, B, shift):
+         m = 1e9
+         for (x0, x1, y0, y1) in B.rects:
+@@ -168,15 +187,30 @@ class GeneratedApproach:
+                     continue
+                 if not self.reachable(B, p, n):
+                     continue
+-                nw = B.dir_world(n)
+-                s = abs(tq) * 0.5 + (float(nw @ err) / (dist + 1e-9)) * min(dist, 1.0)
+-                s -= self.lam * self.path_len(B, self.rp, B.to_world(p - n * (R_ROBOT + 0.04)))
+-                m = self.wall_margin(B, nw * 0.3)
+-                if m < 0.25:
+-                    s -= 10 + (0.25 - m) * 10
++                cl = np.array(COR[name])
++                cw = B.to_world(cl)
++                arm = float(np.linalg.norm(p - cl))
++                ang = dth
++                c_, s_ = math.cos(ang), math.sin(ang)
++                Rr = np.array([[c_, -s_], [s_, c_]])
++                pf = cw + Rr @ (B.p - cw)
++                resid = float(np.linalg.norm(g - pf))
++                path = self.path_len(B, self.rp, B.to_world(p - n * (R_ROBOT + 0.04)))
++                cost = (path + abs(dth) * arm + self.kres * resid) / 0.05 + (self.kpush if resid > 0.03 else 0.0)
++                # wall check along the predicted rotation
++                m = 1e9
++                for f in (0.5, 1.0):
++                    a2 = dth * f
++                    c2, s2 = math.cos(a2), math.sin(a2)
++                    R2 = np.array([[c2, -s2], [s2, c2]])
++                    p2 = cw + R2 @ (B.p - cw)
++                    m = min(m, self.wall_margin_pose(B, p2, B.th + a2))
++                if m < 0.2:
++                    cost += 1000 + (0.2 - m) * 1000
++                s = -cost
+                 if s > bs:
+                     bs, best = s, pr
+-            if best is not None and bs > -5:
++            if best is not None and bs > -900:
+                 return best, dth, g
+             if best is not None and self.wall_margin(B, np.zeros(2)) > 0.45:
+                 return best, dth, g

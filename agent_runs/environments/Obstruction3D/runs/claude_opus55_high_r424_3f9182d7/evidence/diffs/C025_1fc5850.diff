@@ -1,0 +1,26 @@
+diff --git a/approach.py b/approach.py
+index 8910876..103e1ca 100644
+--- a/approach.py
++++ b/approach.py
+@@ -154,13 +154,10 @@ class GeneratedApproach:
+         gz = p[2] + 0.035  # TCP height for grasp (object centre 2-5 cm below TCP works)
+         return [
+             ('move', np.array([p[0], p[1], max(SAFE_Z, gz + 0.05)]), yaw, False),
+-            ('move', np.array([p[0], p[1], gz + 0.02]), yaw, False),
+             ('move', np.array([p[0], p[1], gz]), yaw, True),
+             ('close', obj.name, p.copy(), yaw, [0.045, 0.03, 0.05, 0.025]),
+-            ('move', np.array([p[0], p[1], gz + 0.03]), yaw, False),
+             ('move', np.array([p[0], p[1], SAFE_Z]), yaw, False),
+             ('place_move', place_center + np.array([0, 0, SAFE_Z - place_center[2]]), yaw, False),
+-            ('place_move', place_center + np.array([0, 0, 0.02]), yaw, False),
+             ('place_move', place_center, yaw, True),
+             ('open', place_center, yaw),
+             ('move_rel_up', SAFE_Z, yaw),
+@@ -176,7 +173,6 @@ class GeneratedApproach:
+         return [
+             ('move_rel_up', SAFE_Z, yaw),
+             ('place_move', place_center + np.array([0, 0, SAFE_Z - place_center[2]]), yaw, False),
+-            ('place_move', place_center + np.array([0, 0, 0.02]), yaw, False),
+             ('place_move', place_center, yaw, True),
+             ('open', place_center, yaw),
+             ('move_rel_up', SAFE_Z, yaw),

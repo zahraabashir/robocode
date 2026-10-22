@@ -1,0 +1,54 @@
+diff --git a/approach.py b/approach.py
+index fa730d8..fb75a6f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -158,7 +158,8 @@ class TModel:
+ class GeneratedApproach:
+     def __init__(self, action_space, observation_space, primitives):
+         self.action_space = action_space
+-        self.alpha = 50.0
++        self.goal_bonus = 0.05
++        self.overhead = 2.0
+         self.H = 40
+         self.replan_every = 8
+         self.model = None
+@@ -248,18 +249,19 @@ class GeneratedApproach:
+         travel = np.where(HERE, 0.0, self.travel_est(robot, PRE, pose) + 0.12 / MAXD)
+         cur = np.repeat(pose[None], N, 0)
+         rob = SW.copy()
+-        bestscore = np.full(N, np.inf)
++        bestscore = np.full(N, -np.inf)
+         bestk = np.zeros(N, int)
+         H = self.H
+         for k in range(1, H + 1):
+             cur, rob = self.sim.step(cur, rob, DW * SP[:, None])
+             cst = self.cost(cur)
+             done = self.in_goal(cur, 0.75)
+-            score = np.where(done, 0.0, self.alpha * cst) + k + travel
+-            m = score < bestscore
++            cst = np.where(done, -self.goal_bonus, cst)
++            score = (c0 - cst) / (k + travel + self.overhead)
++            m = score > bestscore
+             bestscore[m] = score[m]
+             bestk[m] = k
+-        i = int(np.argmin(bestscore))
++        i = int(np.argmax(bestscore))
+         return SW[i], DW[i] * SP[i], bestk[i], bestscore[i], c0, HERE[i]
+ 
+     def in_goal(self, poses, frac=1.0):
+diff --git a/dbg.py b/dbg.py
+index 0334dcf..b5d0511 100644
+--- a/dbg.py
++++ b/dbg.py
+@@ -6,9 +6,9 @@ env=make_env(); obs,_=env.reset(seed=int(sys.argv[1]))
+ ap=GeneratedApproach(None,None,{}); ap.reset(obs,{})
+ orig=ap.plan_push
+ def pp(pose,robot):
+-    r=orig(pose,robot); print("PLAN pose",pose,"cost %.3f pred %.3f k %d"%(r[4],r[3],r[2]), "start",r[0],"dir",r[1]); return r
++    r=orig(pose,robot); print("PLAN pose",pose,"rob",robot,"cost %.3f score %.3f k %d here %d"%(r[4],r[3],r[2],r[5]), "start",r[0],"dir",r[1]); return r
+ ap.plan_push=pp
+ for i in range(int(sys.argv[2])):
+     a=ap.get_action(obs)
+     obs,r,te,tr,_=env.step(a)
+-print(obs[[0,1,2,16,17]], ap.mode, ap.path)
++    if te: print("DONE",i); break

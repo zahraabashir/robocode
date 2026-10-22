@@ -1,0 +1,36 @@
+diff --git a/approach.py b/approach.py
+index 3484da4..2968644 100644
+--- a/approach.py
++++ b/approach.py
+@@ -6,6 +6,7 @@ import heapq
+ def rot(a):
+  c,s=math.cos(a),math.sin(a)
+  return np.array([[c,-s],[s,c]])
++def action(d):return d/max(1.,float(np.max(np.abs(d)))/.049)
+ def wrap(a):return (a+math.pi)%(2*math.pi)-math.pi
+ 
+ class GeneratedApproach:
+@@ -57,7 +58,7 @@ class GeneratedApproach:
+  def rate(self,s,p,n):
+   R=rot(s[2]);w,h,v=s[12:15]
+   cy=-(h*w/2+v*(w+v/2))/(h+v);c=np.array([0.,cy]);r=p-c
+-  force=-n;moment=np.cross(r,force);j=.18
++  force=-n;moment=np.cross(r,force);j=(h*((h*h+w*w)/12+(-w/2-cy)**2)+v*((w*w+v*v)/12+(-w-v/2-cy)**2))/(h+v)
+   omega=moment/j;vel=force-omega*np.array([-c[1],c[0]])
+   ep=(s[29:31]-s[:2])@R;ea=wrap(s[31]-s[2]);weight=.5
+   twist=np.r_[vel,weight*omega];error=np.r_[ep,weight*ea]
+@@ -81,7 +82,7 @@ class GeneratedApproach:
+    if np.linalg.norm(target-s[16:18])<.025:self.phase='push';self.age=0
+    else:
+     route=self.path(s[16:18],target,s)
+-    return np.clip(route[0]-s[16:18],-.049,.049)
++    return action(route[0]-s[16:18])
+   gain,twist,error=self.rate(s,p,n)
+   best=max(self.rate(s,x,y)[0] for x,y in self.candidates(s))
+   if (self.age>8 and gain<best*.6) or gain<.008 or self.age>110:
+@@ -89,4 +90,4 @@ class GeneratedApproach:
+    return np.clip(R@n*.045,-.049,.049)
+   scale=np.clip(np.dot(error,twist)/(np.dot(twist,twist)+1e-9),.003,.035)
+   target=s[:2]+R@(p+n*(.099-scale))
+-  return np.clip(target-s[16:18],-.049,.049)
++  return action(target-s[16:18])

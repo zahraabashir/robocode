@@ -1,0 +1,60 @@
+diff --git a/approach.py b/approach.py
+index 52884a2..e24294f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -26,13 +26,12 @@ class GeneratedApproach:
+         for o in self.objects(state, 'obstacle'):
+             p = self.xy(state, o)
+             h = np.array([state.get(o, 'half_x'), state.get(o, 'half_y')])
+-            self.rects.append((p-h-.19, p+h+.19))
++            self.rects.append((p-h, p+h))
+             if state.get(o, 'half_z') > .1:
+                 self.occluders.append((p-h, p+h))
+-        self.rects.append((np.array([-.24, -1.69]), np.array([.24, 1.69])))
+-        self.occluders.append((np.array([-.05,-1.5]),np.array([.05,1.5])))
+-        self.rects.append((self.lander-np.array([.5,.4]),self.lander+np.array([.5,.4])))
+-        axis = np.arange(-2.3, 2.301, .1)
++        self.rects.append((np.array([-.05, -3.]), np.array([.05, 3.])))
++        self.rects.append((self.lander-np.array([.3,.25]),self.lander+np.array([.3,.25])))
++        axis = np.arange(-2.2, 2.201, .1)
+         self.size = len(axis)
+         xx, yy = np.meshgrid(axis, axis)
+         self.points = np.column_stack([xx.ravel(), yy.ravel()])
+@@ -50,9 +49,9 @@ class GeneratedApproach:
+         self.tick = 0
+ 
+     def valid(self, pts):
+-        good = np.all(np.abs(pts) <= 2.31, axis=-1)
++        good = np.all(np.abs(pts) <= 2.265, axis=-1)
+         for lo,hi in self.rects:
+-            good &= ~np.all((pts >= lo) & (pts <= hi),axis=-1)
++            good &= np.linalg.norm(np.maximum(np.maximum(lo-pts,pts-hi),0),axis=-1) > .182
+         return good
+ 
+     def visible(self, pts, target, radius):
+@@ -126,7 +125,7 @@ class GeneratedApproach:
+         for task in candidates:
+             pp,cost=self.route(p,self.masks[task],other)
+             cost+=2 if task[0]=='image' else 0
+-            if cost<score:best=task;score=cost;path=pp
++            if cost<score and cost<1e5:best=task;score=cost;path=pp
+         if best is None:
+             if self.pending(s,r):best=('send',0);path,_=self.route(p,self.masks[best],other)
+             else:
+@@ -161,12 +160,14 @@ class GeneratedApproach:
+             path=self.paths[r]
+             while path and np.max(np.abs(path[0]-p))<.025:path.pop(0)
+             dest=p.copy()
+-            for point in path[:5]:
++            selected=-1
++            for pi,point in enumerate(path[:5]):
+                 d=point-p
+                 if np.max(np.abs(d))>.20001:break
+                 probes=p+np.linspace(0,1,5)[:,None]*d
+-                if np.all(self.valid(probes)) and np.linalg.norm(point-pos[1-r])>.4:dest=point.copy()
++                if np.all(self.valid(probes)) and np.linalg.norm(point-pos[1-r])>.4:dest=point.copy();selected=pi
+                 else:break
++            if selected>0:del path[:selected]
+             d=np.clip(dest-p,-.2,.2)
+             q=p+d
+             op=0.

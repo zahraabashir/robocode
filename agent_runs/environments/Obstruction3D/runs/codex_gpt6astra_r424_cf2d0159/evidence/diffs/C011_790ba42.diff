@@ -1,0 +1,57 @@
+diff --git a/approach.py b/approach.py
+index 6009fd9..a73e26e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -33,6 +33,8 @@ class GeneratedApproach:
+         self.steps=0
+         self.qhigh=ik(.45,.30)
+         self.qlow=ik(.45,.1)
++        self.down=[ik(.45,z) for z in np.arange(.28,.059,-.02)]
++        self.di=0
+     def get_action(self,state):
+         self.steps+=1
+         robot=next(iter(state.get_objects(self.robot_type)))
+@@ -51,8 +53,10 @@ class GeneratedApproach:
+             action[:2]=tp[:2]-[.45,.001]-b
+             if np.max(abs(action[:2]))<.001:self.phase=2
+         elif self.phase==2:
+-            action[3:10]=self.qlow-q
+-            if np.max(abs(action[3:10]))<.001:self.phase=3
++            action[3:10]=self.down[min(self.di,len(self.down)-1)]-q
++            action[10]=-1
++            if state.get(robot,'grasp_active')>.5:self.phase=4
++            elif np.max(abs(action[3:10]))<.001:self.di+=1
+         elif self.phase==3:
+             action[10]=-1
+             self.phase=4
+@@ -66,4 +70,6 @@ class GeneratedApproach:
+             action[3:10]=ik(.45,.11)-q
+             if np.max(abs(action[3:10]))<.001:self.phase=7
+         else:action[10]=1
++        m=np.max(np.abs(action[:10]))
++        if m>.15:action[:10]*=.15/m
+         return np.clip(action,self.action_space.low,self.action_space.high).astype(np.float32)
+diff --git a/probe_vertical.log b/probe_vertical.log
+new file mode 100644
+index 0000000..de2bae7
+--- /dev/null
++++ b/probe_vertical.log
+@@ -0,0 +1,18 @@
++FAIL 0 0 FK [0.48000001 0.00100004 0.23000001]
++FAIL -0.02 0 FK [0.48000001 0.00100004 0.23000001]
++FAIL 0.02 0 FK [0.48000001 0.00100004 0.23000001]
++FAIL -0.04 0 FK [0.48000001 0.00100004 0.23000001]
++FAIL 0.04 0 FK [0.48000001 0.00100004 0.23000001]
++FAIL 0 -0.02 FK [0.48000001 0.00100004 0.23000001]
++FAIL -0.02 -0.02 FK [0.48000001 0.00100004 0.23000001]
++FAIL 0.02 -0.02 FK [0.48000001 0.00100004 0.23000001]
++FAIL -0.04 -0.02 FK [0.48000001 0.00100004 0.23000001]
++FAIL 0.04 -0.02 FK [0.48000001 0.00100004 0.23000001]
++FAIL 0 0.02 FK [0.48000001 0.00100004 0.23000001]
++FAIL -0.02 0.02 FK [0.48000001 0.00100004 0.23000001]
++FAIL 0.02 0.02 FK [0.48000001 0.00100004 0.23000001]
++FAIL -0.04 0.02 FK [0.48000001 0.00100004 0.23000001]
++FAIL 0.04 0.02 FK [0.48000001 0.00100004 0.23000001]
++FAIL 0 -0.04 FK [0.48000001 0.00100004 0.23000001]
++FAIL -0.02 -0.04 FK [0.48000001 0.00100004 0.23000001]
++FAIL 0.02 -0.04 FK [0.48000001 0.00100004 0.23000001]

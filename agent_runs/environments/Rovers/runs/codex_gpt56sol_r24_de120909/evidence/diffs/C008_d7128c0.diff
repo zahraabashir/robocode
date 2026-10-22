@@ -1,0 +1,69 @@
+diff --git a/approach.py b/approach.py
+index 477f198..c19bb42 100644
+--- a/approach.py
++++ b/approach.py
+@@ -28,6 +28,9 @@ class GeneratedApproach:
+         self.targets = [None, None]
+         self.stalls = [0, 0]
+         self.lastpos = list(self.home)
++        # Known-clear robust communication poses.  The right rover must stand
++        # above the north tip of the wall for line of sight to the lander.
++        self.radio = [(1.0, .45), self.home[1]]
+         # Pick one concrete sample of each required kind and give it to the rover
+         # already on that side of the wall.
+         self.sample_jobs = [set(), set()]
+@@ -101,7 +104,7 @@ class GeneratedApproach:
+             _,g,k=heapq.heappop(openq)
+             if g != cost.get(k): continue
+             p=pos(k)
+-            if any((p[0]-q[0])**2+(p[1]-q[1])**2 <= .15**2 for q in goals):
++            if any((p[0]-q[0])**2+(p[1]-q[1])**2 <= .19**2 for q in goals):
+                 end=k; break
+             for dx,dy in ((1,0),(-1,0),(0,1),(0,-1),(1,1),(1,-1),(-1,1),(-1,-1)):
+                 nk=(k[0]+dx,k[1]+dy); np_=pos(nk)
+@@ -140,9 +143,8 @@ class GeneratedApproach:
+                                    for o in self._get(s,"sample"))
+             if not pending_analysis:
+                 return ("drop",pos)
+-            land=self._get(s,"lander")[0]; q=(s.get(land,"x"),s.get(land,"y"))
+-            if math.dist(pos,q) <= 3.85 and self._los(pos,q,rects): return ("send",pos)
+-            cs=self._candidates(s,q,3.8,True); return ("nav_send", min(cs,key=lambda p:math.dist(pos,p)) if cs else self.home[i])
++            q=self.radio[i]
++            return ("send",pos) if math.dist(pos,q)<.16 else ("nav_send",q)
+         # Each rover handles objectives on its own side of the short south wall.
+         need=[]
+         for j,o in enumerate(self._get(s,"objective")):
+@@ -151,9 +153,9 @@ class GeneratedApproach:
+                 q=(s.get(o,"x"),s.get(o,"y")); need.append((o,q))
+         if need:
+             # If we have an unsent image and can see lander, send opportunistically.
+-            land=self._get(s,"lander")[0]; lq=(s.get(land,"x"),s.get(land,"y"))
+             if any(s.get(o,"have_image_rover%d"%i)>.5 for o in self._get(s,"objective")):
+-                if math.dist(pos,lq)<=3.85 and self._los(pos,lq,rects): return ("send",pos)
++                q=self.radio[i]
++                return ("send",pos) if math.dist(pos,q)<.16 else ("nav_send",q)
+             best=None
+             for o,q in need:
+                 # Already photographed by this rover: only needs sending.
+@@ -166,7 +168,7 @@ class GeneratedApproach:
+                     if best is None or val<best[0]: best=(val,p)
+             if best: return ("nav_image",best[1])
+             # All local images taken: go radio.
+-            cs=self._candidates(s,lq,3.8,True); return ("nav_send",min(cs,key=lambda p:math.dist(pos,p)) if cs else self.home[i])
++            return ("nav_send",self.radio[i])
+         # Execute the preassigned one-stone/one-soil jobs (possibly both on one rover).
+         soil=None
+         for kind in sorted(self.sample_jobs[i]):
+@@ -181,10 +183,8 @@ class GeneratedApproach:
+             for o in samples:
+                 q=(s.get(o,"x"),s.get(o,"y"))
+                 if s.get(o,"analyzed_rover%d"%i)>.5:
+-                    land=self._get(s,"lander")[0]; lq=(s.get(land,"x"),s.get(land,"y"))
+-                    if math.dist(pos,lq)<=3.85 and self._los(pos,lq,rects): return ("send",pos)
+-                    cs=self._candidates(s,lq,3.8,True)
+-                    return ("nav_send",min(cs,key=lambda p:math.dist(pos,p)) if cs else self.home[i])
++                    q=self.radio[i]
++                    return ("send",pos) if math.dist(pos,q)<.16 else ("nav_send",q)
+                 q=(s.get(o,"x"),s.get(o,"y"))
+                 candidates.append((math.dist(pos,q),q))
+             q=min(candidates)[1]

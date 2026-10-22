@@ -1,0 +1,48 @@
+diff --git a/approach.py b/approach.py
+index 1292f04..c01e080 100644
+--- a/approach.py
++++ b/approach.py
+@@ -18,6 +18,7 @@ class GeneratedApproach:
+         self.start_pose = np.zeros(3)
+         self.nav = []
+         self.rot_y = -0.7
++        self.rot_cap = False
+         self.line_offset = 0.0
+         self.force_move = False
+         self.start_pd = 0.0
+@@ -121,8 +122,13 @@ class GeneratedApproach:
+                     world = [obj+self._world(p,theta) for p in pts]
+                     return min(min(q[0]-.105,4.895-q[0],q[1]-.105,4.895-q[1]) for q in world)
+                 frac = max((0.80, 0.68, 0.56), key=lever_clear)
++                self.rot_cap = frac < 0.60
+                 self.rot_y = -frac*lv
+-                far0 = obj + self._world(np.array([side*(width*.5+.34), self.rot_y]), theta)
++                if self.rot_cap:
++                    far_local0 = np.array([self.turn_sign*(lh*.5+.34), 0.0])
++                else:
++                    far_local0 = np.array([side*(width*.5+.34), self.rot_y])
++                far0 = obj + self._world(far_local0, theta)
+                 self.nav = self._plan(robot, far0, obj, theta, width, lh, lv)
+             elif pd > 0.018:
+                 self.push_dir = dp / max(pd, 1e-9)
+@@ -139,11 +145,17 @@ class GeneratedApproach:
+         if self.mode.startswith("rot"):
+             # Distal-stem side contact is a reliable long rotation lever.
+             side = -self.turn_sign
+-            far_local = np.array([side * (width * 0.5 + 0.34), self.rot_y])
+-            contact_local = np.array([side * (width * 0.5 + 0.115), self.rot_y])
++            if self.rot_cap:
++                far_local = np.array([self.turn_sign*(lh*.5+.34), 0.0])
++                contact_local = np.array([self.turn_sign*(lh*.5+.115), 0.0])
++                local_force = np.array([-self.turn_sign, 0.0])
++            else:
++                far_local = np.array([side * (width * 0.5 + 0.34), self.rot_y])
++                contact_local = np.array([side * (width * 0.5 + 0.115), self.rot_y])
++                local_force = np.array([self.turn_sign, 0.0])
+             far = obj + self._world(far_local, theta)
+             contact = obj + self._world(contact_local, theta)
+-            force = self._world(np.array([self.turn_sign, 0.0]), theta)
++            force = self._world(local_force, theta)
+             if self.mode == "rot_far":
+                 disturbed = (np.linalg.norm(obj-self.start_pose[:2]) > 0.012 or
+                              abs(self._angle(theta-self.start_pose[2])) > 0.018)

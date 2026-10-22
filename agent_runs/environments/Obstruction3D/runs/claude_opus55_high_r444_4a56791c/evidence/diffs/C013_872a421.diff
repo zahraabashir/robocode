@@ -1,0 +1,99 @@
+diff --git a/approach_v2.py b/approach_v2.py
+index 4578392..47390c4 100644
+--- a/approach_v2.py
++++ b/approach_v2.py
+@@ -407,6 +407,7 @@ class GeneratedApproach:
+             plan = []
+             # escape laterally from touching neighbours before lifting
+             e = np.zeros(2)
++            touch = False
+             Ho = o.footprint()
+             for n, b in objs.items():
+                 if n == name or b.top <= o.bottom + 2e-3 or b.bottom >= o.top - 2e-3:
+@@ -419,11 +420,18 @@ class GeneratedApproach:
+                     v = np.zeros(2)
+                     v[ax] = np.sign(dxy[ax]) if dxy[ax] != 0 else 1.0
+                     e += v
+-            nf = self.fail_count.get(name, 0)
+-            if nf > 0 and np.linalg.norm(e) > 0:
+-                ang = [0, 0.6, -0.6, 1.2, -1.2][nf % 5]
+-                c_, s_ = np.cos(ang), np.sin(ang)
+-                e = np.array([c_ * e[0] - s_ * e[1], s_ * e[0] + c_ * e[1]])
++                    touch = True
++            if touch:
++                nbrs = [b for n, b in objs.items() if n != name and b.top > o.bottom + 2e-3 and b.bottom < o.top - 2e-3]
++                opts = []
++                for k in range(16):
++                    ang = 2 * np.pi * k / 16
++                    d = np.array([np.cos(ang), np.sin(ang)])
++                    sep = min([np.max(np.abs(o.p[:2] + 0.008 * d - b.p[:2]) - (Ho + b.footprint())) for b in nbrs] + [1.0])
++                    opts.append((-min(sep, 0.004) - 0.0005 * float(d @ e), k, d))
++                opts.sort(key=lambda t: t[0])
++                nf = self.fail_count.get(name, 0)
++                e = opts[nf % len(opts)][2]
+             if np.linalg.norm(e) > 0:
+                 e = e / np.linalg.norm(e)
+                 p1 = p0 + np.array([e[0] * 0.008, e[1] * 0.008, 0.002])
+diff --git a/r10v2.txt b/r10v2.txt
+new file mode 100644
+index 0000000..657da7b
+--- /dev/null
++++ b/r10v2.txt
+@@ -0,0 +1,21 @@
++0 (True, 125, 10, 92.02314901351929)
++1 (True, 119, 10, 62.70379590988159)
++2 (True, 93, 10, 62.281108140945435)
++3 (True, 78, 10, 45.84531331062317)
++4 (True, 145, 10, 90.09482216835022)
++5 (True, 114, 10, 67.0106029510498)
++6 (True, 108, 10, 75.81399321556091)
++7 (True, 160, 10, 106.01211953163147)
++8 (True, 123, 10, 85.66822290420532)
++9 (True, 87, 10, 60.09585905075073)
++10 (True, 100, 10, 71.18115091323853)
++11 (True, 100, 10, 66.59610366821289)
++12 (True, 104, 10, 72.33428025245667)
++13 (True, 135, 10, 80.5737771987915)
++14 (True, 110, 10, 64.405433177948)
++15 (True, 135, 10, 63.66275906562805)
++16 (True, 96, 10, 49.53244614601135)
++17 (True, 75, 10, 35.380539655685425)
++18 (True, 103, 10, 32.827847719192505)
++19 (True, 88, 10, 25.02454948425293)
++success 20 / 20 mean steps 109.9 max time 106.01211953163147
+diff --git a/r7v2.txt b/r7v2.txt
+new file mode 100644
+index 0000000..68f3674
+--- /dev/null
++++ b/r7v2.txt
+@@ -0,0 +1,30 @@
++0 (True, 98, 7, 54.41223621368408)
++1 (True, 104, 7, 75.31856060028076)
++2 (True, 74, 7, 49.93993282318115)
++3 (True, 77, 7, 52.8530216217041)
++4 (False, 1000, 7, 218.94374346733093)
++5 (True, 114, 7, 86.38529539108276)
++6 (True, 106, 7, 64.2974042892456)
++7 (True, 122, 7, 79.57644891738892)
++8 (True, 85, 7, 54.00593376159668)
++9 (True, 87, 7, 56.628342151641846)
++10 (True, 69, 7, 46.50450921058655)
++11 (True, 76, 7, 51.43114638328552)
++12 (True, 107, 7, 67.82582974433899)
++13 (True, 129, 7, 91.70317268371582)
++14 (True, 61, 7, 38.008939027786255)
++15 (True, 119, 7, 93.79446053504944)
++16 (True, 62, 7, 38.62404942512512)
++17 (True, 75, 7, 46.38465428352356)
++18 (True, 92, 7, 57.090057134628296)
++19 (True, 88, 7, 58.803157567977905)
++20 (True, 95, 7, 62.33549380302429)
++21 (True, 109, 7, 74.3672263622284)
++22 (True, 76, 7, 49.72415852546692)
++23 (True, 107, 7, 64.89277505874634)
++24 (True, 77, 7, 46.78782272338867)
++25 (True, 49, 7, 36.578845500946045)
++26 (True, 69, 7, 36.91229772567749)
++27 (True, 71, 7, 33.56934118270874)
++28 (True, 103, 7, 28.971372842788696)
++success 29 / 30 mean steps 88.51724137931035 max time 218.94374346733093

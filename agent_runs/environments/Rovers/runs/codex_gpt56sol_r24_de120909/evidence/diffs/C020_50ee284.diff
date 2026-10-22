@@ -1,0 +1,16 @@
+diff --git a/approach.py b/approach.py
+index b3d2885..8b86c74 100644
+--- a/approach.py
++++ b/approach.py
+@@ -160,8 +160,9 @@ class GeneratedApproach:
+     def _candidates(self, s, q, radius, require_los=True):
+         rects=self._rects(s); out=[]
+         # Fine angular rings give plenty of robust visibility choices.
+-        for rad in (min(radius*.72,1.55), min(radius*.88,1.82),
+-                    min(radius*.98,1.88), radius*.55):
++        rings=[min(radius*.72,1.55), min(radius*.88,1.68), radius*.55]
++        if radius<.5: rings.insert(0,radius*.98)
++        for rad in rings:
+             for j in range(32):
+                 a=2*math.pi*j/32
+                 p=(q[0]+rad*math.cos(a),q[1]+rad*math.sin(a))

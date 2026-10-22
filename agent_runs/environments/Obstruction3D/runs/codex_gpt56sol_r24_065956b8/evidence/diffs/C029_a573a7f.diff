@@ -1,0 +1,21 @@
+diff --git a/approach.py b/approach.py
+index 179c3a3..39ec4dd 100644
+--- a/approach.py
++++ b/approach.py
+@@ -170,7 +170,7 @@ class GeneratedApproach:
+             if np.max(np.abs(self.goal_q-q)) < .012 or self.phase_steps > 40:
+                 # Short Cartesian-like descent segments avoid a joint-space
+                 # interpolation arc that can sweep the object into the table.
+-                self.descent_z = [self.destination[2]+d for d in (.10, .055, .025, 0)]
++                self.descent_z = [self.destination[2]+d for d in (.142, .092, .052, .027, .007, 0)]
+                 self.descent_index = 0
+                 waypoint = self.destination.copy()
+                 waypoint[2] = self.descent_z[0]
+@@ -189,6 +189,7 @@ class GeneratedApproach:
+                     waypoint[2] = self.descent_z[self.descent_index]
+                     self._set_goal_for_object_delta(state, waypoint)
+                     self.phase_steps = 0
++                    return self._act_to(q, self.goal_q)
+             else:
+                 return self._act_to(q, self.goal_q)
+ 

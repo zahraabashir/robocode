@@ -1,0 +1,24 @@
+diff --git a/approach.py b/approach.py
+index 3c76b6b..ceb03a5 100644
+--- a/approach.py
++++ b/approach.py
+@@ -81,7 +81,9 @@ class GeneratedApproach:
+             if self.stalled >= 2 or ry < 0.18:
+                 self.phase = "lift"
+             else:
+-                return self._action(dy=-0.05, vac=1.0)
++                # Fine approach is essential: collision resolution rejects an
++                # overshooting move wholesale, leaving the vacuum just off-contact.
++                return self._action(dy=-0.01, vac=1.0)
+         if self.phase == "lift":
+             if oy > self.pick_y + 0.015:
+                 self.attached = True
+@@ -128,7 +130,7 @@ class GeneratedApproach:
+             if self.stalled >= 3:
+                 self.phase = "release"
+             else:
+-                return self._action(dy=-0.05, vac=1.0)
++                return self._action(dy=-0.01, vac=1.0)
+         if self.phase == "release":
+             self.release_wait += 1
+             if self.release_wait < 2:

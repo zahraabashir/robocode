@@ -1,0 +1,1417 @@
+{
+  "scope": "Same three environments and same model across all top folders",
+  "related_records": [
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/dynamic2d/dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298/2026-09-09_08-23-00/replicate_42",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/dynamic2d/dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298/2026-09-09_08-23-00/replicate_42",
+      "condition": "Blackbox",
+      "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298",
+      "replicate_seed": 42,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+        "env_id": "kinder/DynPushT2D-t1-v0"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+          "env_id": "kinder/DynPushT2D-t1-v0"
+        },
+        "replicate_seed": 42,
+        "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "67b441ea8b2614e8f98b5d6797bde4979732624229c2e6e7f8e499cbb9a16703",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "604b578901ee959763e5fbbf32381171e758a979d89afcf444ef52d8c41372ad",
+      "policy_sha256": "814c6eeef81933fd583934a204f755ccc6a7bae10a8e74d375da532295580834",
+      "thread_ids": [
+        "01a084d5-a8e4-7493-8593-e5903df901c2"
+      ]
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/dynamic2d/dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298/2026-09-09_08-23-30/replicate_24",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/dynamic2d/dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298/2026-09-09_08-23-30/replicate_24",
+      "condition": "Blackbox",
+      "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298",
+      "replicate_seed": 24,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+        "env_id": "kinder/DynPushT2D-t1-v0"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+          "env_id": "kinder/DynPushT2D-t1-v0"
+        },
+        "replicate_seed": 24,
+        "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "7814a57b6fd16950bc62d0aa9e4edaf9173139640c4606d2d61f63ea61321346",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "cee4702f9f5f5a02a295593f736315e62a1c31cd629d47f40385694eb905aabd",
+      "policy_sha256": "dec549491fdf3252f74842c94a8b2d40a9f42bf42a61d380a9c32c35864e9680",
+      "thread_ids": [
+        "01a084d6-1e9c-77e2-b752-d24dc3d27266"
+      ]
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/dynamic2d/dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298/2026-09-09_08-24-00/replicate_424",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/dynamic2d/dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298/2026-09-09_08-24-00/replicate_424",
+      "condition": "Blackbox",
+      "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298",
+      "replicate_seed": 424,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+        "env_id": "kinder/DynPushT2D-t1-v0"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+          "env_id": "kinder/DynPushT2D-t1-v0"
+        },
+        "replicate_seed": 424,
+        "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "4ee98bc2928e5c3f2c4e237c8263366df26b6651969a6c73611384ae9849f505",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "7e89c88a5954b1f3319f32ba5d2f53a4fa760c9479dbd6252515fa4a02d18fc3",
+      "policy_sha256": "de3ae7881240c921d82d2b1f35773daa569f89f696f6b900bb80bbea163ad0f4",
+      "thread_ids": [
+        "01a084d6-92de-7fe2-b4ea-e656b6ed3204"
+      ]
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/dynamic2d/dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298/2026-09-09_08-24-30/replicate_444",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/dynamic2d/dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298/2026-09-09_08-24-30/replicate_444",
+      "condition": "Blackbox",
+      "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298",
+      "replicate_seed": 444,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+        "env_id": "kinder/DynPushT2D-t1-v0"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+          "env_id": "kinder/DynPushT2D-t1-v0"
+        },
+        "replicate_seed": 444,
+        "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "fed00a8861bd372339465db44883ec6f64ea88e0cc5d3ee6b3568c174219ccf6",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "5e6701732eb5c48d092576350e01f557564d1dd11a12f7417a0302065cd035c6",
+      "policy_sha256": "25349924a7504bd804005765c57334051060199dacec5913c921ab0e9e1d4697",
+      "thread_ids": [
+        "01a084d7-09ce-71e2-9783-ac62761bbf4a"
+      ]
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/dynamic2d/dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298/2026-09-09_08-25-00/replicate_222",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/dynamic2d/dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298/2026-09-09_08-25-00/replicate_222",
+      "condition": "Blackbox",
+      "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298",
+      "replicate_seed": 222,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+        "env_id": "kinder/DynPushT2D-t1-v0"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+          "env_id": "kinder/DynPushT2D-t1-v0"
+        },
+        "replicate_seed": 222,
+        "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "2010c5fe9f73b60bcfcc63f9aa0d00f4d63ddabbe7dd71fe6fc58b2693b3c05b",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "81b7f0562ec2ad581361de8a3b06320188258def6dd29a14fccc3832e82f9a5e",
+      "policy_sha256": "9ba0a25a29d3f053a8152fca765d9fca529fe6a759f1f2926d053e7e676f0372",
+      "thread_ids": [
+        "01a084d7-7b4b-7972-87da-08e5611eab63"
+      ]
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/kinematic3d/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92/2026-09-09_15-16-06/replicate_42",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/kinematic3d/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92/2026-09-09_15-16-06/replicate_42",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92",
+      "replicate_seed": 42,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 42,
+        "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "d08cb389bc245a611a00cae0d7e9ffc2176f22143f80611d3f066d97d1702223",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "ab44ad0992eac4e6c06b3bcda0a5ebc8b950659f5106a9f7f39de1dd3bf87c0e",
+      "policy_sha256": "adfe01b82b2d3b776860c7750298f6afa65f1bd145d4a4a1e8ddfe818c06c1b3",
+      "thread_ids": [
+        "01a0864f-fc77-7202-a1c9-1c5fcbd99e1c"
+      ]
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/kinematic3d/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92/2026-09-09_15-16-36/replicate_24",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/kinematic3d/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92/2026-09-09_15-16-36/replicate_24",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92",
+      "replicate_seed": 24,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 24,
+        "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "55f236e1954d67c4a9ab0dffa7b968579f41ec8ffd04d042413d950fd1bb94f7",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "065956b84b01a8fbe4a4c9d5af0163f607d6eef65153f4b27df6da7ba9a6b349",
+      "policy_sha256": "cf1d4e931cc1c0d25ab90f290c7ae1d91d606f3a4b70e34d6bbb3a75a874814f",
+      "thread_ids": [
+        "01a08650-6f71-7e22-a7dd-a9452afe7cf6"
+      ]
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/kinematic3d/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92/2026-09-09_15-17-06/replicate_424",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/kinematic3d/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92/2026-09-09_15-17-06/replicate_424",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92",
+      "replicate_seed": 424,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 424,
+        "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "e9bd69feff75467f6733aad8676151bd9ee41f3ba6223781c3510b0a4530fc0e",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "9332a06bda163220da3bdd8cdf75cd70a9c3bed343d2b1a38267ddbb0670f415",
+      "policy_sha256": "622d5c1d4fccf641d2ab881e96849500bc31db33176bd3f6b12a3ae9f314ee2e",
+      "thread_ids": [
+        "01a08650-e988-7691-907e-fcded63d359f"
+      ]
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/kinematic3d/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92/2026-09-09_15-17-36/replicate_444",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/kinematic3d/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92/2026-09-09_15-17-36/replicate_444",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92",
+      "replicate_seed": 444,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 444,
+        "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "fa2e725e86d29e86e20c7330a53539609b783e065374e3989e9227f9a7b0f118",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "fc1b639e9013922a3a6abde964a88c5256683d217e2db9d37c6d4dd79bff7a87",
+      "policy_sha256": "5c4b9eb96b7d50fa034e8248ec479ea843468b04d4089229ff60c04684ae4753",
+      "thread_ids": [
+        "01a08651-5edd-79d2-83f9-78d10c243cbd"
+      ]
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/kinematic3d/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92/2026-09-09_15-18-06/replicate_222",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/kinematic3d/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92/2026-09-09_15-18-06/replicate_222",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92",
+      "replicate_seed": 222,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 222,
+        "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "890cb6bd351fd5dcff3a5b9f8424763bd5405614dc46288fd3863408e076be29",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "9b63ee1eb93e7179d09485106924e4faf77c5100b27d9ed4378f00aaf5adab0b",
+      "policy_sha256": "f066e6d73eac5671f378a7342e5a13b5b89eb8bdd201d3a5eb180d8de7d183c4",
+      "thread_ids": [
+        "01a08651-d47d-7fd0-a9dd-f665288dea1a"
+      ]
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/pddlstream/rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136/2026-09-11_11-32-00_rovers_main/replicate_222",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/pddlstream/rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136/2026-09-11_11-32-00_rovers_main/replicate_222",
+      "condition": "Blackbox",
+      "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136",
+      "replicate_seed": 222,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+        "design_counts": [
+          1,
+          2,
+          3
+        ],
+        "eval_counts": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+          "design_counts": [
+            1,
+            2,
+            3
+          ],
+          "eval_counts": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 222,
+        "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "c49587eb34830cf802cb2a9156aa5002d2ee1f07f0940223b8a184af93aadd3b",
+      "provenance": {
+        "kinder_revision": "473069470322df99c5f33500f1dea8e561cbe92b",
+        "kind": "fresh_strict_blackbox_generation",
+        "model_constraint": "Sol for all subagents",
+        "robocode_revision": "473069470322df99c5f33500f1dea8e561cbe92b",
+        "note": "Fresh full-budget Rovers run; smoke artifacts not reused. Revision field above pins the Rovers runtime, not KinDER."
+      },
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "8e0cac5137e9ac65431bb9d651f9d07245dfbd272d1fc4eec871be72e8c2a5ef",
+      "policy_sha256": "1a29d652272b3d712992ef4859f5ef25edb26ac0d3cc5b0d336507335468c572",
+      "thread_ids": [
+        "01a08fef-5152-7893-853d-53baedb31cda"
+      ]
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/pddlstream/rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136/2026-09-11_11-32-00_rovers_main/replicate_24",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/pddlstream/rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136/2026-09-11_11-32-00_rovers_main/replicate_24",
+      "condition": "Blackbox",
+      "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136",
+      "replicate_seed": 24,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+        "design_counts": [
+          1,
+          2,
+          3
+        ],
+        "eval_counts": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+          "design_counts": [
+            1,
+            2,
+            3
+          ],
+          "eval_counts": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 24,
+        "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "62e5e36c06e7dab433224742580cd7bc3c1b602afeecd1cd22c8563e40958d40",
+      "provenance": {
+        "kinder_revision": "473069470322df99c5f33500f1dea8e561cbe92b",
+        "kind": "fresh_strict_blackbox_generation",
+        "model_constraint": "Sol for all subagents",
+        "robocode_revision": "473069470322df99c5f33500f1dea8e561cbe92b",
+        "note": "Fresh full-budget Rovers run; smoke artifacts not reused. Revision field above pins the Rovers runtime, not KinDER."
+      },
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "de120909e47e1b4ae305c25c304b82280d69eb14ddfedcc50f9bd0291f32fa7b",
+      "policy_sha256": "4225a2b2ee15c7f62e16592b674dd4027b2f5540f6947c4d0138c6ba0b17db03",
+      "thread_ids": [
+        "01a08fcf-ded6-7932-8ba1-eeebc31b7b2c"
+      ]
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/pddlstream/rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136/2026-09-11_11-32-00_rovers_main/replicate_42",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/pddlstream/rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136/2026-09-11_11-32-00_rovers_main/replicate_42",
+      "condition": "Blackbox",
+      "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136",
+      "replicate_seed": 42,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+        "design_counts": [
+          1,
+          2,
+          3
+        ],
+        "eval_counts": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+          "design_counts": [
+            1,
+            2,
+            3
+          ],
+          "eval_counts": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 42,
+        "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "e6810ba0d757fa8baa802e9240bbab57fa6e84411d1e5c98b092d9f27d2c0d4e",
+      "provenance": {
+        "kinder_revision": "473069470322df99c5f33500f1dea8e561cbe92b",
+        "kind": "fresh_strict_blackbox_generation",
+        "model_constraint": "Sol for all subagents",
+        "robocode_revision": "473069470322df99c5f33500f1dea8e561cbe92b",
+        "note": "Fresh full-budget Rovers run; smoke artifacts not reused. Revision field above pins the Rovers runtime, not KinDER."
+      },
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "6b39dfbeb558715bda39af89e8ef492d5cf54b8ba4774c0560211ef912205762",
+      "policy_sha256": "834f8e64a9004b9eaa27071a17a2eeda23f2804b791b1fe5a5541a94bd71e550",
+      "thread_ids": [
+        "01a08fcf-6b06-7982-986b-5799a6d20202"
+      ]
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/pddlstream/rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136/2026-09-11_11-32-00_rovers_main/replicate_424",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/pddlstream/rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136/2026-09-11_11-32-00_rovers_main/replicate_424",
+      "condition": "Blackbox",
+      "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136",
+      "replicate_seed": 424,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+        "design_counts": [
+          1,
+          2,
+          3
+        ],
+        "eval_counts": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+          "design_counts": [
+            1,
+            2,
+            3
+          ],
+          "eval_counts": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 424,
+        "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "f56afec762cb412d923edf32e31bcc989d0a0a93deb5b4ae39330ecae7f3142f",
+      "provenance": {
+        "kinder_revision": "473069470322df99c5f33500f1dea8e561cbe92b",
+        "kind": "fresh_strict_blackbox_generation",
+        "model_constraint": "Sol for all subagents",
+        "robocode_revision": "473069470322df99c5f33500f1dea8e561cbe92b",
+        "note": "Fresh full-budget Rovers run; smoke artifacts not reused. Revision field above pins the Rovers runtime, not KinDER."
+      },
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "0dc2ee42cd6f96a045ad3db71b615200c793d1e564b052efad498c895af06a91",
+      "policy_sha256": "cfc66c90dd9614305ed936b4159980f0787a0ddf4b5d18a472a1ce814e5bf3df",
+      "thread_ids": [
+        "01a08fda-8f8d-7350-b4cf-152a615a4146"
+      ]
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/pddlstream/rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136/2026-09-11_11-32-00_rovers_main/replicate_444",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/pddlstream/rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136/2026-09-11_11-32-00_rovers_main/replicate_444",
+      "condition": "Blackbox",
+      "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136",
+      "replicate_seed": 444,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+        "design_counts": [
+          1,
+          2,
+          3
+        ],
+        "eval_counts": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+          "design_counts": [
+            1,
+            2,
+            3
+          ],
+          "eval_counts": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 444,
+        "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "6745e15a7ee2841f0bffeea09b495f48226870c52940cfc97c336ac9c5d5dc0d",
+      "provenance": {
+        "kinder_revision": "473069470322df99c5f33500f1dea8e561cbe92b",
+        "kind": "fresh_strict_blackbox_generation",
+        "model_constraint": "Sol for all subagents",
+        "robocode_revision": "473069470322df99c5f33500f1dea8e561cbe92b",
+        "note": "Fresh full-budget Rovers run; smoke artifacts not reused. Revision field above pins the Rovers runtime, not KinDER."
+      },
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "061884d6ae426021c24ae1e047ddfd7e19ed12924f57eb3b2aad7972a5b67db4",
+      "policy_sha256": "df3271be20729bafdcca3d92e81139c4d53a326292f944628bf1f9edfcc1fc97",
+      "thread_ids": [
+        "01a08fed-7b08-7880-b8c0-32d13a31293b"
+      ]
+    }
+  ],
+  "exact_transcript_and_policy_groups": [],
+  "note": "Groups are duplicate candidates, not independent development runs. Reevaluations identified by load_dir/provenance are not new generations. Different transcripts remain distinct even with matching policy code. No results.json contents were read."
+}

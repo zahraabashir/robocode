@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 6482434..111b37e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -333,7 +333,7 @@ class GeneratedApproach:
+             sx, sy = g(sm, "x"), g(sm, "y")
+             off = math.hypot(sx - lx, sy - ly)
+             if off <= 0.065:
+-                send &= ~(((bear >= -7) & (bear <= 34) & (Dl >= 1.5)) |
++                send &= ~(((bear >= -7) & (bear <= 31) & (Dl >= 1.5)) |
+                           ((bear >= 83) & (bear <= 109) & (Dl >= 0.55)))
+             if off <= 0.14:
+                 between = (sx - lx) * (CX - lx) + (sy - ly) * (CY - ly) > 0

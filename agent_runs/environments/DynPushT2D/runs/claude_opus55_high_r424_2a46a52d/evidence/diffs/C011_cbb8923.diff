@@ -1,0 +1,21 @@
+diff --git a/approach.py b/approach.py
+index f027227..cd24a8f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -127,6 +127,7 @@ class GeneratedApproach:
+     KMAX = 30
+     NAV_OVER = 3.0
+     LOOK = 15
++    TC_THR = 0.8
+     GRIDNAV = True
+     CURVS = (0.0, 0.02, -0.02, 0.06, -0.06)
+     CURVS2 = (0.0, 0.04, -0.04)
+@@ -281,7 +282,7 @@ class GeneratedApproach:
+                 tc = self._cost_tight(pos, th)
+                 total = nav + k
+                 score = cst + self.STEP_PEN * total
+-                score = np.where(tc < 0.8, -10.0 + 0.001 * total, score)
++                score = np.where(tc < self.TC_THR, -10.0 + 0.001 * total, score)
+                 score = np.where(alive, score, np.inf)
+                 better = score < out_score[si]
+                 if better.any():

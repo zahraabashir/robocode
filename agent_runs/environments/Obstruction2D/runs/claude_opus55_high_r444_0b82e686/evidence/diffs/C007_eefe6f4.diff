@@ -1,0 +1,55 @@
+diff --git a/approach.py b/approach.py
+index 588cb11..bea2eb7 100644
+--- a/approach.py
++++ b/approach.py
+@@ -234,6 +234,11 @@ class GeneratedApproach:
+             bw = blk["w"]
+             reserved.append((self.place_c - bw / 2 - 0.01, self.place_c + bw / 2 + 0.01))
+         cur = held["cx"]
++        future = []
++        for n in self.blockers:
++            if n in others and n not in self.done:
++                gx, gty = self._grasp_x(robot, others[n], others)
++                future.append((gx, gty))
+         best = None
+         for c in np.arange(w / 2 + 0.002, W - w / 2 - 0.002, 0.004):
+             c = float(c)
+@@ -250,8 +255,11 @@ class GeneratedApproach:
+             if self._req(rx, parts, obst) > ty + 1e-9:
+                 continue
+             # does dropping here block future block grasp/placement?
++            newob = [(a, b, FLOOR + held["h"])]
++            bparts0 = self._parts(robot)
++            if any(self._req(gx, bparts0, newob) > gty + 1e-9 for gx, gty in future):
++                continue
+             if strict and blk is not None and self.place_c is not None:
+-                newob = [(a, b, FLOOR + held["h"])]
+                 bparts = self._parts(robot)
+                 gx = blk["cx"] + self.block_g
+                 gty = blk["top"] + robot["maxarm"] + robot["gw"] + GRASP_GAP
+diff --git a/test_approach.py b/test_approach.py
+index 12b4a46..a2eeed9 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -6,6 +6,12 @@ from concurrent.futures import ThreadPoolExecutor
+ 
+ OC=None
+ def run(seed):
++    try:
++        return run_(seed)
++    except Exception as e:
++        return seed, None, 0, str(e)[:80]
++
++def run_(seed):
+     env = make_env()
+     ap = GeneratedApproach(env.action_space, env.observation_space, {})
+     obs, info = env.reset(seed=seed, options=({'object_count': OC} if OC else None))
+@@ -29,6 +35,6 @@ if __name__ == "__main__":
+     with ThreadPoolExecutor(8) as ex:
+         res = list(ex.map(run, range(s0, s0 + n)))
+     for r in res:
+-        if not r[1]: print("FAIL", r)
++        if r[1] is False: print("FAIL", r)
+     ok = [r for r in res if r[1]]
+-    print(f"success {len(ok)}/{len(res)}, mean steps (succ) {np.mean([r[2] for r in ok]) if ok else 0:.1f}")
++    print("errors", [r[0] for r in res if r[1] is None]); print(f"success {len(ok)}/{len(res)}, mean steps (succ) {np.mean([r[2] for r in ok]) if ok else 0:.1f}")

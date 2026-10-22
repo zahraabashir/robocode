@@ -1,0 +1,29 @@
+from env_client import make_env
+from kin import *
+E=make_env()
+for dest in ['blocktop','table','offtable075','offtablezero']:
+ s,_=E.reset(seed=0);r=s.get_object_from_name('robot');b=s.get_object_from_name('obstruction0');fs=['joint_'+str(i) for i in range(1,8)]
+ def vec(s):return np.array([s.get(r,f) for f in fs])
+ def goto(x,y,z,close=False):
+  global s
+  q=ik(.42,z);q[-1]=0;bx=x-.12-.42;by=y-.001
+  for k in range(16):
+   a=np.zeros(11,dtype=np.float32);a[3:10]=np.clip(q-vec(s),-.12,.12);a[0]=np.clip(bx-s.get(r,'pos_base_x'),-.12,.12);a[1]=np.clip(by-s.get(r,'pos_base_y'),-.12,.12);a[10]=-1 if close else 0;s,*_=E.step(a)
+   if np.max(np.abs(q-vec(s)))<1e-5 and abs(bx-s.get(r,'pos_base_x'))<1e-5 and abs(by-s.get(r,'pos_base_y'))<1e-5:break
+ x,y,z=[s.get(b,'pose_'+f) for f in 'xyz'];h=s.get(b,'half_extent_z');goto(x,y,.3)
+ for zt in np.arange(.3,.1,-.005):
+  goto(x,y,zt,True)
+  if s.get(r,'grasp_active'):break
+ print('GRASP',dest,s.get(r,'grasp_active'),zt,vec(s).round(3),fk(vec(s))[0].round(3),s.get(r,'pos_base_x'),s.get(r,'pos_base_y'),flush=True)
+ if not s.get(r,'grasp_active'):continue
+ offset=fk(vec(s))[0][2]-s.get(b,'pose_z');goto(x,y,.3)
+ if dest=='blocktop':
+  bb=s.get_object_from_name('target_block');dx,dy=[s.get(bb,'pose_'+f) for f in 'xy'];dz=s.get(bb,'pose_z')+s.get(bb,'half_extent_z')+h+.001
+ elif dest=='table':dx,dy,dz=.4,-.25,.075+h+.001
+ else:dx,dy,dz=.4,-.6,(.075 if dest.endswith('075') else 0)+h+.001
+ goto(dx,dy,.3)
+ for zt in np.arange(.3,dz+offset,-.01):goto(dx,dy,zt)
+ goto(dx,dy,dz+offset)
+ before=[s.get(b,'pose_'+f) for f in 'xyz'];a=np.zeros(11,dtype=np.float32);a[10]=1;s,*_=E.step(a)
+ print('DROP',dest,'desired',dx,dy,dz,'actual',before,'held',s.get(r,'grasp_active'),flush=True)
+E.close()

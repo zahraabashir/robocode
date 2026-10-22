@@ -1,0 +1,114 @@
+diff --git a/approach.py b/approach.py
+index 578f25f..c7617ea 100644
+--- a/approach.py
++++ b/approach.py
+@@ -1,8 +1,9 @@
+ """Rovers approach: per-rover layered grid BFS + Held-Karp over task subsets,
+ joint assignment of tasks to the two rovers (they cannot cross the middle wall)."""
+ import math
++import time
+ import numpy as np
+-from scipy.ndimage import maximum_filter
++from scipy.ndimage import maximum_filter, minimum_filter
+ 
+ H = 0.05          # grid resolution
+ K = 4             # max cells per step (0.2 / H)
+@@ -98,6 +99,7 @@ class GeneratedApproach:
+         self.bad_send = {n: [] for n in self.w.rovers}
+         self.expect = None
+         self.nreplan = 0
++        self.plan_time = 0.0
+         self._plan(state)
+ 
+     # --------------------------------------------------------------- planning
+@@ -143,6 +145,13 @@ class GeneratedApproach:
+         return X + CAM_OFF * math.cos(th + CAM_ANG), Y + CAM_OFF * math.sin(th + CAM_ANG)
+ 
+     def _plan(self, state):
++        t0 = time.time()
++        try:
++            self._plan_inner(state)
++        finally:
++            self.plan_time += time.time() - t0
++
++    def _plan_inner(self, state):
+         w = self.w
+         g = lambda o, f: self._get(state, o, f)
+         rnames = sorted(w.rovers.keys())
+@@ -308,6 +317,13 @@ class GeneratedApproach:
+         (s0C if calib else s0U)[start] = 0
+         maps = {}      # (S, j) -> (seedU, seedC, TU, TC, AU, AC)
+         seeds = {}
++        def drop_step(a):
++            m = minimum_filter(a, size=2 * K + 1, mode="constant", cval=INF)
++            return np.where(free & (m < INF), m + 1, INF).astype(np.int32)
++
++        store_full = g(w.rovers[r], "store_full") > 0.5
++        if store_full:
++            s0U, s0C = drop_step(s0U), drop_step(s0C)
+         start_maps = self._propagate(s0U, s0C, free, vany)
+ 
+         reg_cache = {}
+@@ -336,7 +352,7 @@ class GeneratedApproach:
+             if kind == "img":
+                 reg = img_region(j, S)
+                 return np.where(reg, AC, INF), np.full(X.shape, INF, np.int32)
+-            return np.where(reg, AU, INF), np.where(reg, AC, INF)
++            return drop_step(np.where(reg, AU, INF)), drop_step(np.where(reg, AC, INF))
+ 
+         for j in range(n):
+             seeds[(1 << j, j)] = op_maps(start_maps, j)
+@@ -394,7 +410,7 @@ class GeneratedApproach:
+                 final[S] = (v, j, extra)
+         res = dict(img_obj=img_obj, X=X, Y=Y, free=free, vany=vany, regions=regions, names=names,
+                    maps=maps, seeds=seeds, start_maps=start_maps, s0=(s0U, s0C),
+-                   final=final, homereg=homereg, send=send, must_send=must_send, r=r)
++                   final=final, store_full=store_full, homereg=homereg, send=send, must_send=must_send, r=r)
+         res["final_any_empty"] = 0 if 0 in final else (min(final, key=lambda s: final[s][0]) if final else None)
+         return res
+ 
+@@ -487,6 +503,26 @@ class GeneratedApproach:
+             else:
+                 cands = [(pj, res["maps"][(prevS, pj)]) for pj in range(len(res["regions"]))
+                          if (prevS >> pj & 1) and (prevS, pj) in res["maps"]]
++            if kind != "img":
++                # undo the forced drop step
++                reg = res["regions"][curj][1]
++                nx, ny = free.shape
++                i, jj = c
++                i0, i1 = max(0, i - K), min(nx, i + K + 1)
++                j0, j1 = max(0, jj - K), min(ny, jj + K + 1)
++                hit = None
++                for pj, Mp in cands:
++                    A = Mp[2] if L == "U" else Mp[3]
++                    sub = np.where(reg[i0:i1, j0:j1], A[i0:i1, j0:j1], INF)
++                    cand = np.argwhere(sub == t - 1)
++                    if len(cand):
++                        hit = (pj, Mp, (i0 + cand[0][0], j0 + cand[0][1]))
++                        break
++                if hit is None:
++                    raise RuntimeError("drop pred not found")
++                steps.append((c, "drop"))
++                c = hit[2]; t -= 1
++                cands = [(hit[0], hit[1])]
+             for pj, Mp in cands:
+                 TU, TC, AU, AC = Mp
+                 if kind == "img":
+@@ -505,6 +541,8 @@ class GeneratedApproach:
+         # back to start
+         sU, sC = res["s0"]
+         c, t, L = self._back_stage(res["start_maps"], sU, sC, vany, free, c, t, L, steps)
++        if res["store_full"] and t == 1:
++            steps.append((c, "drop"))
+         steps.reverse()
+         return [((float(X[c]), float(Y[c])), op) for c, op in steps]
+ 
+@@ -513,7 +551,7 @@ class GeneratedApproach:
+         rnames = sorted(self.w.rovers.keys())
+         if self.expect is not None and self._deviated(state):
+             self.nreplan += 1
+-            if self.nreplan < 40:
++            if self.plan_time < 40.0:
+                 try:
+                     self._plan(state)
+                 except Exception:

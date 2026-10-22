@@ -1,0 +1,70 @@
+diff --git a/NOTES.md b/NOTES.md
+index c1e6ef5..6049a68 100644
+--- a/NOTES.md
++++ b/NOTES.md
+@@ -33,3 +33,9 @@
+ - Per-rover coarse grid (0.05) staged BFS over task orders (DFS trie), joint assignment min makespan,
+   top-K realised on fine grid (0.025) with time-aware send vs other rover trajectory; replan on deviation.
+ - Results: seeds 0-400 all solved, mean 20.475 steps.
++
++## Sample markers near lander (seeds 549, 706)
++- Samples lying within ~0.05 of the lander can occlude sends in strange bearing ranges (probably a 3D raycast). This is rare (~2/800 seeds have a sample within 0.05).
++- Model: each sample is a box (half 0.045) occluding the ray cam->lander, with the ray trimmed at the lander box (half 0.06). This fixed 549 but did not predict 706.
++- Robustness: failed send/img/cal positions are added to self.bad as (x,y,op,arg). The planner then excludes land/vis/any_vis within 0.08 of them, so a replan won't retry the same spot. 706 is now solved in 32 steps, with 2 replans.
++- Results: seeds 400-600 200/200 (mean 20.185); 600-800 200/200 (mean 20.57). Single-thread worst plan time ~7s.
+diff --git a/cnt_near.py b/cnt_near.py
+new file mode 100644
+index 0000000..2b23c02
+--- /dev/null
++++ b/cnt_near.py
+@@ -0,0 +1,9 @@
++from test_approach import make_env
++import numpy as np
++env=make_env(); c=[]
++for s in range(0,800,4):
++    o,_=env.reset(seed=s)
++    T=o.get_object_from_name('sample0').type
++    d=min(np.hypot(o.get(x,'x')+1.9,o.get(x,'y')+2.0) for x in o.get_objects(T))
++    if d<0.3: c.append((s,round(d,3)))
++print(len(c),c)
+diff --git a/probe_occ.py b/probe_occ.py
+new file mode 100644
+index 0000000..437acbe
+--- /dev/null
++++ b/probe_occ.py
+@@ -0,0 +1,27 @@
++import sys, numpy as np
++from test_approach import *
++from concurrent.futures import ThreadPoolExecutor
++def trial(tx,ty):
++    env = make_env(); obs, info = env.reset(seed=SEED)
++    ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++    for t in range(NST):
++        obs,*_=env.step(ap.get_action(obs))
++    r0=obs.get_object_from_name('rover0')
++    for k in range(40):
++        x,y=obs.get(r0,'x'),obs.get(r0,'y')
++        d=np.array([tx-x,ty-y])
++        if np.abs(d).max()<1e-6: break
++        a=np.zeros(8,dtype=np.float32); a[:2]=np.clip(d,-0.2,0.2); a[3]=0.1667; a[7]=0.1667
++        obs,*_=env.step(a)
++        nx,ny=obs.get(r0,'x'),obs.get(r0,'y')
++        if abs(nx-x)+abs(ny-y)<1e-9: return (tx,ty,'blocked',round(x,3),round(y,3))
++    a=np.zeros(8,dtype=np.float32); a[3]=0.5; a[7]=0.1667
++    obs,*_=env.step(a)
++    s=[obs.get(o,'received_analysis') for o in obs.get_objects(obs.get_object_from_name('sample0').type)]+[obs.get(o,'received_image') for o in obs.get_objects(obs.get_object_from_name('objective0').type)]
++    env.close()
++    return (tx,ty,round(math.degrees(math.atan2(ty+2,tx+1.9)),1),max(s))
++import math
++SEED=int(sys.argv[1]); NST=int(sys.argv[2]); R=float(sys.argv[3])
++pts=[(round(-1.9+R*math.cos(math.radians(b)),3), round(-2.0+R*math.sin(math.radians(b)),3)) for b in range(0,50,3)]
++with ThreadPoolExecutor(8) as ex:
++    for r in ex.map(lambda p: trial(*p), pts): print(r)
+diff --git a/res_c.json b/res_c.json
+new file mode 100644
+index 0000000..573a024
+--- /dev/null
++++ b/res_c.json
+@@ -0,0 +1 @@
++[[600, 1, true, 27, 0, 23.71, 24.2], [601, 1, true, 18, 0, 5.34, 7.0], [602, 1, true, 16, 0, 25.13, 25.5], [603, 1, true, 17, 0, 27.16, 27.4], [604, 1, true, 20, 0, 28.61, 30.4], [605, 1, true, 31, 0, 23.18, 23.9], [606, 3, true, 22, 0, 26.15, 27.3], [607, 3, true, 20, 0, 28.31, 30.3], [608, 2, true, 20, 0, 38.89, 39.2], [609, 3, true, 23, 0, 27.79, 29.9], [610, 2, true, 18, 0, 27.43, 28.5], [611, 3, true, 22, 0, 23.97, 24.4], [612, 3, true, 21, 0, 32.5, 33.4], [613, 2, true, 21, 0, 22.82, 25.7], [614, 3, true, 20, 0, 27.87, 28.2], [615, 3, true, 22, 0, 34.62, 35.1], [616, 2, true, 20, 0, 25.44, 25.8], [617, 2, true, 20, 0, 28.51, 28.9], [618, 1, true, 20, 0, 20.27, 22.6], [619, 2, true, 19, 0, 28.95, 29.3], [620, 3, true, 20, 0, 18.26, 18.7], [621, 1, true, 18, 0, 16.55, 17.8], [622, 2, true, 18, 0, 22.76, 24.1], [623, 3, true, 21, 0, 26.71, 27.8], [624, 1, true, 23, 0, 19.81, 20.3], [625, 2, true, 22, 0, 16.62, 17.1], [626, 3, true, 20, 0, 29.14, 29.6], [627, 3, true, 23, 0, 26.46, 26.8], [628, 1, true, 16, 0, 14.67, 15.8], [629, 3, true, 20, 0, 24.91, 25.4], [630, 2, true, 24, 0, 22.65, 24.4], [631, 1, true, 20, 0, 25.51, 26.1], [632, 2, true, 18, 0, 19.65, 20.0], [633, 2, true, 21, 0, 19.97, 20.3], [634, 2, true, 18, 0, 29.66, 30.0], [635, 3, true, 20, 0, 27.03, 27.5], [636, 1, true, 19, 0, 26.31, 27.6], [637, 1, true, 17, 0, 22.45, 24.0], [638, 3, true, 20, 0, 35.6, 35.9], [639, 3, true, 20, 0, 26.52, 26.7], [640, 3, true, 20, 0, 27.02, 27.3], [641, 3, true, 24, 0, 37.37, 38.0], [642, 1, true, 23, 0, 22.82, 23.1], [643, 2, true, 20, 0, 19.99, 20.3], [644, 2, true, 21, 0, 31.55, 31.9], [645, 1, true, 18, 0, 21.46, 21.7], [646, 2, true, 20, 0, 17.86, 18.1], [647, 1, true, 18, 0, 19.21, 19.5], [648, 1, true, 16, 0, 25.11, 25.3], [649, 2, true, 19, 0, 24.04, 24.2], [650, 3, true, 21, 0, 26.14, 26.4], [651, 3, true, 20, 0, 27.66, 28.0], [652, 2, true, 20, 0, 20.56, 21.2], [653, 1, true, 20, 0, 18.05, 18.1], [654, 1, true, 18, 0, 18.12, 18.2], [655, 1, true, 16, 0, 16.31, 16.4], [656, 1, true, 16, 0, 15.89, 16.0], [657, 1, true, 20, 0, 14.98, 15.1], [658, 2, true, 20, 0, 13.57, 13.7], [659, 3, true, 21, 0, 13.91, 14.0], [660, 2, true, 24, 0, 14.87, 15.0], [661, 1, true, 18, 0, 11.4, 11.5], [662, 2, true, 19, 0, 17.84, 18.0], [663, 3, true, 25, 0, 18.23, 20.1], [664, 2, true, 22, 0, 13.03, 13.5], [665, 3, true, 19, 0, 22.96, 23.5], [666, 3, true, 23, 0, 23.61, 23.8], [667, 2, true, 22, 0, 24.29, 24.6], [668, 2, true, 22, 0, 19.33, 19.5], [669, 3, true, 21, 0, 23.52, 23.9], [670, 1, true, 20, 0, 18.6, 19.3], [671, 1, true, 18, 0, 30.64, 31.0], [672, 3, true, 22, 0, 29.2, 29.4], [673, 3, true, 20, 0, 34.39, 34.7], [674, 3, true, 27, 0, 30.06, 30.5], [675, 2, true, 20, 0, 23.73, 23.9], [676, 1, true, 18, 0, 23.23, 23.4], [677, 1, true, 16, 0, 21.62, 22.4], [678, 2, true, 18, 0, 21.06, 21.8], [679, 2, true, 18, 0, 28.45, 28.8], [680, 3, true, 20, 0, 33.16, 34.7], [681, 3, true, 20, 0, 29.96, 30.3], [682, 3, true, 22, 0, 34.68, 35.1], [683, 3, true, 20, 0, 24.31, 24.7], [684, 1, true, 18, 0, 20.64, 21.0], [685, 3, true, 19, 0, 33.05, 33.8], [686, 3, true, 20, 0, 36.3, 37.3], [687, 3, true, 21, 0, 31.98, 32.3], [688, 1, true, 21, 0, 16.15, 17.5], [689, 1, true, 21, 0, 13.75, 14.2], [690, 3, true, 21, 0, 31.84, 32.4], [691, 1, true, 21, 0, 16.85, 17.2], [692, 2, true, 19, 0, 29.98, 30.3], [693, 3, true, 20, 0, 32.59, 32.9], [694, 3, true, 23, 0, 28.36, 29.9], [695, 1, true, 25, 0, 16.6, 17.7], [696, 2, true, 26, 0, 29.81, 30.2], [697, 3, true, 26, 0, 39.63, 41.0], [698, 3, true, 21, 0, 33.89, 34.9], [699, 3, true, 19, 0, 35.3, 35.7], [700, 1, true, 20, 0, 23.37, 23.8], [701, 1, true, 20, 0, 25.72, 26.0], [702, 1, true, 19, 0, 27.68, 28.0], [703, 3, true, 21, 0, 31.98, 33.8], [704, 2, true, 20, 0, 25.91, 26.3], [705, 1, true, 23, 0, 20.88, 21.3], [706, 3, true, 32, 2, 28.05, 40.4], [707, 1, true, 19, 0, 22.94, 23.3], [708, 2, true, 20, 0, 33.18, 33.9], [709, 3, true, 20, 0, 27.15, 27.4], [710, 2, true, 19, 0, 28.78, 30.0], [711, 2, true, 18, 0, 30.49, 30.9], [712, 1, true, 18, 0, 20.39, 20.7], [713, 2, true, 19, 0, 30.97, 31.2], [714, 3, true, 22, 0, 45.25, 47.4], [715, 2, true, 19, 0, 31.67, 31.9], [716, 2, true, 19, 0, 25.32, 25.7], [717, 1, true, 16, 0, 29.06, 29.5], [718, 3, true, 22, 0, 27.72, 28.5], [719, 2, true, 18, 0, 23.8, 24.1], [720, 3, true, 21, 0, 23.52, 25.6], [721, 2, true, 25, 0, 24.72, 25.1], [722, 2, true, 17, 0, 24.45, 24.7], [723, 3, true, 20, 0, 26.08, 28.1], [724, 1, true, 20, 0, 23.55, 25.3], [725, 1, true, 18, 0, 20.41, 20.7], [726, 1, true, 19, 0, 19.79, 20.2], [727, 1, true, 21, 0, 20.85, 22.3], [728, 3, true, 21, 0, 28.41, 28.6], [729, 1, true, 25, 0, 22.78, 23.6], [730, 2, true, 20, 0, 15.86, 16.0], [731, 2, true, 20, 0, 14.39, 14.5], [732, 1, true, 31, 0, 16.05, 17.4], [733, 3, true, 25, 0, 14.94, 15.6], [734, 1, true, 18, 0, 13.43, 13.5], [735, 1, true, 18, 0, 16.13, 16.2], [736, 1, true, 21, 0, 12.73, 12.8], [737, 1, true, 16, 0, 14.76, 14.8], [738, 2, true, 20, 0, 14.92, 15.0], [739, 3, true, 21, 0, 14.58, 15.6], [740, 1, true, 20, 0, 12.89, 14.2], [741, 2, true, 23, 0, 12.32, 13.5], [742, 2, true, 29, 0, 12.78, 13.6], [743, 2, true, 21, 0, 12.92, 13.1], [744, 3, true, 20, 0, 13.62, 13.7], [745, 3, true, 20, 0, 14.25, 14.4], [746, 2, true, 18, 0, 13.34, 13.6], [747, 1, true, 20, 0, 12.58, 13.1], [748, 2, true, 16, 0, 13.0, 13.7], [749, 1, true, 17, 0, 11.9, 13.2], [750, 2, true, 19, 0, 12.16, 13.0], [751, 3, true, 20, 0, 11.41, 12.9], [752, 2, true, 19, 0, 11.26, 11.4], [753, 1, true, 21, 0, 11.41, 11.5], [754, 2, true, 20, 0, 13.47, 13.6], [755, 2, true, 20, 0, 13.76, 13.9], [756, 2, true, 18, 0, 15.3, 15.4], [757, 3, true, 19, 0, 17.36, 17.6], [758, 3, true, 22, 0, 15.53, 15.7], [759, 3, true, 21, 0, 15.74, 15.9], [760, 1, true, 18, 0, 14.49, 15.3], [761, 3, true, 19, 0, 20.55, 20.7], [762, 2, true, 37, 0, 14.62, 15.6], [763, 3, true, 29, 0, 19.79, 20.9], [764, 3, true, 20, 0, 17.48, 18.8], [765, 3, true, 21, 0, 17.07, 19.0], [766, 3, true, 20, 0, 15.98, 17.6], [767, 2, true, 19, 0, 14.54, 14.7], [768, 3, true, 21, 0, 15.81, 17.5], [769, 2, true, 21, 0, 13.9, 14.1], [770, 3, true, 20, 0, 14.09, 14.2], [771, 2, true, 23, 0, 10.06, 10.2], [772, 1, true, 22, 0, 9.52, 9.7], [773, 3, true, 30, 0, 14.12, 14.3], [774, 2, true, 20, 0, 12.05, 12.2], [775, 3, true, 21, 0, 19.8, 20.0], [776, 3, true, 21, 0, 15.34, 15.5], [777, 3, true, 20, 0, 17.89, 18.0], [778, 3, true, 21, 0, 15.72, 15.9], [779, 3, true, 21, 0, 16.35, 16.5], [780, 3, true, 23, 0, 14.13, 14.7], [781, 3, true, 20, 0, 12.81, 13.7], [782, 1, true, 20, 0, 10.86, 11.3], [783, 3, true, 21, 0, 9.01, 10.4], [784, 3, true, 21, 0, 8.21, 8.4], [785, 3, true, 21, 0, 11.33, 11.5], [786, 1, true, 21, 0, 5.96, 6.1], [787, 3, true, 20, 0, 14.1, 14.2], [788, 2, true, 19, 0, 12.71, 12.8], [789, 2, true, 21, 0, 16.31, 16.5], [790, 1, true, 18, 0, 13.03, 13.2], [791, 1, true, 20, 0, 11.77, 12.0], [792, 3, true, 22, 0, 17.31, 17.4], [793, 2, true, 21, 0, 11.36, 11.5], [794, 3, true, 20, 0, 16.16, 16.3], [795, 3, true, 21, 0, 11.8, 11.9], [796, 1, true, 17, 0, 11.34, 11.4], [797, 3, true, 19, 0, 12.34, 12.5], [798, 2, true, 19, 0, 11.1, 11.2], [799, 2, true, 21, 0, 9.22, 9.5]]
+\ No newline at end of file

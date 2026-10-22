@@ -1,0 +1,29 @@
+diff --git a/approach.py b/approach.py
+index 4b79729..8ac05b7 100644
+--- a/approach.py
++++ b/approach.py
+@@ -157,11 +157,12 @@ class GeneratedApproach:
+                 q = pos(nb)
+                 if self._blocked(q, extra, margin):
+                     continue
+-                nc = cost[cur] + (1.414 if dx and dy else 1.0)
++                # Diagonal and axial commands both consume one environment step.
++                nc = cost[cur] + 1.0
+                 if nc < cost.get(nb, 1e30):
+                     cost[nb] = nc
+                     came[nb] = cur
+-                    h = math.hypot(nb[0] - g[0], nb[1] - g[1])
++                    h = max(abs(nb[0] - g[0]), abs(nb[1] - g[1]))
+                     heapq.heappush(frontier, (nc + h, nb))
+         if found is None:
+             return None
+@@ -330,6 +331,9 @@ class GeneratedApproach:
+                     dx, dy = self._move(i, positions[i], goal, positions[1-i])
+                     action[4*i] = dx
+                     action[4*i+1] = dy
++                    if self._dist((positions[i][0] + dx, positions[i][1] + dy),
++                                  self._xy(state, sob)) <= 0.22:
++                        self._set_op(action, i, SAMPLE)
+                     continue
+ 
+             if self.phase[i] == "images":

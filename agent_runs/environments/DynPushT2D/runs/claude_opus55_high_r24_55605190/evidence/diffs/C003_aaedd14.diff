@@ -1,0 +1,104 @@
+diff --git a/approach.py b/approach.py
+index 80210c9..8a095a3 100644
+--- a/approach.py
++++ b/approach.py
+@@ -88,6 +88,8 @@ class GeneratedApproach:
+         return e_ref + e_com + 0.6 * np.abs(dth)
+ 
+     def seg_free(self, pose, a, b, clear):
++        if a is self.start_pt:
++            clear = min(clear, self.start_d - 0.004)
+         n = max(2, int(np.linalg.norm(b - a) / 0.01) + 1)
+         t = np.linspace(0, 1, n)[:, None]
+         P = a[None] + t * (b - a)[None]
+@@ -207,22 +209,30 @@ class GeneratedApproach:
+         paths = [None] * K
+         self.build_nodes(pose)
+         start = robot.copy()
+-        # retreat if touching
++        prefix = []
+         rb = (robot - pose[0:2]) @ R0
+         dd = g.dist_body(rb[None])[0]
+-        prefix = []
+         if dd < RAD + 0.03:
+-            # outward direction approx: numeric gradient
+-            eps = 1e-3
+-            gx = g.dist_body((rb + [eps, 0])[None])[0] - g.dist_body((rb - [eps, 0])[None])[0]
+-            gy = g.dist_body((rb + [0, eps])[None])[0] - g.dist_body((rb - [0, eps])[None])[0]
+-            gv = np.array([gx, gy])
+-            if np.linalg.norm(gv) < 1e-9:
+-                gv = rb - g.C
+-            gv = R0 @ (gv / np.linalg.norm(gv))
+-            st = np.clip(robot + gv * (RAD + 0.035 - dd), LO + 0.005, HI - 0.005)
+-            prefix = [st]
+-            start = st
++            # retreat: pick direction maximizing clearance
++            angs_r = np.linspace(0, 2 * np.pi, 24, endpoint=False)
++            dirs = np.stack([np.cos(angs_r), np.sin(angs_r)], 1)
++            bestd, bestp = -1, None
++            for mag in (0.04, 0.08):
++                P = rb[None] + dirs * mag
++                Pw = pose[0:2] + P @ R0.T
++                dv = g.dist_body(P)
++                inb = np.all((Pw >= LO + 0.005) & (Pw <= HI - 0.005), 1)
++                dv = np.where(inb, dv, -1)
++                j = int(np.argmax(dv))
++                if dv[j] > bestd + 0.01:
++                    bestd, bestp = dv[j], Pw[j]
++                if bestd > RAD + 0.02:
++                    break
++            if bestp is not None:
++                prefix = [bestp]
++                start = bestp
++        self.start_d = g.dist_body(((start - pose[0:2]) @ R0)[None])[0]
++        self.start_pt = start
+         pre_body = (pre - pose[0:2]) @ R0
+         pre_ok = g.dist_body(pre_body) > RAD + 0.015
+         pre_ok &= np.all((pre >= LO + 0.005) & (pre <= HI - 0.005), 1)
+@@ -266,7 +276,7 @@ class GeneratedApproach:
+         push_steps = results_len / AMAX + 3
+         order = np.argsort(-(imp / (lb + push_steps + 4)))
+         best_i, best_rate, best_path = None, -np.inf, None
+-        for i in order[:25]:
++        for i in order[:60]:
+             if not np.isfinite(results_E[i]) or imp[i] <= 1e-4:
+                 continue
+             ub_rate = imp[i] / (lb[i] + push_steps[i] + 4)
+@@ -313,8 +323,13 @@ class GeneratedApproach:
+         if not self.plan:
+             p = self.plan_push(s)
+             if p is None:
+-                # fallback: small random-ish wiggle away
+-                a = np.array([0.0, 0.0])
++                # fallback: move away from the block, towards the arena centre
++                com = s[0:2] + rot(s[2]) @ self.g.C
++                d = s[16:18] - com
++                d = d / (np.linalg.norm(d) + 1e-9) + 0.5 * (np.array([2.5, 2.5]) - s[16:18]) / 2.5
++                d = d / (np.linalg.norm(d) + 1e-9)
++                self.plan = [('nav', d * AMAX)] * 3
++                _, a = self.plan.pop(0)
+                 return self._safe(s, a)
+             self.plan = self.build_actions(s[16:18], p)
+         _, a = self.plan.pop(0)
+diff --git a/dbg.py b/dbg.py
+new file mode 100644
+index 0000000..91be273
+--- /dev/null
++++ b/dbg.py
+@@ -0,0 +1,16 @@
++import sys, numpy as np
++from env_client import make_env
++import approach
++from approach import GeneratedApproach
++seed=int(sys.argv[1])
++env=make_env(); ap=GeneratedApproach(None,None,{})
++obs,info=env.reset(seed=seed); ap.reset(obs,info)
++orig=ap.plan_push
++def pp(s):
++    p=orig(s)
++    print('t',t,'pose',np.round(s[0:3],3),'goal',np.round(s[29:32],3),'robot',np.round(s[16:18],2), 'plan', None if p is None else (len(p['path']), np.round(p['u'],2), round(p['L'],2), round(p['E0'],3), round(p['Epred'],3)))
++    return p
++ap.plan_push=pp
++for t in range(int(sys.argv[2])):
++    a=ap.get_action(obs); obs,r,te,tr,_=env.step(a)
++    if te: print('done',t); break

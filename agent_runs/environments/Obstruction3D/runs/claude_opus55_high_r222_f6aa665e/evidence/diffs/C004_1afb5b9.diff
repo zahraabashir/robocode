@@ -1,0 +1,844 @@
+diff --git a/approach.py b/approach.py
+index 744534b..d91a176 100644
+--- a/approach.py
++++ b/approach.py
+@@ -34,7 +34,7 @@ FINGER = 0.155          # EE frame -> fingertip distance (along tool z)
+ FINGER_OFF = 0.05       # finger centre offset from tool axis along closing direction
+ 
+ # joint limits (Kinova Gen3); None = continuous
+-_LIM = [None, (-2.24, 2.24), None, (-2.57, 2.57), None, (-2.09, 2.09), None]
++_LIM = [None, (-2.38, 2.38), None, (-2.63, 2.63), None, (-2.2, 2.2), None]
+ 
+ 
+ def fk(q):
+@@ -333,7 +333,7 @@ class GeneratedApproach:
+                 self.cur = None
+                 continue
+             # intermediate cartesian target
+-            step = 0.04
++            step = 0.08
+             nd = np.linalg.norm(d)
+             tgt = goal if nd < step else p + d * step / nd
+             qt, err = ik(q, tgt, Rt)
+diff --git a/dbg_run.py b/dbg_run.py
+new file mode 100644
+index 0000000..bbc2a19
+--- /dev/null
++++ b/dbg_run.py
+@@ -0,0 +1,20 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach, fk
++seed=int(sys.argv[1]); N=int(sys.argv[2]) if len(sys.argv)>2 else 1000
++env = make_env(); obs, info = env.reset(seed=seed)
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++bx = ap._boxes(obs)
++for n,b in sorted(bx.items()): print(n, {k: round(v,3) for k,v in b.items()})
++lastseg=None
++for t in range(N):
++    a = ap.get_action(obs)
++    seg = ap.cur
++    key = None if seg is None else (seg[0], tuple(np.round(seg[1],3)) if seg[0]=='move' else seg[1], seg[2] if seg[0]=='move' and seg[2] is None else (round(seg[2],2) if seg[0]=='move' else seg[2]), seg[3] if len(seg)>3 else '')
++    obs, r, term, trunc, info = env.step(a)
++    q = ap._q(obs); T,_,_ = fk(q)
++    rob = ap._robot(obs)
++    if key != lastseg or np.allclose(q, ap.last_q):
++        print(t, key, "ee", np.round(T[:3,3],3), "grasp", obs.get(rob,'grasp_active'), "REJ" if np.allclose(q, ap.last_q) and np.any(a[3:10]!=0) else "")
++        lastseg = key
++    if term: print("DONE", t); break
+diff --git a/probe_base_14.py b/probe_base_14.py
+new file mode 100644
+index 0000000..2b6f65a
+--- /dev/null
++++ b/probe_base_14.py
+@@ -0,0 +1,23 @@
++import numpy as np
++exec(open('probe_base_11.py').read().split("for seed in")[0])
++for seed in [1]:
++    obs,_=env.reset(seed=seed); R=obs.get_object_from_name("robot"); o0=objs(obs)
++    base=np.array([obs.get(R,"pos_base_x"),obs.get(R,"pos_base_y")])
++    TB=obs.get_object_from_name("target_block"); tb=np.array([obs.get(TB,"pose_x"),obs.get(TB,"pose_y")])
++    rel=tb-base; q=np.array([0,0.26,np.pi,-2.27,0,0.96,np.pi/2]); obs,_=goto(obs,R,q)
++    z=0.125
++    for zr in np.arange(0.40,z,-0.01):
++        q,_=ik(np.array([rel[0]-0.12,rel[1],zr]),q); obs,rj=goto(obs,R,q)
++    rejs=[];grasps=[]
++    for dy in np.arange(-0.1,0.101,0.025):
++        for dx in np.arange(-0.12,0.121,0.01):
++            q,_=ik(np.array([rel[0]+dx,rel[1]+dy,z]),q); obs,rj=goto(obs,R,q)
++            if rj: rejs.append((round(dx,3),round(dy,3)))
++            a=np.zeros(11,np.float32); a[10]=-1; obs,*_=env.step(a)
++            if obs.get(R,"grasp_active")>0.5 or obs.get(R,"finger_state")!=0: grasps.append((round(dx,3),round(dy,3),obs.get(R,"finger_state")))
++            a[10]=1; obs,*_=env.step(a)
++        q,_=ik(np.array([rel[0]-0.12,rel[1]+dy+0.025,z+0.1]),q); obs,_=goto(obs,R,q)
++    o=objs(obs)
++    print("rejections",len(rejs),rejs[:20]); print("grasps",grasps[:10])
++    print("moved:",{k:np.round(o[k]-o0[k],3) for k in o0 if np.abs(o[k]-o0[k]).max()>1e-6})
++env.close()
+diff --git a/probe_base_15.py b/probe_base_15.py
+new file mode 100644
+index 0000000..ef36f7b
+--- /dev/null
++++ b/probe_base_15.py
+@@ -0,0 +1,16 @@
++import numpy as np
++exec(open('probe_base_11.py').read().split("for seed in")[0])
++seed=1
++obs,_=env.reset(seed=seed); R=obs.get_object_from_name("robot")
++base=np.array([obs.get(R,"pos_base_x"),obs.get(R,"pos_base_y")])
++TB=obs.get_object_from_name("target_block"); tb0=np.array(obs.data[TB][:7],float)
++rel=tb0[:2]-base; q=np.array([0,0.26,np.pi,-2.27,0,0.96,np.pi/2]); obs,rj=goto(obs,R,q); print("home rej",rj)
++for zr in np.arange(0.40,0.125,-0.01):
++    q,_=ik(np.array([rel[0]-0.12,rel[1],zr]),q); obs,rj=goto(obs,R,q)
++    if rj: print("rej descending",zr)
++for dx in np.arange(-0.12,0.121,0.01):
++    q,_=ik(np.array([rel[0]+dx,rel[1],0.125]),q); obs,rj=goto(obs,R,q)
++    tb=np.array(obs.data[TB][:7],float)
++    print(f"dx={dx:+.2f} rej={rj} tb_delta={np.round(tb-tb0,4)} fs={obs.get(R,'finger_state'):.3f}")
++    if rj: break
++env.close()
+diff --git a/probe_base_16.py b/probe_base_16.py
+new file mode 100644
+index 0000000..4ef389d
+--- /dev/null
++++ b/probe_base_16.py
+@@ -0,0 +1,19 @@
++import numpy as np
++exec(open('probe_base_11.py').read().split("for seed in")[0])
++def run(seed,dy,z):
++    obs,_=env.reset(seed=seed); R=obs.get_object_from_name("robot")
++    base=np.array([obs.get(R,"pos_base_x"),obs.get(R,"pos_base_y")])
++    TB=obs.get_object_from_name("target_block"); tb0=np.array(obs.data[TB][:7],float)
++    rel=tb0[:2]-base+np.array([0,dy]); q=np.array([0,0.26,np.pi,-2.27,0,0.96,np.pi/2]); obs,rj=goto(obs,R,q)
++    for zr in np.arange(0.40,z,-0.01):
++        q,_=ik(np.array([rel[0]-0.12,rel[1],zr]),q); obs,rj=goto(obs,R,q)
++        if rj: return f"rej descending {zr:.2f}"
++    for dx in np.arange(-0.12,0.121,0.01):
++        q,_=ik(np.array([rel[0]+dx,rel[1],z]),q); obs,rj=goto(obs,R,q)
++        tb=np.array(obs.data[TB][:7],float)
++        if rj or np.abs(tb-tb0).max()>1e-6: return f"stop dx={dx:+.2f} rej={rj} tb_delta={np.round(tb-tb0,4)}"
++    return "passed through all dx"
++for z in [0.13,0.15,0.17,0.2]:
++    for dy in [0.0,-0.12]:
++        print(f"z={z} dy={dy}:",run(1,dy,z))
++env.close()
+diff --git a/probe_tab_desc.py b/probe_tab_desc.py
+new file mode 100644
+index 0000000..b54e8aa
+--- /dev/null
++++ b/probe_tab_desc.py
+@@ -0,0 +1,55 @@
++from env_client import make_env
++from kin import *
++import numpy as np, sys
++seed=int(sys.argv[1]); yaw=float(sys.argv[2]); x=float(sys.argv[3])
++ys=np.round(np.arange(-0.6,0.6001,0.05),3)
++if len(sys.argv)>4: ys=np.round(np.arange(float(sys.argv[4]),float(sys.argv[5])+1e-6,float(sys.argv[6])),3)
++env = make_env()
++B=(0,0,0); Rd=down_R(yaw)
++def reset():
++    o,_=env.reset(seed=seed); return o
++obs=reset(); R=obs.get_object_from_name("robot")
++objs=[]
++for n in ['target_block','target_region','obstruction0','obstruction1','obstruction2','obstruction3']:
++    try:
++        o=obs.get_object_from_name(n); objs.append((obs.get(o,'pose_x'),obs.get(o,'pose_y')))
++    except Exception: pass
++def q_of(o): return np.array([o.get(R,f'joint_{i}') for i in range(1,8)])
++def goto(obs, qt, maxn=40):
++    for _ in range(maxn):
++        q=q_of(obs); d=qt-q
++        if np.max(np.abs(d))<1e-4: break
++        a=np.zeros(11,np.float32); a[3:10]=np.clip(d,-.2,.2)
++        obs2,r,te,tr,_=env.step(a)
++        if np.allclose(q_of(obs2),q): return obs2,False
++        obs=obs2
++    return obs,True
++def moveto(obs,p):
++    q=q_of(obs); qt,e=ik(q,np.array(p),Rd,B)
++    if e>1e-3: return obs,False,e
++    obs,ok=goto(obs,qt); return obs,ok,e
++res=[]
++for y in ys:
++    if any(np.hypot(x-ox,y-oy)<0.09 for ox,oy in objs): res.append('O'); continue
++    q=q_of(obs)
++    _,e1=ik(q,np.array([x,y,0.36]),Rd,B); _,e2=ik(q,np.array([x,y,0.23]),Rd,B)
++    if e1>1e-3 and e2>1e-3: res.append('N'); continue
++    # up then across
++    p=ee_pose(q,B)[:3,3]
++    obs,ok,_=moveto(obs,[p[0],p[1],0.36])
++    good=True
++    for t in np.linspace(0,1,6)[1:]:
++        obs,ok,e=moveto(obs,[p[0]+t*(x-p[0]),p[1]+t*(y-p[1]),0.36])
++        if not ok: good=False; break
++    if not good:
++        obs=reset(); obs,ok,e=moveto(obs,[x,y,0.36])
++        if not ok: res.append('T'); obs=reset(); continue
++    stop=None; last=0.36
++    for z in np.round(np.arange(0.35,0.0999,-0.01),3):
++        obs,ok,e=moveto(obs,[x,y,z])
++        if e>1e-3: stop='n%d'%round(z*100); break
++        if not ok: stop='%d'%round(z*100); break
++    res.append(stop if stop else 'F')
++    for z in np.arange(ee_pose(q_of(obs),B)[2,3],0.37,0.02): obs,ok,e=moveto(obs,[x,y,min(z,0.36)])
++print("%+.3f "%x+" ".join("%4s"%r for r in res), flush=True)
++env.close()
+diff --git a/probe_tab_ref.py b/probe_tab_ref.py
+new file mode 100644
+index 0000000..3dae27f
+--- /dev/null
++++ b/probe_tab_ref.py
+@@ -0,0 +1,55 @@
++from env_client import make_env
++from kin import *
++import numpy as np, sys
++seed=int(sys.argv[1]); yaw=float(sys.argv[2]); x=float(sys.argv[3])
++ys=np.round(np.arange(-0.6,0.6001,0.05),3); ZMIN=0.0999
++if len(sys.argv)>4: ys=np.round(np.arange(float(sys.argv[4]),float(sys.argv[5])+1e-6,float(sys.argv[6])),3)
++env = make_env()
++B=(0,0,0); Rd=down_R(yaw)
++def reset():
++    o,_=env.reset(seed=seed); return o
++obs=reset(); R=obs.get_object_from_name("robot")
++objs=[]
++for n in ['target_block','target_region','obstruction0','obstruction1','obstruction2','obstruction3']:
++    try:
++        o=obs.get_object_from_name(n); objs.append((obs.get(o,'pose_x'),obs.get(o,'pose_y')))
++    except Exception: pass
++def q_of(o): return np.array([o.get(R,f'joint_{i}') for i in range(1,8)])
++def goto(obs, qt, maxn=40):
++    for _ in range(maxn):
++        q=q_of(obs); d=qt-q
++        if np.max(np.abs(d))<1e-4: break
++        a=np.zeros(11,np.float32); a[3:10]=np.clip(d,-.2,.2)
++        obs2,r,te,tr,_=env.step(a)
++        if np.allclose(q_of(obs2),q): return obs2,False
++        obs=obs2
++    return obs,True
++def moveto(obs,p):
++    q=q_of(obs); qt,e=ik(q,np.array(p),Rd,B)
++    if e>1e-3: return obs,False,e
++    obs,ok=goto(obs,qt); return obs,ok,e
++res=[]
++for y in ys:
++    if any(np.hypot(x-ox,y-oy)<0.09 for ox,oy in objs): res.append('O'); continue
++    q=q_of(obs)
++    _,e1=ik(q,np.array([x,y,0.36]),Rd,B); _,e2=ik(q,np.array([x,y,0.23]),Rd,B)
++    if e1>1e-3 and e2>1e-3: res.append('N'); continue
++    # up then across
++    p=ee_pose(q,B)[:3,3]
++    obs,ok,_=moveto(obs,[p[0],p[1],0.36])
++    good=True
++    for t in np.linspace(0,1,6)[1:]:
++        obs,ok,e=moveto(obs,[p[0]+t*(x-p[0]),p[1]+t*(y-p[1]),0.36])
++        if not ok: good=False; break
++    if not good:
++        obs=reset(); obs,ok,e=moveto(obs,[x,y,0.36])
++        if not ok: res.append('T'); obs=reset(); continue
++    stop=None; last=0.36
++    for z in np.round(np.arange(0.35,ZMIN,-0.01),3):
++        obs,ok,e=moveto(obs,[x,y,z])
++        if e>1e-3: stop='n%d'%round(z*100); break
++        if not ok: stop='%d'%round(z*100); break
++    res.append(stop if stop else 'F')
++    for z in np.arange(ee_pose(q_of(obs),B)[2,3],0.37,0.02): obs,ok,e=moveto(obs,[x,y,min(z,0.36)])
++print("%+.3f "%x+" ".join("%4s"%r for r in res), flush=True)
++env.close()
+diff --git a/probe_tab_run.sh b/probe_tab_run.sh
+new file mode 100644
+index 0000000..c88e338
+--- /dev/null
++++ b/probe_tab_run.sh
+@@ -0,0 +1,5 @@
++yaw=$1; seed=$2; out=$3
++for x in $(seq -0.10 0.05 0.70); do
++  /opt/robocode-strict/bin/python probe_tab_desc.py $seed $yaw $x >> $out.tmp 2>&1 &
++done; wait
++sort -r -n -k1 $out.tmp > $out
+diff --git a/probe_tab_y0_s0.txt b/probe_tab_y0_s0.txt
+new file mode 100644
+index 0000000..08092a2
+--- /dev/null
++++ b/probe_tab_y0_s0.txt
+@@ -0,0 +1,101 @@
++Traceback (most recent call last):
++Traceback (most recent call last):
++Traceback (most recent call last):
++Traceback (most recent call last):
++Traceback (most recent call last):
++Traceback (most recent call last):
++Traceback (most recent call last):
++RuntimeError: Connection to the environment server was closed
++RuntimeError: Connection to the environment server was closed
++RuntimeError: Connection to the environment server was closed
++RuntimeError: Connection to the environment server was closed
++RuntimeError: Connection to the environment server was closed
++RuntimeError: Connection to the environment server was closed
++RuntimeError: Connection to the environment server was closed
+++0.650    N    N    N    N    N    N    T    T    F    F    F    F    F    F    F    F    F    T    T    N    N    N    N    N    N
+++0.600    N    N    N    N    T    F    F    F    F    F    F    F    F    F    F    F    F    F    F    F    T    N    N    N    N
+++0.500    N    N    T    F   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   11    T    N    N
+++0.350    F    F    F    F   22   22   22   22   22   22   22   22   22   22    O    O    O    O   22   22   22   11    F    F    F
+++0.200    F    F    F    F   22   22   22   22   22   22   22   22   22   22   22   22    O    O    O   22   22   11    F    F    F
+++0.150    F    F    F    F   22   22   22   22   22   22   22   24   25   23   22    O    O    O    O   22   22   11    F    F    F
+++0.050    F    F    F    F   22   22   22   22   22   25   29    T    T    T    T    O    O    O    O   22   22    F    F    F    F
+++0.000    F    F    F    F    F    F    F    F    F   26   29    T    T    T    T   24    F    F    F    F    F    F    F    F    F
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 478, in _request
++  File "/sandbox/env_client.py", line 478, in _request
++  File "/sandbox/env_client.py", line 478, in _request
++  File "/sandbox/env_client.py", line 478, in _request
++  File "/sandbox/env_client.py", line 478, in _request
++  File "/sandbox/env_client.py", line 478, in _request
++  File "/sandbox/env_client.py", line 478, in _request
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    raise RuntimeError("Connection to the environment server was closed")
++    raise RuntimeError("Connection to the environment server was closed")
++    raise RuntimeError("Connection to the environment server was closed")
++    raise RuntimeError("Connection to the environment server was closed")
++    raise RuntimeError("Connection to the environment server was closed")
++    raise RuntimeError("Connection to the environment server was closed")
++    raise RuntimeError("Connection to the environment server was closed")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^
++        ^^^^^^^
++        ^^^^^^^
++        ^^^^^^^
++        ^^^^^^^
++        ^^^^^^^
++        ^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++-0.050    F    F    F    F    F    F    F    F    F   25   29    T    T    T    T   23    F    F    F    F    F    F    F    F    F
++-0.100    F    F    F    F    F    F    F    F    F   22   27    T    T    T    T   20   19    F    F    F    F    F    F    F    F
+diff --git a/probe_tab_y0_s0.txt.tmp b/probe_tab_y0_s0.txt.tmp
+new file mode 100644
+index 0000000..61edf27
+--- /dev/null
++++ b/probe_tab_y0_s0.txt.tmp
+@@ -0,0 +1,101 @@
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++    obs=reset(); R=obs.get_object_from_name("robot")
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++    obs=reset(); R=obs.get_object_from_name("robot")
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++    obs=reset(); R=obs.get_object_from_name("robot")
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
++Traceback (most recent call last):
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++        ^^^^^^^
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++    obs=reset(); R=obs.get_object_from_name("robot")
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++    obs=reset(); R=obs.get_object_from_name("robot")
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
+++0.650    N    N    N    N    N    N    T    T    F    F    F    F    F    F    F    F    F    T    T    N    N    N    N    N    N
+++0.500    N    N    T    F   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   11    T    N    N
+++0.050    F    F    F    F   22   22   22   22   22   25   29    T    T    T    T    O    O    O    O   22   22    F    F    F    F
+++0.600    N    N    N    N    T    F    F    F    F    F    F    F    F    F    F    F    F    F    F    F    T    N    N    N    N
+++0.200    F    F    F    F   22   22   22   22   22   22   22   22   22   22   22   22    O    O    O   22   22   11    F    F    F
+++0.350    F    F    F    F   22   22   22   22   22   22   22   22   22   22    O    O    O    O   22   22   22   11    F    F    F
+++0.150    F    F    F    F   22   22   22   22   22   22   22   24   25   23   22    O    O    O    O   22   22   11    F    F    F
+++0.000    F    F    F    F    F    F    F    F    F   26   29    T    T    T    T   24    F    F    F    F    F    F    F    F    F
++-0.100    F    F    F    F    F    F    F    F    F   22   27    T    T    T    T   20   19    F    F    F    F    F    F    F    F
++-0.050    F    F    F    F    F    F    F    F    F   25   29    T    T    T    T   23    F    F    F    F    F    F    F    F    F
+diff --git a/probe_tab_y0_s1.txt b/probe_tab_y0_s1.txt
+new file mode 100644
+index 0000000..21a242e
+--- /dev/null
++++ b/probe_tab_y0_s1.txt
+@@ -0,0 +1,125 @@
++Traceback (most recent call last):
++Traceback (most recent call last):
++Traceback (most recent call last):
++Traceback (most recent call last):
++Traceback (most recent call last):
++Traceback (most recent call last):
++Traceback (most recent call last):
++Traceback (most recent call last):
++Traceback (most recent call last):
++RuntimeError: Connection to the environment server was closed
++RuntimeError: Connection to the environment server was closed
++RuntimeError: Connection to the environment server was closed
++RuntimeError: Connection to the environment server was closed
++RuntimeError: Connection to the environment server was closed
++RuntimeError: Connection to the environment server was closed
++RuntimeError: Connection to the environment server was closed
++RuntimeError: Connection to the environment server was closed
++RuntimeError: Connection to the environment server was closed
+++0.600    N    N    N    N    T    F    F    F    F    F    F    F    F    F    F    F    F    F    F    F    T    N    N    N    N
+++0.400    T    F    F    F   22   22   22   22    O    O    O   22   22   22   22   22   22   22   22   22   22   11    F    F    T
+++0.350    F    F    F    F   22   22   22   22   22    O    O   22   22   22   22   22   22   22   22   22   22   11    F    F    F
+++0.300    F    F    F    F   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   11    F    F    F
+++0.200    F    F    F    F   22   22   22   22   22   22   22   22   22   22   22    O    O   22   22   22   22   11    F    F    F
+++0.100    F    F    F    F   22   22   22   22   22   22   26    T    T    T   25    O    O    O   22   22   22   11    F    F    F
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 478, in _request
++  File "/sandbox/env_client.py", line 478, in _request
++  File "/sandbox/env_client.py", line 478, in _request
++  File "/sandbox/env_client.py", line 478, in _request
++  File "/sandbox/env_client.py", line 478, in _request
++  File "/sandbox/env_client.py", line 478, in _request
++  File "/sandbox/env_client.py", line 478, in _request
++  File "/sandbox/env_client.py", line 478, in _request
++  File "/sandbox/env_client.py", line 478, in _request
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    raise RuntimeError("Connection to the environment server was closed")
++    raise RuntimeError("Connection to the environment server was closed")
++    raise RuntimeError("Connection to the environment server was closed")
++    raise RuntimeError("Connection to the environment server was closed")
++    raise RuntimeError("Connection to the environment server was closed")
++    raise RuntimeError("Connection to the environment server was closed")
++    raise RuntimeError("Connection to the environment server was closed")
++    raise RuntimeError("Connection to the environment server was closed")
++    raise RuntimeError("Connection to the environment server was closed")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^
++        ^^^^^^^
++        ^^^^^^^
++        ^^^^^^^
++        ^^^^^^^
++        ^^^^^^^
++        ^^^^^^^
++        ^^^^^^^
++        ^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++-0.050    F    F    F    F    F    F    F    F    F   25   29    T    T    T    T   23    F    F    F    F    F    F    F    F    F
++-0.100    F    F    F    F    F    F    F    F    F   22   27    T    T    T    T   20   19    F    F    F    F    F    F    F    F
+diff --git a/probe_tab_y0_s1.txt.tmp b/probe_tab_y0_s1.txt.tmp
+new file mode 100644
+index 0000000..6e3ae9a
+--- /dev/null
++++ b/probe_tab_y0_s1.txt.tmp
+@@ -0,0 +1,125 @@
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++    obs=reset(); R=obs.get_object_from_name("robot")
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++    obs=reset(); R=obs.get_object_from_name("robot")
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++    obs=reset(); R=obs.get_object_from_name("robot")
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++    obs=reset(); R=obs.get_object_from_name("robot")
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++    obs=reset(); R=obs.get_object_from_name("robot")
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++    o,_=env.reset(seed=seed); return o
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++    obs=reset(); R=obs.get_object_from_name("robot")
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++    obs=reset(); R=obs.get_object_from_name("robot")
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
+++0.400    T    F    F    F   22   22   22   22    O    O    O   22   22   22   22   22   22   22   22   22   22   11    F    F    T
+++0.100    F    F    F    F   22   22   22   22   22   22   26    T    T    T   25    O    O    O   22   22   22   11    F    F    F
+++0.350    F    F    F    F   22   22   22   22   22    O    O   22   22   22   22   22   22   22   22   22   22   11    F    F    F
+++0.200    F    F    F    F   22   22   22   22   22   22   22   22   22   22   22    O    O   22   22   22   22   11    F    F    F
+++0.600    N    N    N    N    T    F    F    F    F    F    F    F    F    F    F    F    F    F    F    F    T    N    N    N    N
+++0.300    F    F    F    F   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   11    F    F    F
++-0.050    F    F    F    F    F    F    F    F    F   25   29    T    T    T    T   23    F    F    F    F    F    F    F    F    F
++-0.100    F    F    F    F    F    F    F    F    F   22   27    T    T    T    T   20   19    F    F    F    F    F    F    F    F
+diff --git a/probe_tab_y90_s0.txt b/probe_tab_y90_s0.txt
+new file mode 100644
+index 0000000..85e7b9e
+--- /dev/null
++++ b/probe_tab_y90_s0.txt
+@@ -0,0 +1,41 @@
++Traceback (most recent call last):
++Traceback (most recent call last):
++RuntimeError: Connection to the environment server was closed
++RuntimeError: Connection to the environment server was closed
+++0.700    N    N    N    N    N    N    N    N    N    T    T    T    T    T    T    T    N    N    N    N    N    N    N    N    N
+++0.650    N    N    N    N    N    N    T    T    F    F    F    F    F    F    F    F    F    T    T    N    N    N    N    N    N
+++0.550    N    N    N    T    F    F    F    F    F    F    F    F    F    F    F    F    F    F    F    F    F    T    N    N    N
+++0.500    N    N    T   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22    T    N    N
+++0.450    N    T    F   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22    F    T    N
+++0.400    T    F    F   22   22   22   22   22   22   22   22   22   22   22   22    O    O   22   22   22   22   22    F    F    T
+++0.350    F    F    F   22   22   22   22   22   22   22   22   22   22   22    O    O    O    O   22   22   22   22    F    F    F
+++0.300    F    F    F   22   22   22   22   22   22   22   22   22   22   22    O    O    O    O   22   22   22   22    F    F    F
+++0.250    F    F    F   22   22   22   22   22   22   22   22   22   22   22   22    O   22   22   22   22   22   22    F    F    F
+++0.200    F    F    F   22   22   22   22   22   22   22   22   22   22   22   22   22    O    O    O   22   22   22    F    F    F
+++0.150    F    F    F   22   22   22   22   22   22   22   22   25   26   24   22    O    O    O    O   22   22   22    F    F    F
+++0.100    F    F    F   22   22   22   22   22   22   22   27   29   29   28   25    O    O    O    O   22   22   22    F    F    F
+++0.050    F    F    F    F   11   11   11   11   14   25    T    T    T    T    T    O    O    O    O   11   11    F    F    F    F
+++0.000    F    F    F    F    F    F    F    F   17   26    T    T    T    T    T   24    F    F    F    F    F    F    F    F    F
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 525, in reset
++  File "/sandbox/env_client.py", line 478, in _request
++  File "/sandbox/env_client.py", line 478, in _request
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++    raise RuntimeError("Connection to the environment server was closed")
++    raise RuntimeError("Connection to the environment server was closed")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    obs=reset(); R=obs.get_object_from_name("robot")
++    o,_=env.reset(seed=seed); return o
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^^^^^^^^^^^^^^
++        ^^^^^^^
++        ^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++-0.100    F    F    F    F    F    F    F    F    F   22   27   29   34    T   25   19    F    F    F    F    F    F    F    F    F
+diff --git a/probe_tab_y90_s0.txt.tmp b/probe_tab_y90_s0.txt.tmp
+new file mode 100644
+index 0000000..80ed792
+--- /dev/null
++++ b/probe_tab_y90_s0.txt.tmp
+@@ -0,0 +1,41 @@
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++    obs=reset(); R=obs.get_object_from_name("robot")
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
++Traceback (most recent call last):
++  File "/sandbox/probe_tab_desc.py", line 11, in <module>
++    obs=reset(); R=obs.get_object_from_name("robot")
++        ^^^^^^^
++  File "/sandbox/probe_tab_desc.py", line 10, in reset
++    o,_=env.reset(seed=seed); return o
++        ^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
+++0.700    N    N    N    N    N    N    N    N    N    T    T    T    T    T    T    T    N    N    N    N    N    N    N    N    N
+++0.650    N    N    N    N    N    N    T    T    F    F    F    F    F    F    F    F    F    T    T    N    N    N    N    N    N
+++0.500    N    N    T   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22    T    N    N
+++0.450    N    T    F   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22   22    F    T    N
+++0.400    T    F    F   22   22   22   22   22   22   22   22   22   22   22   22    O    O   22   22   22   22   22    F    F    T
+++0.100    F    F    F   22   22   22   22   22   22   22   27   29   29   28   25    O    O    O    O   22   22   22    F    F    F
+++0.300    F    F    F   22   22   22   22   22   22   22   22   22   22   22    O    O    O    O   22   22   22   22    F    F    F
+++0.200    F    F    F   22   22   22   22   22   22   22   22   22   22   22   22   22    O    O    O   22   22   22    F    F    F
+++0.150    F    F    F   22   22   22   22   22   22   22   22   25   26   24   22    O    O    O    O   22   22   22    F    F    F
+++0.350    F    F    F   22   22   22   22   22   22   22   22   22   22   22    O    O    O    O   22   22   22   22    F    F    F
+++0.250    F    F    F   22   22   22   22   22   22   22   22   22   22   22   22    O   22   22   22   22   22   22    F    F    F
+++0.050    F    F    F    F   11   11   11   11   14   25    T    T    T    T    T    O    O    O    O   11   11    F    F    F    F
+++0.550    N    N    N    T    F    F    F    F    F    F    F    F    F    F    F    F    F    F    F    F    F    T    N    N    N
+++0.000    F    F    F    F    F    F    F    F   17   26    T    T    T    T    T   24    F    F    F    F    F    F    F    F    F
++-0.100    F    F    F    F    F    F    F    F    F   22   27   29   34    T   25   19    F    F    F    F    F    F    F    F    F
+diff --git a/prof.py b/prof.py
+new file mode 100644
+index 0000000..7e1bc30
+--- /dev/null
++++ b/prof.py
+@@ -0,0 +1,11 @@
++import time, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++env = make_env(); obs, info = env.reset(seed=7)
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++ta=te=0
++for i in range(60):
++    t=time.time(); a=ap.get_action(obs); ta+=time.time()-t
++    t=time.time(); obs,r,term,tr,info=env.step(a); te+=time.time()-t
++    if term: break
++print(i, "approach", ta, "env", te)

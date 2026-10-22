@@ -1,0 +1,46 @@
+diff --git a/approach.py b/approach.py
+index 95168a4..07b756e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -96,7 +96,7 @@ class GeneratedApproach:
+         self.held = None
+         self.stuck = 0
+         self.last_pos = None
+-        self.grasp_eps = 0.002
++        self.grasp_eps = 0.007
+         self.fail_count = {}
+         self.t = 0
+ 
+diff --git a/prof.out b/prof.out
+new file mode 100644
+index 0000000..da3cc74
+Binary files /dev/null and b/prof.out differ
+diff --git a/prof.py b/prof.py
+new file mode 100644
+index 0000000..10e4e1a
+--- /dev/null
++++ b/prof.py
+@@ -0,0 +1,12 @@
++import cProfile, pstats, sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++env = make_env(); ap = GeneratedApproach(env.action_space, env.observation_space, {})
++obs, info = env.reset(seed=int(sys.argv[1])); ap.reset(obs, info)
++def run():
++    global obs
++    for t in range(200):
++        a = ap.get_action(obs); obs, r, term, *_ = env.step(a)
++        if term: break
++cProfile.run('run()', 'prof.out')
++pstats.Stats('prof.out').sort_stats('cumulative').print_stats(15)
+diff --git a/test_approach.py b/test_approach.py
+index 9bb08e6..5b3c1f1 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -25,5 +25,5 @@ if __name__ == '__main__':
+     with ThreadPoolExecutor(8) as ex:
+         res = list(ex.map(run, range(a, b)))
+     for r in res:
+-        if not r[2] or len(res)<20: print(r)
++        if not r[2] or len(res)<20 or r[5] > 3: print(r)
+     print('max compute', max(r[5] for r in res)); print('success', sum(r[2] for r in res), '/', len(res), 'mean steps', np.mean([r[3] for r in res]))

@@ -1,0 +1,43 @@
+diff --git a/probe_cluster_grasp.log b/probe_cluster_grasp.log
+new file mode 100644
+index 0000000..3154f50
+--- /dev/null
++++ b/probe_cluster_grasp.log
+@@ -0,0 +1,14 @@
++SUCCESS 0 0 0 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 0 0.015 0 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 0 -0.015 0 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 0 0 0.015 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 0 0 -0.015 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 0.7853981633974483 0 0 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 0.7853981633974483 0.015 0 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 0.7853981633974483 -0.015 0 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 0.7853981633974483 0 0.015 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 0.7853981633974483 0 -0.015 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 2.356194490192345 0 0 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 2.356194490192345 0.015 0 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 2.356194490192345 -0.015 0 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 2.356194490192345 0 0.015 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
+diff --git a/test_sweep.py b/test_sweep.py
+new file mode 100644
+index 0000000..3b51e68
+--- /dev/null
++++ b/test_sweep.py
+@@ -0,0 +1,17 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import sys,time,json
++start=int(sys.argv[1]) if len(sys.argv)>1 else 0
++end=int(sys.argv[2]) if len(sys.argv)>2 else 20
++count=int(sys.argv[3]) if len(sys.argv)>3 else None
++for seed in range(start,end):
++ e=make_env();s,info=e.reset(seed=seed,options={} if count is None else {'object_count':count});p=GeneratedApproach(e.action_space,e.observation_space,{});t0=time.time();p.reset(s,info)
++ last=None;stuck=0
++ for k in range(1000):
++  a=p.get_action(s);s,r,t,tr,info=e.step(a)
++  ro=next(iter(s.get_objects(p.robot_type)))
++  now=(p.phase,p.goal,tuple(s.get(ro,'joint_'+str(i)) for i in range(1,8)),s.get(ro,'pos_base_x'),s.get(ro,'pos_base_y'),s.get(ro,'grasp_active'))
++  stuck=stuck+1 if now==last else 0;last=now
++  if t or tr or stuck>45 or time.time()-t0>55:break
++ print(json.dumps({'seed':seed,'count':count,'success':bool(t),'steps':k+1,'phase':p.phase,'goal':p.goal,'seconds':round(time.time()-t0,2),'grasp':s.get(ro,'grasp_active')}),flush=True)
++ e.close()

@@ -1,0 +1,17 @@
+diff --git a/approach.py b/approach.py
+index c7b90c4..ef94456 100644
+--- a/approach.py
++++ b/approach.py
+@@ -228,8 +228,10 @@ class GeneratedApproach:
+                     self.goal_q = _HOME.copy()
+                     self.phase, self.phase_steps = "target_home", 0
+                 else:
+-                    self.goal_q = _HOME.copy()
+-                    self.phase, self.phase_steps = "prepick_base", 0
++                    # In a dense cluster, try a neighbor first; removing either
++                    # one often makes the original vertical grasp collision-free.
++                    self.deferred.add(self.object)
++                    self.phase, self.phase_steps = "retract", 0
+                 return self._act_to(q, self.goal_q, 1.0)
+             else:
+                 return self._act_to(q, q, -1.0)

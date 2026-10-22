@@ -1,0 +1,25 @@
+diff --git a/approach.py b/approach.py
+index ead97e3..b5395b9 100644
+--- a/approach.py
++++ b/approach.py
+@@ -19,6 +19,7 @@ class GeneratedApproach:
+         self.nav = []
+         self.rot_y = -0.7
+         self.rot_cap = False
++        self.cap_preferred = False
+         self.line_offset = 0.0
+         self.force_move = False
+         self.start_pd = 0.0
+@@ -122,8 +123,10 @@ class GeneratedApproach:
+                     world = [obj+self._world(p,theta) for p in pts]
+                     return min(min(q[0]-.105,4.895-q[0],q[1]-.105,4.895-q[1]) for q in world)
+                 frac = max((0.80, 0.68, 0.56), key=lever_clear)
+-                self.rot_cap = (frac < 0.60 and self.turn_sign > 0.0 and
+-                                (obj[1] < 1.30 or obj[1] > 3.70))
++                if (frac < 0.60 and self.turn_sign > 0.0 and
++                        (obj[1] < 1.30 or obj[1] > 3.70)):
++                    self.cap_preferred = True
++                self.rot_cap = self.cap_preferred and self.turn_sign > 0.0
+                 self.rot_y = -frac*lv
+                 if self.rot_cap:
+                     far_local0 = np.array([self.turn_sign*(lh*.5+.34), 0.0])

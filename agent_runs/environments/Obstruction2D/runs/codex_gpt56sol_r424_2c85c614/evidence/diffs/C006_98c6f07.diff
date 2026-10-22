@@ -1,0 +1,30 @@
+diff --git a/approach.py b/approach.py
+index 53de72b..6611f2e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -10,9 +10,13 @@ class GeneratedApproach:
+ 
+     def reset(self, state, info):
+         rects = state.get_objects(self.types["rectangle"])
+-        self.todo = [o.name for o in rects if o.type.name == "rectangle"]
+-        self.todo.sort(key=lambda n: state.get(state.get_object_from_name(n), "height"))
+-        self.todo.append(state.get_objects(self.types["target_block"])[0].name)
++        # Park every movable rectangle, tallest first.  Including the target in
++        # this clearing pass matters when it physically shields a shorter object.
++        self.todo = [o.name for o in rects]
++        self.todo.sort(key=lambda n: -state.get(state.get_object_from_name(n), "height"))
++        target_name = state.get_objects(self.types["target_block"])[0].name
++        self.todo.append(target_name)  # retrieve it last for the actual placement
++        self.final_index = len(self.todo) - 1
+         xs = [state.get(state.get_object_from_name(n), "x") for n in state.get_object_names()]
+         self.park_base = max(xs) + 0.45
+         robot = state.get_objects(self.types["crv_robot"])[0]
+@@ -37,7 +41,7 @@ class GeneratedApproach:
+         if self.index >= len(self.todo):
+             return self._action()
+         obj = state.get_object_from_name(self.todo[self.index])
+-        is_target = obj.type.name == "target_block"
++        is_target = self.index == self.final_index
+         ox, oy = state.get(obj, "x"), state.get(obj, "y")
+         width = state.get(obj, "width")
+ 

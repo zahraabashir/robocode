@@ -1,0 +1,15 @@
+diff --git a/approach.py b/approach.py
+index 7e46a61..29d42fb 100644
+--- a/approach.py
++++ b/approach.py
+@@ -63,7 +63,9 @@ class GeneratedApproach:
+                 self.phase, self.stalled = "descend", 0
+                 self.last_robot_y, self.pick_y = ry, oy
+             else:
+-                return self._action(dx=self._clip(tx - rx, 0.05), vac=1.0)
++                # Keep suction off in transit: a previously parked object may
++                # touch the gripper as it passes underneath.
++                return self._action(dx=self._clip(tx - rx, 0.05), vac=0.0)
+         if self.phase == "descend":
+             if self.last_robot_y is not None and abs(ry - self.last_robot_y) < 0.001:
+                 self.stalled += 1

@@ -1,0 +1,22 @@
+diff --git a/approach.py b/approach.py
+index 13ccbfc..99bf6a7 100644
+--- a/approach.py
++++ b/approach.py
+@@ -145,7 +145,7 @@ class GeneratedApproach:
+         g = np.array([obs[29], obs[30]])
+         gth = self.goal_theta(obs)
+         err = g - B.p
+-        dth = gth - B.th
++        dth = wrap(gth - B.th)
+         prims = self.primitives_list(B)
+         dist = np.linalg.norm(err)
+         need_rot = abs(dth) > self.ang_tol
+@@ -322,7 +322,7 @@ class GeneratedApproach:
+         if self.mode == 'push':
+             self.push_steps += 1
+             err = self.push_goal - B.p
+-            dth = self.goal_theta(obs) - B.th
++            dth = wrap(self.goal_theta(obs) - B.th)
+             nw = B.dir_world(n)
+             done = False
+             if k in ('t', 'f'):

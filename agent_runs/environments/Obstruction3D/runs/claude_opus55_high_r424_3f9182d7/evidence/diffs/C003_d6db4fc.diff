@@ -1,0 +1,1236 @@
+diff --git a/approach.py b/approach.py
+index 2b71c5c..917085e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -2,10 +2,12 @@ import numpy as np
+ from kin import fk, ik, down_R
+ 
+ JF = ['joint_%d' % i for i in range(1, 8)]
++TOOL = 0.12          # TCP offset along EE z (gripper centre)
+ MAXD = 0.19
+-SAFE_Z = 0.33       # EE transit height
+-GRASP_DZ = 0.14     # EE height above object center when grasping (calibrate)
++SAFE_Z = 0.27        # TCP transit height
+ TABLE_Z = 0.075
++X_RANGE = (0.12, 0.44)
++Y_RANGE = (-0.36, 0.36)
+ 
+ 
+ def _pose(s, o):
+@@ -16,22 +18,26 @@ def _he(s, o):
+     return np.array([s.get(o, 'half_extent_x'), s.get(o, 'half_extent_y'), s.get(o, 'half_extent_z')])
+ 
+ 
+-def _yaw(s, o):
+-    qx, qy, qz, qw = [s.get(o, f) for f in ('pose_qx', 'pose_qy', 'pose_qz', 'pose_qw')]
+-    return np.arctan2(2 * (qw * qz + qx * qy), 1 - 2 * (qy * qy + qz * qz))
++def _quat_R(x, y, z, w):
++    return np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
++                     [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
++                     [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
++
++
++def _wrap(a):
++    return (a + np.pi) % (2 * np.pi) - np.pi
+ 
+ 
+ class GeneratedApproach:
+     def __init__(self, action_space, observation_space, primitives):
+         self.action_space = action_space
+ 
+-    # ------------------------------------------------------------------
+     def reset(self, state, info):
+-        self.queue = []       # list of ('move', pos, yaw) | ('grip', val, n)
+-        self.phase = 'plan'
++        self.queue = []
+         self.qtarget = None
+-        self.stuck = 0
++        self.cur = None
+         self.last_q = None
++        self.retries = 0
+ 
+     def _robot(self, s):
+         r = s.get_object_from_name('robot')
+@@ -39,89 +45,157 @@ class GeneratedApproach:
+         base = (s.get(r, 'pos_base_x'), s.get(r, 'pos_base_y'), s.get(r, 'pos_base_rot'))
+         return r, q, base
+ 
+-    # ------------------------------------------------------------------
+-    def _overlaps(self, s, o, reg):
++    # ------------------------------------------------------------------ planning
++    def _overlaps(self, s, o, reg, margin=0.004):
+         p, h = _pose(s, o), _he(s, o)
+         rp, rh = _pose(s, reg), _he(s, reg)
+-        return (abs(p[0] - rp[0]) < h[0] + rh[0] + 0.005 and
+-                abs(p[1] - rp[1]) < h[1] + rh[1] + 0.005)
++        return (abs(p[0] - rp[0]) < h[0] + rh[0] + margin and
++                abs(p[1] - rp[1]) < h[1] + rh[1] + margin)
+ 
+-    def _free_spot(self, s, obj, avoid):
+-        """Find a free table spot for obj away from the objects in avoid."""
++    def _free_spot(self, s, obj, avoid, cur):
+         h = _he(s, obj)
+-        best, bestd = None, -1
+-        for x in np.linspace(0.05, 0.35, 13):
+-            for y in np.linspace(-0.3, 0.3, 25):
++        best, bestscore = None, -1e9
++        for x in np.linspace(X_RANGE[0], X_RANGE[1], 17):
++            for y in np.linspace(Y_RANGE[0], Y_RANGE[1], 37):
+                 dmin = 1e9
+                 for o in avoid:
+                     p, oh = _pose(s, o), _he(s, o)
+                     dx = abs(x - p[0]) - (h[0] + oh[0])
+                     dy = abs(y - p[1]) - (h[1] + oh[1])
+                     dmin = min(dmin, max(dx, dy))
+-                if dmin > 0.06:
+-                    # prefer close to robot centre line
+-                    score = dmin - 0.2 * abs(y)
+-                    if best is None or score > bestd:
+-                        best, bestd = (x, y), score
+-                elif best is None and dmin > bestd:
+-                    bestd = dmin
+-                    best = (x, y)
++                score = min(dmin, 0.07) - 0.1 * np.hypot(x - cur[0], y - cur[1])
++                if score > bestscore:
++                    best, bestscore = (x, y), score
+         return np.array(best)
+ 
+-    def _plan_pick_place(self, s, obj, place_xy, place_z_center):
++    def _grasp_yaw(self, s, obj, q, base):
++        h = _he(s, obj)
++        R = _quat_R(*[s.get(obj, f) for f in ('pose_qx', 'pose_qy', 'pose_qz', 'pose_qw')])
++        oyaw = np.arctan2(R[1, 0], R[0, 0])
++        # fingers close along EE x: span the smaller side
++        yaw = oyaw if h[0] <= h[1] else oyaw + np.pi / 2
++        # choose yaw or yaw+pi closest to current gripper yaw
++        M = fk(base, q, TOOL)
++        cy = np.arctan2(M[1, 0], M[0, 0])
++        if abs(_wrap(yaw - cy)) > np.pi / 2:
++            yaw += np.pi
++        return _wrap(yaw)
++
++    def _plan_pick_place(self, s, obj, place_xy, support_top):
++        _, q, base = self._robot(s)
+         p = _pose(s, obj)
+-        yaw = _yaw(s, obj)
+-        q = []
+-        q.append(('grip', 1.0, 1))
+-        q.append(('move', np.array([p[0], p[1], SAFE_Z]), yaw))
+-        q.append(('move', np.array([p[0], p[1], p[2] + GRASP_DZ]), yaw))
+-        q.append(('grip', -1.0, 2))
+-        q.append(('move', np.array([p[0], p[1], SAFE_Z]), yaw))
+-        q.append(('move', np.array([place_xy[0], place_xy[1], SAFE_Z]), yaw))
+-        q.append(('move', np.array([place_xy[0], place_xy[1], place_z_center + GRASP_DZ + 0.003]), yaw))
+-        q.append(('grip', 1.0, 2))
+-        q.append(('move', np.array([place_xy[0], place_xy[1], SAFE_Z]), yaw))
+-        return q
++        h = _he(s, obj)
++        yaw = self._grasp_yaw(s, obj, q, base)
++        gz = p[2] + min(0.03, h[2] + 0.005)  # TCP height for grasp
++        gz = max(gz, 0.108)
++        place_center = np.array([place_xy[0], place_xy[1], support_top + h[2] + 0.002])
++        return [
++            ('move', np.array([p[0], p[1], max(SAFE_Z, gz + 0.05)]), yaw, False),
++            ('move', np.array([p[0], p[1], gz]), yaw, True),
++            ('close', obj.name),
++            ('move', np.array([p[0], p[1], SAFE_Z]), yaw, False),
++            ('place_move', place_center + np.array([0, 0, SAFE_Z - place_center[2]]), yaw, False),
++            ('place_move', place_center + np.array([0, 0, 0.02]), yaw, False),
++            ('place_move', place_center, yaw, True),
++            ('open', place_center, yaw),
++            ('move_rel_up', SAFE_Z, yaw),
++        ]
+ 
+     def _plan(self, s):
+         reg = s.get_object_from_name('target_region')
+         tb = s.get_object_from_name('target_block')
+-        cubes = [s.get_object_from_name(n) for n in s.get_object_names()
++        _, q, base = self._robot(s)
++        cur = fk(base, q, TOOL)[:3, 3]
++        cubes = [s.get_object_from_name(n) for n in sorted(s.get_object_names())
+                  if n.startswith('obstruction')]
+         blocking = [o for o in cubes if self._overlaps(s, o, reg)]
+         if blocking:
+-            o = blocking[0]
++            # remove the tallest (top-most) first
++            o = max(blocking, key=lambda c: _pose(s, c)[2] + _he(s, c)[2])
+             others = [c for c in cubes if c.name != o.name] + [reg, tb]
+-            spot = self._free_spot(s, o, others)
+-            return self._plan_pick_place(s, o, spot, TABLE_Z + _he(s, o)[2])
++            spot = self._free_spot(s, o, others, cur)
++            return self._plan_pick_place(s, o, spot, TABLE_Z)
+         rp = _pose(s, reg)
+-        z = rp[2] + _he(s, reg)[2] + _he(s, tb)[2]
+-        return self._plan_pick_place(s, tb, rp[:2], z)
++        return self._plan_pick_place(s, tb, rp[:2], rp[2] + _he(s, reg)[2])
++
++    # ------------------------------------------------------------------ execution
++    def _tcp_target_for_block(self, s, center, yaw):
++        """TCP position so that the held block's centre lands at `center`."""
++        r = s.get_object_from_name('robot')
++        t = np.array([s.get(r, 'grasp_tf_x'), s.get(r, 'grasp_tf_y'), s.get(r, 'grasp_tf_z')])
++        return center - down_R(yaw) @ t
+ 
+-    # ------------------------------------------------------------------
+     def get_action(self, s):
++        for _ in range(20):
++            a = self._step(s)
++            if a is not None:
++                return a
++        return np.zeros(11, dtype=np.float32)
++
++    def _step(self, s):
+         a = np.zeros(11, dtype=np.float32)
+         r, q, base = self._robot(s)
++        grasping = s.get(r, 'grasp_active') > 0.5
++        if grasping:
++            a[10] = -1.0
+         if not self.queue:
+             self.queue = self._plan(s)
+             self.qtarget = None
++            self.last_q = None
+         cmd = self.queue[0]
+-        if cmd[0] == 'grip':
+-            a[10] = cmd[1]
+-            n = cmd[2] - 1
+-            if n <= 0:
++        kind = cmd[0]
++        if kind == 'close':
++            if grasping:
++                self.queue.pop(0)
++                return None
++            self.retries += 1
++            if self.retries > 3:
++                # failed grasp: replan from scratch
++                self.retries = 0
++                self.queue = [('move_rel_up', SAFE_Z, None)]
++                return None
++            a[10] = -1.0
++            return a
++        if kind == 'open':
++            if not grasping:
+                 self.queue.pop(0)
+-            else:
+-                self.queue[0] = ('grip', cmd[1], n)
++                self.retries = 0
++                return None
++            self.retries += 1
++            if self.retries > 1:
++                # lower a bit and try again
++                self.retries = 0
++                c = cmd[1] - np.array([0, 0, 0.002])
++                self.queue[0] = ('open', c, cmd[2])
++                self.queue.insert(0, ('place_move', c, cmd[2], True))
++                return None
++            a[10] = 1.0
+             return a
+-        # move
+         if self.qtarget is None:
+-            qt, ok = ik(base, q, cmd[1], down_R(cmd[2]))
++            if kind == 'move':
++                pos, yaw = cmd[1], cmd[2]
++            elif kind == 'place_move':
++                pos, yaw = self._tcp_target_for_block(s, cmd[1], cmd[2]), cmd[2]
++            elif kind == 'move_rel_up':
++                M = fk(base, q, TOOL)
++                pos = M[:3, 3].copy(); pos[2] = max(pos[2], cmd[1])
++                yaw = np.arctan2(M[1, 0], M[0, 0]) if cmd[2] is None else cmd[2]
++            qt, ok = ik(base, q, pos, down_R(yaw), tool=TOOL)
+             self.qtarget = qt
++            self.last_q = None
+         d = self.qtarget - q
+         if np.max(np.abs(d)) < 1e-4:
+             self.queue.pop(0)
+             self.qtarget = None
+-            return self.get_action(s) if self.queue else a
++            return None
++        if self.last_q is not None and np.allclose(self.last_q, q, atol=1e-7):
++            # previous action rejected (collision)
++            allow = len(cmd) > 3 and cmd[3]
++            self.queue.pop(0)
++            self.qtarget = None
++            if not allow:
++                self.queue = []  # replan
++            return None
++        self.last_q = q.copy()
+         a[3:10] = np.clip(d, -MAXD, MAXD)
+         return a
+diff --git a/calib_1.py b/calib_1.py
+new file mode 100644
+index 0000000..14f0f69
+--- /dev/null
++++ b/calib_1.py
+@@ -0,0 +1,7 @@
++from calib_u import *
++e=R()
++for seed in range(8):
++    e.reset(seed); print(seed, 'block',np.round(e.blk(),3),'obst',[np.round(e.blk(n),3) for n in e.obs.get_object_names() if 'obst' in n][:2], 'region', np.round(e.blk('target_region')[:3],3))
++e.reset(1)
++for g in [1,1,1,-1,-1,-1,-1,0,1]:
++    e.stepq(np.zeros(7),g); print(g, e.rob('finger_state'), e.rob('grasp_active'))
+diff --git a/calib_10.py b/calib_10.py
+new file mode 100644
+index 0000000..270c786
+--- /dev/null
++++ b/calib_10.py
+@@ -0,0 +1,24 @@
++import numpy as np, kin
++from scipy.optimize import least_squares
++from scipy.spatial.transform import Rotation as Rot
++D=np.concatenate([np.load(f'dbg/g{s}.npy') for s in [1,5,6]])
++def T6(p): M=np.eye(4); M[:3,:3]=Rot.from_rotvec(p[3:6]).as_matrix(); M[:3,3]=p[:3]; return M
++blk=[]
++for d in D:  # block pose in mobile-base frame
++    M=np.eye(4); M[:3,:3]=Rot.from_quat(d[13:17]).as_matrix(); M[:3,3]=d[10:13]
++    Tb=np.eye(4); Tb[:3,:3]=kin._rz(d[2]); Tb[:3,3]=[d[0],d[1],0]; blk.append(np.linalg.inv(Tb)@M)
++def res(p):
++    r=[]
++    for i,d in enumerate(D):
++        P=T6(p[:6])@kin.fk((0,0,0),d[3:10]+p[12:19])@T6(p[6:12])
++        r.append(P[:3,3]-blk[i][:3,3]); r.append(0.1*(P[:3,:3]-blk[i][:3,:3]).ravel())
++    return np.concatenate(r)
++best=None
++for k in range(8):
++    p0=np.random.default_rng(k).normal(0,0.3,19) if k else np.zeros(19)
++    s=least_squares(res,p0)
++    if best is None or s.cost<best.cost: best=s
++    print(k, s.cost)
++p=best.x; r=res(p).reshape(len(D),-1)
++print('pos rms',np.sqrt((r[:,:3]**2).mean()),'max',np.abs(r[:,:3]).max(),'rot rms',np.sqrt((r[:,3:]**2).mean())*10)
++np.set_printoptions(precision=4,suppress=True); print(p)
+diff --git a/calib_11.py b/calib_11.py
+new file mode 100644
+index 0000000..4866ec7
+--- /dev/null
++++ b/calib_11.py
+@@ -0,0 +1,31 @@
++# per-joint axis identification from grasped block
++from calib_u import *
++from scipy.spatial.transform import Rotation as Rot
++import sys
++seed=int(sys.argv[1]); e=R(); e.reset(seed); b=e.blk()
++x,y=b[0]-0.10,b[1]-0.01; z=0.40
++e.go([x,y,z],0.0)
++while z>0.25+1e-9:
++    if not e.go([x,y,z-0.005],0.0): break
++    z-=0.005
++for i in range(2): e.stepq(np.zeros(7),-1.0)
++e.go([x,y,0.42],0.0,grip=-1)
++def bp():
++    return np.array([e.g('target_block',k) for k in ['pose_x','pose_y','pose_z']]), Rot.from_quat([e.g('target_block',k) for k in ['pose_qx','pose_qy','pose_qz','pose_qw']]).as_matrix()
++def jframes(base,q):
++    bx,by,br=base; M=kin._T((bx,by,0),kin._rz(br)); out=[]
++    for Jt,qi in zip(kin._JT,q):
++        M=M@Jt; out.append(M.copy()); M=M@kin._T((0,0,0),kin._rz(qi))
++    return out
++np.set_printoptions(precision=3,suppress=True)
++d=0.1
++for j in range(7):
++    p0,R0=bp(); q=e.q(); fr=jframes(e.base(),q)
++    dq=np.zeros(7); dq[j]=d; ok=e.stepq(dq,-1.0)
++    p1,R1=bp(); e.stepq(-dq,-1.0)
++    rv=Rot.from_matrix(R1@R0.T).as_rotvec(); ang=np.linalg.norm(rv); w=rv/ang
++    A=np.eye(3)-R1@R0.T; c=np.linalg.pinv(A,rcond=1e-3)@(p1-R1@R0.T@p0)
++    zf=fr[j][:3,2]; of=fr[j][:3,3]
++    # distance between true axis line and FK axis line points
++    cperp=c-of; cperp-=np.dot(cperp,w)*w
++    print(f"j{j+1} ok={ok} ang={ang:.3f} true_w={w} fk_z={zf} dot={np.dot(w,zf):+.3f} true_pt={c} fk_org={of} off_perp={cperp}")
+diff --git a/calib_12.py b/calib_12.py
+new file mode 100644
+index 0000000..28e3802
+--- /dev/null
++++ b/calib_12.py
+@@ -0,0 +1,24 @@
++import numpy as np, kin
++from scipy.optimize import least_squares
++from scipy.spatial.transform import Rotation as Rot
++S=[1,5,6]; DS=[np.load(f'dbg/g{s}.npy') for s in S]
++np.set_printoptions(precision=4,suppress=True)
++def prep(D):
++    blk=[];arm=[]
++    for d in D:
++        M=np.eye(4); M[:3,:3]=Rot.from_quat(d[13:17]).as_matrix(); M[:3,3]=d[10:13]
++        Tb=np.eye(4); Tb[:3,:3]=kin._rz(d[2]); Tb[:3,3]=[d[0],d[1],0]; blk.append(np.linalg.inv(Tb)@M); arm.append(kin.fk((0,0,0),d[3:10]))
++    return blk,arm
++P=[prep(D) for D in DS]
++def res(p):
++    r=[]
++    for k,(blk,arm) in enumerate(P):
++        t=p[3+3*k:6+3*k]
++        for a,b in zip(arm,blk): r.append(a[:3,:3]@t+a[:3,3]+p[:3]-b[:3,3])
++    return np.concatenate(r)
++s=least_squares(res,np.zeros(3+3*len(S))); r=res(s.x).reshape(-1,3)
++print('pos rms',np.sqrt((r**2).mean()),'max',np.abs(r).max())
++print('base offset (arm-base frame)',s.x[:3])
++for k,D in enumerate(DS):
++    blk,arm=P[k]; Rt=arm[0][:3,:3].T@blk[0][:3,:3]
++    print('seed',S[k],'block pos in EE frame',s.x[3+3*k:6+3*k],'Rrel quat',Rot.from_matrix(Rt).as_quat(),'| grasp_tf',D[0,17:24])
+diff --git a/calib_13.py b/calib_13.py
+new file mode 100644
+index 0000000..d6030d0
+--- /dev/null
++++ b/calib_13.py
+@@ -0,0 +1,7 @@
++import numpy as np, kin
++from scipy.spatial.transform import Rotation as Rot
++D=np.load('dbg/g1.npy')
++np.set_printoptions(precision=3,suppress=True)
++for i in [0,1,2,3,4,5,10,20,40]:
++    d=D[i]; Rb=Rot.from_quat(d[13:17]).as_matrix(); Ra=kin.fk(d[:3],d[3:10])[:3,:3]
++    print(i, np.round(d[:3],3), Rot.from_matrix(Ra.T@Rb).as_rotvec(), 'blkpos',d[10:13])
+diff --git a/calib_14.py b/calib_14.py
+new file mode 100644
+index 0000000..f408111
+--- /dev/null
++++ b/calib_14.py
+@@ -0,0 +1,13 @@
++# grasp test in TCP coords: python calib_14.py seed yaw dx dy tcpz
++from calib_u import *
++import sys
++seed=int(sys.argv[1]); yaw=float(sys.argv[2]); dx,dy,zt=[float(v) for v in sys.argv[3:6]]; T=0.12
++e=R(); e.reset(seed); b=e.blk(); x,y=b[0]+dx,b[1]+dy; z=0.25
++e.go([x,y,z],yaw,tool=T)
++while z>zt+1e-9:
++    if not e.go([x,y,z-0.0025],yaw,tool=T): break
++    z-=0.0025
++e.stepq(np.zeros(7),-1.0)
++ga=e.rob('grasp_active'); fs=e.rob('finger_state')
++e.go([x,y,0.25],yaw,tool=T,grip=-1)
++print(f"seed{seed} yaw{yaw:.2f} d=({dx:+.3f},{dy:+.3f}) tcpz={z:.4f} grasp={ga} fs={fs:.3f} blk_after_lift_z={e.blk()[2]:.3f} tf={[round(e.rob('grasp_tf_'+k),4) for k in 'x y z qx qy qz qw'.split()]}")
+diff --git a/calib_15.py b/calib_15.py
+new file mode 100644
+index 0000000..1e2fd45
+--- /dev/null
++++ b/calib_15.py
+@@ -0,0 +1,20 @@
++# release test: python calib_15.py seed relx rely relz(tcp)
++from calib_u import *
++import sys
++seed=int(sys.argv[1]); T=0.12; e=R(); e.reset(seed); b=e.blk(); yaw=0.0 if b[3]<b[4] else np.pi/2
++x,y=b[0],b[1]; z=0.25; e.go([x,y,z],yaw,tool=T)
++while z>b[2]+b[5]+0.005: 
++    e.go([x,y,z-0.005],yaw,tool=T); z-=0.005
++e.stepq(np.zeros(7),-1.0); print('grasp',e.rob('grasp_active'))
++tx,ty,tz=[float(v) for v in sys.argv[2:5]]
++e.go([x,y,0.25],yaw,tool=T,grip=-1); print('go target',e.go([tx,ty,0.25],yaw,tool=T,grip=-1))
++zz=0.25
++while zz>tz+1e-9:
++    if not e.go([tx,ty,zz-0.0025],yaw,tool=T,grip=-1): print('lower blocked at tcp z',round(zz,4),'blk',np.round(e.blk()[:3],4)); break
++    zz-=0.0025
++print('before open blk',np.round(e.blk()[:3],4))
++for i in range(3):
++    ok=e.stepq(np.zeros(7),1.0); print('open',i,'grasp',e.rob('grasp_active'),'fs',e.rob('finger_state'),'blk',np.round(e.blk()[:3],4),'blk_ga',e.g('target_block','grasp_active'))
++e.go([tx,ty,0.3],yaw,tool=T,grip=0); print('after retreat blk',np.round(e.blk()[:3],4))
++for n in e.obs.get_object_names():
++    if n!='robot': print(n,np.round(e.blk(n),3))
+diff --git a/calib_2.py b/calib_2.py
+new file mode 100644
+index 0000000..dc0e907
+--- /dev/null
++++ b/calib_2.py
+@@ -0,0 +1,22 @@
++# horizontal approach probe: python calib_2.py seed yaw zoff
++from calib_u import *
++import sys
++seed=int(sys.argv[1]); yaw=float(sys.argv[2]); zfk=float(sys.argv[3])
++e=R(); res=[]
++for ang in [0,90,180,270]:
++    d=np.array([np.cos(np.radians(ang)),np.sin(np.radians(ang)),0])
++    e.reset(seed); b=e.blk(); c=b[:3].copy(); c[2]=zfk
++    s=0.25
++    e.go(c-d*s+[0,0,0.1],yaw); ok=e.go(c-d*s,yaw)
++    if not ok: res.append((ang,'startblk')); continue
++    for step in [0.01,0.001]:
++        while s>-0.25:
++            r=e.go(c-d*(s-step),yaw)
++            if r is None: print('ikfail'); break
++            if not r: break
++            s-=step
++    res.append(s)
++# contact positions along axis: EE coordinate at contact relative to block center
++xa=-res[0]; xb=res[2]; ya=-res[1]; yb=res[3]
++b=e.blk()
++print(f"seed {seed} yaw {yaw:.2f} z {zfk} blk {np.round(b[:2],3)} he {np.round(b[3:5],3)} | x: {xa:.3f} {xb:.3f} ctr {-(xa+xb)/2:+.3f} w {xb-xa-2*b[3]:.3f} | y: {ya:.3f} {yb:.3f} ctr {-(ya+yb)/2:+.3f} w {yb-ya-2*b[4]:.3f}",flush=True)
+diff --git a/calib_3.py b/calib_3.py
+new file mode 100644
+index 0000000..0fa2b48
+--- /dev/null
++++ b/calib_3.py
+@@ -0,0 +1,15 @@
++from calib_u import *
++import sys
++e=R(); e.reset(1)
++yaw=float(sys.argv[1]); p=[float(v) for v in sys.argv[2:5]]
++qt,ok=kin.ik(e.base(),e.q(),np.array(p),kin.down_R(yaw)); print(ok, np.round(qt,3))
++o=e.obs.copy()
++for i,f in enumerate(F): o.set(e.r,f,qt[i])
++M=kin.fk(e.base(),qt)
++def put(name,pos,h=0.015):
++    b=o.get_object_from_name(name)
++    for k,v in zip(['pose_x','pose_y','pose_z'],pos): o.set(b,k,v)
++    for k in ['half_extent_x','half_extent_y','half_extent_z']: o.set(b,k,h)
++put('target_block',M[:3,3]); put('obstruction0',M[:3,3]+M[:3,2]*0.157)
++put('target_region',[p[0],p[1],0.08],0.01)
++import shutil; pth=e.env.render_state(state=o); shutil.copy(pth,'dbg/r_'+sys.argv[5]+'.png'); print(pth)
+diff --git a/calib_4.py b/calib_4.py
+new file mode 100644
+index 0000000..c57bfd9
+--- /dev/null
++++ b/calib_4.py
+@@ -0,0 +1,8 @@
++from calib_u import *
++import sys, shutil
++e=R(); e.reset(int(sys.argv[1])); yaw=float(sys.argv[2]); b=e.blk()
++dx,dy,z=[float(v) for v in sys.argv[3:6]]
++qt,ok=kin.ik(e.base(),e.q(),np.array([b[0]+dx,b[1]+dy,z]),kin.down_R(yaw))
++o=e.obs.copy()
++for i,f in enumerate(F): o.set(e.r,f,qt[i])
++pth=e.env.render_state(state=o); shutil.copy(pth,'dbg/r_'+sys.argv[6]+'.png'); print(ok,np.round(qt,3))
+diff --git a/calib_5.py b/calib_5.py
+new file mode 100644
+index 0000000..86ceab4
+--- /dev/null
++++ b/calib_5.py
+@@ -0,0 +1,15 @@
++# descend-grid in TCP coords (tool=0.12): python calib_5.py seed yaw dy -> TCP z where descent stopped, over dx
++from calib_u import *
++import sys
++seed=int(sys.argv[1]); yaw=float(sys.argv[2]); dy=float(sys.argv[3]); T=0.12
++e=R(); row=[]
++for dx in np.arange(-0.08,0.081,0.01):
++    e.reset(seed); b=e.blk(); z=0.25
++    r0=e.go([b[0]+dx,b[1]+dy,z],yaw,tool=T)
++    while z>0.06:
++        r=e.go([b[0]+dx,b[1]+dy,z-0.0025],yaw,tool=T)
++        if not r: break
++        z-=0.0025
++    M=e.ee(T); err=np.linalg.norm(M[:3,:3]-kin.down_R(yaw))
++    row.append(z if (r is not None and err<0.05) else -1)
++print(f"{dy:+.2f} "+" ".join(f"{v:.3f}" for v in row),flush=True)
+diff --git a/calib_6.py b/calib_6.py
+new file mode 100644
+index 0000000..116f792
+--- /dev/null
++++ b/calib_6.py
+@@ -0,0 +1,19 @@
++# grasp attempt: python calib_6.py seed yaw ox oy zfinal
++from calib_u import *
++import sys
++seed=int(sys.argv[1]); yaw=float(sys.argv[2]); ox,oy,zf=[float(v) for v in sys.argv[3:6]]
++e=R(); e.reset(seed); b=e.blk()
++x,y=b[0]-ox,b[1]-oy; z=0.40
++e.go([x,y,z],yaw)
++while z>zf+1e-9:
++    if not e.go([x,y,z-0.005],yaw): break
++    z-=0.005
++print('stopped z',round(z,3))
++for i in range(6):
++    e.stepq(np.zeros(7),-1.0); print('close',i,e.rob('finger_state'),e.rob('grasp_active'),e.g('target_block','grasp_active'))
++for i in range(5):
++    r=e.go([x,y,z+0.02*(i+1)],yaw); print('lift',r,np.round(e.blk()[:3],4),'ee',np.round(e.ee()[:3,3],4))
++print('tf',[round(e.rob('grasp_tf_'+k),4) for k in ['x','y','z','qx','qy','qz','qw']])
++from scipy.spatial.transform import Rotation as Rot
++Rb=Rot.from_quat([e.g('target_block',k) for k in ['pose_qx','pose_qy','pose_qz','pose_qw']]).as_matrix()
++M=e.ee(); print('EE R\n',np.round(M[:3,:3],3),'\nblock R\n',np.round(Rb,3))
+diff --git a/calib_7.py b/calib_7.py
+new file mode 100644
+index 0000000..8a67dd2
+--- /dev/null
++++ b/calib_7.py
+@@ -0,0 +1,23 @@
++# collect grasped samples: python calib_7.py seed out.npy
++from calib_u import *
++import sys
++seed=int(sys.argv[1]); e=R(); e.reset(seed); b=e.blk(); yaw=0.0
++x,y=b[0]-0.10,b[1]-0.01; z=0.40
++e.go([x,y,z],yaw)
++while z>0.25+1e-9:
++    if not e.go([x,y,z-0.005],yaw): break
++    z-=0.005
++for i in range(2): e.stepq(np.zeros(7),-1.0)
++print('grasp',e.rob('grasp_active'))
++e.go([x,y,0.40],yaw,grip=-1)
++rng=np.random.default_rng(seed); D=[]
++def rec():
++    D.append(np.concatenate([e.base(),e.q(),[e.g('target_block',k) for k in ['pose_x','pose_y','pose_z','pose_qx','pose_qy','pose_qz','pose_qw']],[e.rob('grasp_tf_'+k) for k in ['x','y','z','qx','qy','qz','qw']],[e.rob('grasp_active')]]))
++rec(); q0=e.q()
++for t in range(120):
++    a=np.zeros(11,np.float32); a[10]=-1
++    if t%4==3: a[:3]=rng.uniform(-0.1,0.1,3)
++    else:
++        a[3:10]=np.clip(rng.uniform(-0.15,0.15,7)+0.3*(q0-e.q()),-0.2,0.2)
++    e.step(a); rec()
++D=np.array(D); np.save(sys.argv[2],D); print(D.shape, 'grasp_active all', D[:,-1].min(), 'tf std', D[:,17:24].std(0).round(5))
+diff --git a/calib_8.py b/calib_8.py
+new file mode 100644
+index 0000000..7d82155
+--- /dev/null
++++ b/calib_8.py
+@@ -0,0 +1,28 @@
++import numpy as np, kin
++from scipy.optimize import least_squares
++from scipy.spatial.transform import Rotation as Rot
++D=np.concatenate([np.load(f'dbg/g{s}.npy') for s in [1,5,6]])
++def T6(p): M=np.eye(4); M[:3,:3]=Rot.from_rotvec(p[3:6]).as_matrix(); M[:3,3]=p[:3]; return M
++def Tbase(b): M=np.eye(4); M[:3,:3]=kin._rz(b[2]); M[:3,3]=[b[0],b[1],0]; return M
++blkT=[]
++for d in D:
++    M=np.eye(4); M[:3,:3]=Rot.from_quat(d[13:17]).as_matrix(); M[:3,3]=d[10:13]; blkT.append(M)
++arm=[kin.fk((0,0,0),d[3:10]) for d in D]
++def pred(p,i): return Tbase(D[i,:3])@T6(p[:6])@arm[i]@T6(p[6:12])
++def res(p):
++    r=[]
++    for i in range(len(D)):
++        P=pred(p,i); r.append(P[:3,3]-blkT[i][:3,3]); r.append(0.1*(P[:3,:3]-blkT[i][:3,:3]).ravel())
++    return np.concatenate(r)
++best=None
++for k in range(5):
++    p0=np.random.default_rng(k).normal(0,0.3,12) if k else np.zeros(12)
++    s=least_squares(res,p0)
++    if best is None or s.cost<best.cost: best=s
++p=best.x; r=res(p).reshape(len(D),-1)
++print('pos rms',np.sqrt((r[:,:3]**2).mean()), 'max',np.abs(r[:,:3]).max(), 'rot rms',np.sqrt((r[:,3:]**2).mean())*10)
++B=T6(p[:6]); T=T6(p[6:12])
++np.set_printoptions(precision=4,suppress=True)
++print('B=\n',B,'\nB rpy',Rot.from_matrix(B[:3,:3]).as_euler('xyz'),'\nT=\n',T,'\nT rpy',Rot.from_matrix(T[:3,:3]).as_euler('xyz'))
++print('grasp_tf',D[0,17:24])
++np.save('dbg/fitp.npy',p)
+diff --git a/calib_9.py b/calib_9.py
+new file mode 100644
+index 0000000..7f1d379
+--- /dev/null
++++ b/calib_9.py
+@@ -0,0 +1,10 @@
++import numpy as np, kin
++D=np.load('dbg/g1.npy')
++for i in range(1,len(D)):
++    db=D[i,:3]-D[i-1,:3]; dq=D[i,3:10]-D[i-1,3:10]
++    if np.abs(db).max()>1e-6 and np.abs(dq).max()<1e-9:
++        # predicted: rotate previous block pos about previous base (x,y) by dtheta then translate
++        b0=D[i-1,:3]; b1=D[i,:3]; p0=D[i-1,10:13]; p1=D[i,10:13]
++        rel=kin._rz(-b0[2])@(p0-[b0[0],b0[1],0]); pred=kin._rz(b1[2])@rel+[b1[0],b1[1],0]
++        print(np.round(db,3),'err',np.round(p1-pred,4))
++    if i>40: break
+diff --git a/calib_u.py b/calib_u.py
+new file mode 100644
+index 0000000..0381a16
+--- /dev/null
++++ b/calib_u.py
+@@ -0,0 +1,29 @@
++from env_client import make_env
++import numpy as np, kin
++F=['joint_%d'%i for i in range(1,8)]
++class R:
++    def __init__(s): s.env=make_env()
++    def reset(s,seed):
++        s.obs,_=s.env.reset(seed=seed); s.r=s.obs.get_object_from_name('robot'); return s.obs
++    def g(s,name,f): return s.obs.get(s.obs.get_object_from_name(name),f)
++    def rob(s,f): return s.obs.get(s.r,f)
++    def q(s): return np.array([s.rob(f) for f in F])
++    def base(s): return (s.rob('pos_base_x'),s.rob('pos_base_y'),s.rob('pos_base_rot'))
++    def blk(s,name='target_block'): return np.array([s.g(name,f) for f in ['pose_x','pose_y','pose_z','half_extent_x','half_extent_y','half_extent_z']])
++    def step(s,a):
++        a=np.asarray(a,dtype=np.float32); s.obs,rew,term,trunc,info=s.env.step(a); return rew,term,info
++    def stepq(s,dq,grip=0.0,db=(0,0,0)):
++        a=np.zeros(11,np.float32); a[:3]=db; a[3:10]=dq; a[10]=grip
++        v0=s.env and np.concatenate([s.q(),s.base()]); s.step(a)
++        return not np.allclose(v0,np.concatenate([s.q(),s.base()]))
++    def goq(s,qt,grip=0.0):
++        q=s.q()
++        while np.max(np.abs(qt-q))>1e-6:
++            if not s.stepq(np.clip(qt-q,-0.19,0.19),grip): return False
++            q=s.q()
++        return True
++    def go(s,p,yaw=0.0,grip=0.0,R=None,tool=None):
++        qt,ok=kin.ik(s.base(),s.q(),np.array(p,float),kin.down_R(yaw) if R is None else R,tool=tool)
++        if not ok: return None
++        return s.goq(qt,grip)
++    def ee(s,tool=None): return kin.fk(s.base(),s.q(),tool)
+diff --git a/dbg/c2_1_-1.5708.txt b/dbg/c2_1_-1.5708.txt
+new file mode 100644
+index 0000000..52e5076
+--- /dev/null
++++ b/dbg/c2_1_-1.5708.txt
+@@ -0,0 +1,5 @@
++Traceback (most recent call last):
++  File "/sandbox/calib_2.py", line 20, in <module>
++    xa=-res[0]; xb=res[2]; ya=-res[1]; yb=res[3]
++       ^^^^^^^
++TypeError: bad operand type for unary -: 'tuple'
+diff --git a/dbg/c2_1_0.txt b/dbg/c2_1_0.txt
+new file mode 100644
+index 0000000..135093e
+--- /dev/null
++++ b/dbg/c2_1_0.txt
+@@ -0,0 +1 @@
++seed 1 yaw 0.00 z 0.277 blk [0.138 0.183] he [0.028 0.039] | x: -0.191 -0.062 ctr +0.127 w 0.072 | y: 0.250 -0.250 ctr -0.000 w -0.578
+diff --git a/dbg/c2_1_1.5708.txt b/dbg/c2_1_1.5708.txt
+new file mode 100644
+index 0000000..7bac9f8
+--- /dev/null
++++ b/dbg/c2_1_1.5708.txt
+@@ -0,0 +1 @@
++seed 1 yaw 1.57 z 0.277 blk [0.138 0.183] he [0.028 0.039] | x: 0.250 -0.250 ctr -0.000 w -0.557 | y: 0.250 -0.250 ctr -0.000 w -0.578
+diff --git a/dbg/c2_1_3.1416.txt b/dbg/c2_1_3.1416.txt
+new file mode 100644
+index 0000000..3384cbf
+--- /dev/null
++++ b/dbg/c2_1_3.1416.txt
+@@ -0,0 +1 @@
++seed 1 yaw 3.14 z 0.277 blk [0.138 0.183] he [0.028 0.039] | x: -0.198 -0.042 ctr +0.120 w 0.099 | y: 0.250 -0.250 ctr -0.000 w -0.578
+diff --git a/dbg/c2_3_-1.5708.txt b/dbg/c2_3_-1.5708.txt
+new file mode 100644
+index 0000000..52e5076
+--- /dev/null
++++ b/dbg/c2_3_-1.5708.txt
+@@ -0,0 +1,5 @@
++Traceback (most recent call last):
++  File "/sandbox/calib_2.py", line 20, in <module>
++    xa=-res[0]; xb=res[2]; ya=-res[1]; yb=res[3]
++       ^^^^^^^
++TypeError: bad operand type for unary -: 'tuple'
+diff --git a/dbg/c2_3_0.txt b/dbg/c2_3_0.txt
+new file mode 100644
+index 0000000..52e5076
+--- /dev/null
++++ b/dbg/c2_3_0.txt
+@@ -0,0 +1,5 @@
++Traceback (most recent call last):
++  File "/sandbox/calib_2.py", line 20, in <module>
++    xa=-res[0]; xb=res[2]; ya=-res[1]; yb=res[3]
++       ^^^^^^^
++TypeError: bad operand type for unary -: 'tuple'
+diff --git a/dbg/c2_3_1.5708.txt b/dbg/c2_3_1.5708.txt
+new file mode 100644
+index 0000000..52e5076
+--- /dev/null
++++ b/dbg/c2_3_1.5708.txt
+@@ -0,0 +1,5 @@
++Traceback (most recent call last):
++  File "/sandbox/calib_2.py", line 20, in <module>
++    xa=-res[0]; xb=res[2]; ya=-res[1]; yb=res[3]
++       ^^^^^^^
++TypeError: bad operand type for unary -: 'tuple'
+diff --git a/dbg/c2_3_3.1416.txt b/dbg/c2_3_3.1416.txt
+new file mode 100644
+index 0000000..52e5076
+--- /dev/null
++++ b/dbg/c2_3_3.1416.txt
+@@ -0,0 +1,5 @@
++Traceback (most recent call last):
++  File "/sandbox/calib_2.py", line 20, in <module>
++    xa=-res[0]; xb=res[2]; ya=-res[1]; yb=res[3]
++       ^^^^^^^
++TypeError: bad operand type for unary -: 'tuple'
+diff --git a/dbg/c5_1_0_-0.02.txt b/dbg/c5_1_0_-0.02.txt
+new file mode 100644
+index 0000000..f54e54f
+--- /dev/null
++++ b/dbg/c5_1_0_-0.02.txt
+@@ -0,0 +1 @@
++-0.02 0.285 0.285 0.285 0.245 0.275 0.275 0.275 0.265 0.240 0.240 0.240 0.235 0.235 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5_1_0_-0.04.txt b/dbg/c5_1_0_-0.04.txt
+new file mode 100644
+index 0000000..d396ab7
+--- /dev/null
++++ b/dbg/c5_1_0_-0.04.txt
+@@ -0,0 +1 @@
++-0.04 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5_1_0_-0.06.txt b/dbg/c5_1_0_-0.06.txt
+new file mode 100644
+index 0000000..0004d68
+--- /dev/null
++++ b/dbg/c5_1_0_-0.06.txt
+@@ -0,0 +1 @@
++-0.06 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5_1_0_-0.08.txt b/dbg/c5_1_0_-0.08.txt
+new file mode 100644
+index 0000000..189d136
+--- /dev/null
++++ b/dbg/c5_1_0_-0.08.txt
+@@ -0,0 +1 @@
++-0.08 0.235 0.235 0.235 0.235 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.235 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5_1_0_-0.10.txt b/dbg/c5_1_0_-0.10.txt
+new file mode 100644
+index 0000000..a262328
+--- /dev/null
++++ b/dbg/c5_1_0_-0.10.txt
+@@ -0,0 +1 @@
++-0.10 0.235 0.235 0.235 0.235 0.235 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.235 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5_1_0_-0.12.txt b/dbg/c5_1_0_-0.12.txt
+new file mode 100644
+index 0000000..8b4901d
+--- /dev/null
++++ b/dbg/c5_1_0_-0.12.txt
+@@ -0,0 +1 @@
++-0.12 0.335 0.285 0.235 0.235 0.235 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5_1_0_-0.14.txt b/dbg/c5_1_0_-0.14.txt
+new file mode 100644
+index 0000000..4ea00ae
+--- /dev/null
++++ b/dbg/c5_1_0_-0.14.txt
+@@ -0,0 +1 @@
++-0.14 0.370 0.325 0.265 0.235 0.235 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5_1_0_-0.16.txt b/dbg/c5_1_0_-0.16.txt
+new file mode 100644
+index 0000000..db4b55c
+--- /dev/null
++++ b/dbg/c5_1_0_-0.16.txt
+@@ -0,0 +1 @@
++-0.16 0.400 0.355 0.280 0.235 0.235 0.235 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5_1_0_0.00.txt b/dbg/c5_1_0_0.00.txt
+new file mode 100644
+index 0000000..5c33b59
+--- /dev/null
++++ b/dbg/c5_1_0_0.00.txt
+@@ -0,0 +1 @@
+++0.00 0.290 0.285 0.285 0.245 0.275 0.275 0.275 0.265 0.240 0.240 0.235 0.235 0.235 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5_1_0_0.02.txt b/dbg/c5_1_0_0.02.txt
+new file mode 100644
+index 0000000..376d646
+--- /dev/null
++++ b/dbg/c5_1_0_0.02.txt
+@@ -0,0 +1 @@
+++0.02 0.290 0.285 0.285 0.240 0.275 0.275 0.275 0.265 0.240 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5_1_0_0.04.txt b/dbg/c5_1_0_0.04.txt
+new file mode 100644
+index 0000000..59879d4
+--- /dev/null
++++ b/dbg/c5_1_0_0.04.txt
+@@ -0,0 +1 @@
+++0.04 0.290 0.285 0.285 0.240 0.275 0.275 0.275 0.265 0.240 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5_1_0_0.06.txt b/dbg/c5_1_0_0.06.txt
+new file mode 100644
+index 0000000..97548cb
+--- /dev/null
++++ b/dbg/c5_1_0_0.06.txt
+@@ -0,0 +1 @@
+++0.06 0.245 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5_1_0_0.08.txt b/dbg/c5_1_0_0.08.txt
+new file mode 100644
+index 0000000..f4bdcb1
+--- /dev/null
++++ b/dbg/c5_1_0_0.08.txt
+@@ -0,0 +1 @@
+++0.08 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.240 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5_1_0_0.10.txt b/dbg/c5_1_0_0.10.txt
+new file mode 100644
+index 0000000..efa8693
+--- /dev/null
++++ b/dbg/c5_1_0_0.10.txt
+@@ -0,0 +1 @@
+++0.10 0.235 0.240 0.240 0.240 0.240 0.240 0.240 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5_1_0_0.12.txt b/dbg/c5_1_0_0.12.txt
+new file mode 100644
+index 0000000..840f8da
+--- /dev/null
++++ b/dbg/c5_1_0_0.12.txt
+@@ -0,0 +1 @@
+++0.12 0.235 0.240 0.240 0.240 0.240 0.240 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5_1_0_0.14.txt b/dbg/c5_1_0_0.14.txt
+new file mode 100644
+index 0000000..3693d61
+--- /dev/null
++++ b/dbg/c5_1_0_0.14.txt
+@@ -0,0 +1 @@
+++0.14 0.235 0.240 0.240 0.240 0.240 0.240 0.240 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5_1_0_0.16.txt b/dbg/c5_1_0_0.16.txt
+new file mode 100644
+index 0000000..617c990
+--- /dev/null
++++ b/dbg/c5_1_0_0.16.txt
+@@ -0,0 +1 @@
+++0.16 0.235 0.240 0.240 0.240 0.240 0.240 0.240 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235 0.235
+diff --git a/dbg/c5b_0_-0.01.txt b/dbg/c5b_0_-0.01.txt
+new file mode 100644
+index 0000000..9ef3234
+--- /dev/null
++++ b/dbg/c5b_0_-0.01.txt
+@@ -0,0 +1 @@
++-0.01 0.150 0.155 0.155 0.155 0.155 0.155 0.155 0.107 0.105 0.107 0.155 0.155 0.155 0.155 0.155 0.155 0.150
+diff --git a/dbg/c5b_0_-0.02.txt b/dbg/c5b_0_-0.02.txt
+new file mode 100644
+index 0000000..6118036
+--- /dev/null
++++ b/dbg/c5b_0_-0.02.txt
+@@ -0,0 +1 @@
++-0.02 0.150 0.155 0.155 0.155 0.155 0.155 0.155 0.107 0.105 0.107 0.155 0.155 0.155 0.155 0.155 0.155 0.150
+diff --git a/dbg/c5b_0_-0.03.txt b/dbg/c5b_0_-0.03.txt
+new file mode 100644
+index 0000000..cfc4628
+--- /dev/null
++++ b/dbg/c5b_0_-0.03.txt
+@@ -0,0 +1 @@
++-0.03 0.150 0.155 0.155 0.155 0.155 0.155 0.155 0.107 0.105 0.107 0.155 0.155 0.155 0.155 0.155 0.155 0.150
+diff --git a/dbg/c5b_0_-0.04.txt b/dbg/c5b_0_-0.04.txt
+new file mode 100644
+index 0000000..c5386c7
+--- /dev/null
++++ b/dbg/c5b_0_-0.04.txt
+@@ -0,0 +1 @@
++-0.04 0.150 0.155 0.155 0.155 0.155 0.155 0.155 0.107 0.105 0.107 0.155 0.155 0.155 0.155 0.155 0.155 0.150
+diff --git a/dbg/c5b_0_-0.05.txt b/dbg/c5b_0_-0.05.txt
+new file mode 100644
+index 0000000..8f36ace
+--- /dev/null
++++ b/dbg/c5b_0_-0.05.txt
+@@ -0,0 +1 @@
++-0.05 0.125 0.120 0.117 0.117 0.117 0.117 0.117 0.107 0.105 0.107 0.117 0.117 0.117 0.117 0.117 0.117 0.117
+diff --git a/dbg/c5b_0_-0.06.txt b/dbg/c5b_0_-0.06.txt
+new file mode 100644
+index 0000000..86dcac8
+--- /dev/null
++++ b/dbg/c5b_0_-0.06.txt
+@@ -0,0 +1 @@
++-0.06 0.135 0.130 0.125 0.117 0.110 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_0_-0.07.txt b/dbg/c5b_0_-0.07.txt
+new file mode 100644
+index 0000000..8804525
+--- /dev/null
++++ b/dbg/c5b_0_-0.07.txt
+@@ -0,0 +1 @@
++-0.07 0.142 0.140 0.132 0.127 0.120 0.112 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_0_-0.08.txt b/dbg/c5b_0_-0.08.txt
+new file mode 100644
+index 0000000..1e9f99f
+--- /dev/null
++++ b/dbg/c5b_0_-0.08.txt
+@@ -0,0 +1 @@
++-0.08 0.152 0.147 0.140 0.135 0.127 0.120 0.112 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_0_0.00.txt b/dbg/c5b_0_0.00.txt
+new file mode 100644
+index 0000000..5a94653
+--- /dev/null
++++ b/dbg/c5b_0_0.00.txt
+@@ -0,0 +1 @@
+++0.00 0.150 0.155 0.155 0.155 0.155 0.155 0.155 0.107 0.105 0.107 0.155 0.155 0.155 0.155 0.155 0.155 0.150
+diff --git a/dbg/c5b_0_0.01.txt b/dbg/c5b_0_0.01.txt
+new file mode 100644
+index 0000000..ebb8c08
+--- /dev/null
++++ b/dbg/c5b_0_0.01.txt
+@@ -0,0 +1 @@
+++0.01 0.150 0.155 0.155 0.155 0.155 0.155 0.155 0.107 0.105 0.107 0.155 0.155 0.155 0.155 0.155 0.155 0.150
+diff --git a/dbg/c5b_0_0.02.txt b/dbg/c5b_0_0.02.txt
+new file mode 100644
+index 0000000..0cefe12
+--- /dev/null
++++ b/dbg/c5b_0_0.02.txt
+@@ -0,0 +1 @@
+++0.02 0.150 0.155 0.155 0.155 0.155 0.155 0.155 0.107 0.105 0.107 0.155 0.155 0.155 0.155 0.155 0.155 0.150
+diff --git a/dbg/c5b_0_0.03.txt b/dbg/c5b_0_0.03.txt
+new file mode 100644
+index 0000000..5c3f880
+--- /dev/null
++++ b/dbg/c5b_0_0.03.txt
+@@ -0,0 +1 @@
+++0.03 0.150 0.155 0.155 0.155 0.155 0.155 0.155 0.107 0.105 0.107 0.155 0.155 0.155 0.155 0.155 0.155 0.150
+diff --git a/dbg/c5b_0_0.04.txt b/dbg/c5b_0_0.04.txt
+new file mode 100644
+index 0000000..d514e8e
+--- /dev/null
++++ b/dbg/c5b_0_0.04.txt
+@@ -0,0 +1 @@
+++0.04 0.150 0.155 0.155 0.155 0.155 0.155 0.155 0.107 0.105 0.107 0.155 0.155 0.155 0.155 0.155 0.155 0.150
+diff --git a/dbg/c5b_0_0.05.txt b/dbg/c5b_0_0.05.txt
+new file mode 100644
+index 0000000..08a5cae
+--- /dev/null
++++ b/dbg/c5b_0_0.05.txt
+@@ -0,0 +1 @@
+++0.05 0.117 0.117 0.117 0.117 0.117 0.117 0.117 0.107 0.105 0.107 0.117 0.117 0.117 0.117 0.117 0.117 0.117
+diff --git a/dbg/c5b_0_0.06.txt b/dbg/c5b_0_0.06.txt
+new file mode 100644
+index 0000000..5f4eed2
+--- /dev/null
++++ b/dbg/c5b_0_0.06.txt
+@@ -0,0 +1 @@
+++0.06 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_0_0.07.txt b/dbg/c5b_0_0.07.txt
+new file mode 100644
+index 0000000..0c68951
+--- /dev/null
++++ b/dbg/c5b_0_0.07.txt
+@@ -0,0 +1 @@
+++0.07 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_0_0.08.txt b/dbg/c5b_0_0.08.txt
+new file mode 100644
+index 0000000..0d9e4f0
+--- /dev/null
++++ b/dbg/c5b_0_0.08.txt
+@@ -0,0 +1 @@
+++0.08 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_-0.01.txt b/dbg/c5b_1.5708_-0.01.txt
+new file mode 100644
+index 0000000..05463c6
+--- /dev/null
++++ b/dbg/c5b_1.5708_-0.01.txt
+@@ -0,0 +1 @@
++-0.01 0.072 0.067 0.060 0.072 0.117 0.155 0.155 0.155 0.155 0.155 0.155 0.155 0.117 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_-0.02.txt b/dbg/c5b_1.5708_-0.02.txt
+new file mode 100644
+index 0000000..c582c54
+--- /dev/null
++++ b/dbg/c5b_1.5708_-0.02.txt
+@@ -0,0 +1 @@
++-0.02 0.090 0.085 0.077 0.072 0.117 0.155 0.155 0.155 0.155 0.155 0.155 0.155 0.117 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_-0.03.txt b/dbg/c5b_1.5708_-0.03.txt
+new file mode 100644
+index 0000000..5b8c17c
+--- /dev/null
++++ b/dbg/c5b_1.5708_-0.03.txt
+@@ -0,0 +1 @@
++-0.03 0.105 0.097 0.092 0.085 0.117 0.155 0.155 0.155 0.155 0.155 0.155 0.155 0.117 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_-0.04.txt b/dbg/c5b_1.5708_-0.04.txt
+new file mode 100644
+index 0000000..b0ca567
+--- /dev/null
++++ b/dbg/c5b_1.5708_-0.04.txt
+@@ -0,0 +1 @@
++-0.04 0.115 0.110 0.105 0.100 0.117 0.155 0.155 0.155 0.155 0.155 0.155 0.155 0.117 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_-0.05.txt b/dbg/c5b_1.5708_-0.05.txt
+new file mode 100644
+index 0000000..8959ac2
+--- /dev/null
++++ b/dbg/c5b_1.5708_-0.05.txt
+@@ -0,0 +1 @@
++-0.05 0.125 0.120 0.115 0.110 0.117 0.155 0.155 0.155 0.155 0.155 0.155 0.155 0.117 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_-0.06.txt b/dbg/c5b_1.5708_-0.06.txt
+new file mode 100644
+index 0000000..b1233b4
+--- /dev/null
++++ b/dbg/c5b_1.5708_-0.06.txt
+@@ -0,0 +1 @@
++-0.06 0.135 0.130 0.125 0.120 0.117 0.155 0.155 0.155 0.155 0.155 0.155 0.155 0.117 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_-0.07.txt b/dbg/c5b_1.5708_-0.07.txt
+new file mode 100644
+index 0000000..45c93d4
+--- /dev/null
++++ b/dbg/c5b_1.5708_-0.07.txt
+@@ -0,0 +1 @@
++-0.07 0.142 0.140 0.135 0.130 0.122 0.155 0.155 0.155 0.155 0.155 0.155 0.155 0.117 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_-0.08.txt b/dbg/c5b_1.5708_-0.08.txt
+new file mode 100644
+index 0000000..9795f4d
+--- /dev/null
++++ b/dbg/c5b_1.5708_-0.08.txt
+@@ -0,0 +1 @@
++-0.08 0.152 0.147 0.142 0.137 0.130 0.155 0.155 0.155 0.155 0.155 0.155 0.155 0.117 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_0.00.txt b/dbg/c5b_1.5708_0.00.txt
+new file mode 100644
+index 0000000..fd90bc8
+--- /dev/null
++++ b/dbg/c5b_1.5708_0.00.txt
+@@ -0,0 +1 @@
+++0.00 0.060 0.060 0.060 0.072 0.107 0.107 0.107 0.107 0.107 0.107 0.107 0.107 0.107 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_0.01.txt b/dbg/c5b_1.5708_0.01.txt
+new file mode 100644
+index 0000000..7497653
+--- /dev/null
++++ b/dbg/c5b_1.5708_0.01.txt
+@@ -0,0 +1 @@
+++0.01 0.060 0.060 0.060 0.072 0.117 0.155 0.155 0.155 0.155 0.155 0.155 0.155 0.117 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_0.02.txt b/dbg/c5b_1.5708_0.02.txt
+new file mode 100644
+index 0000000..a6bb7cc
+--- /dev/null
++++ b/dbg/c5b_1.5708_0.02.txt
+@@ -0,0 +1 @@
+++0.02 0.060 0.060 0.060 0.072 0.117 0.155 0.155 0.155 0.155 0.155 0.155 0.155 0.117 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_0.03.txt b/dbg/c5b_1.5708_0.03.txt
+new file mode 100644
+index 0000000..722621f
+--- /dev/null
++++ b/dbg/c5b_1.5708_0.03.txt
+@@ -0,0 +1 @@
+++0.03 0.060 0.060 0.060 0.072 0.117 0.155 0.155 0.155 0.155 0.155 0.155 0.155 0.117 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_0.04.txt b/dbg/c5b_1.5708_0.04.txt
+new file mode 100644
+index 0000000..b7fb752
+--- /dev/null
++++ b/dbg/c5b_1.5708_0.04.txt
+@@ -0,0 +1 @@
+++0.04 0.060 0.060 0.060 0.072 0.117 0.155 0.155 0.155 0.155 0.155 0.155 0.155 0.117 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_0.05.txt b/dbg/c5b_1.5708_0.05.txt
+new file mode 100644
+index 0000000..08dc9b2
+--- /dev/null
++++ b/dbg/c5b_1.5708_0.05.txt
+@@ -0,0 +1 @@
+++0.05 0.060 0.060 0.060 0.072 0.117 0.155 0.155 0.155 0.155 0.155 0.155 0.155 0.117 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_0.06.txt b/dbg/c5b_1.5708_0.06.txt
+new file mode 100644
+index 0000000..685abde
+--- /dev/null
++++ b/dbg/c5b_1.5708_0.06.txt
+@@ -0,0 +1 @@
+++0.06 0.060 0.060 0.060 0.067 0.117 0.155 0.155 0.155 0.155 0.155 0.155 0.155 0.117 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_0.07.txt b/dbg/c5b_1.5708_0.07.txt
+new file mode 100644
+index 0000000..6be0d5e
+--- /dev/null
++++ b/dbg/c5b_1.5708_0.07.txt
+@@ -0,0 +1 @@
+++0.07 0.060 0.060 0.060 0.067 0.117 0.155 0.155 0.155 0.155 0.155 0.155 0.155 0.117 0.105 0.105 0.105 0.105
+diff --git a/dbg/c5b_1.5708_0.08.txt b/dbg/c5b_1.5708_0.08.txt
+new file mode 100644
+index 0000000..47d596f
+--- /dev/null
++++ b/dbg/c5b_1.5708_0.08.txt
+@@ -0,0 +1 @@
+++0.08 0.060 0.060 0.060 0.067 0.117 0.155 0.155 0.155 0.155 0.155 0.155 0.155 0.117 0.105 0.105 0.105 0.105
+diff --git a/dbg/fitp.npy b/dbg/fitp.npy
+new file mode 100644
+index 0000000..d149873
+Binary files /dev/null and b/dbg/fitp.npy differ
+diff --git a/dbg/g1.npy b/dbg/g1.npy
+new file mode 100644
+index 0000000..bd1b6eb
+Binary files /dev/null and b/dbg/g1.npy differ
+diff --git a/dbg/g5.npy b/dbg/g5.npy
+new file mode 100644
+index 0000000..ac9fd13
+Binary files /dev/null and b/dbg/g5.npy differ
+diff --git a/dbg/g6.npy b/dbg/g6.npy
+new file mode 100644
+index 0000000..d7ad5ac
+Binary files /dev/null and b/dbg/g6.npy differ
+diff --git a/dbg/kin_orig.py b/dbg/kin_orig.py
+new file mode 100644
+index 0000000..49670b8
+--- /dev/null
++++ b/dbg/kin_orig.py
+@@ -0,0 +1,73 @@
++import numpy as np
++PI = np.pi
++
++def _rpy(r, p, y):
++    cr, sr, cp, sp, cy, sy = np.cos(r), np.sin(r), np.cos(p), np.sin(p), np.cos(y), np.sin(y)
++    return np.array([[cy*cp, cy*sp*sr-sy*cr, cy*sp*cr+sy*sr],
++                     [sy*cp, sy*sp*sr+cy*cr, sy*sp*cr-cy*sr],
++                     [-sp, cp*sr, cp*cr]])
++
++def _T(xyz, R):
++    M = np.eye(4); M[:3, :3] = R; M[:3, 3] = xyz; return M
++
++def _rz(q):
++    c, s = np.cos(q), np.sin(q)
++    return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1.0]])
++
++_J = [((0, 0, 0.15643), (PI, 0, 0)), ((0, 0.005375, -0.12838), (PI/2, 0, 0)),
++      ((0, -0.21038, -0.006375), (-PI/2, 0, 0)), ((0, 0.006375, -0.21038), (PI/2, 0, 0)),
++      ((0, -0.20843, -0.006375), (-PI/2, 0, 0)), ((0, 0.00017505, -0.10593), (PI/2, 0, 0)),
++      ((0, -0.10593, -0.00017505), (-PI/2, 0, 0))]
++_JT = [_T(xyz, _rpy(*r)) for xyz, r in _J]
++_EE = _T((0, 0, -0.061525), _rpy(PI, 0, 0))
++
++BASE_Z = 0.0
++TOOL = 0.0
++
++def fk(base, q, tool=None):
++    if tool is None:
++        tool = TOOL
++    bx, by, br = base
++    M = _T((bx, by, BASE_Z), _rz(br))
++    for Jt, qi in zip(_JT, q):
++        M = M @ Jt @ _T((0, 0, 0), _rz(qi))
++    M = M @ _EE
++    if tool:
++        M = M @ _T((0, 0, tool), np.eye(3))
++    return M
++
++def _err(M, pos, R):
++    ep = pos - M[:3, 3]
++    Re = R @ M[:3, :3].T
++    # rotation error as axis-angle (small-angle approx ok via skew)
++    eo = 0.5 * np.array([Re[2, 1]-Re[1, 2], Re[0, 2]-Re[2, 0], Re[1, 0]-Re[0, 1]])
++    return np.concatenate([ep, eo])
++
++def ik(base, q0, pos, R, iters=200, tol=1e-4, rot_w=0.3, tool=None):
++    q = np.array(q0, dtype=float)
++    W = np.array([1, 1, 1, rot_w, rot_w, rot_w])
++    for _ in range(iters):
++        M = fk(base, q, tool)
++        e = _err(M, pos, R) * W
++        if np.linalg.norm(e[:3]) < tol and np.linalg.norm(e[3:]) < tol*3:
++            return q, True
++        Jm = np.zeros((6, 7))
++        h = 1e-6
++        for i in range(7):
++            dq = q.copy(); dq[i] += h
++            Jm[:, i] = (_err(M, pos, R) - _err(fk(base, dq, tool), pos, R)) * W / h
++        lam = 1e-3
++        d = Jm.T @ np.linalg.solve(Jm @ Jm.T + lam*np.eye(6), e)
++        n = np.max(np.abs(d))
++        if n > 0.3:
++            d *= 0.3 / n
++        q = q + d
++    M = fk(base, q, tool)
++    e = _err(M, pos, R)
++    return q, bool(np.linalg.norm(e[:3]) < 1e-3 and np.linalg.norm(e[3:]) < 1e-2)
++
++def down_R(yaw):
++    # gripper z axis pointing down, x axis direction by yaw
++    c, s = np.cos(yaw), np.sin(yaw)
++    x = np.array([c, s, 0.0]); z = np.array([0, 0, -1.0]); y = np.cross(z, x)
++    return np.stack([x, y, z], axis=1)
+diff --git a/kin.py b/kin.py
+index 49670b8..eb41d9d 100644
+--- a/kin.py
++++ b/kin.py
+@@ -23,12 +23,17 @@ _EE = _T((0, 0, -0.061525), _rpy(PI, 0, 0))
+ 
+ BASE_Z = 0.0
+ TOOL = 0.0
++# Calibrated from grasped-block poses (fit rms 5e-7 m): the arm's base link sits at
++# this offset from (pos_base_x, pos_base_y, 0), expressed in the mobile-base frame.
++ARM_OFFSET = (0.1199, 0.0, -0.0052)
++# grasp_tf_* is the block pose relative to the frame end_effector_link @ Tz(GRASP_Z).
++GRASP_Z = 0.12
+ 
+ def fk(base, q, tool=None):
+     if tool is None:
+         tool = TOOL
+     bx, by, br = base
+-    M = _T((bx, by, BASE_Z), _rz(br))
++    M = _T((bx, by, BASE_Z), _rz(br)) @ _T(ARM_OFFSET, np.eye(3))
+     for Jt, qi in zip(_JT, q):
+         M = M @ Jt @ _T((0, 0, 0), _rz(qi))
+     M = M @ _EE
+@@ -39,8 +44,18 @@ def fk(base, q, tool=None):
+ def _err(M, pos, R):
+     ep = pos - M[:3, 3]
+     Re = R @ M[:3, :3].T
+-    # rotation error as axis-angle (small-angle approx ok via skew)
+-    eo = 0.5 * np.array([Re[2, 1]-Re[1, 2], Re[0, 2]-Re[2, 0], Re[1, 0]-Re[0, 1]])
++    # rotation error as proper axis-angle (log map); the old skew-only version
++    # was blind to 180-degree flips and let IK converge to flipped wrists.
++    v = 0.5 * np.array([Re[2, 1]-Re[1, 2], Re[0, 2]-Re[2, 0], Re[1, 0]-Re[0, 1]])
++    c = np.clip((np.trace(Re) - 1) / 2, -1.0, 1.0); sn = np.linalg.norm(v)
++    ang = np.arctan2(sn, c)
++    if sn > 1e-9:
++        eo = v / sn * ang
++    elif c > 0:
++        eo = v
++    else:  # ~180 deg: axis from the symmetric part
++        B = (Re + np.eye(3)) / 2
++        ax = B[:, np.argmax(np.diag(B))]; eo = ax / np.linalg.norm(ax) * np.pi
+     return np.concatenate([ep, eo])
+ 
+ def ik(base, q0, pos, R, iters=200, tol=1e-4, rot_w=0.3, tool=None):
+diff --git a/stats.py b/stats.py
+new file mode 100644
+index 0000000..8f625b5
+--- /dev/null
++++ b/stats.py
+@@ -0,0 +1,10 @@
++from env_client import make_env
++import numpy as np
++env=make_env()
++for s in range(0,40):
++    obs,info=env.reset(seed=s)
++    g=lambda n,f: obs.get(obs.get_object_from_name(n),f)
++    names=sorted(obs.get_object_names())
++    obst=[n for n in names if n.startswith('obs')]
++    print(s, info['object_count'], "reg",round(g('target_region','pose_x'),2),round(g('target_region','pose_y'),2), "blk",round(g('target_block','pose_x'),2),round(g('target_block','pose_y'),2),
++      "yaw?",round(g('target_block','pose_qz'),2), "obs",[(round(g(n,'pose_x'),2),round(g(n,'pose_y'),2),round(g(n,'pose_z'),3)) for n in obst])

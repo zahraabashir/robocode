@@ -1,0 +1,46 @@
+diff --git a/approach.py b/approach.py
+index 4a34b7a..70adc3b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -160,7 +160,8 @@ class GeneratedApproach:
+     # ------------------------------------------------------------ navigation
+     def nav_step(self, B, rp, target):
+         infl = R_ROBOT + 0.015
+-        if not B.seg_hits(rp, target, infl):
++        d0 = B.dist(rp)
++        if not B.seg_hits(rp, target, min(infl, d0 - 0.003)):
+             return target
+         # waypoints around inflated rects
+         e = R_ROBOT + 0.05
+@@ -186,7 +187,8 @@ class GeneratedApproach:
+             for j in range(1, N):
+                 if j == i:
+                     continue
+-                if B.seg_hits(nodes[i], nodes[j], infl):
++                inf_ij = infl if i != 0 else min(infl, d0 - 0.003)
++                if B.seg_hits(nodes[i], nodes[j], inf_ij):
+                     continue
+                 nd = d + float(np.linalg.norm(nodes[j] - nodes[i]))
+                 if nd < distv[j]:
+@@ -240,7 +242,10 @@ class GeneratedApproach:
+                 self.push_steps = 0
+             else:
+                 d = B.dist(rp)
+-                if d < R_ROBOT + 0.01:
++                wp = None
++                if d > R_ROBOT + 0.004:
++                    wp = self.nav_step(B, rp, pre)
++                if wp is None:
+                     # too close: move away from block
+                     lp = B.to_local(rp)
+                     away = rp - B.to_world((0.0, B.yc))
+@@ -252,9 +257,6 @@ class GeneratedApproach:
+                         if best is None or dd > best[0]:
+                             best = (dd, cand)
+                     return best[1] - rp
+-                wp = self.nav_step(B, rp, pre)
+-                if wp is None:
+-                    return np.zeros(2)
+                 return self._move_to(rp, wp)
+         if self.mode == 'push':
+             self.push_steps += 1

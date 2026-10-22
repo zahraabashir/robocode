@@ -1,0 +1,16 @@
+diff --git a/approach.py b/approach.py
+index 91328d9..6cd3f38 100644
+--- a/approach.py
++++ b/approach.py
+@@ -93,8 +93,10 @@ class GeneratedApproach:
+             if self.object not in self.park_spots:
+                 i = len(self.park_spots)
+                 side = -.34 if ry >= 0 else .34
++                if i % 2:
++                    side = -side
+                 px = .13 + .12*(i % 4)
+-                py = side - np.sign(side)*.07*(i // 4)
++                py = side - np.sign(side)*.07*(i // 8)
+                 self.park_spots[self.object] = (px, py)
+             px, py = self.park_spots[self.object]
+             self.destination = np.array((px, py, .078 + self._get(state, self.object, "half_extent_z")))

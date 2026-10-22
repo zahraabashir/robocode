@@ -1,0 +1,4578 @@
+{
+  "schema_version": 1,
+  "snapshot_date": "2026-10-11",
+  "records": [
+    {
+      "sample_id": "obstruction2d_generalized_replicate_424",
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/kinematic2d/obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__99b3a73f/2026-09-08_22-07-59/replicate_424",
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic2d.obstruction2d:Obstruction2DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          "bilevel_env_name": "obstruction2d"
+        },
+        "replicate_seed": 424,
+        "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__99b3a73f",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "4416c2a865e66e5b58b13b9929dc70b17d70d6565443f80f7240fda81ea948ae",
+      "policy_sha256": "6540af38e538b4fa40e8d05e53f785facef700feb57c99097d8c55e317055a07",
+      "stream_sha256": "2c85c614855fe95e7ba23aea0ad5dbf6a336254fbf18377bf6b5a16049213f2e",
+      "git_head": "4897e46269b5d9f885dd2a13e79b864e96a206f2",
+      "model": "gpt-5.6-sol",
+      "replicate_seed": 424,
+      "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__99b3a73f",
+      "environment_name": "Obstruction2D",
+      "run_id": "codex_gpt56sol_r424_2c85c614",
+      "directory": "environments/Obstruction2D/runs/codex_gpt56sol_r424_2c85c614",
+      "review_status": "prior manual analysis, migrated for review",
+      "backend": "codex"
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/kinematic3d/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92/2026-09-09_15-17-06/replicate_424",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/kinematic3d/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92/2026-09-09_15-17-06/replicate_424",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92",
+      "replicate_seed": 424,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 424,
+        "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "e9bd69feff75467f6733aad8676151bd9ee41f3ba6223781c3510b0a4530fc0e",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "sample_id": "obstruction3d_generalized_replicate_424",
+      "stream_sha256": "9332a06bda163220da3bdd8cdf75cd70a9c3bed343d2b1a38267ddbb0670f415",
+      "policy_sha256": "622d5c1d4fccf641d2ab881e96849500bc31db33176bd3f6b12a3ae9f314ee2e",
+      "thread_ids": [
+        "01a08650-e988-7691-907e-fcded63d359f"
+      ],
+      "git_head": "8007f16d23da006a9f0946d0671c8f39ab8ea786",
+      "working_policy_matches_head": true,
+      "saved_policy_commits": 76,
+      "environment_name": "Obstruction3D",
+      "run_id": "codex_gpt56sol_r424_9332a06b",
+      "directory": "environments/Obstruction3D/runs/codex_gpt56sol_r424_9332a06b",
+      "review_status": "organized only; manual analysis pending",
+      "backend": "codex"
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/kinematic3d/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92/2026-09-09_15-16-36/replicate_24",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/kinematic3d/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92/2026-09-09_15-16-36/replicate_24",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92",
+      "replicate_seed": 24,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 24,
+        "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__8d555f92",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "55f236e1954d67c4a9ab0dffa7b968579f41ec8ffd04d042413d950fd1bb94f7",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "sample_id": "obstruction3d_generalized_replicate_24",
+      "stream_sha256": "065956b84b01a8fbe4a4c9d5af0163f607d6eef65153f4b27df6da7ba9a6b349",
+      "policy_sha256": "cf1d4e931cc1c0d25ab90f290c7ae1d91d606f3a4b70e34d6bbb3a75a874814f",
+      "thread_ids": [
+        "01a08650-6f71-7e22-a7dd-a9452afe7cf6"
+      ],
+      "git_head": "0a0929bd08672e78d0dc386c36a6df12902d3375",
+      "working_policy_matches_head": true,
+      "saved_policy_commits": 29,
+      "environment_name": "Obstruction3D",
+      "run_id": "codex_gpt56sol_r24_065956b8",
+      "directory": "environments/Obstruction3D/runs/codex_gpt56sol_r24_065956b8",
+      "review_status": "organized only; manual analysis pending",
+      "backend": "codex"
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/dynamic2d/dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298/2026-09-09_08-24-00/replicate_424",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/dynamic2d/dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298/2026-09-09_08-24-00/replicate_424",
+      "condition": "Blackbox",
+      "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298",
+      "replicate_seed": 424,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+        "env_id": "kinder/DynPushT2D-t1-v0"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+          "env_id": "kinder/DynPushT2D-t1-v0"
+        },
+        "replicate_seed": 424,
+        "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "4ee98bc2928e5c3f2c4e237c8263366df26b6651969a6c73611384ae9849f505",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "sample_id": "dynpusht2d_replicate_424",
+      "stream_sha256": "7e89c88a5954b1f3319f32ba5d2f53a4fa760c9479dbd6252515fa4a02d18fc3",
+      "policy_sha256": "de3ae7881240c921d82d2b1f35773daa569f89f696f6b900bb80bbea163ad0f4",
+      "thread_ids": [
+        "01a084d6-92de-7fe2-b4ea-e656b6ed3204"
+      ],
+      "git_head": "96336670221c7b16483ff9c8cf87139d1bcb8fae",
+      "working_policy_matches_head": true,
+      "saved_policy_commits": 11,
+      "environment_name": "DynPushT2D",
+      "run_id": "codex_gpt56sol_r424_7e89c88a",
+      "directory": "environments/DynPushT2D/runs/codex_gpt56sol_r424_7e89c88a",
+      "review_status": "prior manual analysis, migrated for review",
+      "backend": "codex"
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/dynamic2d/dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298/2026-09-09_08-23-30/replicate_24",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/dynamic2d/dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298/2026-09-09_08-23-30/replicate_24",
+      "condition": "Blackbox",
+      "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298",
+      "replicate_seed": 24,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+        "env_id": "kinder/DynPushT2D-t1-v0"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+          "env_id": "kinder/DynPushT2D-t1-v0"
+        },
+        "replicate_seed": 24,
+        "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__3e52b298",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "7814a57b6fd16950bc62d0aa9e4edaf9173139640c4606d2d61f63ea61321346",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "sample_id": "dynpusht2d_replicate_24",
+      "stream_sha256": "cee4702f9f5f5a02a295593f736315e62a1c31cd629d47f40385694eb905aabd",
+      "policy_sha256": "dec549491fdf3252f74842c94a8b2d40a9f42bf42a61d380a9c32c35864e9680",
+      "thread_ids": [
+        "01a084d6-1e9c-77e2-b752-d24dc3d27266"
+      ],
+      "git_head": "47dea9d34800e0ab5751c3e0a5b8bf2438d4d7ea",
+      "working_policy_matches_head": true,
+      "saved_policy_commits": 77,
+      "environment_name": "DynPushT2D",
+      "run_id": "codex_gpt56sol_r24_cee4702f",
+      "directory": "environments/DynPushT2D/runs/codex_gpt56sol_r24_cee4702f",
+      "review_status": "prior manual analysis, migrated for review",
+      "backend": "codex"
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/pddlstream/rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136/2026-09-11_11-32-00_rovers_main/replicate_424",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/pddlstream/rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136/2026-09-11_11-32-00_rovers_main/replicate_424",
+      "condition": "Blackbox",
+      "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136",
+      "replicate_seed": 424,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+        "design_counts": [
+          1,
+          2,
+          3
+        ],
+        "eval_counts": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+          "design_counts": [
+            1,
+            2,
+            3
+          ],
+          "eval_counts": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 424,
+        "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "f56afec762cb412d923edf32e31bcc989d0a0a93deb5b4ae39330ecae7f3142f",
+      "provenance": {
+        "kinder_revision": "473069470322df99c5f33500f1dea8e561cbe92b",
+        "kind": "fresh_strict_blackbox_generation",
+        "model_constraint": "Sol for all subagents",
+        "robocode_revision": "473069470322df99c5f33500f1dea8e561cbe92b",
+        "note": "Fresh full-budget Rovers run; smoke artifacts not reused. Revision field above pins the Rovers runtime, not KinDER."
+      },
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "sample_id": "rovers_generalized_replicate_424",
+      "stream_sha256": "0dc2ee42cd6f96a045ad3db71b615200c793d1e564b052efad498c895af06a91",
+      "policy_sha256": "cfc66c90dd9614305ed936b4159980f0787a0ddf4b5d18a472a1ce814e5bf3df",
+      "thread_ids": [
+        "01a08fda-8f8d-7350-b4cf-152a615a4146"
+      ],
+      "git_head": "0d4421dafd8406cfbcb682dd9280daac0b4233b8",
+      "working_policy_matches_head": true,
+      "saved_policy_commits": 26,
+      "environment_name": "Rovers",
+      "run_id": "codex_gpt56sol_r424_0dc2ee42",
+      "directory": "environments/Rovers/runs/codex_gpt56sol_r424_0dc2ee42",
+      "review_status": "prior manual analysis, migrated for review",
+      "backend": "codex"
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT5.6 Sol/pddlstream/rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136/2026-09-11_11-32-00_rovers_main/replicate_24",
+      "relative_path": "Blackbox/Codex GPT5.6 Sol/pddlstream/rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136/2026-09-11_11-32-00_rovers_main/replicate_24",
+      "condition": "Blackbox",
+      "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136",
+      "replicate_seed": 24,
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+        "design_counts": [
+          1,
+          2,
+          3
+        ],
+        "eval_counts": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium",
+            "input_usd_per_mtok": 4.0,
+            "cached_input_usd_per_mtok": 0.4,
+            "output_usd_per_mtok": 20.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+          "design_counts": [
+            1,
+            2,
+            3
+          ],
+          "eval_counts": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 24,
+        "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "62e5e36c06e7dab433224742580cd7bc3c1b602afeecd1cd22c8563e40958d40",
+      "provenance": {
+        "kinder_revision": "473069470322df99c5f33500f1dea8e561cbe92b",
+        "kind": "fresh_strict_blackbox_generation",
+        "model_constraint": "Sol for all subagents",
+        "robocode_revision": "473069470322df99c5f33500f1dea8e561cbe92b",
+        "note": "Fresh full-budget Rovers run; smoke artifacts not reused. Revision field above pins the Rovers runtime, not KinDER."
+      },
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "sample_id": "rovers_generalized_replicate_24",
+      "stream_sha256": "de120909e47e1b4ae305c25c304b82280d69eb14ddfedcc50f9bd0291f32fa7b",
+      "policy_sha256": "4225a2b2ee15c7f62e16592b674dd4027b2f5540f6947c4d0138c6ba0b17db03",
+      "thread_ids": [
+        "01a08fcf-ded6-7932-8ba1-eeebc31b7b2c"
+      ],
+      "git_head": "70cf2a1c81dac8b8191277b61dae7702dda2ef95",
+      "working_policy_matches_head": true,
+      "saved_policy_commits": 26,
+      "environment_name": "Rovers",
+      "run_id": "codex_gpt56sol_r24_de120909",
+      "directory": "environments/Rovers/runs/codex_gpt56sol_r24_de120909",
+      "review_status": "organized only; manual analysis pending",
+      "backend": "codex"
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/obstruction2d_generalized/obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7/2026-09-30_11-03-11/replicate_424",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/obstruction2d_generalized/obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7/2026-09-30_11-03-11/replicate_424",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7",
+      "replicate_seed": 424,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic2d.obstruction2d:Obstruction2DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "bilevel_env_name": "obstruction2d"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic2d.obstruction2d:Obstruction2DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          "bilevel_env_name": "obstruction2d"
+        },
+        "replicate_seed": 424,
+        "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "2e501fa8e4591ba46e6441b6d359ed902ad7c1a9547d446a38824c8fc8499c20",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "b71e467197959d981e5c7a73d8f6ca7bc3b48e42cec2c1bf6458fb86dc3591c8",
+      "policy_sha256": "cd62d78098e622f07ce2e20fc9892468ff5bb23d3912af5610db7b444e58b38a",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "Obstruction2D",
+      "sample_id": "claude_opus55_obstruction2d_generalized_replicate_424",
+      "matched_gpt_sample_id": "obstruction2d_generalized_replicate_424",
+      "review_status": "initial controller review and selected trace checks; full trace annotation pending",
+      "git_head": "394a6f0b22ad3e77326d9aa878362109d91b8990",
+      "run_id": "claude_opus55_high_r424_b71e4671",
+      "directory": "environments/Obstruction2D/runs/claude_opus55_high_r424_b71e4671",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true
+      },
+      "thread_ids": [
+        "7f73c3a8-30a9-4bff-91ce-857e19acd7dc"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "task_description_sha256": "240d5820bb4a168097d097757da0a75a73f4f92f77e767784ed549d086d77469",
+      "task_description_identical_to_gpt": true,
+      "controller_review": {
+        "date": "2026-10-10",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Complete final controller and imported local runtime helpers read; selected development diffs/messages checked. No fresh execution, full trace labeling, or formal taxonomy annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/obstruction3d_generalized/obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34/2026-09-30_20-08-02/replicate_424",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/obstruction3d_generalized/obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34/2026-09-30_20-08-02/replicate_424",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34",
+      "replicate_seed": 424,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 424,
+        "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "2144397d8f2d187f34b2a4780b9a6d0f2ea7e9a37db84ef670c5621003fce5b2",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "3f9182d7e051e63da552175e7961681c9d9e766a02c3fea8d9f13cdf37623c9b",
+      "policy_sha256": "e758ac76388e3a3173af2f1785063dad1f0e5c02caa16e01a8846c1ff226f6cc",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "Obstruction3D",
+      "sample_id": "claude_opus55_obstruction3d_generalized_replicate_424",
+      "matched_gpt_sample_id": "obstruction3d_generalized_replicate_424",
+      "review_status": "initial controller review and selected trace checks; full trace annotation pending",
+      "git_head": "c30325a2d8738f93028e2d4f1812e5d43113e44c",
+      "run_id": "claude_opus55_high_r424_3f9182d7",
+      "directory": "environments/Obstruction3D/runs/claude_opus55_high_r424_3f9182d7",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true
+      },
+      "thread_ids": [
+        "baed60ee-043e-4d13-ac2d-a7de867342fc"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "task_description_sha256": "e5b2b6cd52c011a7f1ec184c573d362676a5e6fe66db454b880d4ceca7cfb1b4",
+      "task_description_identical_to_gpt": true,
+      "controller_review": {
+        "date": "2026-10-10",
+        "files": [
+          "approach.py",
+          "kin.py"
+        ],
+        "scope": "Complete final controller and imported local runtime helpers read; selected development diffs/messages checked. No fresh execution, full trace labeling, or formal taxonomy annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/obstruction3d_generalized/obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34/2026-09-30_19-47-30/replicate_24",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/obstruction3d_generalized/obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34/2026-09-30_19-47-30/replicate_24",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34",
+      "replicate_seed": 24,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 24,
+        "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "a12cc60033ff481ba3cfa8718fb8ffd381c68ddd673ba4fc000e83a68c221520",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "024d0ca5450844bf0ebee57a4e8613fa51e913b80d25619ac7adada299d00c87",
+      "policy_sha256": "d3d2d91d1de180281449cd3d4d2ad7f8f2a2b3dad030a0224e7fe820091a5d3a",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "Obstruction3D",
+      "sample_id": "claude_opus55_obstruction3d_generalized_replicate_24",
+      "matched_gpt_sample_id": "obstruction3d_generalized_replicate_24",
+      "review_status": "initial controller review and selected trace checks; full trace annotation pending",
+      "git_head": "7d554d68167a01e575bce0334b97cac55d4b05e3",
+      "run_id": "claude_opus55_high_r24_024d0ca5",
+      "directory": "environments/Obstruction3D/runs/claude_opus55_high_r24_024d0ca5",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true
+      },
+      "thread_ids": [
+        "7fcd5f83-a1b5-427d-9f51-b323364fbaeb"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "task_description_sha256": "e5b2b6cd52c011a7f1ec184c573d362676a5e6fe66db454b880d4ceca7cfb1b4",
+      "task_description_identical_to_gpt": true,
+      "controller_review": {
+        "date": "2026-10-10",
+        "files": [
+          "approach.py",
+          "kin.py"
+        ],
+        "scope": "Complete final controller and imported local runtime helpers read; selected development diffs/messages checked. No fresh execution, full trace labeling, or formal taxonomy annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/dynpusht2d/dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6/2026-09-30_16-51-40/replicate_424",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/dynpusht2d/dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6/2026-09-30_16-51-40/replicate_424",
+      "condition": "Blackbox",
+      "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6",
+      "replicate_seed": 424,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+        "env_id": "kinder/DynPushT2D-t1-v0"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+          "env_id": "kinder/DynPushT2D-t1-v0"
+        },
+        "replicate_seed": 424,
+        "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "d9cb5fd2e18998276146c2fbf97664983044dc1abac814f445d7f38133cc481c",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "2a46a52d65bafc33df5d3f18d264f69b9376196f72dabc67e1a8c020bc636154",
+      "policy_sha256": "881b6f33605909c3394d71a5528d87155ce41cedd09492b348a957a0700adcde",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "DynPushT2D",
+      "sample_id": "claude_opus55_dynpusht2d_replicate_424",
+      "matched_gpt_sample_id": "dynpusht2d_replicate_424",
+      "review_status": "initial controller review and selected trace checks; full trace annotation pending",
+      "git_head": "cbb89235844112d3b2072ebf48704bf4d1897739",
+      "run_id": "claude_opus55_high_r424_2a46a52d",
+      "directory": "environments/DynPushT2D/runs/claude_opus55_high_r424_2a46a52d",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true
+      },
+      "thread_ids": [
+        "8ffe8615-4e22-4c8a-be01-3d19a3051d94"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "task_description_sha256": "c112652aa000c5b7a4668c60b3da0c0daa70465a7f753c73200d462dfc1ca0b0",
+      "task_description_identical_to_gpt": true,
+      "controller_review": {
+        "date": "2026-10-10",
+        "files": [
+          "approach.py",
+          "navgrid.py"
+        ],
+        "scope": "Complete final controller and imported local runtime helpers read; selected development diffs/messages checked. No fresh execution, full trace labeling, or formal taxonomy annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/dynpusht2d/dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6/2026-09-30_16-51-10/replicate_24",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/dynpusht2d/dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6/2026-09-30_16-51-10/replicate_24",
+      "condition": "Blackbox",
+      "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6",
+      "replicate_seed": 24,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+        "env_id": "kinder/DynPushT2D-t1-v0"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+          "env_id": "kinder/DynPushT2D-t1-v0"
+        },
+        "replicate_seed": 24,
+        "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "870d10713dffa9933062ec1a9248a426c2b6897830d0cc081e81f4367ff29d5c",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "55605190fb371485529dfe2362edbeb18f6da266dcbb3562ad8b2bbca1ed367c",
+      "policy_sha256": "c72397eb310407a329d87707139b6cdb26a32ba27197cec1020f778a852f96c8",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "DynPushT2D",
+      "sample_id": "claude_opus55_dynpusht2d_replicate_24",
+      "matched_gpt_sample_id": "dynpusht2d_replicate_24",
+      "review_status": "initial controller review and selected trace checks; full trace annotation pending",
+      "git_head": "936a3d271afdec81ccc81a3a57d8e0bd2311fd58",
+      "run_id": "claude_opus55_high_r24_55605190",
+      "directory": "environments/DynPushT2D/runs/claude_opus55_high_r24_55605190",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true
+      },
+      "thread_ids": [
+        "942c4c99-7a08-4366-becd-ab410bd2b942"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "task_description_sha256": "c112652aa000c5b7a4668c60b3da0c0daa70465a7f753c73200d462dfc1ca0b0",
+      "task_description_identical_to_gpt": true,
+      "controller_review": {
+        "date": "2026-10-10",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Complete final controller and imported local runtime helpers read; selected development diffs/messages checked. No fresh execution, full trace labeling, or formal taxonomy annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_10-39-32/replicate_424",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_10-39-32/replicate_424",
+      "condition": "Blackbox",
+      "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1",
+      "replicate_seed": 424,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+        "design_counts": [
+          1,
+          2,
+          3
+        ],
+        "eval_counts": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+          "design_counts": [
+            1,
+            2,
+            3
+          ],
+          "eval_counts": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 424,
+        "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "5a9d75c16eae1bf553ee177e789606583074b051416acca16c61115251187652",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "4c49acd04b8b82b005f06ff60942ba0828566950082ccdad21fcff14919ba35b",
+      "policy_sha256": "b8d2c1ede11e4d2630b1eef8852efc0e3728aae2319a80986e4a7f28d02ab4a9",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "Rovers",
+      "sample_id": "claude_opus55_rovers_generalized_replicate_424",
+      "matched_gpt_sample_id": "rovers_generalized_replicate_424",
+      "review_status": "initial controller review and selected trace checks; full trace annotation pending",
+      "git_head": "ff66920573d4190a29dee40e68bf48fac945a1c7",
+      "run_id": "claude_opus55_high_r424_4c49acd0",
+      "directory": "environments/Rovers/runs/claude_opus55_high_r424_4c49acd0",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true
+      },
+      "thread_ids": [
+        "8efd4ace-4532-4b6a-8051-8066d3340cf2"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "task_description_sha256": "0c861719eb0c3ab9cdcf77370ab4a7d5ac4b65d4ad6d2424a5ecf450f8540c1b",
+      "task_description_identical_to_gpt": true,
+      "controller_review": {
+        "date": "2026-10-10",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Complete final controller and imported local runtime helpers read; selected development diffs/messages checked. No fresh execution, full trace labeling, or formal taxonomy annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_10-20-45/replicate_24",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_10-20-45/replicate_24",
+      "condition": "Blackbox",
+      "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1",
+      "replicate_seed": 24,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+        "design_counts": [
+          1,
+          2,
+          3
+        ],
+        "eval_counts": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+          "design_counts": [
+            1,
+            2,
+            3
+          ],
+          "eval_counts": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 24,
+        "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "46624d4f67d88ab0c1bf426cc6d91a9cdd10f9223a82d61d58749d3271dbbf6a",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "1cd6a7a54a3286d3cabfa7329aa9155d54c0b929136d59594854fb97fdecc81e",
+      "policy_sha256": "b443819ca29d0469c88e8129504688a2ffd6f669cdf708d031c8a90d4dca3eeb",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "Rovers",
+      "sample_id": "claude_opus55_rovers_generalized_replicate_24",
+      "matched_gpt_sample_id": "rovers_generalized_replicate_24",
+      "review_status": "initial controller review and selected trace checks; full trace annotation pending",
+      "git_head": "a010326ad1d8164ef0eea61ce7410b6d82c804e1",
+      "run_id": "claude_opus55_high_r24_1cd6a7a5",
+      "directory": "environments/Rovers/runs/claude_opus55_high_r24_1cd6a7a5",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true
+      },
+      "thread_ids": [
+        "17f311bb-c19a-41c6-af2d-1950dd850d72"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "task_description_sha256": "0c861719eb0c3ab9cdcf77370ab4a7d5ac4b65d4ad6d2424a5ecf450f8540c1b",
+      "task_description_identical_to_gpt": true,
+      "controller_review": {
+        "date": "2026-10-10",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Complete final controller and imported local runtime helpers read; selected development diffs/messages checked. No fresh execution, full trace labeling, or formal taxonomy annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT6 Astra/obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b0dab54__seed424__2026-09-21_22-22-01/run",
+      "relative_path": "Blackbox/Codex GPT6 Astra/obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b0dab54__seed424__2026-09-21_22-22-01/run",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b0dab54",
+      "replicate_seed": 424,
+      "model": "gpt-6-astra",
+      "reasoning_effort": "high",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic2d.obstruction2d:Obstruction2DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "bilevel_env_name": "obstruction2d"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-6-astra",
+            "reasoning_effort": "high",
+            "input_usd_per_mtok": 10.0,
+            "cached_input_usd_per_mtok": 1.0,
+            "output_usd_per_mtok": 50.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic2d.obstruction2d:Obstruction2DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          "bilevel_env_name": "obstruction2d"
+        },
+        "replicate_seed": 424,
+        "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b0dab54",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "76b294bbb7a09eac2b3eaae077d59c6d4f67830c627d30742db4ea09386714ef",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "51fd524e002b3951d7427e0e39616d66693a4a82e4793bad5a63b22cb8328aef",
+      "policy_sha256": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2",
+      "git_head": "bfc4b68e9d1e694a3bf0bc0d379c24ed4308d91b",
+      "backend": "codex",
+      "environment_name": "Obstruction2D",
+      "configured_effort": "high",
+      "sample_id": "astra_gpt6_obstruction2d_generalized_replicate_424",
+      "run_id": "codex_gpt6astra_r424_51fd524e",
+      "review_status": "initial final-controller review and selected development sequences",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "eval_seed": true
+      },
+      "thread_ids": [
+        "01a0c5a2-4394-7471-8c35-5dce118cfc8d"
+      ],
+      "task_description_sha256": "240d5820bb4a168097d097757da0a75a73f4f92f77e767784ed549d086d77469",
+      "task_description_identical_to_reference": true,
+      "settings_reference_sample_id": "obstruction2d_generalized_replicate_424",
+      "directory": "environments/Obstruction2D/runs/codex_gpt6astra_r424_51fd524e",
+      "matched_gpt_sample_id": "obstruction2d_generalized_replicate_424",
+      "export_provenance": {
+        "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b0dab54",
+        "seed": 424,
+        "output_dir": "/data01/mmerler/robocode/outputs/astra/astra-high-20usd-cache-fixed-2026-09-19/obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b0dab54/2026-09-21_22-22-01/replicate_424",
+        "git_sha": "a8e0579f1e191f23a95e1df70367b4e588523768",
+        "session": "astra-q-9871464a74d7",
+        "phase": "done"
+      },
+      "identity_review": "Unique candidate in saved inventory for model/environment/replicate/strict Blackbox with load_dir null. Selected transcript/thread identities checked against existing collection; no full archive-wide deduplication claimed.",
+      "controller_review": {
+        "date": "2026-10-10",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Complete final controller and imported local runtime helpers read; selected development diffs/messages checked. No fresh execution, full trace labeling, or formal taxonomy annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT6 Astra/bowen_astra_0921/0921/obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__d0148e6c/2026-09-21_13-17-16/replicate_24",
+      "relative_path": "Blackbox/Codex GPT6 Astra/bowen_astra_0921/0921/obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__d0148e6c/2026-09-21_13-17-16/replicate_24",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__d0148e6c",
+      "replicate_seed": 24,
+      "model": "gpt-6-astra",
+      "reasoning_effort": "high",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic2d.obstruction2d:Obstruction2DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "bilevel_env_name": "obstruction2d"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-6-astra",
+            "reasoning_effort": "high",
+            "input_usd_per_mtok": 10.0,
+            "cached_input_usd_per_mtok": 1.0,
+            "output_usd_per_mtok": 50.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "docker",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic2d.obstruction2d:Obstruction2DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          "bilevel_env_name": "obstruction2d"
+        },
+        "replicate_seed": 24,
+        "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__d0148e6c",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "1a46d2f61000c5dcba7c40514e6eee0f3d428b5cdd605bee77bbf4ccc27a8e1c",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "29375d555097729610e966a1e6959344869320a276c9e2418b7a057ab858a557",
+      "policy_sha256": "c7c9db30a99eb3764bb063ed6b03030573cfa8e0d5623c189cac5c65e31afb38",
+      "git_head": "3b0289191de493678a1a4daa43dfa65bc0784e45",
+      "backend": "codex",
+      "environment_name": "Obstruction2D",
+      "configured_effort": "high",
+      "sample_id": "astra_gpt6_obstruction2d_generalized_replicate_24",
+      "run_id": "codex_gpt6astra_r24_29375d55",
+      "review_status": "initial final-controller review and selected development sequences",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "replicate_seed": true,
+        "eval_seed": true
+      },
+      "thread_ids": [
+        "01a0c4f8-ddcd-7112-9449-3d59678cc8c0"
+      ],
+      "task_description_sha256": "240d5820bb4a168097d097757da0a75a73f4f92f77e767784ed549d086d77469",
+      "task_description_identical_to_reference": true,
+      "settings_reference_sample_id": "claude_opus55_obstruction2d_generalized_replicate_24",
+      "directory": "environments/Obstruction2D/runs/codex_gpt6astra_r24_29375d55",
+      "pairing_note": "Coverage updated 2026-10-11: Claude Opus 5.5 High replicate 24 is now included and is the same-environment/replicate task/settings reference; checked evaluation settings and task bytes match. No GPT-5.6-sol replicate 24 is selected for Obstruction2D. Backend, model, container backend and experiment dates differ.",
+      "identity_review": "Unique candidate in saved inventory for model/environment/replicate/strict Blackbox with load_dir null. Selected transcript/thread identities checked against existing collection; no full archive-wide deduplication claimed.",
+      "controller_review": {
+        "date": "2026-10-10",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Complete final controller and imported local runtime helpers read; selected development diffs/messages checked. No fresh execution, full trace labeling, or formal taxonomy annotation."
+      },
+      "previous_settings_reference_sample_id": "obstruction2d_generalized_replicate_424",
+      "organized_date": "2026-10-11"
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT6 Astra/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__61018f09__seed424__2026-09-21_18-23-44/run",
+      "relative_path": "Blackbox/Codex GPT6 Astra/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__61018f09__seed424__2026-09-21_18-23-44/run",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__61018f09",
+      "replicate_seed": 424,
+      "model": "gpt-6-astra",
+      "reasoning_effort": "high",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-6-astra",
+            "reasoning_effort": "high",
+            "input_usd_per_mtok": 10.0,
+            "cached_input_usd_per_mtok": 1.0,
+            "output_usd_per_mtok": 50.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 424,
+        "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__61018f09",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "98daf382ff7a9d789d27c3fe2ef82c51d3cd2cbad59f1aaeb5623e64c7a329c4",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "cf2d01592e74b6ddfa6246cb955ee4d11ed05f4efd7146e9a41efbc600fe8944",
+      "policy_sha256": "703e11c4a7b1a401a8825237045264eee42875587ce6b35f8b9fbdc3d8e9d262",
+      "git_head": "9a515a32ae3e3a0dbaf15d4585a2dbcc5d01181e",
+      "backend": "codex",
+      "environment_name": "Obstruction3D",
+      "configured_effort": "high",
+      "sample_id": "astra_gpt6_obstruction3d_generalized_replicate_424",
+      "run_id": "codex_gpt6astra_r424_cf2d0159",
+      "review_status": "initial final-controller review and selected development sequences",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "eval_seed": true
+      },
+      "thread_ids": [
+        "01a0c4c8-55dd-7a32-a064-58f46641acf5"
+      ],
+      "task_description_sha256": "e5b2b6cd52c011a7f1ec184c573d362676a5e6fe66db454b880d4ceca7cfb1b4",
+      "task_description_identical_to_reference": true,
+      "settings_reference_sample_id": "obstruction3d_generalized_replicate_424",
+      "directory": "environments/Obstruction3D/runs/codex_gpt6astra_r424_cf2d0159",
+      "matched_gpt_sample_id": "obstruction3d_generalized_replicate_424",
+      "export_provenance": {
+        "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__61018f09",
+        "seed": 424,
+        "output_dir": "/data01/mmerler/robocode/outputs/astra/astra-high-20usd-cache-fixed-2026-09-19/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__61018f09/2026-09-21_18-23-44/replicate_424",
+        "git_sha": "a8e0579f1e191f23a95e1df70367b4e588523768",
+        "session": "astra-q-653d851f574a",
+        "phase": "evaluating"
+      },
+      "identity_review": "Unique candidate in saved inventory for model/environment/replicate/strict Blackbox with load_dir null. Selected transcript/thread identities checked against existing collection; no full archive-wide deduplication claimed.",
+      "controller_review": {
+        "date": "2026-10-10",
+        "files": [
+          "approach.py",
+          "kinematics_fit.py"
+        ],
+        "scope": "Complete final controller and imported local runtime helpers read; selected development diffs/messages checked. No fresh execution, full trace labeling, or formal taxonomy annotation.",
+        "additional_development_files": [
+          "fit_fk.py"
+        ]
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT6 Astra/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__bf1ef19e__seed24__2026-09-20_02-39-58/run",
+      "relative_path": "Blackbox/Codex GPT6 Astra/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__bf1ef19e__seed24__2026-09-20_02-39-58/run",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__bf1ef19e",
+      "replicate_seed": 24,
+      "model": "gpt-6-astra",
+      "reasoning_effort": "high",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-6-astra",
+            "reasoning_effort": "high",
+            "input_usd_per_mtok": 10.0,
+            "cached_input_usd_per_mtok": 1.0,
+            "output_usd_per_mtok": 50.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 24,
+        "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__bf1ef19e",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "56f298e3fc0344f63c8b5a4cfd28c97e06e516fa999c77743dd59fa6a05ec5d0",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "512c8dbfd01373d8e51dae8444e87c9e35fa22fb26d83154f91a40b93bc509eb",
+      "policy_sha256": "b56d2a95db8f353f761f40aeb49e2a2a6c6c1c0837e043ced71ef4a6e5bd0e52",
+      "git_head": "e4d97eadb34486947fe47c881f8fd564d20aab17",
+      "backend": "codex",
+      "environment_name": "Obstruction3D",
+      "configured_effort": "high",
+      "sample_id": "astra_gpt6_obstruction3d_generalized_replicate_24",
+      "run_id": "codex_gpt6astra_r24_512c8dbf",
+      "review_status": "initial final-controller review and selected development sequences",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "eval_seed": true
+      },
+      "thread_ids": [
+        "01a0bc41-edc1-7e50-94c9-432fc6cf3f09"
+      ],
+      "task_description_sha256": "e5b2b6cd52c011a7f1ec184c573d362676a5e6fe66db454b880d4ceca7cfb1b4",
+      "task_description_identical_to_reference": true,
+      "settings_reference_sample_id": "obstruction3d_generalized_replicate_24",
+      "directory": "environments/Obstruction3D/runs/codex_gpt6astra_r24_512c8dbf",
+      "matched_gpt_sample_id": "obstruction3d_generalized_replicate_24",
+      "export_provenance": {
+        "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__bf1ef19e",
+        "seed": 24,
+        "output_dir": "/data01/mmerler/robocode/outputs/astra/astra-high-20usd-cache-fixed-2026-09-19/obstruction3d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__bf1ef19e/2026-09-20_02-39-58/replicate_24",
+        "git_sha": "a8e0579f1e191f23a95e1df70367b4e588523768",
+        "session": "astra-q-2fc890ccc9f6",
+        "phase": "evaluating"
+      },
+      "identity_review": "Unique candidate in saved inventory for model/environment/replicate/strict Blackbox with load_dir null. Selected transcript/thread identities checked against existing collection; no full archive-wide deduplication claimed.",
+      "controller_review": {
+        "date": "2026-10-10",
+        "files": [
+          "approach.py",
+          "kin.py"
+        ],
+        "scope": "Complete final controller and imported local runtime helpers read; selected development diffs/messages checked. No fresh execution, full trace labeling, or formal taxonomy annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT6 Astra/dynpusht2d__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__b111212d__seed424__2026-09-21_22-16-22/run",
+      "relative_path": "Blackbox/Codex GPT6 Astra/dynpusht2d__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__b111212d__seed424__2026-09-21_22-16-22/run",
+      "condition": "Blackbox",
+      "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__b111212d",
+      "replicate_seed": 424,
+      "model": "gpt-6-astra",
+      "reasoning_effort": "high",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+        "env_id": "kinder/DynPushT2D-t1-v0"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-6-astra",
+            "reasoning_effort": "high",
+            "input_usd_per_mtok": 10.0,
+            "cached_input_usd_per_mtok": 1.0,
+            "output_usd_per_mtok": 50.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+          "env_id": "kinder/DynPushT2D-t1-v0"
+        },
+        "replicate_seed": 424,
+        "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__b111212d",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "c5b7e2ae4a9c22a7c6c33424c5c8b07e2701116938889c7d405734ea23afcaab",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "4e86deee34892d8751cac98b8df9a5f9c4195443aaa1b48c85c3bee26311d741",
+      "policy_sha256": "1ea4e922e582d867c6d6a7426a35dbd8aa8922d91fb47cac3152e21e56174f8d",
+      "git_head": "f187e282ec91e95453532024c60912b9a1e0286b",
+      "backend": "codex",
+      "environment_name": "DynPushT2D",
+      "configured_effort": "high",
+      "sample_id": "astra_gpt6_dynpusht2d_replicate_424",
+      "run_id": "codex_gpt6astra_r424_4e86deee",
+      "review_status": "initial final-controller review and selected development sequences",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "eval_seed": true
+      },
+      "thread_ids": [
+        "01a0c59d-1502-7962-9dcf-81c20d0a708a"
+      ],
+      "task_description_sha256": "c112652aa000c5b7a4668c60b3da0c0daa70465a7f753c73200d462dfc1ca0b0",
+      "task_description_identical_to_reference": true,
+      "settings_reference_sample_id": "dynpusht2d_replicate_424",
+      "directory": "environments/DynPushT2D/runs/codex_gpt6astra_r424_4e86deee",
+      "matched_gpt_sample_id": "dynpusht2d_replicate_424",
+      "export_provenance": {
+        "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__b111212d",
+        "seed": 424,
+        "output_dir": "/data01/mmerler/robocode/outputs/astra/astra-high-20usd-cache-fixed-2026-09-19/dynpusht2d__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__b111212d/2026-09-21_22-16-22/replicate_424",
+        "git_sha": "a8e0579f1e191f23a95e1df70367b4e588523768",
+        "session": "astra-q-033076d5d872",
+        "phase": "done"
+      },
+      "identity_review": "Unique candidate in saved inventory for model/environment/replicate/strict Blackbox with load_dir null. Selected transcript/thread identities checked against existing collection; no full archive-wide deduplication claimed.",
+      "controller_review": {
+        "date": "2026-10-10",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Complete final controller and imported local runtime helpers read; selected development diffs/messages checked. No fresh execution, full trace labeling, or formal taxonomy annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT6 Astra/bowen_astra_0921/0921/dynpusht2d__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__6fad45c9/2026-09-21_12-39-55/replicate_24",
+      "relative_path": "Blackbox/Codex GPT6 Astra/bowen_astra_0921/0921/dynpusht2d__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__6fad45c9/2026-09-21_12-39-55/replicate_24",
+      "condition": "Blackbox",
+      "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__6fad45c9",
+      "replicate_seed": 24,
+      "model": "gpt-6-astra",
+      "reasoning_effort": "high",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+        "env_id": "kinder/DynPushT2D-t1-v0"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-6-astra",
+            "reasoning_effort": "high",
+            "input_usd_per_mtok": 10.0,
+            "cached_input_usd_per_mtok": 1.0,
+            "output_usd_per_mtok": 50.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "docker",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+          "env_id": "kinder/DynPushT2D-t1-v0"
+        },
+        "replicate_seed": 24,
+        "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__6fad45c9",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "8c5ab73ca0f80e4562ba9a3a24a8c34421fad97135bda13bb3253deb8035c26a",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "644304ab12bab53aa0988a4fc6bb2aa93852427f0c4338c6889665609e6dfe22",
+      "policy_sha256": "3dbbda02979672e5c23a61ec92227a1c8850e312c9342dfd06f9c9d7eb7c3eee",
+      "git_head": "6adbc34c71602e613d0ae66376ba015ed5a81141",
+      "backend": "codex",
+      "environment_name": "DynPushT2D",
+      "configured_effort": "high",
+      "sample_id": "astra_gpt6_dynpusht2d_replicate_24",
+      "run_id": "codex_gpt6astra_r24_644304ab",
+      "review_status": "initial final-controller review and selected development sequences",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "eval_seed": true
+      },
+      "thread_ids": [
+        "01a0c4d6-aba7-7470-9201-ca311630b8cc"
+      ],
+      "task_description_sha256": "c112652aa000c5b7a4668c60b3da0c0daa70465a7f753c73200d462dfc1ca0b0",
+      "task_description_identical_to_reference": true,
+      "settings_reference_sample_id": "dynpusht2d_replicate_24",
+      "directory": "environments/DynPushT2D/runs/codex_gpt6astra_r24_644304ab",
+      "matched_gpt_sample_id": "dynpusht2d_replicate_24",
+      "identity_review": "Unique candidate in saved inventory for model/environment/replicate/strict Blackbox with load_dir null. Selected transcript/thread identities checked against existing collection; no full archive-wide deduplication claimed.",
+      "controller_review": {
+        "date": "2026-10-10",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Complete final controller and imported local runtime helpers read; selected development diffs/messages checked. No fresh execution, full trace labeling, or formal taxonomy annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT6 Astra/rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b143aaf__seed424__2026-09-21_22-01-34/run",
+      "relative_path": "Blackbox/Codex GPT6 Astra/rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b143aaf__seed424__2026-09-21_22-01-34/run",
+      "condition": "Blackbox",
+      "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b143aaf",
+      "replicate_seed": 424,
+      "model": "gpt-6-astra",
+      "reasoning_effort": "high",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+        "design_counts": [
+          1,
+          2,
+          3
+        ],
+        "eval_counts": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-6-astra",
+            "reasoning_effort": "high",
+            "input_usd_per_mtok": 10.0,
+            "cached_input_usd_per_mtok": 1.0,
+            "output_usd_per_mtok": 50.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+          "design_counts": [
+            1,
+            2,
+            3
+          ],
+          "eval_counts": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 424,
+        "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b143aaf",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "179aa0a7e688bb14807286e30b7a4874116501570d31aca6413b203c9a3506d3",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "657f1d255f22e0029e0b735593de69bcfaac717a27ac46ae1a1103d8d816b9f8",
+      "policy_sha256": "ea6d21baf4eeb001ee0f8985caed48cf41b12a364764596f37603c05126a6af8",
+      "git_head": "b628d28c623684c715c78b2e702a5d8c7f273a4d",
+      "backend": "codex",
+      "environment_name": "Rovers",
+      "configured_effort": "high",
+      "sample_id": "astra_gpt6_rovers_generalized_replicate_424",
+      "run_id": "codex_gpt6astra_r424_657f1d25",
+      "review_status": "initial final-controller review and selected development sequences",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "eval_seed": true
+      },
+      "thread_ids": [
+        "01a0c58f-9561-7452-a072-ee0096cca100"
+      ],
+      "task_description_sha256": "0c861719eb0c3ab9cdcf77370ab4a7d5ac4b65d4ad6d2424a5ecf450f8540c1b",
+      "task_description_identical_to_reference": true,
+      "settings_reference_sample_id": "rovers_generalized_replicate_424",
+      "directory": "environments/Rovers/runs/codex_gpt6astra_r424_657f1d25",
+      "matched_gpt_sample_id": "rovers_generalized_replicate_424",
+      "export_provenance": {
+        "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b143aaf",
+        "seed": 424,
+        "output_dir": "/data01/mmerler/robocode/outputs/astra/astra-high-20usd-cache-fixed-2026-09-19/rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b143aaf/2026-09-21_22-01-34/replicate_424",
+        "git_sha": "a8e0579f1e191f23a95e1df70367b4e588523768",
+        "session": "astra-q-b203f7e6c49f",
+        "phase": "evaluating"
+      },
+      "identity_review": "Unique candidate in saved inventory for model/environment/replicate/strict Blackbox with load_dir null. Selected transcript/thread identities checked against existing collection; no full archive-wide deduplication claimed.",
+      "controller_review": {
+        "date": "2026-10-10",
+        "files": [
+          "approach.py",
+          "task_planner.py"
+        ],
+        "scope": "Complete final controller and imported local runtime helpers read; selected development diffs/messages checked. No fresh execution, full trace labeling, or formal taxonomy annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Codex GPT6 Astra/rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__bb57c256__seed24__2026-09-20_03-45-58/run",
+      "relative_path": "Blackbox/Codex GPT6 Astra/rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__bb57c256__seed24__2026-09-20_03-45-58/run",
+      "condition": "Blackbox",
+      "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__bb57c256",
+      "replicate_seed": 24,
+      "model": "gpt-6-astra",
+      "reasoning_effort": "high",
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+        "design_counts": [
+          1,
+          2,
+          3
+        ],
+        "eval_counts": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "codex",
+            "model": "gpt-6-astra",
+            "reasoning_effort": "high",
+            "input_usd_per_mtok": 10.0,
+            "cached_input_usd_per_mtok": 1.0,
+            "output_usd_per_mtok": 50.0
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+          "design_counts": [
+            1,
+            2,
+            3
+          ],
+          "eval_counts": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 24,
+        "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__bb57c256",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "7742dde3db3d0d562fd41b052f78c5f216295b850d9c6f6f3cb3a786f3c97f18",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "10c7bc43a933c6c89e23d4f5875f616c6b09f8070d212897f903bbf934945b89",
+      "policy_sha256": "a7c260a825f88845383d6ae950f031d307431d409d8aa778acb66db7bd4752f7",
+      "git_head": "7cc4641efbbaea1a1018677648148bb1c5023d7b",
+      "backend": "codex",
+      "environment_name": "Rovers",
+      "configured_effort": "high",
+      "sample_id": "astra_gpt6_rovers_generalized_replicate_24",
+      "run_id": "codex_gpt6astra_r24_10c7bc43",
+      "review_status": "initial final-controller review and selected development sequences",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "eval_seed": true
+      },
+      "thread_ids": [
+        "01a0bc7e-27ea-7520-924c-9cbe950d55ad"
+      ],
+      "task_description_sha256": "0c861719eb0c3ab9cdcf77370ab4a7d5ac4b65d4ad6d2424a5ecf450f8540c1b",
+      "task_description_identical_to_reference": true,
+      "settings_reference_sample_id": "rovers_generalized_replicate_24",
+      "directory": "environments/Rovers/runs/codex_gpt6astra_r24_10c7bc43",
+      "matched_gpt_sample_id": "rovers_generalized_replicate_24",
+      "export_provenance": {
+        "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__bb57c256",
+        "seed": 24,
+        "output_dir": "/data01/mmerler/robocode/outputs/astra/astra-high-20usd-cache-fixed-2026-09-19/rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__bb57c256/2026-09-20_03-45-58/replicate_24",
+        "git_sha": "a8e0579f1e191f23a95e1df70367b4e588523768",
+        "session": "astra-q-5dbb21dd91d9",
+        "phase": "evaluating"
+      },
+      "identity_review": "Unique candidate in saved inventory for model/environment/replicate/strict Blackbox with load_dir null. Selected transcript/thread identities checked against existing collection; no full archive-wide deduplication claimed.",
+      "controller_review": {
+        "date": "2026-10-10",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Complete final controller and imported local runtime helpers read; selected development diffs/messages checked. No fresh execution, full trace labeling, or formal taxonomy annotation.",
+        "additional_development_files": [
+          "tour_candidate.py (planning and execution integration)",
+          "ordered_candidate.py (planning and execution integration)",
+          "test_tour.py",
+          "test_ordered.py"
+        ]
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/dynpusht2d/dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6/2026-09-28_18-47-11/replicate_42",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/dynpusht2d/dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6/2026-09-28_18-47-11/replicate_42",
+      "condition": "Blackbox",
+      "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__a627c5d7",
+      "replicate_seed": 42,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+        "env_id": "kinder/DynPushT2D-t1-v0"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+          "env_id": "kinder/DynPushT2D-t1-v0"
+        },
+        "replicate_seed": 42,
+        "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__a627c5d7",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "cf260a4b838c3226c936687526425c449752a1b03c3634a73209d076bdbd347d",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "39564662ee7a90a2d5be85b8e81f06ff98e0b016220045279f238030ddc8e870",
+      "policy_sha256": "29f8431ff242ce7c29185715af751003018e8df8250ed06aaf2f7141d0a0108f",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "DynPushT2D",
+      "sample_id": "claude_opus55_dynpusht2d_replicate_42",
+      "review_status": "targeted controller review and selected trace checks; full trace annotation pending",
+      "git_head": "96fd518c4e5419032fa809e389603a27cb160873",
+      "run_id": "claude_opus55_high_r42_39564662",
+      "thread_ids": [
+        "5c992931-d128-4844-911e-97416f18561b"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "organized_date": "2026-10-11",
+      "addition_batch": "claude_five_seeds_2026-10-11",
+      "directory": "environments/DynPushT2D/runs/claude_opus55_high_r42_39564662",
+      "settings_reference_sample_id": "claude_opus55_dynpusht2d_replicate_424",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "approach.backend": true,
+        "approach.max_turns": true,
+        "primitives": true,
+        "mcp_tools": true
+      },
+      "task_description_sha256": "c112652aa000c5b7a4668c60b3da0c0daa70465a7f753c73200d462dfc1ca0b0",
+      "task_description_identical_to_reference": true,
+      "pairing_note": "Within-Claude expansion: full saved configuration matches the existing Claude reference except replicate_seed and experiment_id. Evaluation seed is unchanged. Cross-model same-seed coverage is incomplete.",
+      "identity_review": "Distinct main transcript SHA-256 and recorded session IDs within the 35-run selection; fresh config load_dir is null; final policy matches saved HEAD. Not an archive-wide lineage audit.",
+      "config_differences_from_reference": {
+        "experiment_id": {
+          "reference": "dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6",
+          "selected": "dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__a627c5d7"
+        },
+        "replicate_seed": {
+          "reference": 424,
+          "selected": 42
+        }
+      },
+      "controller_review": {
+        "date": "2026-10-11",
+        "files": [
+          "approach.py",
+          "tmodel.py"
+        ],
+        "scope": "Targeted review of planner/execution functions, active flags, and cited development diffs/messages. Not a complete controller/helper audit or exhaustive trace labeling. No archived code executed; no formal ACT*ONOMY annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/dynpusht2d/dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6/2026-09-30_17-32-45/replicate_222",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/dynpusht2d/dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6/2026-09-30_17-32-45/replicate_222",
+      "condition": "Blackbox",
+      "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6",
+      "replicate_seed": 222,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+        "env_id": "kinder/DynPushT2D-t1-v0"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+          "env_id": "kinder/DynPushT2D-t1-v0"
+        },
+        "replicate_seed": 222,
+        "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "9edbb7160ef1d4a1eaabb391e3c8b96b450303b693bc70ab1d76d80d5106e045",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "2702c65685e4b938acdd0e3b4e263c4984ecb877d715a8c17a18246d0a02726e",
+      "policy_sha256": "1daadafa795b6eee8fd3b80edf5ee7bdaa087c43e0bfa219d3328e1c7a28db21",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "DynPushT2D",
+      "sample_id": "claude_opus55_dynpusht2d_replicate_222",
+      "review_status": "targeted controller review and selected trace checks; full trace annotation pending",
+      "git_head": "b0d4acb0195ad5e9b69231870bfb329cb8c21bc0",
+      "run_id": "claude_opus55_high_r222_2702c656",
+      "thread_ids": [
+        "ecb91905-e2b9-43ee-845f-b27ef69d2c5e"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "organized_date": "2026-10-11",
+      "addition_batch": "claude_five_seeds_2026-10-11",
+      "directory": "environments/DynPushT2D/runs/claude_opus55_high_r222_2702c656",
+      "settings_reference_sample_id": "claude_opus55_dynpusht2d_replicate_424",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "approach.backend": true,
+        "approach.max_turns": true,
+        "primitives": true,
+        "mcp_tools": true
+      },
+      "task_description_sha256": "c112652aa000c5b7a4668c60b3da0c0daa70465a7f753c73200d462dfc1ca0b0",
+      "task_description_identical_to_reference": true,
+      "pairing_note": "Within-Claude expansion: full saved configuration matches the existing Claude reference except replicate_seed and experiment_id. Evaluation seed is unchanged. Cross-model same-seed coverage is incomplete.",
+      "identity_review": "Distinct main transcript SHA-256 and recorded session IDs within the 35-run selection; fresh config load_dir is null; final policy matches saved HEAD. Not an archive-wide lineage audit.",
+      "config_differences_from_reference": {
+        "replicate_seed": {
+          "reference": 424,
+          "selected": 222
+        }
+      },
+      "controller_review": {
+        "date": "2026-10-11",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Targeted review of planner/execution functions, active flags, and cited development diffs/messages. Not a complete controller/helper audit or exhaustive trace labeling. No archived code executed; no formal ACT*ONOMY annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/dynpusht2d/dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6/2026-09-30_17-07-12/replicate_444",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/dynpusht2d/dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6/2026-09-30_17-07-12/replicate_444",
+      "condition": "Blackbox",
+      "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6",
+      "replicate_seed": 444,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+        "env_id": "kinder/DynPushT2D-t1-v0"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.kinder_geom2d_env.KinderGeom2DEnv",
+          "env_id": "kinder/DynPushT2D-t1-v0"
+        },
+        "replicate_seed": 444,
+        "experiment_id": "dynpusht2d__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e50196a6",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "ed42bb5558dae8659280af36eeb165424224098c7a04e4f9318d4db8007f4b8d",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "2bf26d60fe9f1a864d33bc035633e76f6c86240354f2e6a9bbc96b93682388d7",
+      "policy_sha256": "813a31e31361c9fcf0315ca3dff8a7beee39de99bfda4a16edf7e5c7b12fde23",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "DynPushT2D",
+      "sample_id": "claude_opus55_dynpusht2d_replicate_444",
+      "review_status": "targeted controller review and selected trace checks; full trace annotation pending",
+      "git_head": "26c067613f9fab4446012250b059eebc35b89165",
+      "run_id": "claude_opus55_high_r444_2bf26d60",
+      "thread_ids": [
+        "40e37400-6288-4ca4-9858-39c0d5e697f3"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "organized_date": "2026-10-11",
+      "addition_batch": "claude_five_seeds_2026-10-11",
+      "directory": "environments/DynPushT2D/runs/claude_opus55_high_r444_2bf26d60",
+      "settings_reference_sample_id": "claude_opus55_dynpusht2d_replicate_424",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "approach.backend": true,
+        "approach.max_turns": true,
+        "primitives": true,
+        "mcp_tools": true
+      },
+      "task_description_sha256": "c112652aa000c5b7a4668c60b3da0c0daa70465a7f753c73200d462dfc1ca0b0",
+      "task_description_identical_to_reference": true,
+      "pairing_note": "Within-Claude expansion: full saved configuration matches the existing Claude reference except replicate_seed and experiment_id. Evaluation seed is unchanged. Cross-model same-seed coverage is incomplete.",
+      "identity_review": "Distinct main transcript SHA-256 and recorded session IDs within the 35-run selection; fresh config load_dir is null; final policy matches saved HEAD. Not an archive-wide lineage audit.",
+      "config_differences_from_reference": {
+        "replicate_seed": {
+          "reference": 424,
+          "selected": 444
+        }
+      },
+      "controller_review": {
+        "date": "2026-10-11",
+        "files": [
+          "approach.py",
+          "model_v.py"
+        ],
+        "scope": "Targeted review of planner/execution functions, active flags, and cited development diffs/messages. Not a complete controller/helper audit or exhaustive trace labeling. No archived code executed; no formal ACT*ONOMY annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/obstruction2d_generalized/obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7/2026-09-30_10-21-38/replicate_24",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/obstruction2d_generalized/obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7/2026-09-30_10-21-38/replicate_24",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7",
+      "replicate_seed": 24,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic2d.obstruction2d:Obstruction2DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "bilevel_env_name": "obstruction2d"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic2d.obstruction2d:Obstruction2DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          "bilevel_env_name": "obstruction2d"
+        },
+        "replicate_seed": 24,
+        "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "8664e70f40d5d07cadcfcfe359a6e389bb82b977492a70d10dcaa403f7676c8a",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "f8729873a2d0ddc334a9fa37b1e3b9cb37d4d0b95578b3947d36a8cb70f411e6",
+      "policy_sha256": "906f851a40c1cc131b8f620c67acb168c23b168b618d31c494ac4827353c775f",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "Obstruction2D",
+      "sample_id": "claude_opus55_obstruction2d_generalized_replicate_24",
+      "review_status": "targeted controller review and selected trace checks; full trace annotation pending",
+      "git_head": "c6c922b66d02fd0d4acc8cfb3ddb4d572ce2588e",
+      "run_id": "claude_opus55_high_r24_f8729873",
+      "thread_ids": [
+        "5e42a7ae-1276-4dbd-9c27-5a06586c53d5"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "organized_date": "2026-10-11",
+      "addition_batch": "claude_five_seeds_2026-10-11",
+      "directory": "environments/Obstruction2D/runs/claude_opus55_high_r24_f8729873",
+      "settings_reference_sample_id": "claude_opus55_obstruction2d_generalized_replicate_424",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "approach.backend": true,
+        "approach.max_turns": true,
+        "primitives": true,
+        "mcp_tools": true
+      },
+      "task_description_sha256": "240d5820bb4a168097d097757da0a75a73f4f92f77e767784ed549d086d77469",
+      "task_description_identical_to_reference": true,
+      "pairing_note": "Within-Claude expansion: full saved configuration matches the existing Claude reference except replicate_seed and experiment_id. Evaluation seed is unchanged. Cross-model same-seed coverage is incomplete.",
+      "identity_review": "Distinct main transcript SHA-256 and recorded session IDs within the 35-run selection; fresh config load_dir is null; final policy matches saved HEAD. Not an archive-wide lineage audit.",
+      "config_differences_from_reference": {
+        "replicate_seed": {
+          "reference": 424,
+          "selected": 24
+        }
+      },
+      "controller_review": {
+        "date": "2026-10-11",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Targeted review of planner/execution functions, active flags, and cited development diffs/messages. Not a complete controller/helper audit or exhaustive trace labeling. No archived code executed; no formal ACT*ONOMY annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/obstruction2d_generalized/obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7/2026-09-28_13-29-40/replicate_42",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/obstruction2d_generalized/obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7/2026-09-28_13-29-40/replicate_42",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__09aa4f72",
+      "replicate_seed": 42,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic2d.obstruction2d:Obstruction2DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "bilevel_env_name": "obstruction2d"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic2d.obstruction2d:Obstruction2DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          "bilevel_env_name": "obstruction2d"
+        },
+        "replicate_seed": 42,
+        "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__09aa4f72",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "21e703a334418e2ca79a5fe8138008a47bb1414fcba8175f40b240b3269f9e26",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "820cc0f3517fb0feab52eef3c97f3a839d704500f496f979bfaef946ad1644b6",
+      "policy_sha256": "958ce0d465f28124a059cf47421fd1456971dcd1f94535fd7e47c1ad646ead63",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "Obstruction2D",
+      "sample_id": "claude_opus55_obstruction2d_generalized_replicate_42",
+      "review_status": "targeted controller review and selected trace checks; full trace annotation pending",
+      "git_head": "c4cf81824e979a872ffc29e19b75787faeb06856",
+      "run_id": "claude_opus55_high_r42_820cc0f3",
+      "thread_ids": [
+        "400ab8cd-6b9b-4652-9cf0-9cab1e7f48b1"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "organized_date": "2026-10-11",
+      "addition_batch": "claude_five_seeds_2026-10-11",
+      "directory": "environments/Obstruction2D/runs/claude_opus55_high_r42_820cc0f3",
+      "settings_reference_sample_id": "claude_opus55_obstruction2d_generalized_replicate_424",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "approach.backend": true,
+        "approach.max_turns": true,
+        "primitives": true,
+        "mcp_tools": true
+      },
+      "task_description_sha256": "240d5820bb4a168097d097757da0a75a73f4f92f77e767784ed549d086d77469",
+      "task_description_identical_to_reference": true,
+      "pairing_note": "Within-Claude expansion: full saved configuration matches the existing Claude reference except replicate_seed and experiment_id. Evaluation seed is unchanged. Cross-model same-seed coverage is incomplete.",
+      "identity_review": "Distinct main transcript SHA-256 and recorded session IDs within the 35-run selection; fresh config load_dir is null; final policy matches saved HEAD. Not an archive-wide lineage audit.",
+      "config_differences_from_reference": {
+        "experiment_id": {
+          "reference": "obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7",
+          "selected": "obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__09aa4f72"
+        },
+        "replicate_seed": {
+          "reference": 424,
+          "selected": 42
+        }
+      },
+      "controller_review": {
+        "date": "2026-10-11",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Targeted review of planner/execution functions, active flags, and cited development diffs/messages. Not a complete controller/helper audit or exhaustive trace labeling. No archived code executed; no formal ACT*ONOMY annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/obstruction2d_generalized/obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7/2026-09-30_12-15-49/replicate_222",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/obstruction2d_generalized/obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7/2026-09-30_12-15-49/replicate_222",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7",
+      "replicate_seed": 222,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic2d.obstruction2d:Obstruction2DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "bilevel_env_name": "obstruction2d"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic2d.obstruction2d:Obstruction2DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          "bilevel_env_name": "obstruction2d"
+        },
+        "replicate_seed": 222,
+        "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "1630a7e8b7db8f2584f62e7aa716ea9e9c0777037f4a1aea8b7cf99072becf5b",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "c7b08ad093746882e1bc8f94d3ce8fc2ded78efe92becbc6c10fda580c93c256",
+      "policy_sha256": "c58b514eec5b3268c9cc27c2894ccfc734251f9fe50ce4547d3a48f0a22ec1ea",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "Obstruction2D",
+      "sample_id": "claude_opus55_obstruction2d_generalized_replicate_222",
+      "review_status": "targeted controller review and selected trace checks; full trace annotation pending",
+      "git_head": "320dd7d33d70ac9b0f153039a15eb561ddf1677b",
+      "run_id": "claude_opus55_high_r222_c7b08ad0",
+      "thread_ids": [
+        "a5b41097-6883-434b-844f-d9ef59c8ec80"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "organized_date": "2026-10-11",
+      "addition_batch": "claude_five_seeds_2026-10-11",
+      "directory": "environments/Obstruction2D/runs/claude_opus55_high_r222_c7b08ad0",
+      "settings_reference_sample_id": "claude_opus55_obstruction2d_generalized_replicate_424",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "approach.backend": true,
+        "approach.max_turns": true,
+        "primitives": true,
+        "mcp_tools": true
+      },
+      "task_description_sha256": "240d5820bb4a168097d097757da0a75a73f4f92f77e767784ed549d086d77469",
+      "task_description_identical_to_reference": true,
+      "pairing_note": "Within-Claude expansion: full saved configuration matches the existing Claude reference except replicate_seed and experiment_id. Evaluation seed is unchanged. Cross-model same-seed coverage is incomplete.",
+      "identity_review": "Distinct main transcript SHA-256 and recorded session IDs within the 35-run selection; fresh config load_dir is null; final policy matches saved HEAD. Not an archive-wide lineage audit.",
+      "config_differences_from_reference": {
+        "replicate_seed": {
+          "reference": 424,
+          "selected": 222
+        }
+      },
+      "controller_review": {
+        "date": "2026-10-11",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Targeted review of planner/execution functions, active flags, and cited development diffs/messages. Not a complete controller/helper audit or exhaustive trace labeling. No archived code executed; no formal ACT*ONOMY annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/obstruction2d_generalized/obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7/2026-09-30_11-38-43/replicate_444",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/obstruction2d_generalized/obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7/2026-09-30_11-38-43/replicate_444",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7",
+      "replicate_seed": 444,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic2d.obstruction2d:Obstruction2DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "bilevel_env_name": "obstruction2d"
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic2d.obstruction2d:Obstruction2DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          "bilevel_env_name": "obstruction2d"
+        },
+        "replicate_seed": 444,
+        "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__85cd59a7",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "247218d8178c2a1a34803db9fe4c2e4109d398bccb1f3bd55d5bed323ff9391e",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "0b82e686c4e85990b7001ad47949ed65dbe947a5ed047cbb5785199859d63dfd",
+      "policy_sha256": "12e3b21f76c9db8ecfa5949f9310642845861b0189548d84038fc0a6421fa4c6",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "Obstruction2D",
+      "sample_id": "claude_opus55_obstruction2d_generalized_replicate_444",
+      "review_status": "targeted controller review and selected trace checks; full trace annotation pending",
+      "git_head": "4f4bd2eae931a263272d051c158682fa46f330d8",
+      "run_id": "claude_opus55_high_r444_0b82e686",
+      "thread_ids": [
+        "7df24515-ec70-4dc5-befc-3a107e9c0c9c"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "organized_date": "2026-10-11",
+      "addition_batch": "claude_five_seeds_2026-10-11",
+      "directory": "environments/Obstruction2D/runs/claude_opus55_high_r444_0b82e686",
+      "settings_reference_sample_id": "claude_opus55_obstruction2d_generalized_replicate_424",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "approach.backend": true,
+        "approach.max_turns": true,
+        "primitives": true,
+        "mcp_tools": true
+      },
+      "task_description_sha256": "240d5820bb4a168097d097757da0a75a73f4f92f77e767784ed549d086d77469",
+      "task_description_identical_to_reference": true,
+      "pairing_note": "Within-Claude expansion: full saved configuration matches the existing Claude reference except replicate_seed and experiment_id. Evaluation seed is unchanged. Cross-model same-seed coverage is incomplete.",
+      "identity_review": "Distinct main transcript SHA-256 and recorded session IDs within the 35-run selection; fresh config load_dir is null; final policy matches saved HEAD. Not an archive-wide lineage audit.",
+      "config_differences_from_reference": {
+        "replicate_seed": {
+          "reference": 424,
+          "selected": 444
+        }
+      },
+      "controller_review": {
+        "date": "2026-10-11",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Targeted review of planner/execution functions, active flags, and cited development diffs/messages. Not a complete controller/helper audit or exhaustive trace labeling. No archived code executed; no formal ACT*ONOMY annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/obstruction3d_generalized/obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34/2026-09-28_19-18-21/replicate_42",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/obstruction3d_generalized/obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34/2026-09-28_19-18-21/replicate_42",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__13b0d502",
+      "replicate_seed": 42,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 42,
+        "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__13b0d502",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "ce141a3ef2c2fddfe5918755975a36845474e178db0eb3d73aada2fdca40cf2d",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "820c1113e813259a2bd865e5c7b7e8c51888dbdbfe9de3b7c718fea088b35674",
+      "policy_sha256": "835a71448e24413fcd759ca3fac695fdc97567f35a3c5347b4c8ae566cfb9aaa",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "Obstruction3D",
+      "sample_id": "claude_opus55_obstruction3d_generalized_replicate_42",
+      "review_status": "targeted controller review and selected trace checks; full trace annotation pending",
+      "git_head": "e54126cb892ff019b7f4421273cfa17c63579d26",
+      "run_id": "claude_opus55_high_r42_820c1113",
+      "thread_ids": [
+        "673aa172-af73-49ea-ab0d-12741bb24cfa"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "organized_date": "2026-10-11",
+      "addition_batch": "claude_five_seeds_2026-10-11",
+      "directory": "environments/Obstruction3D/runs/claude_opus55_high_r42_820c1113",
+      "settings_reference_sample_id": "claude_opus55_obstruction3d_generalized_replicate_424",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "approach.backend": true,
+        "approach.max_turns": true,
+        "primitives": true,
+        "mcp_tools": true
+      },
+      "task_description_sha256": "e5b2b6cd52c011a7f1ec184c573d362676a5e6fe66db454b880d4ceca7cfb1b4",
+      "task_description_identical_to_reference": true,
+      "pairing_note": "Within-Claude expansion: full saved configuration matches the existing Claude reference except replicate_seed and experiment_id. Evaluation seed is unchanged. Cross-model same-seed coverage is incomplete.",
+      "identity_review": "Distinct main transcript SHA-256 and recorded session IDs within the 35-run selection; fresh config load_dir is null; final policy matches saved HEAD. Not an archive-wide lineage audit.",
+      "config_differences_from_reference": {
+        "experiment_id": {
+          "reference": "obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34",
+          "selected": "obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__13b0d502"
+        },
+        "replicate_seed": {
+          "reference": 424,
+          "selected": 42
+        }
+      },
+      "controller_review": {
+        "date": "2026-10-11",
+        "files": [
+          "approach.py",
+          "kin.py"
+        ],
+        "scope": "Targeted review of planner/execution functions, active flags, and cited development diffs/messages. Not a complete controller/helper audit or exhaustive trace labeling. No archived code executed; no formal ACT*ONOMY annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/obstruction3d_generalized/obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34/2026-09-30_20-32-05/replicate_222",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/obstruction3d_generalized/obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34/2026-09-30_20-32-05/replicate_222",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34",
+      "replicate_seed": 222,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 222,
+        "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "13d89c46edb28408bbd796db90124fcf953af4605b8f59515b06c78884eeb188",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "f6aa665e26f911099af884b79dc74347eccd0047e1e21be700857abaefb93346",
+      "policy_sha256": "48506eca9b152a69be417911683efff203f3cc0331e038c7f620c24c6836dcbd",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "Obstruction3D",
+      "sample_id": "claude_opus55_obstruction3d_generalized_replicate_222",
+      "review_status": "targeted controller review and selected trace checks; full trace annotation pending",
+      "git_head": "3506b1ed994b01b7139dcbc15e39e6bd6b550bbc",
+      "run_id": "claude_opus55_high_r222_f6aa665e",
+      "thread_ids": [
+        "74011835-56b3-4dc3-9d10-a750e3ba2125"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "organized_date": "2026-10-11",
+      "addition_batch": "claude_five_seeds_2026-10-11",
+      "directory": "environments/Obstruction3D/runs/claude_opus55_high_r222_f6aa665e",
+      "settings_reference_sample_id": "claude_opus55_obstruction3d_generalized_replicate_424",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "approach.backend": true,
+        "approach.max_turns": true,
+        "primitives": true,
+        "mcp_tools": true
+      },
+      "task_description_sha256": "e5b2b6cd52c011a7f1ec184c573d362676a5e6fe66db454b880d4ceca7cfb1b4",
+      "task_description_identical_to_reference": true,
+      "pairing_note": "Within-Claude expansion: full saved configuration matches the existing Claude reference except replicate_seed and experiment_id. Evaluation seed is unchanged. Cross-model same-seed coverage is incomplete.",
+      "identity_review": "Distinct main transcript SHA-256 and recorded session IDs within the 35-run selection; fresh config load_dir is null; final policy matches saved HEAD. Not an archive-wide lineage audit.",
+      "config_differences_from_reference": {
+        "replicate_seed": {
+          "reference": 424,
+          "selected": 222
+        }
+      },
+      "controller_review": {
+        "date": "2026-10-11",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Targeted review of planner/execution functions, active flags, and cited development diffs/messages. Not a complete controller/helper audit or exhaustive trace labeling. No archived code executed; no formal ACT*ONOMY annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/obstruction3d_generalized/obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34/2026-09-30_20-27-34/replicate_444",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/obstruction3d_generalized/obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34/2026-09-30_20-27-34/replicate_444",
+      "condition": "Blackbox",
+      "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34",
+      "replicate_seed": 444,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+        "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+        "count_kwarg": "num_obstructions",
+        "count_object_prefix": "obstruction",
+        "design_counts": [
+          0,
+          1,
+          2
+        ],
+        "eval_counts": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.variable_object_count_env.VariableObjectCountEnv",
+          "constant_object_env_path": "kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv",
+          "count_kwarg": "num_obstructions",
+          "count_object_prefix": "obstruction",
+          "design_counts": [
+            0,
+            1,
+            2
+          ],
+          "eval_counts": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 444,
+        "experiment_id": "obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__e66d8b34",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "ea4af6b949b1896fde2cfbe23c2760fd3462b710b590c77c846fd62181ad4a56",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "4a56791ca7f3af7d2c57b00c8fb8ee7aa9642111a6e25f758946895a19a05395",
+      "policy_sha256": "c17092014560e236633bdf7a9193466976b2c6304347284d0bbfa30b35a9f5cb",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "Obstruction3D",
+      "sample_id": "claude_opus55_obstruction3d_generalized_replicate_444",
+      "review_status": "targeted controller review and selected trace checks; full trace annotation pending",
+      "git_head": "e7d8ee408698d4ca3453b5accdd8dc3d48342f76",
+      "run_id": "claude_opus55_high_r444_4a56791c",
+      "thread_ids": [
+        "2e062ba3-73b4-419d-90c6-ff8492a336d3"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "organized_date": "2026-10-11",
+      "addition_batch": "claude_five_seeds_2026-10-11",
+      "directory": "environments/Obstruction3D/runs/claude_opus55_high_r444_4a56791c",
+      "settings_reference_sample_id": "claude_opus55_obstruction3d_generalized_replicate_424",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "approach.backend": true,
+        "approach.max_turns": true,
+        "primitives": true,
+        "mcp_tools": true
+      },
+      "task_description_sha256": "e5b2b6cd52c011a7f1ec184c573d362676a5e6fe66db454b880d4ceca7cfb1b4",
+      "task_description_identical_to_reference": true,
+      "pairing_note": "Within-Claude expansion: full saved configuration matches the existing Claude reference except replicate_seed and experiment_id. Evaluation seed is unchanged. Cross-model same-seed coverage is incomplete.",
+      "identity_review": "Distinct main transcript SHA-256 and recorded session IDs within the 35-run selection; fresh config load_dir is null; final policy matches saved HEAD. Not an archive-wide lineage audit.",
+      "config_differences_from_reference": {
+        "replicate_seed": {
+          "reference": 424,
+          "selected": 444
+        }
+      },
+      "controller_review": {
+        "date": "2026-10-11",
+        "files": [
+          "approach.py",
+          "kin.py"
+        ],
+        "scope": "Targeted review of planner/execution functions, active flags, and cited development diffs/messages. Not a complete controller/helper audit or exhaustive trace labeling. No archived code executed; no formal ACT*ONOMY annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_09-22-35/replicate_42",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_09-22-35/replicate_42",
+      "condition": "Blackbox",
+      "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1",
+      "replicate_seed": 42,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+        "design_counts": [
+          1,
+          2,
+          3
+        ],
+        "eval_counts": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+          "design_counts": [
+            1,
+            2,
+            3
+          ],
+          "eval_counts": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 42,
+        "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "46062778464c8018f169fe0fafcb57a2b6e619e454108f6f58e7b4650c1b832a",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "181ed19d970892afb7afd1a4422a1bbc41356ca849a4b0396d4d3304a70bcd76",
+      "policy_sha256": "f5eaea5a6909337e675a1b4a6ddf52976edaf250981f386cedd5484d4af0e776",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "Rovers",
+      "sample_id": "claude_opus55_rovers_generalized_replicate_42",
+      "review_status": "targeted controller review and selected trace checks; full trace annotation pending",
+      "git_head": "06b7f93fca7bed49e59e69ae7a915faf41a7f9dc",
+      "run_id": "claude_opus55_high_r42_181ed19d",
+      "thread_ids": [
+        "2bdabd45-4dd3-4ae3-a755-e3071de60b54"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "organized_date": "2026-10-11",
+      "addition_batch": "claude_five_seeds_2026-10-11",
+      "directory": "environments/Rovers/runs/claude_opus55_high_r42_181ed19d",
+      "settings_reference_sample_id": "claude_opus55_rovers_generalized_replicate_424",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "approach.backend": true,
+        "approach.max_turns": true,
+        "primitives": true,
+        "mcp_tools": true
+      },
+      "task_description_sha256": "0c861719eb0c3ab9cdcf77370ab4a7d5ac4b65d4ad6d2424a5ecf450f8540c1b",
+      "task_description_identical_to_reference": true,
+      "pairing_note": "Within-Claude expansion: full saved configuration matches the existing Claude reference except replicate_seed and experiment_id. Evaluation seed is unchanged. Cross-model same-seed coverage is incomplete.",
+      "identity_review": "Distinct main transcript SHA-256 and recorded session IDs within the 35-run selection; fresh config load_dir is null; final policy matches saved HEAD. Not an archive-wide lineage audit.",
+      "config_differences_from_reference": {
+        "replicate_seed": {
+          "reference": 424,
+          "selected": 42
+        }
+      },
+      "controller_review": {
+        "date": "2026-10-11",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Targeted review of planner/execution functions, active flags, and cited development diffs/messages. Not a complete controller/helper audit or exhaustive trace labeling. No archived code executed; no formal ACT*ONOMY annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_11-00-45/replicate_222",
+      "condition": "Blackbox",
+      "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1",
+      "replicate_seed": 222,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+        "design_counts": [
+          1,
+          2,
+          3
+        ],
+        "eval_counts": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+          "design_counts": [
+            1,
+            2,
+            3
+          ],
+          "eval_counts": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 222,
+        "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "6d9ebc1f07190c19f2967b040b2a215ff3e8008aaec932d187ba944f9f1cfb0e",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "c6c9dc3118f263effb87427fa130e6a104a9afa06d41e2bff81fd004bc9f5f33",
+      "policy_sha256": "f5d2e1e0eb7aac3cd3f363fc39e305b22c6a33183680a51c3a2bb4cb189c594f",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "Rovers",
+      "sample_id": "claude_opus55_rovers_generalized_replicate_222",
+      "review_status": "targeted controller review and selected trace checks; full trace annotation pending",
+      "git_head": "72f2c981349ab6bae0defb03a8c640e44cde60eb",
+      "run_id": "claude_opus55_high_r222_c6c9dc31",
+      "thread_ids": [
+        "5dae3668-96a7-4c85-a22e-bd172202bd7f"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "organized_date": "2026-10-11",
+      "addition_batch": "claude_five_seeds_2026-10-11",
+      "directory": "environments/Rovers/runs/claude_opus55_high_r222_c6c9dc31",
+      "settings_reference_sample_id": "claude_opus55_rovers_generalized_replicate_424",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "approach.backend": true,
+        "approach.max_turns": true,
+        "primitives": true,
+        "mcp_tools": true
+      },
+      "task_description_sha256": "0c861719eb0c3ab9cdcf77370ab4a7d5ac4b65d4ad6d2424a5ecf450f8540c1b",
+      "task_description_identical_to_reference": true,
+      "pairing_note": "Within-Claude expansion: full saved configuration matches the existing Claude reference except replicate_seed and experiment_id. Evaluation seed is unchanged. Cross-model same-seed coverage is incomplete.",
+      "identity_review": "Distinct main transcript SHA-256 and recorded session IDs within the 35-run selection; fresh config load_dir is null; final policy matches saved HEAD. Not an archive-wide lineage audit.",
+      "config_differences_from_reference": {
+        "replicate_seed": {
+          "reference": 424,
+          "selected": 222
+        }
+      },
+      "controller_review": {
+        "date": "2026-10-11",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Targeted review of planner/execution functions, active flags, and cited development diffs/messages. Not a complete controller/helper audit or exhaustive trace labeling. No archived code executed; no formal ACT*ONOMY annotation."
+      }
+    },
+    {
+      "path": "/Users/zahra.bashir/.cache/robocode-results-viewer/1sNuRoRxMxh7_VDE93hWn_ZNHBd74Uzt2/runs/Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_10-41-02/replicate_444",
+      "relative_path": "Blackbox/Claude Code Opus 5.5 High/rovers_generalized/rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1/2026-10-01_10-41-02/replicate_444",
+      "condition": "Blackbox",
+      "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1",
+      "replicate_seed": 444,
+      "model": "claude-opus-5-5",
+      "reasoning_effort": null,
+      "max_budget_usd": 20.0,
+      "load_dir": null,
+      "blackbox": true,
+      "blackbox_strict": true,
+      "primitive_level": "none",
+      "environment": {
+        "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+        "design_counts": [
+          1,
+          2,
+          3
+        ],
+        "eval_counts": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "config": {
+        "primitive_level": "none",
+        "primitives": [],
+        "approach": {
+          "backend": {
+            "backend": "claude",
+            "model": "claude-opus-5-5",
+            "effort": "high"
+          },
+          "_target_": "robocode.approaches.agentic_approach.AgenticApproach",
+          "max_budget_usd": 20.0,
+          "max_turns": 0,
+          "output_dir": "${hydra:runtime.output_dir}",
+          "load_dir": null,
+          "container_backend": "apptainer",
+          "geometry_prompt": false,
+          "modular_code_prompt": false,
+          "token_budget_prompt": false,
+          "max_output_tokens": 32768,
+          "autocompact_pct": 80,
+          "blackbox": true,
+          "blackbox_strict": true,
+          "telemetry": false
+        },
+        "environment": {
+          "_target_": "robocode.environments.rovers_variable_count_env.RoversVariableCountEnv",
+          "design_counts": [
+            1,
+            2,
+            3
+          ],
+          "eval_counts": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "replicate_seed": 444,
+        "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__aab9e8c1",
+        "eval_seed": 792075,
+        "max_steps": 1000,
+        "num_eval_tasks": 100,
+        "eval_timeout": 60,
+        "render_videos": false,
+        "record_approach_history": false,
+        "mcp_tools": [
+          "render_state",
+          "render_policy"
+        ]
+      },
+      "config_sha256": "03c9973af592de6d1f4108de5a1363b2f25ac36439fa71306b25fed9b8800a55",
+      "provenance": null,
+      "artifacts": {
+        "stream.jsonl": true,
+        "env_description.md": true,
+        "sandbox/approach.py": true,
+        "sandbox/.git": true,
+        "sandbox/.agent_sessions": true
+      },
+      "stream_sha256": "2af61ade8a7015c7521f076b6b181ceb54732f2547831d5b7e33251b2251cf10",
+      "policy_sha256": "a0bdf2aa7d4202793e6487de09ba5a4e9a18cd7b935a6637f1df3b52156813ea",
+      "backend": "claude",
+      "configured_effort": "high",
+      "environment_name": "Rovers",
+      "sample_id": "claude_opus55_rovers_generalized_replicate_444",
+      "review_status": "targeted controller review and selected trace checks; full trace annotation pending",
+      "git_head": "1767f02f9c2c915a6dfdf14f9ab06b30d47db016",
+      "run_id": "claude_opus55_high_r444_2af61ade",
+      "thread_ids": [
+        "4f61efab-6317-47d3-a459-35e1677f1fdb"
+      ],
+      "recorded_message_models": [
+        "claude-opus-5-5"
+      ],
+      "organized_date": "2026-10-11",
+      "addition_batch": "claude_five_seeds_2026-10-11",
+      "directory": "environments/Rovers/runs/claude_opus55_high_r444_2af61ade",
+      "settings_reference_sample_id": "claude_opus55_rovers_generalized_replicate_424",
+      "matching_settings": {
+        "primitive_level": true,
+        "max_steps": true,
+        "num_eval_tasks": true,
+        "eval_timeout": true,
+        "eval_seed": true,
+        "environment": true,
+        "approach.blackbox": true,
+        "approach.blackbox_strict": true,
+        "approach.max_budget_usd": true,
+        "approach.load_dir": true,
+        "approach.geometry_prompt": true,
+        "approach.modular_code_prompt": true,
+        "approach.token_budget_prompt": true,
+        "approach.backend": true,
+        "approach.max_turns": true,
+        "primitives": true,
+        "mcp_tools": true
+      },
+      "task_description_sha256": "0c861719eb0c3ab9cdcf77370ab4a7d5ac4b65d4ad6d2424a5ecf450f8540c1b",
+      "task_description_identical_to_reference": true,
+      "pairing_note": "Within-Claude expansion: full saved configuration matches the existing Claude reference except replicate_seed and experiment_id. Evaluation seed is unchanged. Cross-model same-seed coverage is incomplete.",
+      "identity_review": "Distinct main transcript SHA-256 and recorded session IDs within the 35-run selection; fresh config load_dir is null; final policy matches saved HEAD. Not an archive-wide lineage audit.",
+      "config_differences_from_reference": {
+        "replicate_seed": {
+          "reference": 424,
+          "selected": 444
+        }
+      },
+      "controller_review": {
+        "date": "2026-10-11",
+        "files": [
+          "approach.py"
+        ],
+        "scope": "Targeted review of planner/execution functions, active flags, and cited development diffs/messages. Not a complete controller/helper audit or exhaustive trace labeling. No archived code executed; no formal ACT*ONOMY annotation."
+      }
+    }
+  ],
+  "selection_note": "35 original strict Blackbox development runs: 20 Claude Opus 5.5 High (seeds 24, 42, 222, 424, 444 in each environment), 7 GPT-5.6-sol medium, and 8 GPT-6 Astra high. Same unified format; same-seed cross-model coverage remains incomplete. Saved configs/task text checked; selection identity reviewed without claiming archive-wide deduplication."
+}

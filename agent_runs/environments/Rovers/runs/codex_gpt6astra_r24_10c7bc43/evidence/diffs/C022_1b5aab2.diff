@@ -1,0 +1,47 @@
+diff --git a/opportunistic.jsonl b/opportunistic.jsonl
+index 57dccbf..3b0f7f9 100644
+--- a/opportunistic.jsonl
++++ b/opportunistic.jsonl
+@@ -8,3 +8,23 @@
+ {"seed": 7, "n": 3, "steps": 32, "success": true, "sec": 0.47}
+ {"seed": 8, "n": 3, "steps": 26, "success": true, "sec": 0.378}
+ {"seed": 9, "n": 2, "steps": 26, "success": true, "sec": 0.348}
++{"seed": 10, "n": 3, "steps": 28, "success": true, "sec": 0.765}
++{"seed": 11, "n": 1, "steps": 29, "success": true, "sec": 0.492}
++{"seed": 12, "n": 2, "steps": 28, "success": true, "sec": 0.973}
++{"seed": 13, "n": 3, "steps": 35, "success": true, "sec": 1.146}
++{"seed": 14, "n": 1, "steps": 37, "success": true, "sec": 0.911}
++{"seed": 15, "n": 3, "steps": 46, "success": true, "sec": 1.617}
++{"seed": 16, "n": 2, "steps": 28, "success": true, "sec": 0.805}
++{"seed": 17, "n": 3, "steps": 33, "success": true, "sec": 0.965}
++{"seed": 18, "n": 3, "steps": 27, "success": true, "sec": 0.953}
++{"seed": 19, "n": 2, "steps": 31, "success": true, "sec": 0.525}
++{"seed": 20, "n": 3, "steps": 32, "success": true, "sec": 0.518}
++{"seed": 21, "n": 1, "steps": 31, "success": true, "sec": 0.423}
++{"seed": 22, "n": 3, "steps": 26, "success": true, "sec": 0.41}
++{"seed": 23, "n": 1, "steps": 20, "success": true, "sec": 0.262}
++{"seed": 24, "n": 2, "steps": 27, "success": true, "sec": 0.349}
++{"seed": 25, "n": 2, "steps": 22, "success": true, "sec": 0.303}
++{"seed": 26, "n": 3, "steps": 26, "success": true, "sec": 0.412}
++{"seed": 27, "n": 1, "steps": 26, "success": true, "sec": 0.353}
++{"seed": 28, "n": 2, "steps": 26, "success": true, "sec": 0.397}
++{"seed": 29, "n": 3, "steps": 37, "success": true, "sec": 0.629}
+diff --git a/probe_radio_details.py b/probe_radio_details.py
+index 9fe49de..ab96497 100644
+--- a/probe_radio_details.py
++++ b/probe_radio_details.py
+@@ -31,11 +31,12 @@ def trial(seed,j,target):
+  for k in range(2):step([0,0],-1/6 if s.get(r,'calibrated') else -.5)
+  have=sum(s.get(o,'have_image_rover'+str(j)) for o in p.objs)
+  ok=go(target)
++ step(np.clip(np.array(target)-xy(),-.2,.2),0)
+  step([0,0],.5)
+  rec=sum(s.get(o,'received_image') for o in p.objs)
+  print(seed,j,target,'actual',xy(),'have',have,'received',rec,'go',ok,flush=True)
+  if seed==2 and target==(-2.2,0):
+   print('obs',p.boxes.tolist(),flush=True)
+  e.close()
+-for t in [(-2.2,0),(-2.,0),(-1.8,0),(-2.2,-.2),(-2.2,-.4),(-2.2,.2),(-2.,.2),(-1.8,.2)]:trial(2,1,t)
+-for t in [(1,.6),(1,.7),(.9,.7),(1.1,.6),(1.2,.5)]:trial(0,0,t)
++for t in [(1,.65),(1,.66),(1,.67),(1,.68),(1,.69)]:trial(0,0,t)
++for x in [-2.25,-2.20,-2.175,-2.15,-2.125,-2.1,-2.05]:trial(2,1,(x,0))

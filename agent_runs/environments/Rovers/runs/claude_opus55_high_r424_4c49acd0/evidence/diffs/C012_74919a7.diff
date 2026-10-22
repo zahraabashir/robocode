@@ -1,0 +1,152 @@
+diff --git a/approach.py b/approach.py
+index 974200b..031b768 100644
+--- a/approach.py
++++ b/approach.py
+@@ -130,17 +130,49 @@ class GeneratedApproach:
+         self.obj_pos = {n: (o["x"], o["y"]) for n, o in d["objective"]}
+         self.samples = {n: (o["x"], o["y"], o["is_soil"] > 0.5) for n, o in d["sample"]}
+         self._build_free()
+-        self.sense = {r: sense_offset(self.home[r][2]) for r in self.rovers}
+         self.side = {r: (1 if self.home[r][0] > 0 else -1) for r in self.rovers}
+         self.free_r = {r: self.free & ((GX * self.side[r]) > 0) for r in self.rovers}
+-        self._build_regions()
+-        self._plan()
++        import time as _time
++        t0 = _time.time()
++        r0, r1 = self.rovers
++        cands = []
++        for a in (self.home[r0][2], -math.pi / 2):
++            for b in (self.home[r1][2], -math.pi / 2):
++                cands.append({r0: a, r1: b})
++        best = None
++        last = None
++        for ci, pth in enumerate(cands):
++            if ci > 0 and _time.time() - t0 > 20.0:
++                break
++            self._set_heading_plan(pth)
++            last = ci
++            key = (self.plan_cost, ci)
++            if best is None or key < best[0]:
++                best = (key, ci)
++        if best[1] != last:
++            self._set_heading_plan(cands[best[1]])
+         self.stage_fields = {}
+         self.t = 0
+         self._pred_cache = None
+         self._last = None
+         self.bad_cells = {r: set() for r in self.rovers}
+ 
++    def _set_heading_plan(self, pth):
++        self.plan_th = dict(pth)
++        self.sense = {r: sense_offset(self.plan_th[r]) for r in self.rovers}
++        self._pred_cache = None
++        self._build_regions()
++        self._plan()
++
++    def _target_theta(self, d, r):
++        order = self.fields[r]["order"]
++        for t in order:
++            if t[0] == "obj":
++                ob = [o for n, o in d["objective"] if n == t[1]][0]
++                if ob["have_image_" + r] < 0.5:
++                    return self.plan_th[r]
++        return self.home[r][2]
++
+     def _build_free(self):
+         free = np.ones((N, N), dtype=bool)
+         free &= np.abs(GX) >= WALL_X
+@@ -441,6 +473,8 @@ class GeneratedApproach:
+             nx, ny = ro["x"] + dx, ro["y"] + dy
+             if self._free_pt(r, nx, ny):
+                 ro["x"], ro["y"] = nx, ny
++                dth = float(np.clip(act[4 * k + 2], -0.4, 0.4))
++                ro["theta"] = (ro["theta"] + dth + math.pi) % (2 * math.pi) - math.pi
+         for k, r in enumerate(self.rovers):
+             ro = d2["rover"][r]
+             other = d2["rover"][[q for q in self.rovers if q != r][0]]
+@@ -662,13 +696,36 @@ class GeneratedApproach:
+             other = [q for q in self.rovers if q != r][0]
+             ro = d["rover"][r]
+             orv = d["rover"][other]
+-            dx, dy, op = self._rover_action(d, r, ro, (orv["x"], orv["y"]))
++            th = ro["theta"]
++            err = (self._target_theta(d, r) - th + math.pi) % (2 * math.pi) - math.pi
++            dth = float(np.clip(err, -0.4, 0.4))
++            if abs(dth) < 1e-3:
++                dth = 0.0
++            ro2 = dict(ro)
++            ro2["theta"] = th + dth
++            dx, dy, op = self._rover_action(d, r, ro2, (orv["x"], orv["y"]))
++            op = self._guard_op(d, r, ro2["x"] + dx, ro2["y"] + dy, ro2["theta"], op)
+             act[4 * k + 0] = dx
+             act[4 * k + 1] = dy
+-            act[4 * k + 2] = 0.0
++            act[4 * k + 2] = dth
+             act[4 * k + 3] = SEL[op]
+         return act
+ 
++    def _guard_op(self, d, r, px, py, th, op):
++        if op == "image":
++            ro = d["rover"][r]
++            if ro["calibrated"] < 0.5:
++                return "noop"
++            held = set(n for n, o in d["objective"] if o["have_image_" + r] > 0.5)
++            vis = [o for dd, o in self._visible_objs(r, px, py, th) if o not in held]
++            inr = [o for dd, o in self._inrange_objs(r, px, py, th) if o not in held]
++            if not vis or not inr or vis[0] != inr[0]:
++                return "noop"
++        elif op == "calibrate":
++            if not self._visible_objs(r, px, py, th):
++                return "noop"
++        return op
++
+     def _layer_solve(self, free, H0, home=None):
+         M = H0.copy()
+         G = None
+diff --git a/real_batch4.txt b/real_batch4.txt
+new file mode 100644
+index 0000000..2967e80
+--- /dev/null
++++ b/real_batch4.txt
+@@ -0,0 +1,41 @@
++0 3 25 True 25 1.39
++1 2 20 True 20 1.11
++2 3 21 True 21 1.17
++3 3 22 True 22 1.13
++4 3 21 True 21 1.02
++5 3 24 True 24 1.15
++6 2 20 True 20 1.1
++7 3 21 True 21 1.36
++8 3 21 True 21 1.01
++9 2 22 True 22 0.98
++10 3 22 True 22 1.46
++11 1 19 True 19 0.81
++12 2 23 True 23 0.89
++13 3 25 True 25 1.32
++14 1 29 True 29 1.1
++15 3 21 True 21 1.19
++16 2 21 True 21 1.04
++17 3 21 True 21 1.37
++18 3 21 True 21 1.21
++19 2 24 True 24 1.56
++20 3 27 True 27 1.24
++21 1 20 True 20 0.89
++22 3 23 True 23 1.48
++23 1 18 True 18 1.09
++24 2 19 True 19 1.22
++25 2 20 True 20 0.96
++26 3 22 True 22 1.28
++27 1 21 True 21 0.63
++28 2 22 True 22 1.36
++29 3 22 True 22 1.29
++30 1 20 True 20 1.14
++31 2 25 True 25 1.17
++32 3 20 True 20 1.09
++33 3 23 True 23 1.15
++34 1 20 True 20 1.14
++35 1 18 True 18 0.75
++36 2 21 True 21 1.07
++37 1 18 True 18 1.05
++38 1 20 True 20 1.08
++39 3 23 True 23 1.28
++TOTAL 865 fails 0 maxplan 1.56

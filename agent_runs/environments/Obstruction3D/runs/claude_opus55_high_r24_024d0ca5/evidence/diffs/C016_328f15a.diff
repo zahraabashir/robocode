@@ -1,0 +1,188 @@
+diff --git a/approach.py b/approach.py
+index a80cd54..67e5f1a 100644
+--- a/approach.py
++++ b/approach.py
+@@ -12,6 +12,8 @@ import numpy as np
+ from kin import tool_fk, tool_ik, down_R
+ 
+ JN = [f'joint_{i}' for i in range(1, 8)]
++MERGE_GRIP = True
++CUT_CORNERS = True
+ STEP = 0.2             # max joint delta per step
+ FINGER_DOWN = 0.036    # fingertips below tool frame
+ F_OFF, F_HL, F_HW = 0.046, 0.024, 0.013   # finger centre offset, half length, half width
+@@ -274,14 +276,16 @@ class GeneratedApproach:
+         zt = self._transit_z(state)
+         tool = self._tool(state)[:3, 3]
+         wps = []
++        rs = 0
+         if tool[2] < zt - 0.01:
+             wps.append(np.array([tool[0], tool[1], zt]))
++            rs = 1
+         wps.append(np.array([p[0], p[1], max(zt, tool[2]) if tool[2] < zt + 0.05 else zt]))
+         wps.append(np.array([p[0], p[1], gz]))
+-        self._set_path(state, wps, self.grasp_yaw, final_grip=-1.0, flip=True)
++        self._set_path(state, wps, self.grasp_yaw, final_grip=-1.0, flip=True, rot_start=rs)
+         self.phase = 'to_grasp'
+ 
+-    def _set_path(self, state, wps, yaw, final_grip=0.0, res=0.01, flip=False):
++    def _set_path(self, state, wps, yaw, final_grip=0.0, res=0.01, flip=False, rot_start=0):
+         """Cartesian waypoints -> dense joint path (IK warm-started).
+         Yaw is interpolated from the current tool yaw over all but the last segment."""
+         q = self._q(state)
+@@ -297,7 +301,10 @@ class GeneratedApproach:
+         for w in wps:
+             pts.append(np.asarray(w, dtype=float))
+         seg = [np.linalg.norm(pts[i + 1] - pts[i]) for i in range(len(wps))]
+-        rot_len = sum(seg[:-1]) if len(seg) > 1 and sum(seg[:-1]) > 0.02 else sum(seg)
++        if len(seg) - 1 <= rot_start:
++            rot_start = 0
++        rot0 = sum(seg[:rot_start])
++        rot_len = sum(seg[rot_start:-1]) if len(seg) > 1 and sum(seg[rot_start:-1]) > 0.02 else sum(seg[rot_start:])
+         rot_len = max(rot_len, 1e-6)
+         path = []
+         self.corners = set()
+@@ -309,7 +316,7 @@ class GeneratedApproach:
+             n = max(1, int(np.ceil(d / res)), int(np.ceil(abs(dy) * min(d, rot_len) / rot_len / 0.1)))
+             for k in range(1, n + 1):
+                 pt = cur + (w - cur) * k / n
+-                f = min(1.0, (travelled + d * k / n) / rot_len)
++                f = min(1.0, max(0.0, travelled + d * k / n - rot0) / rot_len)
+                 qn, ok = tool_ik(qc, pt, down_R(y0 + f * dy), base, iters=40)
+                 qn = qc + _wrap(qn - qc)
+                 path.append(qn)
+@@ -334,11 +341,16 @@ class GeneratedApproach:
+         if not self.qpath:
+             return None
+         k = -1
++        crossed = False
+         for i, qp in enumerate(self.qpath):
+             if np.max(np.abs(_wrap(qp - q))) <= self.look:
++                if crossed and not self._safe_move(state, q, qp):
++                    break
+                 k = i
+                 if (i + self.popped) in self.corners:
+-                    break
++                    if not CUT_CORNERS or self.blocked or self.look < STEP:
++                        break
++                    crossed = True
+             else:
+                 break
+         a = np.zeros(11, dtype=np.float32)
+@@ -349,11 +361,37 @@ class GeneratedApproach:
+             d = _wrap(self.qpath[0] - q)
+             a[3:10] = d
+             a[10] = self.travel_grip
++            if MERGE_GRIP and len(self.qpath) == 1 and self.final_grip != 0.0:
++                a[10] = self.final_grip
+         else:
+             d = _wrap(self.qpath[0] - q)
+             a[3:10] = d * (self.look / np.max(np.abs(d)))
+         return a
+ 
++    def _safe_move(self, state, q0, q1):
++        """Check the joint-linear move q0->q1 keeps tool/fingers/held object
++        above all nearby objects (used when cutting path corners)."""
++        base = self._base(state)
++        held = self._grasped_name(state)
++        depth, rad = FINGER_DOWN, 0.075
++        if held is not None:
++            p, _, h = self._pose(state, held)
++            tz = self._tool(state)[2, 3]
++            depth = max(depth, tz - (p[2] - h[2]))
++            rad = max(rad, np.hypot(h[0], h[1]) + 0.01)
++        boxes = [self._box(state, n) for n in self.names if n != held]
++        dq = _wrap(q1 - q0)
++        for f in (0.25, 0.5, 0.75, 1.0):
++            pt = tool_fk(q0 + f * dq, base)[:3, 3]
++            low = pt[2] - depth
++            if low < self.table_z + 0.01:
++                return False
++            for c, hh, bot, top in boxes:
++                dxy = np.maximum(np.abs(pt[:2] - c) - hh, 0.0)
++                if np.hypot(dxy[0], dxy[1]) < rad and low < top + 0.012:
++                    return False
++        return True
++
+     def _noop(self, grip=0.0):
+         a = np.zeros(11, dtype=np.float32); a[10] = grip
+         return a
+@@ -473,10 +511,8 @@ class GeneratedApproach:
+         if kind == 'goal':
+             self.phase = 'done'
+             return self._noop()
+-        tool = self._tool(state)[:3, 3]
+-        self._set_path(state, [tool + np.array([0, 0, 0.03])], self.wp_yaw, flip=True)
+-        self.phase = 'retreat'
+-        a = self._track(state)
++        self._next_task(state)
++        a = self._track(state) if self.phase == 'to_grasp' else None
+         return a if a is not None else self._noop()
+ 
+     def _next_task(self, state):
+diff --git a/dbg_rw.py b/dbg_rw.py
+index c9a06d0..e8a2901 100644
+--- a/dbg_rw.py
++++ b/dbg_rw.py
+@@ -10,6 +10,6 @@ for t in range(int(sys.argv[2])):
+     a=ap.get_action(obs)
+     obs,r,term,tr,_=env.step(a)
+     key=(ap.phase, ap._grasped_name(obs), ap.tasks[0] if ap.tasks else None)
+-    if key!=last or ap.blocked:
++    if key!=last or ap.blocked or len(sys.argv)>4:
+         print(t,ap.phase,len(ap.qpath),np.round(ap._tool(obs)[:3,3],3),'blk',ap.blocked,'grip',a[10],key[1],key[2]); last=key
+     if term: print('DONE',t+1);break
+diff --git a/res_d3.txt b/res_d3.txt
+new file mode 100644
+index 0000000..8458174
+--- /dev/null
++++ b/res_d3.txt
+@@ -0,0 +1,48 @@
++seed 9: success=True steps=25 time=18.3s nobs=1 phase=open
++seed 1: success=True steps=45 time=39.6s nobs=1 phase=open
++seed 0: success=True steps=43 time=42.4s nobs=2 phase=open
++seed 3: success=True steps=49 time=39.6s nobs=2 phase=open
++seed 4: success=True steps=60 time=63.9s nobs=2 phase=open
++seed 6: success=True steps=60 time=58.3s nobs=1 phase=open
++seed 11: success=True steps=23 time=22.4s nobs=0 phase=to_place
++seed 10: success=True steps=32 time=33.3s nobs=2 phase=to_place
++seed 5: success=True steps=62 time=62.9s nobs=2 phase=open
++seed 8: success=True steps=68 time=81.4s nobs=2 phase=open
++seed 7: success=True steps=61 time=67.2s nobs=2 phase=open
++seed 14: success=True steps=12 time=18.2s nobs=0 phase=to_place
++seed 2: success=True steps=75 time=86.6s nobs=2 phase=open
++seed 12: success=True steps=44 time=48.1s nobs=1 phase=to_place
++seed 16: success=True steps=32 time=33.6s nobs=1 phase=to_place
++seed 15: success=True steps=34 time=45.8s nobs=2 phase=to_place
++seed 21: success=True steps=28 time=26.3s nobs=0 phase=to_place
++seed 18: success=True steps=42 time=44.9s nobs=2 phase=to_place
++seed 22: success=True steps=35 time=36.5s nobs=2 phase=to_place
++seed 17: success=True steps=54 time=60.0s nobs=2 phase=to_place
++seed 24: success=True steps=23 time=28.3s nobs=1 phase=to_place
++seed 13: success=True steps=76 time=84.2s nobs=2 phase=to_place
++seed 19: success=True steps=60 time=59.9s nobs=1 phase=to_place
++seed 23: success=True steps=37 time=46.1s nobs=0 phase=to_place
++seed 20: success=True steps=60 time=70.5s nobs=2 phase=to_place
++seed 26: success=True steps=32 time=43.0s nobs=2 phase=to_place
++seed 29: success=True steps=28 time=30.3s nobs=2 phase=to_place
++seed 25: success=True steps=49 time=59.5s nobs=1 phase=to_place
++seed 34: success=True steps=16 time=16.9s nobs=0 phase=to_place
++seed 30: success=True steps=29 time=32.8s nobs=0 phase=to_place
++seed 27: success=True steps=46 time=51.7s nobs=0 phase=to_place
++seed 35: success=True steps=19 time=24.7s nobs=0 phase=to_place
++seed 31: success=True steps=39 time=49.1s nobs=1 phase=to_place
++seed 32: success=True steps=42 time=56.4s nobs=2 phase=to_place
++seed 33: success=True steps=45 time=56.3s nobs=2 phase=to_place
++seed 38: success=True steps=19 time=25.1s nobs=0 phase=to_place
++seed 37: success=True steps=20 time=31.6s nobs=0 phase=to_place
++seed 42: success=True steps=18 time=21.3s nobs=0 phase=to_place
++seed 36: success=True steps=40 time=53.2s nobs=1 phase=to_place
++seed 28: success=True steps=61 time=93.3s nobs=1 phase=to_place
++seed 41: success=True steps=27 time=37.9s nobs=1 phase=to_place
++seed 47: success=True steps=11 time=14.1s nobs=0 phase=to_place
++seed 40: success=True steps=37 time=54.6s nobs=1 phase=to_place
++seed 48: success=True steps=14 time=16.3s nobs=0 phase=to_place
++seed 49: success=True steps=13 time=13.1s nobs=0 phase=to_place
++seed 43: success=True steps=28 time=43.3s nobs=1 phase=to_place
++seed 39: success=True steps=48 time=71.8s nobs=2 phase=to_place
++seed 46: success=True steps=32 time=42.2s nobs=1 phase=to_place

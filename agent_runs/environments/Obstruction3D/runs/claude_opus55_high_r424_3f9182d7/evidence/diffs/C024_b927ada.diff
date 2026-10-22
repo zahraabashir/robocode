@@ -1,0 +1,60 @@
+diff --git a/approach.py b/approach.py
+index 81dc975..8910876 100644
+--- a/approach.py
++++ b/approach.py
+@@ -155,13 +155,13 @@ class GeneratedApproach:
+         return [
+             ('move', np.array([p[0], p[1], max(SAFE_Z, gz + 0.05)]), yaw, False),
+             ('move', np.array([p[0], p[1], gz + 0.02]), yaw, False),
+-            ('move', np.array([p[0], p[1], gz]), yaw, True, FINE),
++            ('move', np.array([p[0], p[1], gz]), yaw, True),
+             ('close', obj.name, p.copy(), yaw, [0.045, 0.03, 0.05, 0.025]),
+-            ('move', np.array([p[0], p[1], gz + 0.03]), yaw, False, FINE),
++            ('move', np.array([p[0], p[1], gz + 0.03]), yaw, False),
+             ('move', np.array([p[0], p[1], SAFE_Z]), yaw, False),
+             ('place_move', place_center + np.array([0, 0, SAFE_Z - place_center[2]]), yaw, False),
+             ('place_move', place_center + np.array([0, 0, 0.02]), yaw, False),
+-            ('place_move', place_center, yaw, True, FINE),
++            ('place_move', place_center, yaw, True),
+             ('open', place_center, yaw),
+             ('move_rel_up', SAFE_Z, yaw),
+         ]
+@@ -177,7 +177,7 @@ class GeneratedApproach:
+             ('move_rel_up', SAFE_Z, yaw),
+             ('place_move', place_center + np.array([0, 0, SAFE_Z - place_center[2]]), yaw, False),
+             ('place_move', place_center + np.array([0, 0, 0.02]), yaw, False),
+-            ('place_move', place_center, yaw, True, FINE),
++            ('place_move', place_center, yaw, True),
+             ('open', place_center, yaw),
+             ('move_rel_up', SAFE_Z, yaw),
+         ]
+diff --git a/res5.txt b/res5.txt
+new file mode 100644
+index 0000000..f3ec86a
+--- /dev/null
++++ b/res5.txt
+@@ -0,0 +1,5 @@
++(59, 2, True, 147, 24.3)
++success 60 / 60 mean steps 84.33333333333333
++count 4 success 16 / 16 mean steps 211.375 max compute 4.0
++count 5 success 16 / 16 mean steps 268.8125 max compute 6.0
++count 6 success 16 / 16 mean steps 321.0 max compute 8.2
+diff --git a/timeit.py b/timeit.py
+new file mode 100644
+index 0000000..723e46b
+--- /dev/null
++++ b/timeit.py
+@@ -0,0 +1,13 @@
++import sys, time
++from env_client import make_env
++from approach import GeneratedApproach
++env=make_env(); seed=int(sys.argv[1])
++opts={"object_count":int(sys.argv[2])} if len(sys.argv)>2 else None
++obs,info=env.reset(seed=seed, options=opts)
++ap=GeneratedApproach(env.action_space, env.observation_space, None)
++t0=time.time(); ap.reset(obs,info); tc=time.time()-t0; te=0
++for t in range(1000):
++    t0=time.time(); a=ap.get_action(obs); tc+=time.time()-t0
++    t0=time.time(); obs,r,term,trunc,info=env.step(a); te+=time.time()-t0
++    if term or trunc: break
++print('steps',t+1,'term',term,'policy s',round(tc,2),'env s',round(te,2))

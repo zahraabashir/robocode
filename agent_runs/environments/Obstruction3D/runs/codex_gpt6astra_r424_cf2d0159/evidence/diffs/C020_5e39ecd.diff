@@ -1,0 +1,44 @@
+diff --git a/probe_sideverify.log b/probe_sideverify.log
+new file mode 100644
+index 0000000..4e89bb1
+--- /dev/null
++++ b/probe_sideverify.log
+@@ -0,0 +1,8 @@
++robot {'pos_base_x': -0.4509332478046417, 'pos_base_y': -0.3362736999988556, 'pos_base_rot': 0.0, 'joint_1': 0.0, 'joint_2': 0.44754084944725037, 'joint_3': -3.1415927410125732, 'joint_4': -2.120941162109375, 'joint_5': 0.0, 'joint_6': 0.009999980218708515, 'joint_7': 0.6907963752746582, 'finger_state': 0.03999999910593033, 'grasp_active': 1.0, 'grasp_tf_x': -0.01752994954586029, 'grasp_tf_y': -0.014039874076843262, 'grasp_tf_z': 0.050890080630779266, 'grasp_tf_qx': 0.901231050491333, 'grasp_tf_qy': 0.32428330183029175, 'grasp_tf_qz': 0.2704664468765259, 'grasp_tf_qw': -0.09731894731521606}
++target_block {'pose_x': 0.18906673789024353, 'pose_y': -0.33527371287345886, 'pose_z': 0.10000000149011612, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 1.0, 'object_type': -1.0, 'half_extent_x': 0.022278690710663795, 'half_extent_y': 0.02316378802061081, 'half_extent_z': 0.02500000037252903}
++target_region {'pose_x': 0.15949532389640808, 'pose_y': 0.0742836520075798, 'pose_z': 0.07999999821186066, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.027848364785313606, 'half_extent_y': 0.02895473502576351, 'half_extent_z': 0.004999999888241291}
++LIFT 0 [('target_block', [0.18906675279140472, -0.33527377247810364, 0.10000002384185791], 1.0), ('target_region', [0.15949532389640808, 0.0742836520075798, 0.07999999821186066], 0.0)]
++LIFT 1 [('target_block', [0.18906675279140472, -0.33527377247810364, 0.10000002384185791], 1.0), ('target_region', [0.15949532389640808, 0.0742836520075798, 0.07999999821186066], 0.0)]
++LIFT 2 [('target_block', [0.18906675279140472, -0.33527377247810364, 0.10000002384185791], 1.0), ('target_region', [0.15949532389640808, 0.0742836520075798, 0.07999999821186066], 0.0)]
++LIFT 3 [('target_block', [0.18906675279140472, -0.33527377247810364, 0.10000002384185791], 1.0), ('target_region', [0.15949532389640808, 0.0742836520075798, 0.07999999821186066], 0.0)]
++LIFT 4 [('target_block', [0.18906675279140472, -0.33527377247810364, 0.10000002384185791], 1.0), ('target_region', [0.15949532389640808, 0.0742836520075798, 0.07999999821186066], 0.0)]
+diff --git a/probe_tilt.py b/probe_tilt.py
+new file mode 100644
+index 0000000..e35ba4a
+--- /dev/null
++++ b/probe_tilt.py
+@@ -0,0 +1,24 @@
++from env_client import make_env
++from probe_fk import fk
++from scipy.spatial.transform import Rotation as R
++from scipy.optimize import least_squares
++import numpy as np
++q0=np.array([0,-.35,-np.pi,-2.5,0,-.87,np.pi/2]); qdown=np.array([0,.5,-np.pi,-1.8,0,-np.pi+.5+1.8,np.pi/2]);_,rd=fk(qdown)
++def solve(p,rt,q):
++ def fun(v):
++  pp,rr=fk(v);return np.r_[5*(pp-p),R.from_matrix(rr.T@rt).as_rotvec()]
++ return least_squares(fun,q,max_nfev=120).x
++e=make_env()
++for angle in [-30,30,-60,60,90,-90,120,-120,180]:
++ rt=R.from_euler('y',angle,degrees=True).as_matrix()@rd
++ s,_=e.reset(seed=0,options={'object_count':0});o=s.get_object_from_name('target_block');ro=s.get_object_from_name('robot');target=np.array([s.get(o,'pose_'+v) for v in 'xyz']);base=target[:2]-[.55,.001];q=q0.copy()
++ print('ANGLE',angle,flush=True)
++ for j,L in enumerate(np.arange(.30,.029,-.005)):
++  p=np.r_[target[:2]-base,target[2]]-L*rt[:,2];q=solve(p,rt,q)
++  for t in range(100 if j==0 else 3):
++   cur=np.array([s.get(ro,'joint_'+str(k)) for k in range(1,8)]);a=np.zeros(11);a[:2]=np.clip(base-[s.get(ro,'pos_base_x'),s.get(ro,'pos_base_y')],-.1,.1);dq=q-cur;a[3:10]=dq*min(1,.035/max(1e-9,np.max(abs(dq))));a[-1]=-1
++   s,r,term,tr,i=e.step(a)
++   if s.get(ro,'grasp_active'):
++    print('SUCCESS',angle,L,{f:s.get(ro,f) for f in s.type_features[ro.type]},flush=True);e.close();quit()
++ print('FAIL',angle,flush=True)
++e.close()

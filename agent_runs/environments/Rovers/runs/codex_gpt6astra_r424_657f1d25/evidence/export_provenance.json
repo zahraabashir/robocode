@@ -1,0 +1,74 @@
+{
+  "sheet_row": 116,
+  "experiment_id": "rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b143aaf",
+  "environment": "rovers_generalized",
+  "seed": 424,
+  "output_dir": "/data01/mmerler/robocode/outputs/astra/astra-high-20usd-cache-fixed-2026-09-19/rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b143aaf/2026-09-21_22-01-34/replicate_424",
+  "run_dir": "/data01/mmerler/robocode/outputs/astra/astra-high-20usd-cache-fixed-2026-09-19/rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b143aaf/2026-09-21_22-01-34",
+  "evidence": "/data01/mmerler/robocode/outputs/astra/queue/runs/116-b203f7e6c49f",
+  "argv": [
+    "/data01/mmerler/robocode/.venv/bin/python",
+    "experiments/run_experiment.py",
+    "-m",
+    "environment=rovers_generalized",
+    "approach=agentic",
+    "primitive_level=none",
+    "approach.blackbox=true",
+    "approach.blackbox_strict=true",
+    "approach/backend=codex_gpt6",
+    "eval_timeout=60",
+    "approach.backend.reasoning_effort=high",
+    "approach.container_backend=apptainer",
+    "approach.max_budget_usd=20.0",
+    "max_steps=1000",
+    "num_eval_tasks=100",
+    "experiment_id=rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b143aaf",
+    "replicate_seed=424",
+    "eval_seed=792075",
+    "hydra.sweep.dir=/data01/mmerler/robocode/outputs/astra/astra-high-20usd-cache-fixed-2026-09-19/rovers_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b143aaf/2026-09-21_22-01-34",
+    "hydra.sweep.subdir=replicate_${replicate_seed}"
+  ],
+  "session": "astra-q-b203f7e6c49f",
+  "token": "b203f7e6c49f",
+  "created": 1790020905.4188669,
+  "base_note": "Astra high; $20 cap; strict black box. Claim before launching.",
+  "status": "launched",
+  "git_sha": "a8e0579f1e191f23a95e1df70367b4e588523768",
+  "quality_audit": {
+    "checked_at": 1790023604.6339521,
+    "complete": true,
+    "issues": [],
+    "review": [],
+    "responses": 196,
+    "tokens": {
+      "input_tokens": 10997495,
+      "cached_input_tokens": 10776704,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 73889,
+      "reasoning_output_tokens": 35972,
+      "total_tokens": 11071384
+    },
+    "cache_fraction": 0.9799235189468147,
+    "estimated_cost_usd": 16.679064,
+    "network_signals": [
+      {
+        "call_id": "call_hhUUkADoo7zpNL5g1MFFK0NI",
+        "tool": "exec",
+        "matches": [
+          "text(await tools.exec_command({cmd:\"rg -n 'socket|sendall|recv|makefile|connect' env_client.py | tail -25\",\"max_output_tokens\":1400}));\n"
+        ],
+        "output": "[{'type': 'input_text', 'text': 'Script completed\\nWall time 0.2 seconds\\nOutput:\\n'}, {'type': 'input_text', 'text': '{\"chunk_id\":\"c5e0df\",\"wall_time_seconds\":0.000008206,\"exit_code\":0,\"original_token_count\":97,\"output\":\"35:import socket\\\\n469:        self._sock = socket.create_connection((meta[\\\\\"host\\\\\"], meta[\\\\\"port\\\\\"]))\\\\n470:        self._file = self._sock.makefile(\\\\\"rwb\\\\\")\\\\n636:        lacks the env source), against this connection\\'s env. Mirrors the\\\\n682:        \\\\\"\\\\\"\\\\\"Close the connection (and the server-side environment).\\\\\"\\\\\"\\\\\"\\\\n690:            # makefile() wraps a dup of the socket; close it too so the buffered\\\\n\"}'}]"
+      }
+    ],
+    "packages": [
+      "numpy",
+      "scipy"
+    ],
+    "timeouts": 0,
+    "accepted": true
+  },
+  "last_quality_check": 1790023604.6575437,
+  "phase": "evaluating",
+  "last_sync": 1790023533.0885952,
+  "last_upload_try": 1790023604.6575475
+}

@@ -1,0 +1,29 @@
+diff --git a/approach.py b/approach.py
+index ddc2400..33bb7a6 100644
+--- a/approach.py
++++ b/approach.py
+@@ -191,11 +191,9 @@ class GeneratedApproach:
+                             iters=100 if i < n else 300)
+                 path.append(qc.copy())
+             self.qtarget = path
++            self.pidx = 0
+             self.last_q = None
+         path = self.qtarget
+-        # drop waypoints already reached
+-        while len(path) > 1 and np.max(np.abs(path[0] - q)) < 1e-4:
+-            path.pop(0)
+         if np.max(np.abs(path[-1] - q)) < 1e-4:
+             self.queue.pop(0)
+             self.qtarget = None
+@@ -209,9 +207,10 @@ class GeneratedApproach:
+                 self.queue = [('move_rel_up', SAFE_Z + 0.03, None, True)]  # retreat, then replan
+             return None
+         # furthest waypoint reachable in one step
+-        k = 0
++        k = self.pidx
+         while k + 1 < len(path) and np.max(np.abs(path[k + 1] - q)) <= MAXD:
+             k += 1
+         self.last_q = q.copy()
++        self.pidx = k
+         a[3:10] = np.clip(path[k] - q, -MAXD, MAXD)
+         return a

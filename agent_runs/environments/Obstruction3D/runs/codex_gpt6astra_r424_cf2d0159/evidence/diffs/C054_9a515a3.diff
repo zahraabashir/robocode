@@ -1,0 +1,19 @@
+diff --git a/VALIDATION.md b/VALIDATION.md
+new file mode 100644
+index 0000000..a601d5c
+--- /dev/null
++++ b/VALIDATION.md
+@@ -0,0 +1,5 @@
++The policy uses empirically calibrated forward kinematics, cached small inverse-kinematics solves, and feedback from object poses. It clears nearby obstructions onto free supported table locations, then places the target with 1 mm contact clearance. Object enumeration and planning do not assume an obstruction count.
++
++Broad sweeps covered 75 seeded episodes using default counts, five obstructions, and ten obstructions. Three failures were found and corrected: clustered pickup, a nearly touching neighbor blocking lift, and an enclosed obstruction requiring alternate grasp points or ordering. Targeted reruns solved all three. The hardest ten-obstruction case completed in 492 actions and 10.22 seconds on the live server.
++
++A final regression reused one GeneratedApproach across two resets with different object counts; both succeeded (131 and 85 actions). Python compilation also passed. Earlier sweep logs retain the pre-fix failures; targeted recovery logs record their resolution.
+diff --git a/reuse_final.log b/reuse_final.log
+new file mode 100644
+index 0000000..86a1600
+--- /dev/null
++++ b/reuse_final.log
+@@ -0,0 +1,2 @@
++2 2 True 131 2.461
++22 1 True 85 1.427

@@ -1,0 +1,67 @@
+diff --git a/approach.py b/approach.py
+index c62e526..cb23b47 100644
+--- a/approach.py
++++ b/approach.py
+@@ -386,6 +386,41 @@ class GeneratedApproach:
+         for ri in range(2):
+             P = tabs[ri][0]
+             self.actions[ri] = self._extract(P, best[1][ri][1])
++        # time-aware re-plan of final send against other rover's trajectory
++        trajs = []
++        for ri in range(2):
++            r = sc.rovers["rover%d" % ri]
++            trajs.append([(r["x"], r["y"])] + [(a[0], a[1]) for a in self.actions[ri]])
++        new_actions = list(self.actions)
++        for ri in range(2):
++            stages = best[1][ri][1]
++            if stages[-1][0] != "send":
++                continue
++            P = tabs[ri][0]
++            Fprev = stages[-2][3]
++            G0 = op_stage(Fprev, P.land)
++            other = trajs[1 - ri]
++            G = np.full(G0.shape, INF, dtype=G0.dtype)
++            pending_mask = G0 < INF
++            tmin = int(G0[pending_mask].min()) if pending_mask.any() else INF
++            lx, ly = sc.lander
++            t = tmin
++            while pending_mask.any() and t < tmin + 200:
++                ox, oy = other[min(t, len(other) - 1)]
++                blk = seg_hits_disk(P.X, P.Y, lx, ly, ox, oy, ROVER_OCC_R) | \
++                    seg_hits_disk(P.camx, P.camy, lx, ly, ox, oy, ROVER_OCC_R)
++                ok = pending_mask & (G0 <= t) & ~blk
++                G[ok] = t
++                pending_mask &= ~ok
++                if t >= len(other) - 1 and not ok.any() and (G0 <= t).all():
++                    break
++                t += 1
++            F2 = propagate(G, P.free)
++            if F2[(P.hi, P.hj)] >= INF:
++                continue
++            st = stages[:-1] + [("send", None, G, F2)]
++            new_actions[ri] = self._extract(P, st)
++        self.actions = new_actions
+ 
+     def _extract(self, P, stages):
+         """Backtrack through stage fields; returns list of (x,y,op) targets."""
+diff --git a/dbg4.py b/dbg4.py
+new file mode 100644
+index 0000000..38f027b
+--- /dev/null
++++ b/dbg4.py
+@@ -0,0 +1,15 @@
++import sys
++from test_approach import *
++seed=int(sys.argv[1])
++env = make_env(); obs, info = env.reset(seed=seed)
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++for o in obs:
++    if o.type.name=='obstacle' and obs.get(o,'half_x')<0.1: print(o.name, round(obs.get(o,'x'),2), round(obs.get(o,'y'),2))
++steps=0
++while True:
++    n=len(ap.log)
++    a=ap.get_action(obs)
++    if len(ap.log)>n:
++        r1=obs.get_object_from_name('rover1'); print('step',steps,'rover1 at', obs.get(r1,'x'), obs.get(r1,'y'), ap.log[-1]); break
++    obs,r,term,tr,info=env.step(a); steps+=1
++    if term: break

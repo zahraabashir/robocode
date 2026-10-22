@@ -1,0 +1,168 @@
+diff --git a/approach.py b/approach.py
+index e8e2eec..0c4809e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -6,6 +6,7 @@ MAXD = 0.05
+ ARM_MAX = 0.2
+ EARLY = True
+ BOTTOM_OFF = 0.018
++GOFF = 0.022  # gripper centre may overhang object edge by this much
+ VM = 0.025  # keep gripper this far from non-held objects while vacuum is on
+ 
+ 
+@@ -108,7 +109,7 @@ class GeneratedApproach:
+         """Candidate robot x's to grasp object o from above, best first (only collision-free ones if any)."""
+         r = self.r
+         top = o['y1']
+-        cands = np.linspace(o['x0'] + 0.008, o['x1'] - 0.008, 21)
++        cands = np.linspace(o['x0'] - GOFF, o['x1'] + GOFF, 25)
+         centre = (o['x0'] + o['x1']) / 2
+         out = []
+         for cx in cands:
+@@ -127,15 +128,16 @@ class GeneratedApproach:
+     def _grasp_x(self, o, rects):
+         return self._grasp_xs(o, rects)[0]
+ 
+-    def _place_candidates_target(self, blk, surf, rects):
++    def _place_candidates_target(self, blk, surf, rects, fast=False):
+         """Return (list of (n_blockers, cost, rx, ry, blockers), held, gx, gy)."""
+         r = self.r
+         gxs = self._grasp_xs(blk, rects)
+         centre_g = (blk['x0'] + blk['x1']) / 2
+         # a handful of grasp offsets: best one, then spread
+-        if len(gxs) > 5:
+-            idx = np.linspace(0, len(gxs) - 1, 5).astype(int)
+-            gxs = [gxs[0]] + [gxs[i] for i in idx]
++        if len(gxs) > 7:
++            sx = sorted(gxs)
++            idx = np.linspace(0, len(sx) - 1, 7).astype(int)
++            gxs = [gxs[0]] + [sx[i] for i in idx]
+         bw = blk['x1'] - blk['x0']
+         m = 0.004
+         lo = surf['x0'] + m
+@@ -147,13 +149,17 @@ class GeneratedApproach:
+         best = None
+         others = [(n, o) for n, o in rects.items()
+                   if o['type'] != 'target_surface' and n != blk['name']]
+-        PA = self._profile(self.xs, rects, None)
++        PA = None if fast else self._profile(self.xs, rects, None)
+         for gi, gx in enumerate(gxs):
+             gy = blk['y1'] + ARM_MAX + r['gw'] + self.grasp_eps
+             held = dict(name=blk['name'], dx0=blk['x0'] - gx, dx1=blk['x1'] - gx,
+                         dy0=blk['y0'] - gy, dy1=blk['y1'] - gy)
+-            cA = self._est(r['x'], r['y'], gx, gy, PA)
+-            PB = self._profile(self.xs, {n: o for n, o in others}, held)
++            if fast:
++                cA = 0
++                PB = None
++            else:
++                cA = self._est(r['x'], r['y'], gx, gy, PA)
++                PB = self._profile(self.xs, {n: o for n, o in others}, held)
+             bottom = surf['y1'] + BOTTOM_OFF
+             ry = bottom - held['dy0']
+             res = []
+@@ -166,7 +172,7 @@ class GeneratedApproach:
+                     need = self._clear_y_at(rx, {name: o}, held, ARM_MAX)
+                     if need > ry - 1e-4:
+                         blockers.append(name)
+-                cost = cA + self._est(gx, gy, rx, ry, PB) + abs(px - centre) * 0.1 + 0.001 * gi
++                cost = (cA + self._est(gx, gy, rx, ry, PB) if not fast else 0) + abs(px - centre) * 0.1 + 0.001 * gi
+                 res.append((len(blockers), cost, rx, ry, blockers))
+             if not res:
+                 continue
+@@ -250,8 +256,11 @@ class GeneratedApproach:
+             if self._clear_y_at(gx, rs, None, ARM_MAX, vm=VM) > gy - 1e-4:
+                 return False
+         if tplace is not None:
+-            rx, ry, hb = tplace
+-            if self._clear_y_at(rx, rs, hb, ARM_MAX) > ry - 1e-4:
++            blk, surf, others, nb = tplace
++            r2 = dict(others)
++            r2['_box'] = bx
++            c2 = self._place_candidates_target(blk, surf, r2, fast=True)[0]
++            if not c2 or c2[0][0] > nb:
+                 return False
+         return True
+ 
+@@ -272,9 +281,7 @@ class GeneratedApproach:
+             _, _, rxt, ryt, _ = cands[0]
+         else:
+             rxt, ryt = (surf['x0'] + surf['x1']) / 2, 0.5
+-        tplace = None
+-        if cands:
+-            tplace = (cands[0][2], cands[0][3], held_b)
++        tplace = (blk, surf, others, cands[0][0] if cands else 99)
+         grasps = []
+         for k, q in others.items():
+             if q['type'] == 'target_surface':
+@@ -311,7 +318,7 @@ class GeneratedApproach:
+                     c3 = self._est(gxb, gyb, rxt, ryt, P3n)
+                     cost = c1 + c2 + c3 + 0.01 * (ry - ry_low)
+                     if best is None or cost < best[0]:
+-                        bx = dict(x0=x0, x1=x1, y1=ry + held['dy1'], name='_box')
++                        bx = dict(x0=x0, x1=x1, y0=ry + held['dy0'], y1=ry + held['dy1'], name='_box', type='rectangle')
+                         if self._box_ok(bx, grasps, tplace):
+                             best = (cost, rx, ry)
+             if best is not None:
+@@ -323,7 +330,7 @@ class GeneratedApproach:
+         r = self.r
+         goal = o['y1'] + ARM_MAX + r['gw'] + self.grasp_eps
+         best = None
+-        for cx in np.linspace(o['x0'] + 0.008, o['x1'] - 0.008, 21):
++        for cx in np.linspace(o['x0'] - GOFF, o['x1'] + GOFF, 25):
+             if cx < WORLD_X[0] + r['R'] + 1e-3 or cx > WORLD_X[1] - r['R'] - 1e-3:
+                 continue
+             bl = []
+diff --git a/big_test2.txt b/big_test2.txt
+new file mode 100644
+index 0000000..bd2fa2d
+--- /dev/null
++++ b/big_test2.txt
+@@ -0,0 +1,5 @@
++(3038, 3, False, 1000, 73.0)
++success 79 / 80 mean steps 60.3125
++(3057, 4, False, 1000, 99.3)
++success 79 / 80 mean steps 70.1
++success 100 / 100 mean steps 32.53
+diff --git a/dbg4.py b/dbg4.py
+new file mode 100644
+index 0000000..b41f208
+--- /dev/null
++++ b/dbg4.py
+@@ -0,0 +1,13 @@
++import numpy as np, sys
++from env_client import make_env
++from approach import GeneratedApproach
++env = make_env()
++ap = GeneratedApproach(env.action_space, env.observation_space, {})
++obs, info = env.reset(seed=int(sys.argv[1]), options={'object_count':int(sys.argv[2])})
++ap.reset(obs, info)
++r, rects = ap._parse(obs); ap.r = r
++blk=rects['target_block']; surf=rects['target_surface']
++print(ap._grasp_xs(blk, rects))
++c, held, gx, gy = ap._place_candidates_target(blk, surf, rects)
++print(len(c), c[:3], gx)
++print(ap._plan(rects))
+diff --git a/exp4.py b/exp4.py
+new file mode 100644
+index 0000000..0023008
+--- /dev/null
++++ b/exp4.py
+@@ -0,0 +1,17 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++for off in [0.0, 0.02, 0.03, 0.034, 0.04]:
++    obs, info = env.reset(seed=0)
++    R = obs.get_object_from_name('robot'); B = obs.get_object_from_name('target_block')
++    def st(a):
++        global obs
++        obs,*_ = env.step(np.array(a,dtype=np.float32))
++    st([0,0,0,0.1,0])
++    top = obs.get(B,'y')+obs.get(B,'height'); tx = obs.get(B,'x') - off
++    gy = top + 0.21 + 0.002
++    for i in range(40):
++        st([np.clip(tx-obs.get(R,'x'),-.05,.05), np.clip(gy-obs.get(R,'y'),-.05,.05),0,0,0])
++    st([0,0,0,0,1]); st([0,0.05,0,0,1])
++    print(off, 'block y', round(obs.get(B,'y'),3), round(obs.get(R,'y')-gy,3))
++env.close()

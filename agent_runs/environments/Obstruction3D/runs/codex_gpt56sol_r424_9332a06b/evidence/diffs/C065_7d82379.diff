@@ -1,0 +1,19 @@
+diff --git a/approach.py b/approach.py
+index 7d419a1..3cf27cc 100644
+--- a/approach.py
++++ b/approach.py
+@@ -139,11 +139,9 @@ class GeneratedApproach:
+                 d=.04*self.cal_sign; a += self.B[:,self.cal_i]*d; a[10]=-1.
+                 self.last_pos=feat; self.last_delta=d; return a
+         if self.mode=="release":
+-            if self.object_name!="target_block" and self.release_t<60:
+-                g=np.array([self.release_x,self.dest[1],self.rest_z-.005])
+-                er=np.r_[g-pos,-feat[3:]]
+-                u=np.linalg.solve(self.J.T@self.J+1e-5*np.eye(5),self.J.T@np.clip(er,-.03,.03))
+-                a += self.B@np.clip(u,-.05,.05)
++            # The last waypoint is already a supported drop.  Moving the wrist
++            # down while opening can clamp a cuboid against the table and stop
++            # the fingers entirely, so release without Cartesian motion.
+             a[10]=1.; self.release_t+=1; return a
+         clearance=.19
+         goals=[np.array([pos[0],pos[1],clearance]),np.array([self.dest[0],self.dest[1],clearance]),

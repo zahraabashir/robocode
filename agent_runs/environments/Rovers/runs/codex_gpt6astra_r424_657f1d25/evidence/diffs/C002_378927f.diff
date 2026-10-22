@@ -1,0 +1,110 @@
+diff --git a/inspect_env.py b/inspect_env.py
+new file mode 100644
+index 0000000..12ec7cb
+--- /dev/null
++++ b/inspect_env.py
+@@ -0,0 +1,12 @@
++from env_client import make_env
++import numpy as np
++E=make_env(); s,i=E.reset(seed=0)
++print('INFO',i,'max',E.max_steps)
++for name in s.get_object_names():
++ o=s.get_object_from_name(name)
++ print(name,{f:s.get(o,f) for f in E.observation_space.type_features[o.type]})
++for op in [-.5,-1/6,.5]:
++ a=np.zeros(8);a[3]=a[7]=op
++ s,r,t,tr,i=E.step(a)
++ print('OP',op,[(n, {f:s.get(s.get_object_from_name(n),f) for f in E.observation_space.type_features[s.get_object_from_name(n).type]}) for n in s.get_object_names() if n.startswith(('rover','objective'))])
++E.close()
+diff --git a/probe_motion.py b/probe_motion.py
+new file mode 100644
+index 0000000..d6c986d
+--- /dev/null
++++ b/probe_motion.py
+@@ -0,0 +1,28 @@
++from env_client import make_env
++import numpy as np
++
++def vals(s,n='rover0'):
++ o=s.get_object_from_name(n);return [s.get(o,f) for f in ['x','y','theta','at_home']]
++def step(e,dx=0,dy=0,dt=0):
++ a=np.zeros(8);a[:3]=[dx,dy,dt];t,*_=e.step(a);return t
++for y in [-2.30,-2.25,-2.2,-2,-1.5,-1,-.5,0,.5,1,1.5,1.75,2,2.25,2.3]:
++ e=make_env();s,_=e.reset(seed=0)
++ while abs(vals(s)[1]-y)>.001:
++  old=vals(s);s=step(e,dy=np.clip(y-old[1],-.2,.2))
++  if vals(s)==old:break
++ for _ in range(20):
++  old=vals(s);s=step(e,dx=-.05)
++  if vals(s)==old:break
++ print('wall scan',y,vals(s))
++ e.close()
++for mode in ['east','south','wall','home']:
++ e=make_env();s,_=e.reset(seed=0)
++ for k in range(160):
++  old=vals(s)
++  if mode=='east':s=step(e,dx=.01)
++  if mode=='south':s=step(e,dy=-.01)
++  if mode=='wall':s=step(e,dx=-.01)
++  if mode=='home':s=step(e,dx=.01)
++  if vals(s)==old or (mode=='home' and vals(s)[-1]==0):break
++ print('exact',mode,vals(s),k)
++ e.close()
+diff --git a/probe_shape.py b/probe_shape.py
+new file mode 100644
+index 0000000..7327995
+--- /dev/null
++++ b/probe_shape.py
+@@ -0,0 +1,18 @@
++from env_client import make_env
++import numpy as np
++
++def p(s):
++ o=s.get_object_from_name('rover0');return np.array([s.get(o,'x'),s.get(o,'y')])
++def step(e,s,dx=0,dy=0):
++ a=np.zeros(8);a[:2]=[dx,dy];t,*_=e.step(a);return t
++for y in [-.1987184,.0312816,.0212816,.0112816,-.4287184,1.60,1.57,1.58,1.59,1.60,1.62,1.64,1.68,1.70,1.73,1.75,2.0]:
++ e=make_env();s,_=e.reset(seed=0)
++ for k in range(30):
++  d=np.clip(y-p(s)[1],-.2,.2)
++  if abs(d)<1e-6:break
++  s=step(e,s,dy=d)
++ for k in range(130):
++  old=p(s);s=step(e,s,dx=-.005)
++  if np.allclose(p(s),old):break
++ print(y,p(s))
++ e.close()
+diff --git a/probe_visibility.py b/probe_visibility.py
+new file mode 100644
+index 0000000..ebfbe1d
+--- /dev/null
++++ b/probe_visibility.py
+@@ -0,0 +1,28 @@
++import numpy as np
++from env_client import make_env
++
++def run(seed=0):
++ env=make_env(); s,_=env.reset(seed=seed)
++ rs=[s.get_object_from_name('rover'+str(i)) for i in range(2)]
++ def xy(i):return np.array([s.get(rs[i],f) for f in ('x','y')])
++ def step(i,op=0,d=(0,0)):
++  nonlocal s
++  a=np.zeros(8,np.float32);a[4*i:4*i+2]=d;a[4*i+3]=op
++  s,*_=env.step(a)
++ def go(i,target):
++  for _ in range(50):
++   p=xy(i);d=np.clip(np.array(target)-p,-.2,.2)
++   if np.max(np.abs(d))<1e-5:return True
++   step(i,d=d)
++   if np.linalg.norm(xy(i)-p)<1e-5:print('blocked',i,xy(i),target);return False
++ def ims():return [(o.name,int(s.get(o,'have_image_rover0')),int(s.get(o,'have_image_rover1')),int(s.get(o,'received_image'))) for o in s.get_objects(env.observation_space.get_type('objective'))]
++ go(0,(1,.5));step(0,-.5);step(0,-1/6);step(0,-.5);step(0,-1/6);print('photo',xy(0),ims())
++ step(0,.5);print('send high',ims())
++ go(0,(1,-1.75));step(0,.5);print('send home',ims())
++ go(1,(-1.4,-.1));step(1,-5/6);print('sample at',xy(1),[(o.name,int(s.get(o,'analyzed_rover1'))) for o in s.get_objects(env.observation_space.get_type('sample'))])
++ go(1,(-1.4,0));step(1,-5/6);step(1,.5);print('sample/send',xy(1),[(o.name,int(s.get(o,'analyzed_rover1')),int(s.get(o,'received_analysis'))) for o in s.get_objects(env.observation_space.get_type('sample'))])
++ step(1,5/6);print('drop',s.get(rs[1],'store_full'))
++ go(1,(-1.8,.35));step(1,-.5);step(1,-1/6);print('left photo',xy(1),ims())
++ go(0,(.4,-1.75));go(0,(-.4,-1.75));print('cross bottom',xy(0))
++ env.close()
++run()

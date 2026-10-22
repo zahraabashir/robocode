@@ -1,0 +1,31 @@
+diff --git a/approach.py b/approach.py
+index 2311190..252f3b9 100644
+--- a/approach.py
++++ b/approach.py
+@@ -105,7 +105,7 @@ class GeneratedApproach:
+ 
+         if self.mode == "choose":
+             branch_mismatch = pd < 0.06 and abs(goal_theta-theta) > 0.14
+-            boundary_recover = min(obj) < 0.72 or max(obj) > 4.28
++            boundary_recover = min(obj) < 0.92 or max(obj) > 4.08
+             if (abs(ae) > 0.11 or branch_mismatch) and not boundary_recover:
+                 self.turn_sign = 1.0 if ae > 0.0 else -1.0
+                 self.mode = "rot_far"
+@@ -176,7 +176,7 @@ class GeneratedApproach:
+         # The effective COM lies down the stem from the reported junction.
+         com = obj + self._world(np.array([0.0, -0.36 * lv]), theta)
+         com = com + np.array([-self.push_dir[1], self.push_dir[0]])*self.line_offset
+-        far = np.clip(com - self.push_dir * 0.82, 0.105, 4.895)
++        far = np.clip(com - self.push_dir * 0.76, 0.105, 4.895)
+         if self.mode == "move_far":
+             disturbed = (np.linalg.norm(obj-self.start_pose[:2]) > 0.012 or
+                          abs(self._angle(theta-self.start_pose[2])) > 0.018)
+@@ -203,7 +203,7 @@ class GeneratedApproach:
+                 return self._safe(-self.push_dir, 0.018)
+             # Once contact is established, keep following through in short
+             # closed-loop segments instead of paying to reacquire every time.
+-            near_boundary = min(obj) < 0.78 or max(obj) > 4.22
++            near_boundary = min(obj) < 0.96 or max(obj) > 4.04
+             if moved > 0.11 and (now_ae < 0.14 or near_boundary) and pd > 0.05:
+                 dtheta = self._angle(theta-self.start_pose[2])
+                 self.line_offset = float(np.clip(self.line_offset + 0.7*dtheta, -0.24, 0.24))

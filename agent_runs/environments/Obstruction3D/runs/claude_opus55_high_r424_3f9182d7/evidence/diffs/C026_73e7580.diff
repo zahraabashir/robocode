@@ -1,0 +1,40 @@
+diff --git a/approach.py b/approach.py
+index 103e1ca..bf0b3ca 100644
+--- a/approach.py
++++ b/approach.py
+@@ -142,6 +142,14 @@ class GeneratedApproach:
+         idx = self.fail_count.get(obj.name, 0) % len(cands)
+         return cands[idx][1]
+ 
++    def _safe_heights(self, s, obj, others):
++        tops = [TABLE_Z] + [_pose(s, o)[2] + _he(s, o)[2] for o in others if o.name != obj.name]
++        top = max(tops)
++        h = _he(s, obj)
++        z_free = float(np.clip(top + 0.06, 0.18, SAFE_Z))
++        z_held = float(np.clip(top + 0.08 + 2 * h[2], 0.18, SAFE_Z))
++        return z_free, z_held
++
+     def _plan_pick_place(self, s, obj, place_xy, support_top, others, place_yaw=None):
+         _, q, base = self._robot(s)
+         p = _pose(s, obj)
+@@ -152,15 +160,16 @@ class GeneratedApproach:
+         self.place_yaw = place_yaw
+         self.cur_obj = obj.name
+         gz = p[2] + 0.035  # TCP height for grasp (object centre 2-5 cm below TCP works)
++        zf, zh = self._safe_heights(s, obj, others)
+         return [
+-            ('move', np.array([p[0], p[1], max(SAFE_Z, gz + 0.05)]), yaw, False),
++            ('move', np.array([p[0], p[1], max(zf, gz + 0.05)]), yaw, False),
+             ('move', np.array([p[0], p[1], gz]), yaw, True),
+             ('close', obj.name, p.copy(), yaw, [0.045, 0.03, 0.05, 0.025]),
+-            ('move', np.array([p[0], p[1], SAFE_Z]), yaw, False),
+-            ('place_move', place_center + np.array([0, 0, SAFE_Z - place_center[2]]), yaw, False),
++            ('move', np.array([p[0], p[1], zh]), yaw, False),
++            ('place_move', place_center + np.array([0, 0, zh - place_center[2]]), yaw, False),
+             ('place_move', place_center, yaw, True),
+             ('open', place_center, yaw),
+-            ('move_rel_up', SAFE_Z, yaw),
++            ('move_rel_up', zf, yaw),
+         ]
+ 
+     def _plan_place(self, s, obj, place_xy, support_top, place_yaw):

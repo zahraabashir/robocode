@@ -1,0 +1,22 @@
+diff --git a/approach.py b/approach.py
+index afddff0..dfb5e1f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -49,7 +49,7 @@ class GeneratedApproach:
+         else:
+             k=self.task_i; self.dest=np.array([.16+.07*(k%4), -.36 if k%2==0 else .36])
+             self.rest_z=.075+self._v(state,name,"half_extent_z")
+-    def _held(self,s): return self._v(s,"robot","grasp_active")>.5
++    def _held(self,s): return self._v(s,self.object_name,"grasp_active")>.5
+     def _feat(self,s):
+         o=self.object_name
+         return np.r_[self._xyz(s,o), .18*np.array([self._v(s,o,"pose_q"+c) for c in "xyz"])]
+@@ -58,6 +58,8 @@ class GeneratedApproach:
+         self.last_pos=self._feat(s); self.last_delta=0.
+     def get_action(self,state):
+         a=np.zeros(self.action_space.shape,dtype=self.action_space.dtype)
++        if self.mode=="pick" and self._v(state,"robot","grasp_active")>.5 and not self._held(state):
++            a[10]=1.; self.pick_t=0; self.pick_i=(self.pick_i+1)%len(self.pick_poses); return a
+         if self.mode=="release" and not self._held(state):
+             self.task_i+=1
+             if self.task_i<len(self.tasks): self._setup(state,self.tasks[self.task_i])

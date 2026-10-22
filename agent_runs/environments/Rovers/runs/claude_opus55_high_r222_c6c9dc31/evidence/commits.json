@@ -1,0 +1,764 @@
+[
+  {
+    "id": "C001",
+    "commit": "5f58f5e7a7d37b842716bb6be2ce7d98bf20ff3a",
+    "parents": [],
+    "date": "2026-10-01T11:00:50+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".claude/settings.json",
+      ".claude/validate_sandbox.py",
+      ".gitignore",
+      "CLAUDE.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_5f58f5e.diff",
+    "diff_sha256": "cca53d52c17958a269f10cb80d89c569f01bac1d1139e000e8d0b98887c3c609",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "77568a234455633752ff794d560de023642b966f",
+    "parents": [
+      "5f58f5e7a7d37b842716bb6be2ce7d98bf20ff3a"
+    ],
+    "date": "2026-10-01T11:22:16+02:00",
+    "title": "First planner: layered grid BFS + Held-Karp + joint assignment",
+    "files": [
+      "approach.py",
+      "probe.py",
+      "probe_coll_1.py",
+      "probe_coll_10.py",
+      "probe_coll_11.py",
+      "probe_coll_12.py",
+      "probe_coll_13.py",
+      "probe_coll_2.py",
+      "probe_coll_3.py",
+      "probe_coll_4.py",
+      "probe_coll_5.py",
+      "probe_coll_6.py",
+      "probe_coll_7.py",
+      "probe_coll_8.py",
+      "probe_coll_9.py",
+      "probe_coll_util.py",
+      "probe_order.py",
+      "probe_samp_0.py",
+      "probe_samp_1.py",
+      "probe_samp_10.py",
+      "probe_samp_11.py",
+      "probe_samp_12.py",
+      "probe_samp_13.py",
+      "probe_samp_14.py",
+      "probe_samp_15.py",
+      "probe_samp_16.py",
+      "probe_samp_17.py",
+      "probe_samp_2.py",
+      "probe_samp_3.py",
+      "probe_samp_4.py",
+      "probe_samp_5.py",
+      "probe_samp_6.py",
+      "probe_samp_7.py",
+      "probe_samp_8.py",
+      "probe_samp_9.py",
+      "probe_samp_util.py",
+      "probe_vis_1.py",
+      "probe_vis_10.py",
+      "probe_vis_11.py",
+      "probe_vis_12.py",
+      "probe_vis_13.py",
+      "probe_vis_14.py",
+      "probe_vis_15.py",
+      "probe_vis_16.py",
+      "probe_vis_17.py",
+      "probe_vis_18.py",
+      "probe_vis_19.py",
+      "probe_vis_2.py",
+      "probe_vis_20.py",
+      "probe_vis_21.py",
+      "probe_vis_22.py",
+      "probe_vis_3.py",
+      "probe_vis_4.py",
+      "probe_vis_5.py",
+      "probe_vis_6.py",
+      "probe_vis_7.py",
+      "probe_vis_8.py",
+      "probe_vis_9.py",
+      "probe_vis_fit.py",
+      "probe_vis_fit2.py",
+      "probe_vis_fit_data.txt",
+      "probe_vis_fit_data2.txt",
+      "probe_vis_scan.py",
+      "probe_vis_util.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C002_77568a2.diff",
+    "diff_sha256": "da0181e8de86f5784d73fa7b534ca84c8039f2e41c9076e21460217af186a3d6",
+    "events": [
+      {
+        "event": "E0522",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "14d2b4bc28778563747111ecf21212b346a5752b4249b16ebce0820789fb36a3",
+    "version": "evidence/versions/C002_77568a2_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "b506e490f62eea5c5ec2b2461f72712038e5a85c",
+    "parents": [
+      "77568a234455633752ff794d560de023642b966f"
+    ],
+    "date": "2026-10-01T11:25:57+02:00",
+    "title": "Fix pillar footprint (octagon ~0.26), learn bad points on rejected moves",
+    "files": [
+      "approach.py",
+      "dbg.py",
+      "dbg2.py",
+      "find_iso.py",
+      "pil_r0.txt",
+      "pil_r1.txt",
+      "probe_pillar.py",
+      "probe_pillar2.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C003_b506e49.diff",
+    "diff_sha256": "bc67ec5b24c5397c98d6c117f8fe40c8be1bf28da6117c34be282083111cad55",
+    "events": [
+      {
+        "event": "E0560",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "858d9ee36df49103c3fde8837c563b8d318ec541c69bcd1a85238bfd120ece77",
+    "version": "evidence/versions/C003_b506e49_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C004",
+    "commit": "a2e44ccf921165d9e69debecfb317f00106c5474",
+    "parents": [
+      "b506e490f62eea5c5ec2b2461f72712038e5a85c"
+    ],
+    "date": "2026-10-01T11:26:56+02:00",
+    "title": "Pillars block LOS; learn bad view/send points",
+    "files": [
+      "approach.py",
+      "dbg3.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C004_a2e44cc.diff",
+    "diff_sha256": "f623e2395330236f699bd25f7cea80381fefcf6ef52e2c773b070e531cd4c2d5",
+    "events": [
+      {
+        "event": "E0575",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "2a6bb9819ffb935e6e1c344e9ebfee857fc4cad8107d3946e608be0b6a758196",
+    "version": "evidence/versions/C004_a2e44cc_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "b946d5ae6bd7b777889c51130979d4547afa6b0e",
+    "parents": [
+      "a2e44ccf921165d9e69debecfb317f00106c5474"
+    ],
+    "date": "2026-10-01T11:27:56+02:00",
+    "title": "Image picks nearest unheld visible objective: model it in regions",
+    "files": [
+      "approach.py",
+      "dbg.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C005_b946d5a.diff",
+    "diff_sha256": "fd19ca47e7bac8815e0048b159bab0c3ae18502bb30819d7021c237fc160ec9f",
+    "events": [
+      {
+        "event": "E0590",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "8f4039222f128627e0262cd1d24fb8da780cf8ce71649401350c7945648c7966",
+    "version": "evidence/versions/C005_b946d5a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C006",
+    "commit": "a15732102f922554ed294ad5ace0e8aae1ae3e6e",
+    "parents": [
+      "b946d5ae6bd7b777889c51130979d4547afa6b0e"
+    ],
+    "date": "2026-10-01T11:30:36+02:00",
+    "title": "Sample picks nearest: model it",
+    "files": [
+      "approach.py",
+      "batch.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C006_a157321.diff",
+    "diff_sha256": "619947e36dfca563c98cc55464c4e81db493caaf344b0c9cea348351b95cfa51",
+    "events": [
+      {
+        "event": "E0612",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "35e6b99686faa4c96b9bf1e4d737e20e92652f3ca74a2d31de2434052c3fef2f",
+    "version": "evidence/versions/C006_a157321_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "646274bed1ec1aab3745877b3e9cfa209ec7e9bb",
+    "parents": [
+      "a15732102f922554ed294ad5ace0e8aae1ae3e6e"
+    ],
+    "date": "2026-10-01T11:32:55+02:00",
+    "title": "Model forced drop step after sample; replan time budget",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C007_646274b.diff",
+    "diff_sha256": "4511a869f90132c35e3e13ef242e208afd4db84ab6137459e4ee3b086a1c6cf2",
+    "events": [
+      {
+        "event": "E0624",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "19c798712976ba794d9a7472dba8bf8413ff053419f05e0311c3aca7e61c5722",
+    "version": "evidence/versions/C007_646274b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C008",
+    "commit": "4543aee1bcdd0edeb9b97185a3990596dd2e281f",
+    "parents": [
+      "646274bed1ec1aab3745877b3e9cfa209ec7e9bb"
+    ],
+    "date": "2026-10-01T11:39:06+02:00",
+    "title": "deviation log",
+    "files": [
+      "approach.py",
+      "batch.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C008_4543aee.diff",
+    "diff_sha256": "3512f1f378c2374b1a4f03985ca87c75412ff0dd8f5132eb44a4010c8dd8d1f8",
+    "events": [
+      {
+        "event": "E0659",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "19458dc529d2807510a4b7c8ef3b79d2edf7f3018ab7736ba9f4e979953a6ed0",
+    "version": "evidence/versions/C008_4543aee_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C009",
+    "commit": "6650d11b819c161864f30e7b27a63098a4b47424",
+    "parents": [
+      "4543aee1bcdd0edeb9b97185a3990596dd2e281f"
+    ],
+    "date": "2026-10-01T11:39:44+02:00",
+    "title": "Time-aware send blocking by other rover; per-rover send check",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C009_6650d11.diff",
+    "diff_sha256": "43688156a77f9a8b64a7feb2105c88ad18abe5e15c86ecc985e2a872f0674842",
+    "events": [
+      {
+        "event": "E0668",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "0e0c8f640e934e750e7dd0474776ca389bc1fad7f3914bb8dd1eedf7f61fa9b3",
+    "version": "evidence/versions/C009_6650d11_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C010",
+    "commit": "ce08108351fc8193774caed0add6f297eafa8323",
+    "parents": [
+      "6650d11b819c161864f30e7b27a63098a4b47424"
+    ],
+    "date": "2026-10-01T11:43:24+02:00",
+    "title": "Pillars as cylinders for LOS",
+    "files": [
+      "approach.py",
+      "dbg4.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C010_ce08108.diff",
+    "diff_sha256": "3c48342285c4eee3caaad34d7ccd50b078917d0fba4f7c92e892e2896e280062",
+    "events": [
+      {
+        "event": "E0699",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1fa3b3ca896d248c38b955970ea86e3e8c8237f28ad8cc953a0714779d21219b",
+    "version": "evidence/versions/C010_ce08108_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C011",
+    "commit": "23cbbc4f7398df368adcd8be42695648506d93d4",
+    "parents": [
+      "ce08108351fc8193774caed0add6f297eafa8323"
+    ],
+    "date": "2026-10-01T11:52:27+02:00",
+    "title": "Empirical pillar LOS rules (strict 0.08, liberal 0.02 near objective)",
+    "files": [
+      "approach.py",
+      "collect_vis.py",
+      "fit3d.py",
+      "fit3d2.py",
+      "fit_rules.py",
+      "fit_vis.py",
+      "vis_data_11.jsonl",
+      "vis_data_21.jsonl",
+      "vis_data_27.jsonl",
+      "vis_data_34.jsonl",
+      "vis_data_37.jsonl",
+      "vis_data_42.jsonl",
+      "vis_data_48.jsonl",
+      "vis_data_54.jsonl"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C011_23cbbc4.diff",
+    "diff_sha256": "2e68ce909a2798e2f9c64ee772b7b3f0fd25f848d49fb89d4d5b31133d92159c",
+    "events": [
+      {
+        "event": "E0766",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "33fe28683a11856e9e4c747e202fe303254dbf57a630cadebc6ade2e78ba1c64",
+    "version": "evidence/versions/C011_23cbbc4_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C012",
+    "commit": "0a50c4ed446d8746b6eb2c77a7b148e2c2c4c63f",
+    "parents": [
+      "23cbbc4f7398df368adcd8be42695648506d93d4"
+    ],
+    "date": "2026-10-01T11:57:52+02:00",
+    "title": "Liberal competitor visibility ignores pillars",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C012_0a50c4e.diff",
+    "diff_sha256": "210b6f28c275c377152b82aef051eba8b66c45e86e77c0f2376d238c98ed59db",
+    "events": [
+      {
+        "event": "E0793",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "379c0c50593ac8e83f282b2b61f3c46b12c2666b42942e91629e7cc245e67276",
+    "version": "evidence/versions/C012_0a50c4e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C013",
+    "commit": "849e834d42d4517238f6794a491adbb019dcac18",
+    "parents": [
+      "0a50c4ed446d8746b6eb2c77a7b148e2c2c4c63f"
+    ],
+    "date": "2026-10-01T12:00:38+02:00",
+    "title": "Grid 0.025",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C013_849e834.diff",
+    "diff_sha256": "24602cd3abfc33c090b29020c3b6b325f8a66c5ea181a2023baab20e2845ad19",
+    "events": [
+      {
+        "event": "E0810",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6a65b3768f1d489b56493b3199eae11f2ed26c9be4d829b54de88d0ad9fbc2b6",
+    "version": "evidence/versions/C013_849e834_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C014",
+    "commit": "f01efdb00a735fa1147ac4b18b2f2612f3beb336",
+    "parents": [
+      "849e834d42d4517238f6794a491adbb019dcac18"
+    ],
+    "date": "2026-10-01T12:03:28+02:00",
+    "title": "Tighter margins",
+    "files": [
+      "approach.py",
+      "approach_safe.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C014_f01efdb.diff",
+    "diff_sha256": "a4a3e4ac7d94f47794c845bc1b974f1beda73362c1c7e4ea4a5bd066c3697717",
+    "events": [
+      {
+        "event": "E0825",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "f88471cb71d50ebda8af0328d0dea895b2af62d4ba93ef5872918d3033f7401a",
+    "version": "evidence/versions/C014_f01efdb_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C015",
+    "commit": "6d5c53871d6f356c422e9e59b16de7afcdc998c4",
+    "parents": [
+      "f01efdb00a735fa1147ac4b18b2f2612f3beb336"
+    ],
+    "date": "2026-10-01T12:13:06+02:00",
+    "title": "Sector-generalize send failures (seed 549)",
+    "files": [
+      "approach.py",
+      "dbg5.py",
+      "lander_pos.py",
+      "near_lander.py",
+      "obs_list.py",
+      "probe_send549.py",
+      "probe_send549b.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C015_6d5c538.diff",
+    "diff_sha256": "c9f517d51c84475556cf25c5470e9b4655b895dff1328cd7621d43cc4fe2899d",
+    "events": [
+      {
+        "event": "E0914",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "25d830aa4a9f9519e9ed7f219767f4064d3bc36b0ca5c5018df93bc47805a3bf",
+    "version": "evidence/versions/C015_6d5c538_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C016",
+    "commit": "5ea0cb3cab86f54c3bd0ba6102b61e23c865427c",
+    "parents": [
+      "6d5c53871d6f356c422e9e59b16de7afcdc998c4"
+    ],
+    "date": "2026-10-01T12:30:46+02:00",
+    "title": "Camera rotation: per-angle visibility regions + theta DP with fallback",
+    "files": [
+      "ana.py",
+      "approach.py",
+      "approach_norot.py",
+      "approach_rot.py",
+      "batch.py",
+      "batch.sh",
+      "count_test.py",
+      "mk.py",
+      "near.txt",
+      "near_lander.py",
+      "plancmp.py",
+      "r0_549.txt",
+      "r0_549b.txt",
+      "r0_col.txt",
+      "r0_col2.txt",
+      "r0_col3.txt",
+      "r0_off.txt",
+      "r1_549.txt",
+      "r1_877.txt",
+      "sp_probe.py",
+      "sw.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C016_5ea0cb3.diff",
+    "diff_sha256": "a0268a26f3fb7b9ed1cb0746aa93c67f9e095da8e425d881088985e51043da88",
+    "events": [
+      {
+        "event": "E1158",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "13b5c672ceaf886004510b4ab42a5988476dbca87a3d01d183ac91f251483f35",
+    "version": "evidence/versions/C016_5ea0cb3_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C017",
+    "commit": "032aba3337544261bfadc56bc6d1c40cfdbf51d2",
+    "parents": [
+      "5ea0cb3cab86f54c3bd0ba6102b61e23c865427c"
+    ],
+    "date": "2026-10-01T12:31:57+02:00",
+    "title": "fix per copy",
+    "files": [
+      "approach.py",
+      "r0_off.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C017_032aba3.diff",
+    "diff_sha256": "8b0daf2634b45bd9cd7b3eb5fea28dfdfaa08767c543552994cea1ef4db64d80",
+    "events": [
+      {
+        "event": "E1208",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "0af6bbe777006bd74cd4ac7752833dc167dcf8686ddb97be12ca28ebe6765779",
+    "version": "evidence/versions/C017_032aba3_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C018",
+    "commit": "7de451bf79b7530fe5634788738ca4f61cff3923",
+    "parents": [
+      "032aba3337544261bfadc56bc6d1c40cfdbf51d2"
+    ],
+    "date": "2026-10-01T13:00:47+02:00",
+    "title": "Revert camera rotation (gain 0.045 steps not worth 2x plan time); keep as approach_rot experiments",
+    "files": [
+      "approach.py",
+      "dbg_dp.py",
+      "mkp.py",
+      "plancmp2.py",
+      "plancmp3.py",
+      "pts_1849.txt",
+      "pts_877.txt",
+      "r0_off.txt",
+      "r1_1849.txt",
+      "sp_probe.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C018_7de451b.diff",
+    "diff_sha256": "8ce602b42f05ca7b4db2e63fd28ed5a11f8a9060a0d73df7ffadcfb954e44afb",
+    "events": [
+      {
+        "event": "E1330",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "25d830aa4a9f9519e9ed7f219767f4064d3bc36b0ca5c5018df93bc47805a3bf",
+    "version": "evidence/versions/C018_7de451b_approach.py",
+    "same_policy_as_earlier": [
+      "C015"
+    ]
+  },
+  {
+    "id": "C019",
+    "commit": "b509eaf1ce6c975e17b7122a92115c6d3ca5e5c1",
+    "parents": [
+      "7de451bf79b7530fe5634788738ca4f61cff3923"
+    ],
+    "date": "2026-10-01T13:00:56+02:00",
+    "title": "Prior: samples near lander occlude sends (empirical sectors/disc)",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C019_b509eaf.diff",
+    "diff_sha256": "21bf5218c6781ec42ed4e70ef1fbc367dd267aa3f4f3973c3321cc66d1b5fcea",
+    "events": [
+      {
+        "event": "E1335",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "44d97ecff61c6572eec609d97a25f6273f07279834b96bb869d8dba4cfbd4d2c",
+    "version": "evidence/versions/C019_b509eaf_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C020",
+    "commit": "cd295fd682981decc12dac97123d4c9b57024ed8",
+    "parents": [
+      "b509eaf1ce6c975e17b7122a92115c6d3ca5e5c1"
+    ],
+    "date": "2026-10-01T13:01:20+02:00",
+    "title": "sector bound 31deg",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C020_cd295fd.diff",
+    "diff_sha256": "f4afa32e53f26a6008b1508b27b7034f8cff4b17cf45e3c7bbead384445d85bb",
+    "events": [
+      {
+        "event": "E1360",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "8eae4af9f0a2848b089b8f1075eee74d89cf069a9fc1c4010324820ca0e4c0e9",
+    "version": "evidence/versions/C020_cd295fd_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C021",
+    "commit": "4f2302eb48e2df9a0932f80dd6bcacb370d4d56b",
+    "parents": [
+      "cd295fd682981decc12dac97123d4c9b57024ed8"
+    ],
+    "date": "2026-10-01T13:09:30+02:00",
+    "title": "disc rule only for 0.065<off<=0.14",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C021_4f2302e.diff",
+    "diff_sha256": "aa180209cb30059a95bb1b7498d498087149dd1f2f28f043ad0d5904d63c588d",
+    "events": [
+      {
+        "event": "E1366",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "d6256667ef27cac39f368ebe352e03b30b22ba9f10c00de38ac1729bfa097ae9",
+    "version": "evidence/versions/C021_4f2302e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C022",
+    "commit": "b77801a930bdf27f51862da19717ec34ee6b1cdf",
+    "parents": [
+      "4f2302eb48e2df9a0932f80dd6bcacb370d4d56b"
+    ],
+    "date": "2026-10-01T13:13:49+02:00",
+    "title": "distance-dependent sector bound",
+    "files": [
+      "approach.py",
+      "batch_list.py",
+      "near_seeds.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C022_b77801a.diff",
+    "diff_sha256": "797f400f57b9d4ba5bf670aa9a2baeb12a69b4c12a33e154218c0b12e24df392",
+    "events": [
+      {
+        "event": "E1390",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "f5d2e1e0eb7aac3cd3f363fc39e305b22c6a33183680a51c3a2bb4cb189c594f",
+    "version": "evidence/versions/C022_b77801a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C023",
+    "commit": "72f2c981349ab6bae0defb03a8c640e44cde60eb",
+    "parents": [
+      "b77801a930bdf27f51862da19717ec34ee6b1cdf"
+    ],
+    "date": "2026-10-01T13:36:31+02:00",
+    "title": "auto-commit uncommitted changes",
+    "files": [
+      "dbg4c.py"
+    ],
+    "file_roles": [
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C023_72f2c98.diff",
+    "diff_sha256": "1ff0cce1e1814ef6178e869265f4273676fbde6dd571102011c7458583559889",
+    "events": [],
+    "annotation": {}
+  }
+]

@@ -1,0 +1,123 @@
+diff --git a/approach.py b/approach.py
+index 06bcea6..e7901a6 100644
+--- a/approach.py
++++ b/approach.py
+@@ -6,12 +6,12 @@ TOOL = 0.12          # TCP offset along EE z (gripper centre)
+ MAXD = 0.19
+ SAFE_Z = 0.27        # TCP transit height
+ TABLE_Z = 0.075
+-X_RANGE = (0.12, 0.44)
++X_RANGE = (0.17, 0.43)
+ FINE = 0.004        # max cartesian advance per step near objects
+ FINGER_OFF = 0.052   # finger centre offset along EE x (open)
+ FINGER_HX = 0.011
+ FINGER_HY = 0.013
+-Y_RANGE = (-0.36, 0.36)
++Y_RANGE = (-0.33, 0.33)
+ 
+ 
+ def _pose(s, o):
+@@ -44,6 +44,8 @@ class GeneratedApproach:
+         self.retries = 0
+         self.grasp_fail = 0
+         self.place_yaw = None
++        self.bad_spots = []
++        self.cur_spot = None
+ 
+     def _robot(self, s):
+         r = s.get_object_from_name('robot')
+@@ -70,6 +72,9 @@ class GeneratedApproach:
+                     dy = abs(y - p[1]) - (h[1] + oh[1])
+                     dmin = min(dmin, max(dx, dy))
+                 score = min(dmin, 0.07) - 0.1 * np.hypot(x - cur[0], y - cur[1])
++                for bx, by in self.bad_spots:
++                    if np.hypot(x - bx, y - by) < 0.05:
++                        score -= 1.0
+                 if score > bestscore:
+                     best, bestscore = (x, y), score
+         return np.array(best)
+@@ -150,6 +155,22 @@ class GeneratedApproach:
+             ('move_rel_up', SAFE_Z, yaw),
+         ]
+ 
++    def _plan_place(self, s, obj, place_xy, support_top, place_yaw):
++        _, q, base = self._robot(s)
++        M = fk(base, q, TOOL)
++        yaw = np.arctan2(M[1, 0], M[0, 0])
++        self.place_yaw = place_yaw
++        h = _he(s, obj)
++        place_center = np.array([place_xy[0], place_xy[1], support_top + h[2] + 0.002])
++        return [
++            ('move_rel_up', SAFE_Z, yaw),
++            ('place_move', place_center + np.array([0, 0, SAFE_Z - place_center[2]]), yaw, False),
++            ('place_move', place_center + np.array([0, 0, 0.02]), yaw, False),
++            ('place_move', place_center, yaw, True, FINE),
++            ('open', place_center, yaw),
++            ('move_rel_up', SAFE_Z, yaw),
++        ]
++
+     def _plan(self, s):
+         reg = s.get_object_from_name('target_region')
+         tb = s.get_object_from_name('target_block')
+@@ -157,12 +178,24 @@ class GeneratedApproach:
+         cur = fk(base, q, TOOL)[:3, 3]
+         cubes = [s.get_object_from_name(n) for n in sorted(s.get_object_names())
+                  if n.startswith('obstruction')]
++        held = [c for c in cubes + [tb] if s.get(c, 'grasp_active') > 0.5]
++        if held:
++            o = held[0]
++            others = [c for c in cubes if c.name != o.name] + [reg, tb]
++            others = [c for c in others if c.name != o.name]
++            if o.name == 'target_block':
++                rp = _pose(s, reg)
++                return self._plan_place(s, o, rp[:2], rp[2] + _he(s, reg)[2], self._obj_yaw(s, reg))
++            spot = self._free_spot(s, o, others, cur)
++            self.cur_spot = spot
++            return self._plan_place(s, o, spot, TABLE_Z, None)
+         blocking = [o for o in cubes if self._overlaps(s, o, reg)]
+         if blocking:
+             # remove the tallest (top-most) first
+             o = max(blocking, key=lambda c: _pose(s, c)[2] + _he(s, c)[2])
+             others = [c for c in cubes if c.name != o.name] + [reg, tb]
+             spot = self._free_spot(s, o, others, cur)
++            self.cur_spot = spot
+             return self._plan_pick_place(s, o, spot, TABLE_Z, others)
+         rp = _pose(s, reg)
+         others = cubes
+@@ -275,6 +308,8 @@ class GeneratedApproach:
+             self.queue.pop(0)
+             self.qtarget = None
+             if not allow:
++                if kind == 'place_move' and self.cur_spot is not None and self.place_yaw is None:
++                    self.bad_spots.append(tuple(self.cur_spot))
+                 self.queue = [('move_rel_up', SAFE_Z + 0.03, None, True)]  # retreat, then replan
+             return None
+         # furthest waypoint reachable in one step
+diff --git a/trace2.py b/trace2.py
+new file mode 100644
+index 0000000..a61676a
+--- /dev/null
++++ b/trace2.py
+@@ -0,0 +1,22 @@
++import sys, numpy as np
++from env_client import make_env
++import approach, kin
++seed=int(sys.argv[1]); N=int(sys.argv[2]) if len(sys.argv)>2 else 300
++env=make_env(); obs,info=env.reset(seed=seed)
++ap=approach.GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs,info)
++last=None; rej=0
++for t in range(N):
++    a=ap.get_action(obs)
++    r=obs.get_object_from_name('robot')
++    q=np.array([obs.get(r,f) for f in approach.JF]); base=(obs.get(r,'pos_base_x'),obs.get(r,'pos_base_y'),obs.get(r,'pos_base_rot'))
++    tcp=kin.fk(base,q,0.12)[:3,3]
++    cmd=ap.queue[0] if ap.queue else None
++    key=(cmd[0], str(cmd[1])) if cmd else None
++    if key!=last:
++        print(t, cmd[0], np.round(cmd[1],3) if not isinstance(cmd[1],(str,float)) else cmd[1], "tcp",np.round(tcp,3),"g",obs.get(r,'grasp_active'))
++        last=key
++    obs2,rew,term,trunc,info=env.step(a)
++    q2=np.array([obs2.get(r,f) for f in approach.JF])
++    if np.allclose(q,q2) and np.any(a[3:10]!=0): print("   rejected at",t)
++    obs=obs2
++    if term: print("TERM",t); break

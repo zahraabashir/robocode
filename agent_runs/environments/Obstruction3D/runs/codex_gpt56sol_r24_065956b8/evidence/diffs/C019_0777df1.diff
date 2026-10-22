@@ -1,0 +1,22 @@
+diff --git a/approach.py b/approach.py
+index a7bfa4d..7160f34 100644
+--- a/approach.py
++++ b/approach.py
+@@ -46,7 +46,7 @@ class GeneratedApproach:
+         base = np.array((self.base_x + .12, self.base_y, 0.0))
+         def residual(q):
+             t = _fk(q)
+-            grasp = base + t[:3, 3] + .12 * t[:3, 2]
++            grasp = base + t[:3, 3] + .16 * t[:3, 2]
+             return np.r_[10 * (grasp - xyz), 1.5 * t[:2, 2], .02 * (q - start)]
+         return least_squares(residual, start, max_nfev=180).x
+ 
+@@ -99,7 +99,7 @@ class GeneratedApproach:
+     def _set_goal_for_object_delta(self, state, desired_object_xyz):
+         q = self._robot_q(state)
+         t = _fk(q)
+-        model_grasp = np.array((self.base_x + .12, self.base_y, 0.0)) + t[:3, 3] + .12*t[:3, 2]
++        model_grasp = np.array((self.base_x + .12, self.base_y, 0.0)) + t[:3, 3] + .16*t[:3, 2]
+         desired_grasp = model_grasp + desired_object_xyz - self._xyz(state, self._held(state))
+         self.goal_q = self._solve(desired_grasp, q)
+ 

@@ -1,0 +1,16 @@
+diff --git a/approach.py b/approach.py
+index 74d3052..85429ab 100644
+--- a/approach.py
++++ b/approach.py
+@@ -89,9 +89,9 @@ class GeneratedApproach:
+     def _dist(a, b):
+         return math.hypot(a[0] - b[0], a[1] - b[1])
+ 
+-    def _blocked(self, p, extra=None, margin=0.185):
++    def _blocked(self, p, extra=None, margin=0.20):
+         x, y = p
+-        if x < -2.38 or x > 2.38 or y < -2.38 or y > 2.38:
++        if x < -2.25 or x > 2.25 or y < -2.25 or y > 2.25:
+             return True
+         for ox, oy, hx, hy in self.obstacles:
+             if abs(x - ox) <= hx + margin and abs(y - oy) <= hy + margin:

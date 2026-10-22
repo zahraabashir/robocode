@@ -1,0 +1,53 @@
+diff --git a/approach.py b/approach.py
+index 4dad70d..61c2bea 100644
+--- a/approach.py
++++ b/approach.py
+@@ -10,6 +10,8 @@ class GeneratedApproach:
+ 
+     def reset(self, state, info):
+         self.step = 0
++        self.mode = "approach"
++        self.push_dir = None
+ 
+     def get_action(self, state):
+         s = np.asarray(state, dtype=float)
+@@ -22,9 +24,21 @@ class GeneratedApproach:
+             direction = delta / dist
+         else:
+             direction = np.array([1.0, 0.0])
+-        # First get behind the object, then push through its centre.
+-        stand = obj - direction * 0.16
+-        target = stand if np.linalg.norm(robot - stand) > 0.055 else obj + direction * 0.10
++        if self.push_dir is None:
++            self.push_dir = direction.copy()
++        if self.mode == "approach":
++            self.push_dir = direction.copy()
++            # Outside the T's roughly 0.6 radius bounding box.
++            stand = obj - self.push_dir * 0.78
++            target = stand
++            if np.linalg.norm(robot - stand) < 0.045:
++                self.mode = "push"
++        else:
++            # Aim through the centre and keep contact rather than oscillating
++            # between the moving staging point and the object.
++            target = obj + self.push_dir * 0.25
++            if np.dot(delta, self.push_dir) < -0.04:
++                self.mode = "approach"
+         action = np.clip(target - robot, self.low, self.high)
+         # The robot has a Euclidean displacement cap in addition to Box bounds.
+         norm = float(np.linalg.norm(action))
+diff --git a/explore_geometry.py b/explore_geometry.py
+index c19a815..5cb88ca 100644
+--- a/explore_geometry.py
++++ b/explore_geometry.py
+@@ -29,7 +29,9 @@ def drive_to(env, state, target, max_steps=100):
+         delta = np.asarray(target) - state[16:18]
+         if np.linalg.norm(delta) < 0.006:
+             break
+-        action = np.clip(delta, -0.05, 0.05)
++        # The server additionally enforces a Euclidean speed cap near 0.05.
++        norm = np.linalg.norm(delta)
++        action = delta * min(1.0, 0.049 / max(norm, 1e-12))
+         state, _, done, trunc, _ = env.step(action)
+         if done or trunc:
+             break

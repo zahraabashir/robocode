@@ -1,0 +1,619 @@
+diff --git a/approach.py b/approach.py
+new file mode 100644
+index 0000000..744534b
+--- /dev/null
++++ b/approach.py
+@@ -0,0 +1,378 @@
++"""Obstruction3D approach: clear obstructions off the target region, then place the
++target block on it.  Uses an internal FK/IK model of the Kinova Gen3 (arm base at the
++world origin, verified empirically) and Cartesian straight-line motions."""
++import numpy as np
++
++PI = np.pi
++
++# ----------------------------------------------------------------------------- kinematics
++def _rpy(r, p, y):
++    cr, sr, cp, sp, cy, sy = np.cos(r), np.sin(r), np.cos(p), np.sin(p), np.cos(y), np.sin(y)
++    return np.array([[cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
++                     [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
++                     [-sp, cp * sr, cp * cr]])
++
++
++def _tf(xyz, rpy):
++    T = np.eye(4)
++    T[:3, :3] = _rpy(*rpy)
++    T[:3, 3] = xyz
++    return T
++
++
++_JOINTS = [
++    _tf([0, 0, 0.15643], [PI, 0, 0]),
++    _tf([0, 0.005375, -0.12838], [PI / 2, 0, 0]),
++    _tf([0, -0.21038, -0.006375], [-PI / 2, 0, 0]),
++    _tf([0, 0.006375, -0.21038], [PI / 2, 0, 0]),
++    _tf([0, -0.20843, -0.006375], [-PI / 2, 0, 0]),
++    _tf([0, 0.00017505, -0.10593], [PI / 2, 0, 0]),
++    _tf([0, -0.10593, -0.00017505], [-PI / 2, 0, 0]),
++]
++_EE = _tf([0, 0, -0.061525], [PI, 0, 0])
++FINGER = 0.155          # EE frame -> fingertip distance (along tool z)
++FINGER_OFF = 0.05       # finger centre offset from tool axis along closing direction
++
++# joint limits (Kinova Gen3); None = continuous
++_LIM = [None, (-2.24, 2.24), None, (-2.57, 2.57), None, (-2.09, 2.09), None]
++
++
++def fk(q):
++    T = np.eye(4)
++    zs, ps = [], []
++    for i in range(7):
++        T = T @ _JOINTS[i]
++        zs.append(T[:3, 2].copy())
++        ps.append(T[:3, 3].copy())
++        c, s = np.cos(q[i]), np.sin(q[i])
++        Rz = np.array([[c, -s, 0, 0], [s, c, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1.0]])
++        T = T @ Rz
++    T = T @ _EE
++    return T, zs, ps
++
++
++def down_R(yaw):
++    c, s = np.cos(yaw), np.sin(yaw)
++    x = np.array([c, s, 0.0])
++    z = np.array([0, 0, -1.0])
++    y = np.cross(z, x)
++    return np.stack([x, y, z], axis=1)
++
++
++def _rotvec(Rm):
++    cos = (np.trace(Rm) - 1) / 2
++    cos = min(1.0, max(-1.0, cos))
++    ang = np.arccos(cos)
++    v = np.array([Rm[2, 1] - Rm[1, 2], Rm[0, 2] - Rm[2, 0], Rm[1, 0] - Rm[0, 1]])
++    if ang < 1e-6:
++        return v * 0.5
++    if ang > PI - 1e-4:
++        # 180 deg: axis from diagonal
++        M = (Rm + np.eye(3)) / 2
++        k = np.argmax(np.diag(M))
++        ax = M[:, k] / np.sqrt(max(M[k, k], 1e-12))
++        return ax * ang
++    return v * ang / (2 * np.sin(ang))
++
++
++def ik(q0, pos, Rt, iters=100, tol=1e-5):
++    q = np.array(q0, dtype=float)
++    err = 1e9
++    for _ in range(iters):
++        T, zs, ps = fk(q)
++        ep = pos - T[:3, 3]
++        er = _rotvec(Rt @ T[:3, :3].T)
++        e = np.concatenate([ep, 0.3 * er])
++        err = np.linalg.norm(e)
++        if err < tol:
++            break
++        J = np.zeros((6, 7))
++        pe = T[:3, 3]
++        for i in range(7):
++            J[:3, i] = np.cross(zs[i], pe - ps[i])
++            J[3:, i] = 0.3 * zs[i]
++        lam = 1e-4
++        dq = J.T @ np.linalg.solve(J @ J.T + lam * np.eye(6), e)
++        n = np.max(np.abs(dq))
++        if n > 0.4:
++            dq *= 0.4 / n
++        q += dq
++        for i, lim in enumerate(_LIM):
++            if lim is not None:
++                q[i] = min(lim[1], max(lim[0], q[i]))
++    return q, err
++
++
++def wrap(a):
++    return (a + PI) % (2 * PI) - PI
++
++
++# ----------------------------------------------------------------------------- approach
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.action_space = action_space
++        self.observation_space = observation_space
++
++    # ---------------------------------------------------------------- state helpers
++    def _robot(self, state):
++        for n in state.get_object_names():
++            if n == "robot":
++                return state.get_object_from_name(n)
++        return None
++
++    def _q(self, state):
++        r = self._robot(state)
++        return np.array([state.get(r, "joint_%d" % i) for i in range(1, 8)])
++
++    def _boxes(self, state):
++        out = {}
++        for n in state.get_object_names():
++            if n == "robot":
++                continue
++            o = state.get_object_from_name(n)
++            try:
++                out[n] = dict(
++                    x=state.get(o, "pose_x"), y=state.get(o, "pose_y"), z=state.get(o, "pose_z"),
++                    hx=state.get(o, "half_extent_x"), hy=state.get(o, "half_extent_y"),
++                    hz=state.get(o, "half_extent_z"), g=state.get(o, "grasp_active"))
++            except Exception:
++                pass
++        return out
++
++    # ---------------------------------------------------------------- episode
++    def reset(self, state, info):
++        self.segs = []          # queue of segments
++        self.cur = None
++        self.last_q = None
++        self.last_cmd = None
++        self.stuck = 0
++        self.held = None
++        self.moved = set()
++        self.fail = {}
++        self.placed_spots = []
++        self.yaw = 0.0
++        self.done_flag = False
++
++    # ---------------------------------------------------------------- geometry
++    def _region(self, boxes):
++        return boxes.get("target_region")
++
++    def _blocking(self, boxes):
++        reg = self._region(boxes)
++        res = []
++        for n, b in boxes.items():
++            if n in ("target_region", "target_block"):
++                continue
++            if abs(b["x"] - reg["x"]) < b["hx"] + reg["hx"] + 0.003 and \
++               abs(b["y"] - reg["y"]) < b["hy"] + reg["hy"] + 0.003 and \
++               b["z"] - b["hz"] < reg["z"] + reg["hz"] + 0.08:
++                res.append(n)
++        return res
++
++    def _grasp_clear(self, boxes, name, yaw):
++        """clearance of finger boxes from other objects for a top-down grasp"""
++        b = boxes[name]
++        ax = np.array([np.cos(yaw), np.sin(yaw)])
++        best = 1e9
++        for sgn in (-1, 1):
++            f = np.array([b["x"], b["y"]]) + sgn * FINGER_OFF * ax
++            for n, o in boxes.items():
++                if n == name or n == "target_region":
++                    continue
++                dx = abs(f[0] - o["x"]) - o["hx"]
++                dy = abs(f[1] - o["y"]) - o["hy"]
++                d = max(dx, dy)
++                best = min(best, d)
++        return best
++
++    def _choose_yaw(self, boxes, name, q):
++        b = boxes[name]
++        cands = []
++        for yaw in (0.0, PI / 2):
++            width = 2 * (b["hx"] if yaw == 0.0 else b["hy"])
++            if width > 0.082:
++                continue
++            clr = self._grasp_clear(boxes, name, yaw)
++            cands.append((min(clr, 0.03) - 0.2 * width, yaw))
++        if not cands:
++            return None
++        cands.sort(reverse=True)
++        yaw = cands[0][1]
++        k = self.fail.get(name, 0)
++        if k % 2 == 1 and len(cands) > 1:
++            yaw = cands[1][1]
++        return self._best_equiv_yaw(yaw, q)
++
++    def _best_equiv_yaw(self, yaw, q):
++        # yaw and yaw+pi are equivalent grasps; pick the one nearer the current tool yaw
++        T, _, _ = fk(q)
++        cur = np.arctan2(T[1, 0], T[0, 0])
++        opts = [yaw, wrap(yaw + PI)]
++        return min(opts, key=lambda a: abs(wrap(a - cur)))
++
++    def _safe_z(self, boxes, held_hz=0.0, held_off=0.0):
++        top = 0.1
++        for n, b in boxes.items():
++            if b["g"] > 0.5:
++                continue
++            top = max(top, b["z"] + b["hz"])
++        return max(0.34, top + 0.03 + held_hz + held_off + FINGER)
++
++    def _drop_spot(self, boxes, name):
++        reg = self._region(boxes)
++        b = boxes[name]
++        best, bs = None, -1e9
++        for x in np.arange(0.15, 0.46, 0.025):
++            for y in np.arange(-0.3, 0.31, 0.025):
++                clr = 1e9
++                for n, o in boxes.items():
++                    if n == name:
++                        continue
++                    m = 0.05 if n != "target_region" else 0.03
++                    dx = abs(x - o["x"]) - o["hx"] - b["hx"] - m
++                    dy = abs(y - o["y"]) - o["hy"] - b["hy"] - m
++                    clr = min(clr, max(dx, dy))
++                for (px, py) in self.placed_spots:
++                    clr = min(clr, max(abs(x - px), abs(y - py)) - 0.08)
++                dist = np.hypot(x - b["x"], y - b["y"])
++                score = min(clr, 0.04) * 10 - dist
++                if score > bs:
++                    bs, best = score, (x, y)
++        return best
++
++    # ---------------------------------------------------------------- planning
++    def _plan_pick_place(self, state, name, place_xy, place_bottom, final_yaw=None):
++        boxes = self._boxes(state)
++        q = self._q(state)
++        b = boxes[name]
++        yaw = self._choose_yaw(boxes, name, q)
++        if yaw is None:
++            yaw = self._best_equiv_yaw(0.0, q)
++        T, _, _ = fk(q)
++        safe0 = self._safe_z(boxes)
++        # fingertip at object centre (but not below support+5mm)
++        tip = max(b["z"], b["z"] - b["hz"] + 0.012)
++        grasp_z = tip + FINGER
++        off = grasp_z - b["z"]          # EE z - object centre z while held
++        safe1 = max(self._safe_z(boxes, b["hz"], 0.0) , b["hz"] + off + 0.03 + 0.15)
++        safe1 = max(safe1, self._safe_z({k: v for k, v in boxes.items() if k != name}) + b["hz"])
++        segs = []
++        segs.append(("move", np.array([T[0, 3], T[1, 3], max(T[2, 3], safe0)]), None))
++        segs.append(("move", np.array([b["x"], b["y"], max(safe0, safe1)]), yaw))
++        segs.append(("move", np.array([b["x"], b["y"], grasp_z]), yaw, "grasp_descend", name))
++        segs.append(("grip", -1.0, name))
++        segs.append(("move", np.array([b["x"], b["y"], safe1]), yaw))
++        pyaw = yaw if final_yaw is None else final_yaw
++        place_z = place_bottom + b["hz"] + off
++        segs.append(("move", np.array([place_xy[0], place_xy[1], safe1]), pyaw))
++        segs.append(("move", np.array([place_xy[0], place_xy[1], place_z]), pyaw, "place_descend"))
++        segs.append(("grip", 1.0, None))
++        segs.append(("move", np.array([place_xy[0], place_xy[1], max(safe1, place_z + 0.05)]), pyaw))
++        return segs
++
++    def _replan(self, state):
++        boxes = self._boxes(state)
++        reg = self._region(boxes)
++        blk = self._blocking(boxes)
++        blk = [n for n in blk if self.fail.get(n, 0) < 6]
++        if blk:
++            # most accessible first: highest grasp clearance
++            q = self._q(state)
++            blk.sort(key=lambda n: -max(self._grasp_clear(boxes, n, 0.0),
++                                         self._grasp_clear(boxes, n, PI / 2)))
++            name = blk[0]
++            spot = self._drop_spot(boxes, name)
++            self.placed_spots.append(spot)
++            b = boxes[name]
++            bottom = 0.075 + 0.002
++            return self._plan_pick_place(state, name, spot, bottom)
++        # place target block
++        tb = boxes["target_block"]
++        return self._plan_pick_place(state, "target_block", (reg["x"], reg["y"]),
++                                     reg["z"] + reg["hz"] + 0.0005)
++
++    # ---------------------------------------------------------------- control
++    def get_action(self, state):
++        q = self._q(state)
++        act = np.zeros(11, dtype=np.float32)
++        # detect rejected motion
++        rejected = False
++        if self.last_cmd is not None and self.last_q is not None:
++            if np.max(np.abs(self.last_cmd)) > 1e-6 and np.max(np.abs(q - self.last_q)) < 1e-7:
++                rejected = True
++        self.last_q = q.copy()
++        self.last_cmd = None
++
++        if rejected and self.cur is not None and self.cur[0] == "move":
++            self._handle_reject(state)
++
++        for _ in range(20):
++            if self.cur is None:
++                if not self.segs:
++                    self.segs = self._replan(state)
++                self.cur = self.segs.pop(0)
++                self.stuck = 0
++            seg = self.cur
++            if seg[0] == "grip":
++                act[10] = seg[1]
++                self.cur = None
++                self.last_cmd = np.zeros(7)
++                return act
++            # move segment
++            goal, yaw = seg[1], seg[2]
++            T, _, _ = fk(q)
++            if yaw is None:
++                Rt = T[:3, :3]
++                Rt = down_R(np.arctan2(T[1, 0], T[0, 0])) if abs(T[2, 2] + 1) < 0.2 else Rt
++            else:
++                Rt = down_R(yaw)
++            p = T[:3, 3]
++            d = goal - p
++            rerr = np.linalg.norm(_rotvec(Rt @ T[:3, :3].T))
++            if np.linalg.norm(d) < 5e-4 and rerr < 2e-3:
++                self.cur = None
++                continue
++            # intermediate cartesian target
++            step = 0.04
++            nd = np.linalg.norm(d)
++            tgt = goal if nd < step else p + d * step / nd
++            qt, err = ik(q, tgt, Rt)
++            dq = qt - q
++            m = np.max(np.abs(dq))
++            if m > 0.2:
++                dq *= 0.2 / m
++            if m < 1e-6:
++                self.cur = None
++                continue
++            act[3:10] = dq.astype(np.float32)
++            self.last_cmd = dq
++            return act
++        return act
++
++    def _handle_reject(self, state):
++        seg = self.cur
++        tag = seg[3] if len(seg) > 3 else None
++        self.stuck += 1
++        if tag == "place_descend":
++            # contact: just release here
++            self.cur = None
++            return
++        if tag == "grasp_descend":
++            # can't reach grasp pose: grasp at current height if fingertips reach object, else retry
++            name = seg[4]
++            boxes = self._boxes(state)
++            b = boxes[name]
++            T, _, _ = fk(self._q(state))
++            tip = T[2, 3] - FINGER
++            if tip < b["z"] + b["hz"] - 0.006:
++                self.cur = None
++                return
++            self.fail[name] = self.fail.get(name, 0) + 1
++            T, _, _ = fk(self._q(state))
++            self.segs = [("move", np.array([T[0, 3], T[1, 3], T[2, 3] + 0.08]), None)]
++            self.cur = None
++            return
++        # generic: go up a bit, then replan
++        T, _, _ = fk(self._q(state))
++        self.segs = [("move", np.array([T[0, 3], T[1, 3], T[2, 3] + 0.03]), None)]
++        self.cur = None
+diff --git a/probe_base_11.py b/probe_base_11.py
+new file mode 100644
+index 0000000..ff321d0
+--- /dev/null
++++ b/probe_base_11.py
+@@ -0,0 +1,49 @@
++from env_client import make_env
++from probe_base_fk import fk
++import numpy as np
++def ik(p, q, tool=0.12, it=300):
++    q=np.array(q,float)
++    for _ in range(it):
++        def err(q):
++            T=fk(q,tool); return np.concatenate([T[:3,3]-p, 0.3*(T[:3,2]-np.array([0,0,-1]))])
++        e=err(q)
++        if np.linalg.norm(e)<1e-5: break
++        J=np.zeros((6,7))
++        for i in range(7):
++            dq=np.zeros(7); dq[i]=1e-5; J[:,i]=(err(q+dq)-e)/1e-5
++        q=q-J.T@np.linalg.solve(J@J.T+1e-4*np.eye(6),e)
++    return q, np.linalg.norm(e)
++env=make_env()
++def goto(obs,R,qt):
++    """move joints to qt in steps<=0.1; return (obs, rejected_flag)"""
++    for _ in range(200):
++        q=np.array([obs.get(R,f"joint_{i}") for i in range(1,8)])
++        d=np.clip(qt-q,-0.1,0.1)
++        if np.abs(d).max()<1e-6: return obs,False
++        a=np.zeros(11,np.float32); a[3:10]=d; a[10]=1
++        obs,*_=env.step(a)
++        q2=np.array([obs.get(R,f"joint_{i}") for i in range(1,8)])
++        if np.allclose(q2,q): return obs,True
++    return obs,False
++def objs(obs): return {o.name: np.array(obs.data[o][:3],dtype=float) for o in obs.data if o.name!="robot"}
++for seed in [1,0,2]:
++    obs,_=env.reset(seed=seed); R=obs.get_object_from_name("robot")
++    base=np.array([obs.get(R,"pos_base_x"),obs.get(R,"pos_base_y")])
++    TB=obs.get_object_from_name("target_block")
++    tb=np.array([obs.get(TB,"pose_x"),obs.get(TB,"pose_y")])
++    for label,xy in [("above block",tb),("empty spot",tb+np.array([0,0.15 if tb[1]<0 else -0.15]))]:
++        obs,_=env.reset(seed=seed); o0=objs(obs)
++        rel=xy-base
++        qh=np.array([0,0.26,np.pi,-2.27,0,0.96,np.pi/2])
++        obs,rj=goto(obs,R,qh)
++        q=qh; last=None
++        for zr in np.arange(0.40,-0.6,-0.01):
++            qt,err=ik(np.array([rel[0],rel[1],zr]),q)
++            if err>1e-3: print("ik fail",zr); break
++            obs,rj=goto(obs,R,qt); q=qt
++            if rj: break
++            last=zr
++        o=objs(obs)
++        mv={k:np.round(o[k]-o0[k],3) for k in o0 if np.abs(o[k]-o0[k]).max()>1e-6}
++        print(f"seed{seed} {label} xy={np.round(xy,3)}: lowest ok z_rel={last}, rejected={rj}, moved={mv}")
++env.close()
+diff --git a/probe_base_12.py b/probe_base_12.py
+new file mode 100644
+index 0000000..2a151b6
+--- /dev/null
++++ b/probe_base_12.py
+@@ -0,0 +1,17 @@
++import numpy as np, sys
++sys.argv=['x']
++exec(open('probe_base_11.py').read().split("for seed in")[0])
++for seed in [1,0]:
++    obs,_=env.reset(seed=seed); R=obs.get_object_from_name("robot"); o0=objs(obs)
++    base=np.array([obs.get(R,"pos_base_x"),obs.get(R,"pos_base_y")])
++    TB=obs.get_object_from_name("target_block"); tb=np.array([obs.get(TB,"pose_x"),obs.get(TB,"pose_y")])
++    rel=tb-base; q=np.array([0,0.26,np.pi,-2.27,0,0.96,np.pi/2]); obs,_=goto(obs,R,q)
++    for zr in np.arange(0.40,0.105,-0.01):
++        q,_=ik(np.array([rel[0],rel[1],zr]),q); obs,rj=goto(obs,R,q)
++    # scan xy offsets at this height for grasp
++    a=np.zeros(11,np.float32); a[10]=-1
++    obs,*_=env.step(a); print("seed",seed,"close at block: finger",obs.get(R,"finger_state"),"grasp",obs.get(R,"grasp_active"), "TB grasp",obs.get(TB,"grasp_active"))
++    for zr in np.arange(0.11,0.3,0.02):
++        q,_=ik(np.array([rel[0],rel[1],zr]),q); obs,rj=goto(obs,R,q)
++    o=objs(obs); print(" after lift moved:",{k:np.round(o[k]-o0[k],3) for k in o0 if np.abs(o[k]-o0[k]).max()>1e-6})
++env.close()
+diff --git a/probe_base_13.py b/probe_base_13.py
+new file mode 100644
+index 0000000..fb11a0d
+--- /dev/null
++++ b/probe_base_13.py
+@@ -0,0 +1,7 @@
++from env_client import make_env
++import numpy as np
++env=make_env(); obs,_=env.reset(seed=1); R=obs.get_object_from_name("robot")
++for g in [-1,-1,-1,1,1,0,-0.3,-0.6]:
++    a=np.zeros(11,np.float32); a[10]=g; obs,r,te,tr,info=env.step(a)
++    print(g, obs.get(R,"finger_state"), obs.get(R,"grasp_active"), r, te, info)
++env.close()
+diff --git a/probe_base_fk.py b/probe_base_fk.py
+new file mode 100644
+index 0000000..312a7e7
+--- /dev/null
++++ b/probe_base_fk.py
+@@ -0,0 +1,16 @@
++import numpy as np
++D=[(np.pi/2,-(0.1564+0.1284),0),(np.pi/2,-(0.0054+0.0064),np.pi),(np.pi/2,-(0.2104+0.2104),np.pi),
++   (np.pi/2,-(0.0064+0.0064),np.pi),(np.pi/2,-(0.2084+0.1059),np.pi),(np.pi/2,0,np.pi),(np.pi,-(0.1059+0.0615),np.pi)]
++def dh(al,d,th):
++    ca,sa,ct,st=np.cos(al),np.sin(al),np.cos(th),np.sin(th)
++    return np.array([[ct,-st*ca,st*sa,0],[st,ct*ca,-ct*sa,0],[0,sa,ca,d],[0,0,0,1]])
++def fk(q,tool=0.0):
++    T=dh(np.pi,0,0)
++    for (al,d,off),qi in zip(D,q): T=T@dh(al,d,qi+off)
++    T=T@np.array([[1,0,0,0],[0,1,0,0],[0,0,1,tool],[0,0,0,1]])
++    return T
++if __name__=="__main__":
++    q0=[0,-0.35,-np.pi,-2.5,0,-0.87,np.pi/2]
++    for j2 in [-0.35,0.0,0.35,0.7]:
++        q=list(q0); q[1]=j2; T=fk(q,0.12); print(j2, np.round(T[:3,3],3), "zaxis",np.round(T[:3,2],2))
++    print("home",np.round(fk([0,0.26,np.pi,-2.27,0,0.96,np.pi/2],0.12)[:3,3],3))
+diff --git a/probe_place.py b/probe_place.py
+new file mode 100644
+index 0000000..d5bcb52
+--- /dev/null
++++ b/probe_place.py
+@@ -0,0 +1,38 @@
++from env_client import make_env
++from kin import *
++import numpy as np, sys
++env = make_env()
++R=None
++def q_of(o): return np.array([o.get(R,f'joint_{i}') for i in range(1,8)])
++def goto(obs, qt, grip=0.0, maxn=40):
++    for _ in range(maxn):
++        q = q_of(obs); d = qt - q
++        if np.max(np.abs(d)) < 1e-4: break
++        a = np.zeros(11, np.float32); a[3:10] = np.clip(d,-.2,.2); a[10] = grip
++        obs2, r, te, tr, info = env.step(a)
++        if np.allclose(q_of(obs2), q): return obs2, False
++        obs = obs2
++    return obs, True
++base=(0,0,0); yaw=1.5708
++obs, info = env.reset(seed=0)
++R = obs.get_object_from_name("robot"); B = obs.get_object_from_name("target_block")
++bx, by = obs.get(B,'pose_x'), obs.get(B,'pose_y')
++q=q_of(obs)
++for z in [0.4,0.33,0.255]:
++    qt,e = ik(q, np.array([bx,by,z]), down_R(yaw), base); obs,ok=goto(obs,qt); q=q_of(obs)
++a=np.zeros(11,np.float32); a[10]=-1; obs,*_=env.step(a)
++tx,ty=0.3,-0.1
++for p in [(bx,by,0.35),(tx,ty,0.35),(tx,ty,0.30),(tx,ty,0.27),(tx,ty,0.26)]:
++    qt,e = ik(q, np.array(p), down_R(yaw), base); obs,ok=goto(obs,qt); q=q_of(obs); print(p, ok, np.round(obs.data[B][:3],4))
++for z in np.arange(0.26,0.24,-0.001):
++    qt,e = ik(q, np.array([tx,ty,z]), down_R(yaw), base); obs,ok=goto(obs,qt); q=q_of(obs)
++    if not ok: print("stop", z, np.round(obs.data[B][:3],4)); break
++a=np.zeros(11,np.float32); a[10]=1; obs,r,te,*_=env.step(a); print("open", np.round(obs.data[R][10:12],3), np.round(obs.data[B][:3],4), r, te)
++qt,e = ik(q, np.array([tx,ty,0.35]), down_R(yaw), base); obs,ok=goto(obs,qt); print("up", ok, np.round(obs.data[B][:3],4))
++# regrasp and release in the air
++qt,e = ik(q_of(obs), np.array([tx,ty,ee_pose(q,base)[2,3]]), down_R(yaw), base); obs,ok=goto(obs,qt)
++a=np.zeros(11,np.float32); a[10]=-1; obs,*_=env.step(a); print("regrasp", obs.data[R][11])
++q=q_of(obs); qt,e = ik(q, np.array([tx,ty,0.33]), down_R(yaw), base); obs,ok=goto(obs,qt)
++a=np.zeros(11,np.float32); a[10]=1; obs,*_=env.step(a); print("release air", np.round(obs.data[B][:3],4))
++obs,*_=env.step(np.zeros(11,np.float32)); print("next", np.round(obs.data[B][:3],4))
++env.close()
+diff --git a/probe_tab_ik.py b/probe_tab_ik.py
+new file mode 100644
+index 0000000..28cc961
+--- /dev/null
++++ b/probe_tab_ik.py
+@@ -0,0 +1,16 @@
++from kin import *
++import numpy as np
++q0=np.array([0,0.26,3.14,-2.27,0,0.96,1.57])  # generic seed
++xs=np.round(np.arange(-0.3,0.95,0.05),3); ys=np.round(np.arange(-0.8,0.85,0.05),3)
++for yaw in [0,np.pi/2]:
++  for z in [0.23,0.40]:
++    print("yaw",round(yaw,2),"z",z,"  cols y from",ys[0],"to",ys[-1])
++    for x in xs[::-1]:
++        row=""
++        for y in ys:
++            best=9
++            for s in [q0, np.array([0,0.5,0,1.8,0,1.0,0]), np.array([np.arctan2(y,x),0.3,3.14,-2.0,0,0.9,1.57])]:
++                q,e=ik(s,np.array([x,y,z]),down_R(yaw),(0,0,0)); best=min(best,e)
++                if best<1e-3: break
++            row+="#" if best<1e-3 else "."
++        print("%+.2f "%x+row)
+diff --git a/probe_tab_info.py b/probe_tab_info.py
+new file mode 100644
+index 0000000..3e972d5
+--- /dev/null
++++ b/probe_tab_info.py
+@@ -0,0 +1,20 @@
++from env_client import make_env
++from kin import *
++import numpy as np
++env = make_env()
++for seed in [0,1,2]:
++    obs, info = env.reset(seed=seed)
++    for o in obs:
++        pass
++    print(type(obs))
++    try:
++        names=[o.name for o in obs]
++    except Exception as e: names=None; print(e)
++    print(names)
++    for n in names or []:
++        o=obs.get_object_from_name(n)
++        f=[k for k in ['pose_x','pose_y','pose_z','half_extent_x','half_extent_y','half_extent_z'] ]
++        try: print(n,[round(float(obs.get(o,k)),3) for k in f])
++        except Exception as e: print(n,e)
++st=env.get_state(); print(type(st), str(st)[:300])
++env.close()
+diff --git a/test_approach.py b/test_approach.py
+new file mode 100644
+index 0000000..33858d2
+--- /dev/null
++++ b/test_approach.py
+@@ -0,0 +1,24 @@
++import sys, time, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++def run(seed, verbose=False):
++    env = make_env()
++    obs, info = env.reset(seed=seed)
++    ap = GeneratedApproach(env.action_space, env.observation_space, {})
++    t = time.time(); ap.reset(obs, info)
++    ret = 0; steps = 0; term = False
++    for steps in range(1, env.max_steps + 1):
++        a = ap.get_action(obs)
++        obs, r, term, trunc, info = env.step(a)
++        ret += r
++        if term or trunc: break
++    dt = time.time() - t
++    env.close()
++    return seed, info.get('object_count'), term, steps, round(dt, 1)
++if __name__ == "__main__":
++    from concurrent.futures import ThreadPoolExecutor
++    seeds = list(range(int(sys.argv[1]), int(sys.argv[2])))
++    with ThreadPoolExecutor(8) as ex:
++        res = list(ex.map(run, seeds))
++    for r in res: print(r)
++    print("success", sum(r[2] for r in res), "/", len(res), "mean steps", np.mean([r[3] for r in res]))

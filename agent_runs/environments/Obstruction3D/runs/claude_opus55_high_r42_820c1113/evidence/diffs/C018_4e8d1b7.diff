@@ -1,0 +1,29 @@
+diff --git a/approach.py b/approach.py
+index 576849c..1660a1c 100644
+--- a/approach.py
++++ b/approach.py
+@@ -8,6 +8,7 @@ TABLE_Z = 0.075
+ TABLE_X = (0.10, 0.50)
+ TABLE_Y = (-0.40, 0.40)
+ ROUTE_MARGIN = 0.02
++W_TRAVEL = 0.15
+ SAFE_MARGIN = 0.03
+ VSTEP = 0.08
+ HSTEP = 0.10
+@@ -171,7 +172,7 @@ class GeneratedApproach:
+                 bad = any(np.hypot(x - b[0], y - b[1]) < 0.04 for b in self.fail.get(name, []))
+                 if bad:
+                     continue
+-                v = min(clear, 0.05) + min(kb, 0.10) - 0.08 * np.hypot(x - p0[0], y - p0[1]) - 0.2 * self._tilt_needed(np.hypot(*(xy - self._mount())))
++                v = min(clear, 0.03) + min(kb, 0.06) - W_TRAVEL * (np.hypot(x - p0[0], y - p0[1]) + np.hypot(x - bp[0], y - bp[1])) - 0.2 * self._tilt_needed(np.hypot(*(xy - self._mount())))
+                 if v > bestv:
+                     bestv, best = v, xy
+         if best is None:
+diff --git a/sweep6.txt b/sweep6.txt
+new file mode 100644
+index 0000000..67e7bd1
+--- /dev/null
++++ b/sweep6.txt
+@@ -0,0 +1,2 @@
++success 100/100  mean steps(success) 23.6  max compute 1.0s
++success 40/40  mean steps(success) 61.4  max compute 1.7s

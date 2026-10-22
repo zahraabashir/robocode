@@ -1,0 +1,26 @@
+diff --git a/approach.py b/approach.py
+index 42bb90e..db6f690 100644
+--- a/approach.py
++++ b/approach.py
+@@ -100,7 +100,8 @@ class GeneratedApproach:
+         pd = float(np.linalg.norm(dp))
+ 
+         if self.mode == "choose":
+-            if abs(ae) > 0.11:
++            branch_mismatch = pd < 0.06 and abs(goal_theta-theta) > 0.14
++            if abs(ae) > 0.11 or branch_mismatch:
+                 self.turn_sign = 1.0 if ae > 0.0 else -1.0
+                 self.mode = "rot_far"
+                 side = -self.turn_sign
+@@ -178,6 +179,11 @@ class GeneratedApproach:
+             self.count += 1
+             moved = float(np.linalg.norm(obj - self.start_pose[:2]))
+             now_ae = abs(self._angle(goal_theta - theta))
++            # Release immediately upon arrival or after crossing the goal;
++            # another inward step can overshoot substantially under contact.
++            if pd < 0.022 or np.dot(dp, self.push_dir) < 0.0:
++                self.mode = "move_retreat"
++                return self._safe(-self.push_dir, 0.018)
+             # Once contact is established, keep following through in short
+             # closed-loop segments instead of paying to reacquire every time.
+             if moved > 0.14 and now_ae < 0.11 and pd > 0.05:

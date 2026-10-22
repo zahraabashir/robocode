@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index dc0aba0..d792798 100644
+--- a/approach.py
++++ b/approach.py
+@@ -89,7 +89,7 @@ class GeneratedApproach:
+     def _dist(a, b):
+         return math.hypot(a[0] - b[0], a[1] - b[1])
+ 
+-    def _blocked(self, p, extra=None, margin=0.22):
++    def _blocked(self, p, extra=None, margin=0.19):
+         x, y = p
+         if x < -2.38 or x > 2.38 or y < -2.38 or y > 2.38:
+             return True

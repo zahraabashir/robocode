@@ -1,0 +1,472 @@
+diff --git a/approach.py b/approach.py
+index 4ef9310..1c11df4 100644
+--- a/approach.py
++++ b/approach.py
+@@ -1,5 +1,9 @@
+ """Approach for Obstruction2DEnv: clear obstructions off the target surface,
+-then pick the target block and place it on the surface."""
++then pick the target block and place it on the surface.
++
++Robot is kept pointing straight down (theta=-pi/2) with arm fully extended.
++Motions between key poses are planned with a small collision-checked
++path search (plateau paths with diagonal rise/fall)."""
+ import math
+ import numpy as np
+ 
+@@ -7,16 +11,17 @@ FLOOR = 0.1
+ X_MIN, X_MAX = 0.1005, 1.5175   # robot base x limits
+ Y_MAX = 0.895                   # robot base y limit
+ WORLD_X = 1.618
+-BASE_R = 0.1
+-GRIP_OFF = 0.205                # base center to gripper tip (arm 0.2 + half gripper width)
+-GAP = 0.0015
++GAP = 0.0015                    # gripper gap above object when grasping
++PLACE_GAP = 0.004               # object gap above floor when releasing
++SPEED = 0.05
++
++
++def _cheb(a, b):
++    return max(abs(a[0] - b[0]), abs(a[1] - b[1]))
+ 
+ 
+-def _objs(state, tname):
+-    out = []
+-    for o in state.get_object_names() if False else []:
+-        pass
+-    return out
++def _nsteps(path):
++    return sum(math.ceil(_cheb(path[i], path[i + 1]) / SPEED - 1e-6) for i in range(len(path) - 1))
+ 
+ 
+ class GeneratedApproach:
+@@ -26,7 +31,7 @@ class GeneratedApproach:
+         self.low = np.asarray(action_space.low, dtype=np.float32)
+         self.high = np.asarray(action_space.high, dtype=np.float32)
+ 
+-    # ------------------------------------------------------------------ utils
++    # ------------------------------------------------------------------ parse
+     def _parse(self, state):
+         robot = None
+         rects = {}
+@@ -40,7 +45,7 @@ class GeneratedApproach:
+                 block = o
+             elif tn == "target_surface":
+                 surface = o
+-            elif tn == "rectangle":
++            elif tn in ("rectangle",):
+                 rects[o.name] = o
+         g = lambda o, f: float(state.get(o, f))
+         self.robot = dict(x=g(robot, "x"), y=g(robot, "y"), theta=g(robot, "theta"),
+@@ -48,6 +53,7 @@ class GeneratedApproach:
+                           arm_max=g(robot, "arm_length"),
+                           gw=g(robot, "gripper_width"), gh=g(robot, "gripper_height"),
+                           r=g(robot, "base_radius"))
++
+         def box(o):
+             return dict(name=o.name, x=g(o, "x"), y=g(o, "y"), w=g(o, "width"), h=g(o, "height"))
+         self.block = box(block)
+@@ -59,34 +65,103 @@ class GeneratedApproach:
+         d[self.block["name"]] = self.block
+         return d
+ 
++    def _grip_off(self):
++        return self.robot["arm_max"] + self.robot["gw"] / 2.0
++
++    # --------------------------------------------------------- collision check
++    def _collides(self, pts, obstacles, carried, margin_map, default_margin):
++        """pts: (N,2) base positions. carried: (dx0, dx1, dy0, dy1) rel to base or None.
++        obstacles: list of boxes. Returns True if any sample collides."""
++        X = pts[:, 0]
++        Y = pts[:, 1]
++        r = self.robot["r"]
++        half = self.robot["gh"] / 2.0
++        go = self._grip_off()
++        if np.any(X < X_MIN - 1e-6) or np.any(X > X_MAX + 1e-6) or np.any(Y > Y_MAX + 1e-6):
++            return True
++        # boxes attached to robot: gripper/arm, carried
++        att = [(X - half, X + half, Y - go, Y)]
++        if carried is not None:
++            att.append((X + carried[0], X + carried[1], Y + carried[2], Y + carried[3]))
++        # floor
++        if np.any(Y - r < FLOOR + 0.002):
++            return True
++        for (x0, x1, y0, y1) in att:
++            if np.any(y0 < FLOOR + 0.001):
++                return True
++        for o in obstacles:
++            m = margin_map.get(o["name"], default_margin)
++            ox0, ox1 = o["x"] - m, o["x"] + o["w"] + m
++            oy0, oy1 = o["y"] - m, o["y"] + o["h"] + m
++            # circle vs rect
++            cx = np.clip(X, ox0, ox1)
++            cy = np.clip(Y, oy0, oy1)
++            if np.any((X - cx) ** 2 + (Y - cy) ** 2 < r * r):
++                return True
++            for (x0, x1, y0, y1) in att:
++                if np.any((x0 < ox1) & (x1 > ox0) & (y0 < oy1) & (y1 > oy0)):
++                    return True
++        return False
++
++    def _path_free(self, path, obstacles, carried, margin_map, m):
++        for i in range(len(path) - 1):
++            a, b = np.array(path[i]), np.array(path[i + 1])
++            L = max(np.linalg.norm(b - a), 1e-9)
++            n = int(L / 0.003) + 2
++            t = np.linspace(0, 1, n)[:, None]
++            pts = a[None] * (1 - t) + b[None] * t
++            if self._collides(pts, obstacles, carried, margin_map, m):
++                return False
++        return True
++
++    def _plan_path(self, A, B, obstacles, carried, special_margin=None):
++        """Find short collision-free polyline from A to B."""
++        m = 0.004
++        margin_map = {}
++        # obstacles in contact at endpoints get zero margin
++        for o in obstacles:
++            for P in (A, B):
++                if self._collides(np.array([P]), [o], carried, {}, m):
++                    margin_map[o["name"]] = 0.0
++        if special_margin:
++            margin_map.update(special_margin)
++        cands = [[A, B]]
++        sgn = 1.0 if B[0] >= A[0] else -1.0
++        hs = np.arange(max(A[1], B[1]), Y_MAX + 1e-9, 0.01)
++        hs = np.append(hs, Y_MAX)
++        for h in hs:
++            for k1 in (1.0, 0.5, 0.0):
++                for k2 in (1.0, 0.5, 0.0):
++                    x1 = A[0] + sgn * k1 * (h - A[1])
++                    x2 = B[0] - sgn * k2 * (h - B[1])
++                    if sgn * (x2 - x1) <= 0:
++                        # triangle: find intersection point
++                        continue
++                    p = [A, (x1, h), (x2, h), B]
++                    cands.append(p)
++            # triangle via single apex
++            for xv in np.linspace(A[0], B[0], 9)[1:-1]:
++                cands.append([A, (xv, h), B])
++        scored = sorted(((_nsteps(p), len(p), i) for i, p in enumerate(cands)))
++        checked = 0
++        for s, _, i in scored:
++            p = cands[i]
++            checked += 1
++            if checked > 400:
++                break
++            if self._path_free(p, obstacles, carried, margin_map, m):
++                return p
++        # fallback: straight up, over, down
++        return [A, (A[0], Y_MAX), (B[0], Y_MAX), B]
++
+     # --------------------------------------------------------------- planning
+     def reset(self, state, info):
+         self.plan = []
+-        self.cur = None
+         self.stall = 0
+         self.last_pos = None
+-        self.held = None
+-        self.grasp_offset = None
+-        self.fail_count = {}
+-        self.moved_away = set()
+-
+-    def _grip_off(self):
+-        return self.robot["arm_max"] + self.robot["gw"] / 2.0
+-
+-    def _max_top(self, exclude=()):
+-        t = FLOOR
+-        for n, b in self._all_movable().items():
+-            if n in exclude:
+-                continue
+-            t = max(t, b["y"] + b["h"])
+-        return t
+-
+-    def _travel_y(self, carried_h, exclude=()):
+-        need = self._max_top(exclude) + 0.03 + self._grip_off() + carried_h
+-        return min(Y_MAX, max(need, 0.0))
++        self.target_name = None
+ 
+     def _grasp_x(self, b, others):
+-        """Choose base x above object b such that base doesn't hit taller neighbors."""
+         half = self.robot["gh"] / 2.0
+         lo, hi = b["x"] + half + 0.003, b["x"] + b["w"] - half - 0.003
+         if hi < lo:
+@@ -122,97 +197,94 @@ class GeneratedApproach:
+                 return x
+         return None
+ 
+-    def _free_spot(self, b, others, forbid):
+-        """Find x (left edge) on the floor for box b avoiding others and forbid intervals."""
++    def _free_spot(self, b, others, forbid, gx_rel, gpos, next_pos):
++        """Find (left x, bottom y) for box b on floor avoiding others and forbid."""
+         w = b["w"]
+         m = 0.03
+         ivs = [(o["x"] - m, o["x"] + o["w"] + m) for o in others] + forbid
+-        cur_c = b["x"] + w / 2
+         best = None
+-        for c in np.arange(X_MIN, X_MAX, 0.005):
+-            x0 = c - w / 2
++        off = gpos[1] - b["y"]
++        for bx in np.arange(X_MIN, X_MAX, 0.005):
++            x0 = bx - gx_rel
+             if x0 < 0.0 or x0 + w > WORLD_X:
+                 continue
+             if any(x0 < i1 and x0 + w > i0 for i0, i1 in ivs):
+                 continue
+-            # base clearance check wrt taller neighbours when descending
+-            cost = abs(c - cur_c)
++            P = (bx, FLOOR + PLACE_GAP + off)
++            cost = _cheb(gpos, P) + _cheb(P, next_pos)
+             if best is None or cost < best[0]:
+                 best = (cost, x0)
+         if best is not None:
+             return best[1], FLOOR
+-        # fallback: stack on top of some other object far from surface
++        # fallback: stack on top of some other object away from surface
+         best = None
+         for o in others:
+-            c = o["x"] + o["w"] / 2
+             if any(o["x"] < i1 and o["x"] + o["w"] > i0 for i0, i1 in forbid):
+                 continue
+             top = o["y"] + o["h"]
+-            cost = top
+-            if best is None or cost < best[0]:
+-                best = (cost, c - w / 2, top)
++            x0 = o["x"] + o["w"] / 2 - w / 2
++            if best is None or top < best[0]:
++                best = (top, x0)
+         if best is not None:
+-            return best[1], best[2]
++            return best[1], best[0]
+         return None
+ 
+     def _make_plan(self):
+-        """Create a list of waypoints: dict(x, y, vac, kind)."""
++        """Returns list of segments: each (waypoint list, vac, kind)."""
+         s = self.surface
+         s0, s1 = s["x"], s["x"] + s["w"]
++        movable = self._all_movable()
+         blockers = [b for n, b in self.obst.items()
+                     if b["x"] < s1 + 0.005 and b["x"] + b["w"] > s0 - 0.005]
++        rx, ry = self.robot["x"], self.robot["y"]
+         if blockers:
+-            # nearest blocker to robot
+-            rx = self.robot["x"]
+             tgt = min(blockers, key=lambda b: abs(b["x"] + b["w"] / 2 - rx))
+-            others = [b for n, b in self._all_movable().items() if n != tgt["name"]]
+-            forbid = [(s0 - 0.03, s1 + 0.03)]
+-            spot = self._free_spot(tgt, others, forbid)
+-            if spot is None:
+-                spot = (0.0, FLOOR)
+-            dest_x, dest_y = spot
+         else:
+             tgt = self.block
+-            others = [b for n, b in self.obst.items()]
+-            dest_x = s0 + (s["w"] - tgt["w"]) / 2
+-            dest_y = FLOOR
++        gx = None
+         for _ in range(10):
+-            others = [b for n, b in self._all_movable().items() if n != tgt["name"]]
++            others = [b for n, b in movable.items() if n != tgt["name"]]
+             gx = self._grasp_x(tgt, others)
+             if gx is not None or self.grasp_conflict is None:
+                 break
+             tgt = self.grasp_conflict
+-            others = [b for n, b in self._all_movable().items() if n != tgt["name"]]
+-            forbid = [(s0 - 0.03, s1 + 0.03)]
+-            spot = self._free_spot(tgt, others, forbid)
+-            if spot is None:
+-                spot = (0.0, FLOOR)
+-            dest_x, dest_y = spot
+         if gx is None:
+             gx = min(max(tgt["x"] + tgt["w"] / 2, X_MIN), X_MAX)
++        others = [b for n, b in movable.items() if n != tgt["name"]]
+         self.target_name = tgt["name"]
+-        others = [b for n, b in self._all_movable().items() if n != tgt["name"]]
++        is_block = tgt["name"] == self.block["name"]
+         gy = tgt["y"] + tgt["h"] + self._grip_off() + GAP
+-        ty_empty = max(self._travel_y(0.0), self.robot["y"] if False else 0)
+-        ty_empty = max(ty_empty, gy)
+-        plan = []
+-        plan.append(dict(x=self.robot["x"], y=max(self.robot["y"], ty_empty), vac=0, kind="move"))
+-        plan.append(dict(x=gx, y=max(self.robot["y"], ty_empty), vac=0, kind="move"))
+-        plan.append(dict(x=gx, y=gy, vac=0, kind="descend"))
+-        plan.append(dict(x=gx, y=gy, vac=1, kind="grasp"))
+-        off = gy - tgt["y"]  # base y minus object bottom
+-        ty_c = max(self._travel_y(tgt["h"] + 0.005, exclude=(tgt["name"],)), gy)
+-        # carried object must clear things; object bottom = base_y - off
+-        ty_c = min(Y_MAX, max(ty_c, self._max_top((tgt["name"],)) + 0.03 + off))
+-        dx = dest_x + (gx - tgt["x"])
+-        dx = min(max(dx, X_MIN), X_MAX)
+-        py = dest_y + off + 0.004
+-        plan.append(dict(x=gx, y=ty_c, vac=1, kind="lift"))
+-        plan.append(dict(x=dx, y=ty_c, vac=1, kind="carry"))
+-        plan.append(dict(x=dx, y=py, vac=1, kind="lower"))
+-        plan.append(dict(x=dx, y=py, vac=0, kind="release"))
+-        plan.append(dict(x=dx, y=ty_c, vac=0, kind="retreat"))
+-        return plan
++        gpos = (gx, gy)
++        off = gy - tgt["y"]
++        gx_rel = gx - tgt["x"]
++        if is_block:
++            dest_x = s0 + (s["w"] - tgt["w"]) / 2
++            dest_y = FLOOR + 0.012 - PLACE_GAP
++        else:
++            b = self.block
++            bgx = b["x"] + b["w"] / 2
++            next_pos = (bgx, b["y"] + b["h"] + self._grip_off() + GAP)
++            forbid = [(s0 - 0.03, s1 + 0.03)]
++            spot = self._free_spot(tgt, others, forbid, gx_rel, gpos, next_pos)
++            if spot is None:
++                spot = (tgt["x"], min(0.6, tgt["y"] + 0.3))
++            dest_x, dest_y = spot
++        px = min(max(dest_x + gx_rel, X_MIN), X_MAX)
++        py = dest_y + off + PLACE_GAP
++        # approach path (nothing carried)
++        p1 = self._plan_path((rx, ry), gpos, others + [tgt], None,
++                             special_margin={tgt["name"]: 0.0})
++        carried = (tgt["x"] - gx, tgt["x"] + tgt["w"] - gx, tgt["y"] - gy, tgt["y"] + tgt["h"] - gy)
++        p2 = self._plan_path(gpos, (px, py), others, carried)
++        segs = []
++        for w in p1[1:]:
++            segs.append(dict(x=w[0], y=w[1], vac=0, kind="move"))
++        segs.append(dict(x=gx, y=gy, vac=1, kind="grasp"))
++        for w in p2[1:]:
++            segs.append(dict(x=w[0], y=w[1], vac=1, kind="carry"))
++        # release on the final step of the carry
++        segs[-1]["release_last"] = not is_block
++        return segs
+ 
+     # ---------------------------------------------------------------- control
+     def get_action(self, state):
+@@ -221,20 +293,14 @@ class GeneratedApproach:
+         if not self.plan:
+             self.plan = self._make_plan()
+             self.stall = 0
+-        wp = self.plan[0]
+-        # check waypoint reached
+-        for _ in range(12):
++        for _ in range(20):
+             wp = self.plan[0]
+-            reached = abs(r["x"] - wp["x"]) < 1e-4 and abs(r["y"] - wp["y"]) < 1e-4 \
+-                and abs(r["arm"] - r["arm_max"]) < 1e-4
+-            if wp["kind"] in ("grasp", "release"):
+-                reached = (r["vac"] > 0.5) == (wp["vac"] > 0.5)
+-            if wp["kind"] == "lift" and reached:
+-                # verify grasp
+-                t = self._all_movable()[self.target_name]
+-                if abs((r["y"] - t["y"]) - (self.plan[0]["y"] - t["y"])) > 1e-3 or \
+-                        t["y"] < FLOOR + 0.01 and r["y"] > t["y"] + t["h"] + 0.3:
+-                    pass
++            if wp["kind"] == "grasp":
++                reached = r["vac"] > 0.5
++            else:
++                reached = abs(r["x"] - wp["x"]) < 1e-4 and abs(r["y"] - wp["y"]) < 1e-4
++                if wp.get("release_last"):
++                    reached = reached and r["vac"] < 0.5
+             if reached:
+                 self.plan.pop(0)
+                 self.stall = 0
+@@ -243,33 +309,31 @@ class GeneratedApproach:
+                 continue
+             break
+         wp = self.plan[0]
+-        # stall detection
+-        pos = (round(r["x"], 5), round(r["y"], 5), round(r["arm"], 5))
+-        if self.last_pos == pos and wp["kind"] not in ("grasp", "release"):
++        pos = (round(r["x"], 5), round(r["y"], 5), round(r["arm"], 5), round(r["vac"]))
++        if self.last_pos == pos:
+             self.stall += 1
+         else:
+             self.stall = 0
+         self.last_pos = pos
++        dth = -math.pi / 2 - r["theta"]
++        darm = r["arm_max"] - r["arm"]
++        if wp["kind"] == "grasp":
++            return self._act(0, 0, darm, 1, dth)
+         if self.stall >= 2:
+-            if wp["kind"] in ("descend", "lower"):
+-                # can't go lower: accept current height
+-                self.plan.pop(0)
+-                self.stall = 0
+-                if wp["kind"] == "lower":
+-                    pass
+-                return self.get_action(state) if self.plan else self._act(0, 0, 0, wp["vac"])
+-            else:
+-                # try going up a bit, then replan
+-                self.plan = []
+-                self.stall = 0
+-                return self._act(0, 0.05, 0, wp["vac"])
++            # stuck: nudge up and replan
++            self.stall = 0
++            self.plan = []
++            if wp["kind"] == "carry" and wp is not None:
++                return self._act(0, 0.02, 0, 1 if r["vac"] > 0.5 else 0, dth)
++            return self._act(0, 0.02, 0, 0, dth)
+         dx = wp["x"] - r["x"]
+         dy = wp["y"] - r["y"]
+-        if wp["kind"] in ("grasp", "release"):
+-            dx = dy = 0.0
+-        dth = -math.pi / 2 - r["theta"]
+-        darm = r["arm_max"] - r["arm"]
+-        return self._act(dx, dy, darm, wp["vac"], dth)
++        mx = max(abs(dx), abs(dy))
++        sc = min(1.0, SPEED / mx) if mx > 0 else 1.0
++        vac = wp["vac"]
++        if wp.get("release_last") and sc >= 1.0:
++            vac = 0
++        return self._act(dx * sc, dy * sc, darm, vac, dth)
+ 
+     def _act(self, dx, dy, darm, vac, dth=0.0):
+         a = np.array([dx, dy, dth, darm, float(vac)], dtype=np.float32)
+diff --git a/probe4.py b/probe4.py
+new file mode 100644
+index 0000000..e07486e
+--- /dev/null
++++ b/probe4.py
+@@ -0,0 +1,19 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=1)
++r = obs.get_objects(env.observation_space.get_type('crv_robot'))[0]
++b = obs.get_object_from_name('target_block')
++def R(): return [round(float(obs.get(r,f)),4) for f in ['x','y','arm_joint','vacuum']]+[round(float(obs.get(b,f)),4) for f in ['x','y']]
++def step(a):
++    global obs
++    obs,*_ = env.step(np.array(a,dtype=np.float32))
++tx = 0.4976+0.097; gy = 0.1+0.159+0.205+0.0015
++step([0,0,0,0.1,1])
++while abs(R()[0]-tx)>1e-5 or abs(R()[1]-gy)>1e-5:
++    dx=tx-R()[0]; dy=gy-R()[1]; s=min(1,0.05/max(abs(dx),abs(dy)))
++    step([dx*s,dy*s,0,0,1]); print(R())
++step([0,0.05,0,0,1]); print('lift', R())
++# lower back and release on same step
++step([0,-0.05+0.003,0,0,0]); print('lower+release', R())
++step([0,0.05,0,0,0]); print('up', R())
+diff --git a/probe5.py b/probe5.py
+new file mode 100644
+index 0000000..fdf07bf
+--- /dev/null
++++ b/probe5.py
+@@ -0,0 +1,21 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=1)
++r = obs.get_objects(env.observation_space.get_type('crv_robot'))[0]
++b = obs.get_object_from_name('target_block')
++def R(): return [round(float(obs.get(r,f)),4) for f in ['x','y','arm_joint','vacuum']]+[round(float(obs.get(b,f)),4) for f in ['x','y']]
++def step(a):
++    global obs
++    obs,*_ = env.step(np.array(a,dtype=np.float32))
++tx = 0.4976+0.097; gy = 0.1+0.159+0.205+0.0015
++step([0,0,0,0.1,0])
++for i in range(40):
++    dx=tx-R()[0]; dy=gy-R()[1]; s=min(1,0.05/max(abs(dx),abs(dy),1e-9))
++    step([dx*s,dy*s,0,0,0])
++print(R())
++step([0,0.05,0,0,1]); print('grasp+lift', R())
++step([0,0.05,0,0,1]); print('lift', R())
++step([0,0.05,0,0,1]); print('lift', R())
++step([0.05,-0.05+0.003,0,0,0]); print('lower+release', R())
++step([0,0.05,0,0,0]); print('up', R())

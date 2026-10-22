@@ -1,0 +1,46 @@
+diff --git a/approach.py b/approach.py
+index 7f79f25..5b31b09 100644
+--- a/approach.py
++++ b/approach.py
+@@ -47,6 +47,7 @@ class GeneratedApproach:
+         # object list.  Treat it as a full-height divider: all useful tasks have
+         # a reachable stance on their own side.
+         self.obstacles.append((0.0, 0.0, 0.18, 2.6))
++        self.lander_xy = self._xy(state, self._objs(state, "lander")[0])
+         samples = self._objs(state, "sample")
+         stones = [s for s in samples if self._v(state, s, "is_soil") < 0.5]
+         soils = [s for s in samples if self._v(state, s, "is_soil") > 0.5]
+@@ -240,6 +241,24 @@ class GeneratedApproach:
+         y = max(-2.25, min(2.25, y))
+         return (x, y)
+ 
++    def _sample_goal(self, state, sample, idx, rover_pos):
++        sx, sy = self._xy(state, sample)
++        candidates = []
++        for radius in (0.0, 0.20, 0.24):
++            count = 1 if radius == 0 else 16
++            for k in range(count):
++                angle = 2.0 * math.pi * k / count
++                q = (sx + radius * math.cos(angle),
++                     sy + radius * math.sin(angle))
++                q = self._same_side_goal(q, idx)
++                if self._dist(q, (sx, sy)) <= 0.245 and not self._blocked(q):
++                    # Strongly prefer a stance away from the collidable lander.
++                    lander_penalty = max(0.0, 0.55 - self._dist(q, self.lander_xy)) * 20.0
++                    candidates.append((self._dist(q, rover_pos) + lander_penalty, q))
++        if candidates:
++            return min(candidates, key=lambda x: x[0])[1]
++        return self._same_side_goal((sx, sy), idx)
++
+     def _received_own_sample(self, state, idx):
+         return all(self._v(state, state.get_object_from_name(name),
+                            "received_analysis") > 0.5
+@@ -280,7 +299,7 @@ class GeneratedApproach:
+                     self._set_op(action, i, SAMPLE)
+                     continue
+                 else:
+-                    goal = self._same_side_goal(self._xy(state, sob), i)
++                    goal = self._sample_goal(state, sob, i, positions[i])
+                     dx, dy = self._move(i, positions[i], goal, positions[1-i])
+                     action[4*i] = dx
+                     action[4*i+1] = dy

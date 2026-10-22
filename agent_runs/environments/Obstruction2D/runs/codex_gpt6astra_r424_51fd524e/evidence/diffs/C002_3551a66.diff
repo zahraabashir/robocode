@@ -1,0 +1,32 @@
+diff --git a/approach.py b/approach.py
+new file mode 100644
+index 0000000..c61c0b2
+--- /dev/null
++++ b/approach.py
+@@ -0,0 +1,9 @@
++import numpy as np
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.action_space = action_space
++        self.observation_space = observation_space
++    def reset(self, state, info):
++        pass
++    def get_action(self, state):
++        return np.array([0,0,0,0,0], dtype=np.float32)
+diff --git a/probe_states.py b/probe_states.py
+new file mode 100644
+index 0000000..ed591ce
+--- /dev/null
++++ b/probe_states.py
+@@ -0,0 +1,11 @@
++from env_client import make_env
++import json
++e=make_env()
++print('limit',e.max_steps)
++for seed in range(5):
++ s,i=e.reset(seed=seed)
++ print('SEED',seed,'INFO',i)
++ for n in sorted(s.get_object_names()):
++  o=s.get_object_from_name(n)
++  print(n,o.type.name,{f:round(s.get(o,f),4) for f in e.observation_space.type_features[o.type] if not f.startswith('color') and f!='z_order'})
++e.close()

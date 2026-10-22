@@ -1,0 +1,49 @@
+diff --git a/approach.py b/approach.py
+index 97d0449..47a3eea 100644
+--- a/approach.py
++++ b/approach.py
+@@ -110,7 +110,8 @@ class Scene:
+         self.pillars = []
+         self.mounds = []
+         self.lander = (-1.9, -2.0)
+-        for o in state:
++        objs = [state.get_object_from_name(nm) for nm in sorted(state.get_object_names())]
++        for o in objs:
+             t = o.type.name
+             g = lambda f: state.get(o, f)
+             if t == "rover":
+diff --git a/dbg8.py b/dbg8.py
+new file mode 100644
+index 0000000..9ac3127
+--- /dev/null
++++ b/dbg8.py
+@@ -0,0 +1,10 @@
++import sys
++from test_approach import *
++for seed in map(int, sys.argv[1:]):
++    env = make_env(); obs, info = env.reset(seed=seed); env.close()
++    ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++    print(seed, 'pred', ap.pred)
++    for ri in range(2):
++        print(' r%d'%ri, len(ap.actions[ri]), [(i+1,round(x,2),round(y,2),op) for i,(x,y,op,h) in enumerate(ap.actions[ri]) if op])
++    for o in obs:
++        if o.type.name in ('objective','sample'): print('  ',o.name,[round(float(v),2) for v in obs.data[o]][:4])
+diff --git a/dbg9.py b/dbg9.py
+new file mode 100644
+index 0000000..fa0a226
+--- /dev/null
++++ b/dbg9.py
+@@ -0,0 +1,13 @@
++import sys
++from test_approach import *
++import approach
++seed=int(sys.argv[1])
++env = make_env(); obs, info = env.reset(seed=seed); env.close()
++ap = GeneratedApproach(env.action_space, env.observation_space, {})
++orig=ap._rover_tables
++def wrap(*a, **k):
++    P,t=orig(*a,**k)
++    print('rover',a[0], sorted([(tuple(sorted(map(str,key))),v[0]) for key,v in t.items()], key=lambda z:z[1])[:40])
++    return P,t
++ap._rover_tables=wrap
++ap.reset(obs, info)

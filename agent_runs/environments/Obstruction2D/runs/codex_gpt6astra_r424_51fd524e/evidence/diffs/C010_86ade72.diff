@@ -1,0 +1,13 @@
+diff --git a/probe_motion.py b/probe_motion.py
+index 93481cc..10e66c6 100644
+--- a/probe_motion.py
++++ b/probe_motion.py
+@@ -30,7 +30,7 @@ e=make_env();s,_=e.reset(seed=0)
+ r=s.get_object_from_name('robot')
+ for axis,sign in [(0,-1),(1,1),(0,1)]:
+  for size in [.05,.005,.0005,.00005]:
+-  for _ in range(40 if size==.05 else 12):
++  for _ in range(60 if size==.05 else 120):
+    a=np.zeros(5,dtype=np.float32);a[axis]=sign*size
+    s,*_=e.step(a)
+  print('BOUND',axis,sign,vals(s,'robot','x y'))

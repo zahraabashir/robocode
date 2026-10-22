@@ -1,0 +1,75 @@
+diff --git a/approach.py b/approach.py
+index 031b768..f260d3c 100644
+--- a/approach.py
++++ b/approach.py
+@@ -134,6 +134,8 @@ class GeneratedApproach:
+         self.free_r = {r: self.free & ((GX * self.side[r]) > 0) for r in self.rovers}
+         import time as _time
+         t0 = _time.time()
++        self._pf_cache = {}
++        self._best_steps = 150
+         r0, r1 = self.rovers
+         cands = []
+         for a in (self.home[r0][2], -math.pi / 2):
+@@ -298,9 +300,15 @@ class GeneratedApproach:
+         return [tuple(idx[c]) for c in chosen]
+ 
+     def _point_field(self, r, cell):
+-        init = np.full((N, N), INF)
+-        init[cell] = 0.0
+-        return bfs_field(self.free_r[r], init)
++        key = (r, int(cell[0]), int(cell[1]))
++        c = self._pf_cache.get(key)
++        if c is None:
++            init = np.full((N, N), INF)
++            init[cell] = 0.0
++            c = bfs_field(self.free_r[r], init)
++            c.setflags(write=False)
++            self._pf_cache[key] = c
++        return c
+ 
+     def _rover_tasks(self, r):
+         tasks = []
+@@ -415,7 +423,8 @@ class GeneratedApproach:
+         for cost, ord0, ord1 in cands[:self.topk]:
+             fields = {r0: self._get_stage_fields(r0, ord0), r1: self._get_stage_fields(r1, ord1)}
+             self.fields = fields
+-            steps = self._simulate(self.d0)
++            steps = self._simulate(self.d0, max_steps=min(150, self._best_steps))
++            self._best_steps = min(self._best_steps, steps)
+             key = (steps, cost)
+             if best is None or key < best[0]:
+                 best = (key, fields, {r0: list(ord0), r1: list(ord1)})
+@@ -464,8 +473,10 @@ class GeneratedApproach:
+         return True
+ 
+     def _model_step(self, d, act):
+-        import copy
+-        d2 = copy.deepcopy(d)
++        d2 = dict(d)
++        d2["objective"] = [(n, dict(o)) for n, o in d["objective"]]
++        d2["sample"] = [(n, dict(o)) for n, o in d["sample"]]
++        d2["rover"] = {k: dict(v) for k, v in d["rover"].items()}
+         for k, r in enumerate(self.rovers):
+             ro = d2["rover"][r]
+             dx = float(np.clip(act[4 * k], -0.2, 0.2))
+diff --git a/p.out b/p.out
+new file mode 100644
+index 0000000..40b1234
+Binary files /dev/null and b/p.out differ
+diff --git a/prof81.py b/prof81.py
+new file mode 100644
+index 0000000..5a0782d
+--- /dev/null
++++ b/prof81.py
+@@ -0,0 +1,10 @@
++import json, cProfile, pstats, time
++from offline import FakeState
++from approach import GeneratedApproach
++S=json.load(open('states_0_200.json'))
++st=S['81'] if isinstance(S,dict) else S[81]
++ap=GeneratedApproach(None,None,None)
++t=time.time()
++cProfile.run("ap.reset(FakeState(st['objs']), st['info'])",'p.out')
++print('time',time.time()-t)
++pstats.Stats('p.out').sort_stats('cumtime').print_stats(14)

@@ -1,0 +1,183 @@
+diff --git a/approach.py b/approach.py
+index 1604ae1..07e62d5 100644
+--- a/approach.py
++++ b/approach.py
+@@ -40,14 +40,16 @@ _LIM = [None, (-2.38, 2.38), None, (-2.63, 2.63), None, (-2.2, 2.2), None]
+ 
+ def fk(q):
+     T = np.eye(4)
+-    zs, ps = [], []
++    zs = np.empty((7, 3))
++    ps = np.empty((7, 3))
+     for i in range(7):
+         T = T @ _JOINTS[i]
+-        zs.append(T[:3, 2].copy())
+-        ps.append(T[:3, 3].copy())
++        zs[i] = T[:3, 2]
++        ps[i] = T[:3, 3]
+         c, s = np.cos(q[i]), np.sin(q[i])
+-        Rz = np.array([[c, -s, 0, 0], [s, c, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1.0]])
+-        T = T @ Rz
++        c0 = T[:, 0].copy()
++        T[:, 0] = c * c0 + s * T[:, 1]
++        T[:, 1] = -s * c0 + c * T[:, 1]
+     T = T @ _EE
+     return T, zs, ps
+ 
+@@ -88,6 +90,8 @@ def _rotvec(Rm):
+ def ik(q0, pos, Rt, iters=100, tol=1e-5):
+     q = np.array(q0, dtype=float)
+     err = 1e9
++    best = 1e9
++    since = 0
+     for _ in range(iters):
+         T, zs, ps = fk(q)
+         ep = pos - T[:3, 3]
+@@ -96,11 +100,19 @@ def ik(q0, pos, Rt, iters=100, tol=1e-5):
+         err = np.linalg.norm(e)
+         if err < tol:
+             break
+-        J = np.zeros((6, 7))
+-        pe = T[:3, 3]
+-        for i in range(7):
+-            J[:3, i] = np.cross(zs[i], pe - ps[i])
+-            J[3:, i] = 0.3 * zs[i]
++        if err < best - 1e-4:
++            best = err
++            since = 0
++        else:
++            since += 1
++            if since > 12 and err > 1e-3:
++                break
++        J = np.empty((6, 7))
++        D = T[:3, 3] - ps
++        J[0] = zs[:, 1] * D[:, 2] - zs[:, 2] * D[:, 1]
++        J[1] = zs[:, 2] * D[:, 0] - zs[:, 0] * D[:, 2]
++        J[2] = zs[:, 0] * D[:, 1] - zs[:, 1] * D[:, 0]
++        J[3:] = 0.3 * zs.T
+         lam = 1e-4
+         dq = J.T @ np.linalg.solve(J @ J.T + lam * np.eye(6), e)
+         n = np.max(np.abs(dq))
+diff --git a/p.out b/p.out
+new file mode 100644
+index 0000000..0497369
+Binary files /dev/null and b/p.out differ
+diff --git a/prof1.py b/prof1.py
+new file mode 100644
+index 0000000..6240e93
+--- /dev/null
++++ b/prof1.py
+@@ -0,0 +1,11 @@
++import sys, time, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++seed=int(sys.argv[1]); OC=int(sys.argv[2]) if len(sys.argv)>2 else None
++env = make_env(); obs, info = env.reset(seed=seed, options=({"object_count":OC} if OC else None))
++t=time.time(); ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info); print("reset", round(time.time()-t,3))
++for k in range(1000):
++    t=time.time(); a = ap.get_action(obs); dt=time.time()-t
++    if dt>0.2: print(k, round(dt,3), ap.cur[0] if ap.cur else None, ap.cur[3] if ap.cur and ap.cur[0]=="move" else "")
++    obs, r, term, trunc, info = env.step(a)
++    if term: print("done", k); break
+diff --git a/prof2.py b/prof2.py
+new file mode 100644
+index 0000000..d6e054a
+--- /dev/null
++++ b/prof2.py
+@@ -0,0 +1,10 @@
++import sys, cProfile, pstats, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++seed=int(sys.argv[1]); K=int(sys.argv[2])
++env = make_env(); obs, info = env.reset(seed=seed)
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++for k in range(K):
++    a = ap.get_action(obs); obs, *_ = env.step(a)
++cProfile.run("ap.get_action(obs)", "p.out")
++pstats.Stats("p.out").sort_stats("cumtime").print_stats(12)
+diff --git a/res_t.txt b/res_t.txt
+index cad5540..c9dfcc8 100644
+--- a/res_t.txt
++++ b/res_t.txt
+@@ -1,41 +1,41 @@
+-(0, 2, True, 30, 37.4, 4.43, 3.152)
+-(1, 1, True, 24, 22.6, 6.66, 5.921)
+-(2, 2, True, 36, 34.7, 2.18, 0.83)
+-(3, 2, True, 25, 16.8, 1.92, 0.627)
+-(4, 2, True, 33, 18.6, 2.14, 0.509)
+-(5, 2, True, 41, 40.9, 2.05, 0.633)
+-(6, 1, True, 25, 30.0, 4.5, 3.882)
+-(7, 2, True, 33, 36.0, 2.85, 2.06)
+-(8, 2, True, 30, 43.3, 0.75, 0.169)
+-(9, 1, True, 20, 25.5, 0.34, 0.12)
+-(10, 2, True, 23, 35.0, 0.51, 0.18)
+-(11, 0, True, 14, 20.4, 0.21, 0.106)
+-(12, 1, True, 29, 36.1, 0.62, 0.176)
+-(13, 2, True, 45, 52.0, 0.92, 0.154)
+-(14, 0, True, 12, 12.9, 0.29, 0.183)
+-(15, 2, True, 32, 36.7, 0.46, 0.161)
+-(16, 1, True, 21, 16.4, 0.48, 0.124)
+-(17, 2, True, 37, 43.3, 0.71, 0.229)
+-(18, 2, True, 25, 22.1, 0.47, 0.106)
+-(19, 1, True, 31, 34.2, 0.66, 0.366)
+-(20, 2, True, 34, 39.7, 0.58, 0.161)
+-(21, 0, True, 15, 15.9, 0.31, 0.156)
+-(22, 2, True, 22, 29.8, 0.43, 0.109)
+-(23, 0, True, 19, 34.7, 0.41, 0.237)
+-(24, 1, True, 14, 24.3, 0.17, 0.11)
+-(25, 1, True, 28, 37.3, 0.46, 0.172)
+-(26, 2, True, 23, 31.7, 0.38, 0.087)
+-(27, 0, True, 27, 40.0, 0.43, 0.245)
+-(28, 1, True, 53, 55.6, 1.46, 0.222)
+-(29, 2, True, 14, 16.9, 0.22, 0.145)
+-(30, 0, True, 18, 21.7, 0.27, 0.105)
+-(31, 1, True, 30, 34.2, 0.52, 0.174)
+-(32, 2, True, 30, 35.1, 0.54, 0.067)
+-(33, 2, True, 30, 32.9, 0.7, 0.13)
+-(34, 0, True, 13, 16.6, 0.13, 0.04)
+-(35, 0, True, 13, 16.7, 0.26, 0.169)
+-(36, 1, True, 20, 16.9, 0.5, 0.181)
+-(37, 0, True, 13, 10.8, 0.18, 0.127)
+-(38, 0, True, 14, 6.4, 0.32, 0.172)
+-(39, 2, True, 39, 6.7, 0.47, 0.055)
++(0, 2, True, 30, 32.0, 0.49, 0.113)
++(1, 1, True, 24, 18.2, 0.52, 0.295)
++(2, 2, True, 36, 40.8, 0.6, 0.127)
++(3, 2, True, 25, 19.7, 0.26, 0.049)
++(4, 2, True, 33, 29.6, 0.35, 0.047)
++(5, 2, True, 41, 39.7, 0.51, 0.11)
++(6, 1, True, 25, 15.6, 0.34, 0.093)
++(7, 2, True, 33, 35.8, 0.25, 0.058)
++(8, 2, True, 30, 33.8, 0.41, 0.077)
++(9, 1, True, 20, 23.0, 0.29, 0.084)
++(10, 2, True, 23, 27.8, 0.28, 0.085)
++(11, 0, True, 14, 13.6, 0.14, 0.06)
++(12, 1, True, 29, 30.8, 0.32, 0.09)
++(13, 2, True, 45, 47.6, 0.5, 0.073)
++(14, 0, True, 12, 10.7, 0.11, 0.054)
++(15, 2, True, 32, 33.7, 0.22, 0.055)
++(16, 1, True, 21, 20.9, 0.28, 0.082)
++(17, 2, True, 37, 43.8, 0.47, 0.085)
++(18, 2, True, 25, 19.1, 0.27, 0.067)
++(19, 1, True, 31, 28.9, 0.43, 0.205)
++(20, 2, True, 34, 35.9, 0.63, 0.2)
++(21, 0, True, 15, 16.4, 0.18, 0.086)
++(22, 2, True, 22, 30.4, 0.25, 0.06)
++(23, 0, True, 19, 33.7, 0.23, 0.146)
++(24, 1, True, 14, 24.3, 0.2, 0.104)
++(25, 1, True, 28, 37.5, 0.3, 0.089)
++(26, 2, True, 23, 30.0, 0.2, 0.048)
++(27, 0, True, 27, 38.6, 0.26, 0.158)
++(28, 1, True, 53, 51.3, 0.75, 0.216)
++(29, 2, True, 14, 15.4, 0.19, 0.15)
++(30, 0, True, 18, 17.6, 0.12, 0.052)
++(31, 1, True, 30, 34.4, 0.31, 0.069)
++(32, 2, True, 30, 35.9, 0.41, 0.06)
++(33, 2, True, 30, 32.6, 0.38, 0.067)
++(34, 0, True, 13, 17.4, 0.24, 0.162)
++(35, 0, True, 13, 16.5, 0.07, 0.02)
++(36, 1, True, 20, 17.8, 0.18, 0.048)
++(37, 0, True, 13, 10.5, 0.2, 0.141)
++(38, 0, True, 14, 7.4, 0.15, 0.097)
++(39, 2, True, 39, 5.9, 0.37, 0.052)
+ success 40 / 40 mean steps 25.875

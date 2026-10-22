@@ -1,0 +1,13 @@
+- environment=rovers_generalized
+- approach=agentic
+- primitive_level=none
+- approach.blackbox=True
+- approach.blackbox_strict=True
+- approach/backend=codex_gpt56sol
+- eval_timeout=60
+- approach.container_backend=apptainer
+- approach.max_budget_usd=20.0
+- num_eval_tasks=100
+- experiment_id=rovers_generalized__agentic__none__blackbox__strict__codex_gpt56sol__timeout_60s__5a838136
+- replicate_seed=424
+- eval_seed=792075

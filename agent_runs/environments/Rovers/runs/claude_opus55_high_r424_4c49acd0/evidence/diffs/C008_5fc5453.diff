@@ -1,0 +1,251 @@
+diff --git a/approach.py b/approach.py
+index ad1517f..c4c10c8 100644
+--- a/approach.py
++++ b/approach.py
+@@ -23,12 +23,12 @@ LANDER_CLEAR = 0.76
+ OBJ_RANGE = 1.975
+ LANDER_RANGE = 3.965
+ LOS_PILLAR = 0.085
+-LOS_ROVER = 0.30
++LOS_ROVER = 0.24
+ SAMPLE_RANGE = 0.24
+ TRUE_OBJ = 1.99
+ TRUE_LANDER = 3.98
+ TRUE_PILLAR = 0.075
+-TRUE_ROVER = 0.27
++TRUE_ROVER = 0.24
+ SENSE_BACK = 0.087
+ SENSE_RIGHT = 0.012
+ INF = 1e9
+@@ -179,6 +179,12 @@ class GeneratedApproach:
+         self.V_home = {}
+         self.V_send = {}
+         Vh0 = {}
++        self.home_mask = {}
++        lsign = 1 if self.lander[0] > 0 else -1
++        self.blocked_rover = None
++        for r in self.rovers:
++            if self.side[r] != lsign:
++                self.blocked_rover = r
+         for r in self.rovers:
+             hx, hy, _ = self.home[r]
+             init = np.full((N, N), INF)
+@@ -214,6 +220,8 @@ class GeneratedApproach:
+                 if scores.min() < scores.max():
+                     init = np.where(hm2, 0.0, INF)
+                     Vh = bfs_field(self.free_r[r], init)
++                    hm = hm2
++            self.home_mask[r] = hm
+             self.V_home[r] = Vh
+             init2 = np.where(self.send_reg[r], Vh, INF)
+             self.V_send[r] = bfs_field(self.free_r[r], init2)
+@@ -375,7 +383,7 @@ class GeneratedApproach:
+                 best = (key, fields, {r0: list(ord0), r1: list(ord1)})
+         if best is None:
+             self.orders = {r: [] for r in self.rovers}
+-            self.fields = {r: self._stage_fields(r, []) for r in self.rovers}
++            self.fields = {r: self._layer_fields(r, []) for r in self.rovers}
+             self.plan_cost = INF
+         else:
+             self.fields = best[1]
+@@ -385,7 +393,7 @@ class GeneratedApproach:
+     def _get_stage_fields(self, r, order):
+         key = (r, tuple(order))
+         if key not in self._field_cache:
+-            self._field_cache[key] = self._stage_fields(r, list(order))
++            self._field_cache[key] = self._layer_fields(r, list(order))
+         return self._field_cache[key]
+ 
+     # ------------------------------------------------------------ model sim
+@@ -634,7 +642,136 @@ class GeneratedApproach:
+             act[4 * k + 3] = SEL[op]
+         return act
+ 
++    def _layer_solve(self, free, H0, home=None):
++        M = H0.copy()
++        G = None
++        for _ in range(400):
++            G = minimum_filter(M, size=2 * STEP_CELLS + 1, mode="constant", cval=INF) + 1.0
++            G[~free] = INF
++            if home is not None:
++                G[home] = 0.0
++            M2 = np.minimum(H0, G)
++            if np.array_equal(M2, M):
++                break
++            M = M2
++        return G
++
++    def _layer_fields(self, r, order):
++        order = list(order)
++        k = len(order)
++        free = self.free_r[r]
++        U = np.zeros((N, N), dtype=bool)
++        for o in self.objs:
++            U |= self.obj_vis[(r, o)]
++        regs = []
++        for i, t in enumerate(order):
++            if t[0] == "obj":
++                held = tuple(o for kk, o in order[:i] if kk == "obj")
++                reg = self._task_region(r, ("obj", t[1]), held)
++                if not reg.any():
++                    reg = self.obj_vis[(r, t[1])]
++            else:
++                reg = self.samp_reg[t[1]] & free
++            regs.append(reg)
++        S = self.send_reg[r]
++        hx, hy, _ = self.home[r]
++        home = self.home_mask[r]
++        G = {}
++        INFA = np.full((N, N), INF)
++        for i in range(k, -1, -1):
++            sents = [1, 0] if i == k else [0]
++            for sent in sents:
++                for full in (0, 1):
++                    for cal in (1, 0):
++                        H0 = INFA.copy()
++                        if cal == 0:
++                            H0 = np.where(U, np.minimum(H0, G[(i, 1, full, sent)]), H0)
++                        if full == 1:
++                            H0 = np.minimum(H0, G[(i, cal, 0, sent)])
++                        if i < k:
++                            nxt_sent = 0
++                            t = order[i]
++                            if t[0] == "obj" and cal == 1:
++                                H0 = np.where(regs[i], np.minimum(H0, G[(i + 1, 0, full, nxt_sent)]), H0)
++                            if t[0] != "obj" and full == 0:
++                                H0 = np.where(regs[i], np.minimum(H0, G[(i + 1, cal, 1, nxt_sent)]), H0)
++                        if i == k and sent == 0:
++                            H0 = np.where(S, np.minimum(H0, G[(i, cal, full, 1)]), H0)
++                        term = (i == k and sent == 1 and full == 0)
++                        G[(i, cal, full, sent)] = self._layer_solve(free, H0, home if term else None)
++        if k == 0:
++            for full in (0, 1):
++                for cal in (0, 1):
++                    G[(0, cal, full, 0)] = G[(0, cal, full, 1)]
++        return {"G": G, "regs": regs, "U": U, "order": order}
++
+     def _rover_action(self, d, r, ro, other_xy):
++        plan = self.fields[r]
++        order = plan["order"]
++        k = len(order)
++        stage = 0
++        while stage < k and self._task_done(d, r, order[stage]):
++            stage += 1
++        pending = False
++        for n, o in d["objective"]:
++            if o["have_image_" + r] > 0.5 and o["received_image"] < 0.5:
++                pending = True
++        for n, sm in d["sample"]:
++            if sm["analyzed_" + r] > 0.5 and sm["received_analysis"] < 0.5:
++                pending = True
++        x, y, th = ro["x"], ro["y"], ro["theta"]
++        cal = 1 if ro["calibrated"] > 0.5 else 0
++        full = 1 if ro["store_full"] > 0.5 else 0
++        if stage == k and pending and not self._predicting and r == self.blocked_rover:
++            return self._rover_action_old(d, r, ro, other_xy)
++        sent = 1 if (stage == k and not pending) else 0
++        G = plan["G"]
++        i, j = to_cell(x, y)
++        i0, i1 = max(i - STEP_CELLS, 0), min(i + STEP_CELLS, N - 1)
++        j0, j1 = max(j - STEP_CELLS, 0), min(j + STEP_CELLS, N - 1)
++        win = (slice(i0, i1 + 1), slice(j0, j1 + 1))
++        opts = [(G[(stage, cal, full, sent)][win], "noop")]
++        if cal == 0:
++            opts.append((np.where(plan["U"][win], G[(stage, 1, full, sent)][win], INF), "calibrate"))
++        if full == 1:
++            opts.append((G[(stage, cal, 0, sent)][win], "drop"))
++        if stage < k:
++            t = order[stage]
++            reg = plan["regs"][stage][win]
++            if t[0] == "obj" and cal == 1:
++                opts.append((np.where(reg, G[(stage + 1, 0, full, 0)][win], INF), "image"))
++            if t[0] != "obj" and full == 0:
++                opts.append((np.where(reg, G[(stage + 1, cal, 1, 0)][win], INF), "sample"))
++        if stage == k and sent == 0:
++            opts.append((np.where(self.send_reg[r][win], G[(stage, cal, full, 1)][win], INF), "send"))
++        ii, jj = np.meshgrid(np.arange(i0, i1 + 1), np.arange(j0, j1 + 1), indexing="ij")
++        mv = np.maximum(np.abs(ii - i), np.abs(jj - j)) * 1e-3 + np.hypot(ii - i, jj - j) * 1e-4
++        best = None
++        for arr, opname in opts:
++            sc = arr + mv + (2e-3 if opname == "noop" else 0.0)
++            idx = np.unravel_index(np.argmin(sc), sc.shape)
++            v = sc[idx]
++            if best is None or v < best[0]:
++                best = (v, idx, opname)
++        if best is None or best[0] >= INF / 2:
++            return self._rover_action_old(d, r, ro, other_xy)
++        _, (ci, cj), op = best
++        ti, tj = i0 + ci, j0 + cj
++        mdx = float(np.clip(COORDS[ti] - x, -0.2, 0.2))
++        mdy = float(np.clip(COORDS[tj] - y, -0.2, 0.2))
++        px, py = x + mdx, y + mdy
++        if op == "noop":
++            vis = self._visible_objs(r, px, py, th)
++            need_imgs = [t[1] for t in order[stage:] if t[0] == "obj"]
++            if full:
++                op = "drop"
++            elif not cal and need_imgs and vis:
++                op = "calibrate"
++            elif pending and self._lander_visible(r, px, py, th, None):
++                op = "send"
++        return mdx, mdy, op
++
++    def _rover_action_old(self, d, r, ro, other_xy):
+         plan = self.fields[r]
+         order = plan["order"]
+         stage = 0
+@@ -650,7 +787,10 @@ class GeneratedApproach:
+         for n, s in d["sample"]:
+             if s["analyzed_" + r] > 0.5 and s["received_analysis"] < 0.5:
+                 pending = True
+-        if stage < len(order):
++        if stage < len(order) and "fields" not in plan:
++            F = self.V_send[r]
++            reg = None
++        elif stage < len(order):
+             F = plan["fields"][stage]
+             reg = plan["regs"][stage]
+         else:
+diff --git a/dbg2.py b/dbg2.py
+new file mode 100644
+index 0000000..ef3b40f
+--- /dev/null
++++ b/dbg2.py
+@@ -0,0 +1,10 @@
++import json
++from offline import FakeState
++import approach, numpy as np
++S=json.load(open('states_0_200.json')); st=S['0']
++ap=approach.GeneratedApproach(None,None,{})
++ap.reset(FakeState(st['objs']), st['info'])
++for r in ap.rovers:
++    G=ap.fields[r]['G']; i,j=approach.to_cell(*ap.home[r][:2])
++    for L in sorted(G): print(r, L, G[L][i,j], (G[L]<1e8).sum())
++    break
+diff --git a/simtrace.py b/simtrace.py
+new file mode 100644
+index 0000000..c4538c2
+--- /dev/null
++++ b/simtrace.py
+@@ -0,0 +1,21 @@
++import json, sys
++from offline import FakeState
++import approach
++from approach import parse
++S=json.load(open('states_0_200.json'))
++seed=sys.argv[1]; st=S[seed]
++ap=approach.GeneratedApproach(None,None,{})
++ap.reset(FakeState(st['objs']), st['info'])
++print(ap.orders, ap.plan_cost)
++d=parse(FakeState(st['objs'])); ap._pred_cache=None
++names={-5/6:'sample',-0.5:'cal',-1/6:'img',0:'-',0.5:'send',5/6:'drop'}
++for t in range(int(sys.argv[2]) if len(sys.argv)>2 else 40):
++    a=ap._policy(d)
++    line=[]
++    for k,r in enumerate(ap.rovers):
++        ro=d['rover'][r]
++        op=min(names.items(), key=lambda kv: abs(kv[0]-a[4*k+3]))[1]
++        line.append(f"{r}({ro['x']:.2f},{ro['y']:.2f})+({a[4*k]:.2f},{a[4*k+1]:.2f}) {op} c{int(ro['calibrated'])}s{int(ro['store_full'])}h{int(ro['at_home'])}")
++    print(t,' | '.join(line))
++    d=ap._model_step(d,a); d['_t']=t+1
++    if ap._goal(d): print('GOAL', t+1); break

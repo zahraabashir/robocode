@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index bf0b3ca..8b2d645 100644
+--- a/approach.py
++++ b/approach.py
+@@ -385,7 +385,7 @@ class GeneratedApproach:
+             return None
+         # furthest waypoint reachable in one step
+         k = self.pidx
+-        if self.fine:
++        if self.fine and k < 6:
+             k = min(k + 1, len(path) - 1)
+         else:
+             while k + 1 < len(path) and np.max(np.abs(path[k + 1] - q)) <= MAXD:

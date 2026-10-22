@@ -1,0 +1,20 @@
+diff --git a/debug_rollout.py b/debug_rollout.py
+new file mode 100644
+index 0000000..c836f8e
+--- /dev/null
++++ b/debug_rollout.py
+@@ -0,0 +1,14 @@
++from env_client import make_env
++from approach import GeneratedApproach
++env=make_env(); s,info=env.reset(seed=0)
++ap=GeneratedApproach(env.action_space,env.observation_space,env.make_primitives()); ap.reset(s,info)
++for step in range(160):
++    if step%10==0:
++        vals=[]
++        for i,n in enumerate(ap.names):
++            r=s.get_object_from_name(n); p=(s.get(r,"x"),s.get(r,"y"))
++            vals.append((i,tuple(round(x,2) for x in p),ap._choose_task(s,i,p),len(ap.paths[i]),ap.stalls[i]))
++        print(step,vals)
++    s,r,t,tr,inf=env.step(ap.get_action(s))
++    if t or tr: print("END",step+1,t,tr);break
++env.close()

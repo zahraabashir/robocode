@@ -1,0 +1,211 @@
+diff --git a/approach.py b/approach.py
+index 9298468..576849c 100644
+--- a/approach.py
++++ b/approach.py
+@@ -315,6 +315,8 @@ class GeneratedApproach:
+         zs = a[2] + (g[2] - a[2]) * np.linspace(0, 1, ns + 1)
+         pts = []
+         self.tight = []
++        if start[2] > self._need_z(start[:2], held, depth, rad) + 0.005:
++            a = np.asarray(start, float).copy()
+         if start[2] < a[2] - 1e-4:
+             pts.append(a)
+             self.tight.append(a)
+@@ -362,31 +364,75 @@ class GeneratedApproach:
+     def _track(self):
+         """Return joint delta toward current path, or None when path done."""
+         self.last_final = False
++        M = fk(self.base, self.q)
++        cur = M[:3, 3]
+         while self.path:
+             pos, yaw = self.path[0][:2]
+-            M = fk(self.base, self.q)
+             final = len(self.path) == 1
+             tol = 5e-4 if final else 0.03
+             if len(self.path[0]) > 2 and not final:
+                 tol = self.path[0][2]
+-            e = np.linalg.norm(M[:3, 3] - pos)
++            e = np.linalg.norm(cur - pos)
+             eo = np.linalg.norm(rot_err(M[:3, :3], self._Rot(yaw)))
+             if e < tol and (eo < (0.01 if final else 0.1)):
+                 self.path.pop(0)
+                 continue
+-            if self.scale < 1.0:
+-                # blocked recently: move along straight cartesian line, small step
+-                cs = 0.04 * self.scale
+-                if e > cs:
+-                    pos = M[:3, 3] + (pos - M[:3, 3]) * (cs / e)
+-            qt, err = self._ik(pos, yaw)
+-            dq = qt - self.q
+-            m = np.max(np.abs(dq))
+-            self.last_final = bool(final and m <= MAX_DQ and err < 1e-3 and self.scale >= 1.0)
+-            if m > MAX_DQ:
+-                dq = dq * (MAX_DQ / m)
+-            return dq
+-        return None
++            break
++        if not self.path:
++            return None
++        # polyline up to first tight corner / final waypoint
++        pts = [cur]
++        k = 0
++        for i, w in enumerate(self.path):
++            pts.append(np.asarray(w[0], float))
++            k = i
++            if (len(w) > 2 and w[2] < 0.01) or i == len(self.path) - 1:
++                break
++        stop_final = (k == len(self.path) - 1)
++        yaw = self.path[k][1]
++        segs = [np.linalg.norm(pts[i + 1] - pts[i]) for i in range(len(pts) - 1)]
++        cum = np.concatenate([[0.0], np.cumsum(segs)])
++        L = cum[-1]
++
++        def at(sv):
++            j = int(np.searchsorted(cum, sv, side='right') - 1)
++            j = min(max(j, 0), len(segs) - 1)
++            f = 0.0 if segs[j] < 1e-9 else (sv - cum[j]) / segs[j]
++            return pts[j] + (pts[j + 1] - pts[j]) * min(max(f, 0.0), 1.0)
++
++        s_max = L
++        if self.scale < 1.0:
++            s_max = min(L, 0.04 * self.scale)
++        qt, err = self._ik(at(s_max), yaw)
++        m = np.max(np.abs(qt - self.q))
++        s_sel = s_max
++        if m > MAX_DQ and s_max > 0.005:
++            lo, hi = 0.0, s_max
++            best = None
++            for _ in range(6):
++                mid = 0.5 * (lo + hi)
++                q2, e2 = self._ik(at(mid), yaw)
++                if np.max(np.abs(q2 - self.q)) <= MAX_DQ:
++                    lo, best = mid, (q2, e2)
++                else:
++                    hi = mid
++            if best is not None:
++                qt, err = best
++                s_sel = lo
++        dq = qt - self.q
++        m = np.max(np.abs(dq))
++        self.last_final = bool(stop_final and s_sel >= L - 1e-9 and m <= MAX_DQ
++                               and err < 1e-3 and self.scale >= 1.0)
++        if m > MAX_DQ:
++            dq = dq * (MAX_DQ / m)
++        # drop intermediate waypoints we pass this step
++        npop = 0
++        for i in range(1, len(cum) - 1):
++            if cum[i] <= s_sel - 1e-9:
++                npop += 1
++        if npop and not (m > MAX_DQ):
++            del self.path[:npop]
++        return dq
+ 
+     def _act(self, dq=None, grip=0.0):
+         a = np.zeros(11, dtype=np.float32)
+diff --git a/sweep5.txt b/sweep5.txt
+new file mode 100644
+index 0000000..02c62c0
+--- /dev/null
++++ b/sweep5.txt
+@@ -0,0 +1,101 @@
++ok   (11, True, 12, 0.0, 37, 'release', 'target_block', 0)
++ok   (10, True, 19, 0.1, 47, 'release', 'target_block', 2)
++ok   (1, True, 30, 0.1, 50, 'release', 'target_block', 1)
++ok   (9, True, 24, 0.1, 52, 'release', 'target_block', 1)
++ok   (3, True, 26, 0.1, 56, 'release', 'target_block', 2)
++ok   (6, True, 33, 0.1, 62, 'release', 'target_block', 1)
++ok   (7, True, 31, 0.2, 67, 'release', 'target_block', 2)
++ok   (14, True, 9, 0.0, 19, 'release', 'target_block', 0)
++ok   (12, True, 21, 0.1, 34, 'release', 'target_block', 1)
++ok   (8, True, 41, 0.2, 79, 'release', 'target_block', 2)
++ok   (0, True, 41, 0.2, 84, 'release', 'target_block', 2)
++ok   (16, True, 19, 0.1, 33, 'release', 'target_block', 1)
++ok   (2, True, 47, 0.3, 93, 'release', 'target_block', 2)
++ok   (4, True, 47, 0.3, 100, 'release', 'target_block', 2)
++ok   (15, True, 20, 0.1, 48, 'release', 'target_block', 2)
++ok   (5, True, 46, 0.2, 100, 'release', 'target_block', 2)
++ok   (13, True, 36, 0.2, 70, 'release', 'target_block', 2)
++ok   (21, True, 17, 0.1, 41, 'release', 'target_block', 0)
++ok   (23, True, 17, 0.1, 36, 'release', 'target_block', 0)
++ok   (19, True, 22, 0.1, 58, 'release', 'target_block', 1)
++ok   (24, True, 17, 0.1, 34, 'release', 'target_block', 1)
++ok   (18, True, 29, 0.1, 69, 'release', 'target_block', 2)
++ok   (22, True, 23, 0.1, 55, 'release', 'target_block', 2)
++ok   (29, True, 10, 0.0, 24, 'release', 'target_block', 2)
++ok   (17, True, 42, 0.3, 88, 'release', 'target_block', 2)
++ok   (27, True, 22, 0.1, 52, 'release', 'target_block', 0)
++ok   (26, True, 27, 0.1, 60, 'release', 'target_block', 2)
++ok   (20, True, 39, 0.3, 95, 'release', 'target_block', 2)
++ok   (25, True, 34, 0.1, 69, 'release', 'target_block', 1)
++ok   (34, True, 14, 0.1, 30, 'release', 'target_block', 0)
++ok   (30, True, 19, 0.1, 52, 'release', 'target_block', 0)
++ok   (37, True, 14, 0.1, 33, 'release', 'target_block', 0)
++ok   (38, True, 12, 0.1, 28, 'release', 'target_block', 0)
++ok   (35, True, 19, 0.1, 45, 'release', 'target_block', 0)
++ok   (36, True, 17, 0.1, 41, 'release', 'target_block', 1)
++ok   (32, True, 32, 0.2, 73, 'release', 'target_block', 2)
++ok   (31, True, 31, 0.1, 76, 'release', 'target_block', 1)
++ok   (42, True, 15, 0.1, 29, 'release', 'target_block', 0)
++ok   (33, True, 32, 0.2, 73, 'release', 'target_block', 2)
++ok   (28, True, 40, 0.2, 94, 'release', 'target_block', 1)
++ok   (41, True, 22, 0.1, 53, 'release', 'target_block', 1)
++ok   (48, True, 8, 0.0, 24, 'release', 'target_block', 0)
++ok   (47, True, 11, 0.0, 27, 'release', 'target_block', 0)
++ok   (40, True, 26, 0.1, 61, 'release', 'target_block', 1)
++ok   (49, True, 15, 0.1, 33, 'release', 'target_block', 0)
++ok   (46, True, 22, 0.1, 48, 'release', 'target_block', 1)
++ok   (43, True, 22, 0.1, 61, 'release', 'target_block', 1)
++ok   (39, True, 36, 0.2, 88, 'release', 'target_block', 2)
++ok   (44, True, 25, 0.1, 70, 'release', 'target_block', 2)
++ok   (54, True, 12, 0.1, 35, 'release', 'target_block', 0)
++ok   (51, True, 20, 0.1, 58, 'release', 'target_block', 1)
++ok   (45, True, 37, 0.2, 85, 'release', 'target_block', 2)
++ok   (57, True, 12, 0.1, 37, 'release', 'target_block', 0)
++ok   (56, True, 18, 0.1, 47, 'release', 'target_block', 1)
++ok   (60, True, 15, 0.1, 34, 'release', 'target_block', 0)
++ok   (50, True, 36, 0.2, 86, 'release', 'target_block', 2)
++ok   (58, True, 22, 0.1, 54, 'release', 'target_block', 1)
++ok   (61, True, 24, 0.2, 47, 'release', 'target_block', 1)
++ok   (53, True, 42, 0.3, 86, 'release', 'target_block', 2)
++ok   (62, True, 24, 0.1, 51, 'release', 'target_block', 1)
++ok   (68, True, 12, 0.1, 23, 'release', 'target_block', 1)
++ok   (63, True, 24, 0.1, 49, 'release', 'target_block', 1)
++ok   (52, True, 45, 0.3, 103, 'release', 'target_block', 2)
++ok   (55, True, 40, 0.3, 98, 'release', 'target_block', 2)
++ok   (65, True, 23, 0.1, 41, 'release', 'target_block', 0)
++ok   (64, True, 24, 0.2, 52, 'release', 'target_block', 1)
++ok   (69, True, 11, 0.1, 40, 'release', 'target_block', 0)
++ok   (74, True, 13, 0.1, 33, 'release', 'target_block', 0)
++ok   (77, True, 14, 0.1, 34, 'release', 'target_block', 0)
++ok   (67, True, 29, 0.2, 72, 'release', 'target_block', 2)
++ok   (66, True, 33, 0.2, 77, 'release', 'target_block', 2)
++ok   (59, True, 56, 0.4, 126, 'release', 'target_block', 2)
++ok   (75, True, 23, 0.1, 52, 'release', 'target_block', 1)
++ok   (79, True, 11, 0.0, 28, 'release', 'target_block', 0)
++ok   (70, True, 32, 0.2, 76, 'release', 'target_block', 1)
++ok   (78, True, 22, 0.1, 42, 'release', 'target_block', 2)
++ok   (73, True, 30, 0.2, 71, 'release', 'target_block', 2)
++ok   (81, True, 14, 0.0, 35, 'release', 'target_block', 0)
++ok   (76, True, 37, 0.2, 80, 'release', 'target_block', 1)
++ok   (84, True, 19, 0.1, 37, 'release', 'target_block', 1)
++ok   (83, True, 21, 0.1, 40, 'release', 'target_block', 2)
++ok   (72, True, 45, 0.3, 96, 'release', 'target_block', 2)
++ok   (71, True, 47, 0.3, 103, 'release', 'target_block', 2)
++ok   (80, True, 32, 0.2, 65, 'release', 'target_block', 2)
++ok   (82, True, 33, 0.2, 64, 'release', 'target_block', 2)
++ok   (90, True, 19, 0.1, 36, 'release', 'target_block', 1)
++ok   (87, True, 29, 0.1, 53, 'release', 'target_block', 1)
++ok   (88, True, 27, 0.2, 54, 'release', 'target_block', 1)
++ok   (86, True, 35, 0.2, 69, 'release', 'target_block', 2)
++ok   (85, True, 36, 0.2, 72, 'release', 'target_block', 2)
++ok   (94, True, 17, 0.1, 44, 'release', 'target_block', 0)
++ok   (89, True, 36, 0.2, 64, 'release', 'target_block', 2)
++ok   (92, True, 29, 0.2, 48, 'release', 'target_block', 1)
++ok   (91, True, 28, 0.2, 54, 'release', 'target_block', 2)
++ok   (97, True, 16, 0.1, 25, 'release', 'target_block', 0)
++ok   (93, True, 32, 0.2, 52, 'release', 'target_block', 2)
++ok   (95, True, 24, 0.1, 44, 'release', 'target_block', 1)
++ok   (98, True, 29, 0.2, 29, 'release', 'target_block', 1)
++ok   (96, True, 36, 0.2, 41, 'release', 'target_block', 2)
++ok   (99, True, 40, 0.3, 25, 'release', 'target_block', 2)
++success 100/100  mean steps(success) 26.2  max compute 0.4s

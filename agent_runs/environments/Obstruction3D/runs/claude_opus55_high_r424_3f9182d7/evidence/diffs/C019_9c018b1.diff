@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 36fb54f..28903fd 100644
+--- a/approach.py
++++ b/approach.py
+@@ -95,7 +95,7 @@ class GeneratedApproach:
+         best = 1e9
+         for o in others:
+             op, oh = _pose(s, o), _he(s, o)
+-            if op[2] + oh[2] < p[2] - 0.035:   # below fingertips
++            if op[2] + oh[2] < p[2] - 0.01:   # below fingertips (tips ~ centre+0.005 at grasp)
+                 continue
+             oyaw = self._obj_yaw(s, o)
+             oc, os_ = np.cos(oyaw), np.sin(oyaw)

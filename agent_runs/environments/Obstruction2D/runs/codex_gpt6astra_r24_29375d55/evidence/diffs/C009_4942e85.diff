@@ -1,0 +1,111 @@
+diff --git a/approach.py b/approach.py
+index fb5cdee..bedf44b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -26,18 +26,18 @@ class GeneratedApproach:
+     def overlap(a,b,margin=.003):
+         return a[0]<b[0]+b[2]+margin and a[0]+a[2]>b[0]-margin and a[1]<b[1]+b[3]+margin and a[1]+a[3]>b[1]-margin
+ 
+-    def hits_configuration(self,q,x,y,w,h,offset):
++    def hits_configuration(self,q,x,y,w,h,offset,body_margin=.003):
+         rx=x+offset;ry=y+h+.215
+         dx=max(q[0]-rx,0,rx-q[0]-q[2])
+         dy=max(q[1]-ry,0,ry-q[1]-q[3])
+-        return (self.overlap((x,y,w,h),q)
++        return (self.overlap((x,y,w,h),q,margin=body_margin)
+                 or self.overlap((rx-.035,ry-.21,.07,.01),q,margin=.014)
+                 or self.overlap((rx-.008,ry-.2,.016,.2),q)
+                 or dx*dx+dy*dy<.103**2)
+ 
+-    def conflicts(self,s,obj,x,y,offset,others):
++    def conflicts(self,s,obj,x,y,offset,others,pickup=False):
+         _,_,w,h=self.rect(s,obj)
+-        return [o for o in others if self.hits_configuration(self.rect(s,o),x,y,w,h,offset)]
++        return [o for o in others if self.hits_configuration(self.rect(s,o),x,y,w,h,offset,body_margin=.00001 if pickup else .003)]
+ 
+     def offsets(self,x,px,w):
+         low=max(.1002-x,.1002-px,-.022)
+@@ -57,7 +57,7 @@ class GeneratedApproach:
+         plans=[]
+         for gx in candidates:
+             for offset in self.offsets(bx,gx,bw):
+-                bad=set(self.conflicts(s,self.block,gx,sy+sh+.005,offset,obs)+self.conflicts(s,self.block,bx,by,offset,obs))
++                bad=set(self.conflicts(s,self.block,gx,sy+sh+.005,offset,obs)+self.conflicts(s,self.block,bx,by,offset,obs,True))
+                 plans.append(((len(bad),abs(offset-bw/2)*.2+abs(gx-bx)*.01),gx,offset,bad))
+         if not plans:
+             gx=(lo+hi)/2;offset=max(.1002-bx,min(1.5178-gx,bw/2))
+@@ -76,7 +76,7 @@ class GeneratedApproach:
+                 others=[p for p in obs+[self.block] if p!=o]
+                 grasps=[]
+                 for off in self.offsets(x,x,w):
+-                    blocking=self.conflicts(s,o,x,y,off,others)
++                    blocking=self.conflicts(s,o,x,y,off,others,True)
+                     grasps.append((len(blocking),abs(off-w/2),off,blocking))
+                 best=min(grasps,key=lambda z:z[:2])
+                 if not best[0]:break
+@@ -93,7 +93,7 @@ class GeneratedApproach:
+                 if py+h>.43:continue
+                 if self.hits_configuration((px,py,w,h),*keep_pick) or self.hits_configuration((px,py,w,h),*keep_place):continue
+                 for off in self.offsets(x,px,w):
+-                    blockers=self.conflicts(s,o,x,y,off,others)+self.conflicts(s,o,px,py,off,others)
++                    blockers=self.conflicts(s,o,x,y,off,others,True)+self.conflicts(s,o,px,py,off,others)
+                     if not blockers:
+                         places.append((py*8+abs(px-x)+abs(off-w/2)*.2,float(px),py,off))
+             if places:
+@@ -107,7 +107,7 @@ class GeneratedApproach:
+                     py=max([.105]+[qy+qh+.025 for qx,qy,qw,qh in occupied if px<qx+qw+.04 and px+w>qx-.04])
+                     if self.hits_configuration((px,py,w,h),*keep_pick) or self.hits_configuration((px,py,w,h),*keep_place):continue
+                     for off in self.offsets(x,px,w):
+-                        blockers=self.conflicts(s,o,x,y,off,others)+self.conflicts(s,o,px,py,off,others)
++                        blockers=self.conflicts(s,o,x,y,off,others,True)+self.conflicts(s,o,px,py,off,others)
+                         fallback.append((len(blockers),py*8+abs(px-x),float(px),py,off))
+                 _,_,px,py,offset=min(fallback)
+                 self.dest=(px,py)
+diff --git a/probe319_fix.py b/probe319_fix.py
+new file mode 100644
+index 0000000..0e62886
+--- /dev/null
++++ b/probe319_fix.py
+@@ -0,0 +1,15 @@
++from env_client import make_env
++from approach import GeneratedApproach
++class Probe(GeneratedApproach):
++ def conflicts(self,s,obj,x,y,offset,others):
++  _,_,w,h=self.rect(s,obj);rx=x+offset;ry=y+h+.215
++  gripper=(rx-.035,ry-.21,.07,.01);arm=(rx-.008,ry-.2,.016,.2);bad=[]
++  for o in others:
++   q=self.rect(s,o);dx=max(q[0]-rx,0,rx-q[0]-q[2]);dy=max(q[1]-ry,0,ry-q[1]-q[3])
++   if self.overlap((x,y,w,h),q,.0002) or self.overlap(gripper,q,.014) or self.overlap(arm,q) or dx*dx+dy*dy<.103**2:bad.append(o)
++  return bad
++E=make_env();s,i=E.reset(seed=319);a=Probe(E.action_space,E.observation_space,{});a.reset(s,i)
++for n in range(1000):
++ act=a.get_action(s);s,r,t,tr,_=E.step(act)
++ if t:break
++print('success',t,'steps',n+1,'phase',a.phase);E.close()
+diff --git a/results_fast.jsonl b/results_fast.jsonl
+index 9f04e50..382befd 100644
+--- a/results_fast.jsonl
++++ b/results_fast.jsonl
+@@ -81,3 +81,22 @@
+ {"seed": 80, "success": true, "steps": 68, "seconds": 0.23, "phase": "place", "task": "target_block", "robot": [0.38471460342407227, 0.4364992380142212], "taskxy": [0.30512362718582153, 0.10500005632638931], "dest": [0.30512363463640213, 0.10500000149011612]}
+ {"seed": 81, "success": true, "steps": 25, "seconds": 0.07, "phase": "place", "task": "target_block", "robot": [0.593959391117096, 0.3846059739589691], "taskxy": [0.534056544303894, 0.10499999672174454], "dest": [0.5340565558075905, 0.10500000149011612]}
+ {"seed": 82, "success": true, "steps": 37, "seconds": 0.12, "phase": "place", "task": "target_block", "robot": [1.2759501934051514, 0.45464026927948], "taskxy": [1.2153900861740112, 0.11872528493404388], "dest": [1.215390176296234, 0.10500000149011612]}
++{"seed": 83, "success": true, "steps": 111, "seconds": 0.65, "phase": "place", "task": "target_block", "robot": [0.25152280926704407, 0.5031046271324158], "taskxy": [0.16700725257396698, 0.10500004887580872], "dest": [0.1670072864294052, 0.10500000149011612]}
++{"seed": 84, "success": true, "steps": 64, "seconds": 0.41, "phase": "place", "task": "target_block", "robot": [0.6042964458465576, 0.4124278724193573], "taskxy": [0.5306367874145508, 0.10500001907348633], "dest": [0.530636821269989, 0.10500000149011612]}
++{"seed": 85, "success": true, "steps": 59, "seconds": 0.44, "phase": "place", "task": "target_block", "robot": [0.9010717868804932, 0.3812885880470276], "taskxy": [0.8189694881439209, 0.10500001162290573], "dest": [0.8189695138931274, 0.10500000149011612]}
++{"seed": 86, "success": true, "steps": 45, "seconds": 0.3, "phase": "place", "task": "target_block", "robot": [0.7719181180000305, 0.3897438645362854], "taskxy": [0.6749577522277832, 0.10500000417232513], "dest": [0.6749577779769897, 0.10500000149011612]}
++{"seed": 87, "success": true, "steps": 53, "seconds": 0.32, "phase": "place", "task": "target_block", "robot": [1.203840970993042, 0.44531750679016113], "taskxy": [1.1384081840515137, 0.10500002652406693], "dest": [1.1384080905914307, 0.10500000149011612]}
++{"seed": 88, "success": true, "steps": 63, "seconds": 0.38, "phase": "place", "task": "target_block", "robot": [0.4685811400413513, 0.41715937852859497], "taskxy": [0.43061888217926025, 0.10500002652406693], "dest": [0.43061895328760147, 0.10500000149011612]}
++{"seed": 89, "success": true, "steps": 61, "seconds": 0.42, "phase": "place", "task": "target_block", "robot": [0.6049009561538696, 0.477839857339859], "taskxy": [0.5215333104133606, 0.1136801466345787], "dest": [0.5215333361625671, 0.10500000149011612]}
++{"seed": 90, "success": true, "steps": 77, "seconds": 0.46, "phase": "place", "task": "target_block", "robot": [0.23972977697849274, 0.5201032757759094], "taskxy": [0.1838860809803009, 0.12488047778606415], "dest": [0.18388607013225555, 0.10500000149011612]}
++{"seed": 91, "success": true, "steps": 43, "seconds": 0.28, "phase": "place", "task": "target_block", "robot": [0.924026608467102, 0.452716201543808], "taskxy": [0.8921021819114685, 0.10500000417232513], "dest": [0.8921022232174873, 0.10500000149011612]}
++{"seed": 92, "success": true, "steps": 54, "seconds": 0.35, "phase": "place", "task": "target_block", "robot": [1.0326489210128784, 0.37041032314300537], "taskxy": [1.00502347946167, 0.10500000417232513], "dest": [1.0050235052108765, 0.10500000149011612]}
++{"seed": 93, "success": true, "steps": 76, "seconds": 0.56, "phase": "place", "task": "target_block", "robot": [1.0940169095993042, 0.41185927391052246], "taskxy": [1.0277326107025146, 0.10499999672174454], "dest": [1.0277326364517212, 0.10500000149011612]}
++{"seed": 94, "success": true, "steps": 23, "seconds": 0.14, "phase": "place", "task": "target_block", "robot": [0.6026239395141602, 0.5030219554901123], "taskxy": [0.5353034138679504, 0.10499999672174454], "dest": [0.5353033800125122, 0.10500000149011612]}
++{"seed": 95, "success": true, "steps": 60, "seconds": 0.38, "phase": "place", "task": "target_block", "robot": [1.2636786699295044, 0.48673880100250244], "taskxy": [1.2265461683273315, 0.10500001907348633], "dest": [1.226546194076538, 0.10500000149011612]}
++{"seed": 96, "success": true, "steps": 32, "seconds": 0.23, "phase": "place", "task": "target_block", "robot": [1.4306432008743286, 0.5141889452934265], "taskxy": [1.398691177368164, 0.10500001907348633], "dest": [1.398691207885742, 0.10500000149011612]}
++{"seed": 97, "success": true, "steps": 36, "seconds": 0.21, "phase": "place", "task": "target_block", "robot": [0.6469581127166748, 0.3773379623889923], "taskxy": [0.6194592118263245, 0.10500001907348633], "dest": [0.6194591637253761, 0.10500000149011612]}
++{"seed": 98, "success": true, "steps": 57, "seconds": 0.35, "phase": "place", "task": "target_block", "robot": [0.23062244057655334, 0.41795989871025085], "taskxy": [0.14807526767253876, 0.10500001907348633], "dest": [0.1480752568244934, 0.10500000149011612]}
++{"seed": 99, "success": true, "steps": 46, "seconds": 0.3, "phase": "place", "task": "target_block", "robot": [1.2927566766738892, 0.4704902172088623], "taskxy": [1.2396767139434814, 0.10499997437000275], "dest": [1.239676739692688, 0.10500000149011612]}
++{"seed": 239, "success": true, "steps": 65, "seconds": 0.42, "phase": "place", "task": "target_block", "robot": [0.16682486236095428, 0.38093799352645874], "taskxy": [0.15599285066127777, 0.10500001907348633], "dest": [0.15599279779195785, 0.10500000149011612]}
++{"seed": 319, "success": false, "steps": 1000, "seconds": 5.8, "phase": "carry", "task": "obstruction1", "robot": [0.7737568020820618, 0.7229787707328796], "taskxy": [0.7957567572593689, 0.3200226128101349], "dest": [0.7957568021207242, 0.105]}

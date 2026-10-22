@@ -1,0 +1,93 @@
+diff --git a/approach.py b/approach.py
+index 62d9060..00dd1c0 100644
+--- a/approach.py
++++ b/approach.py
+@@ -8,7 +8,7 @@ TABLE_Z = 0.075
+ TABLE_X = (0.10, 0.50)
+ TABLE_Y = (-0.40, 0.40)
+ SAFE_Z = 0.30          # tool height for transport
+-GRASP_DZ = 0.025       # tool height above object top when closing
++GRASP_DZ = 0.028       # tool height above object top when closing
+ PLACE_EPS = 0.0015     # clearance above support surface when releasing
+ MAX_DQ = 0.2
+ JLIM = {1: 2.41, 3: 2.66, 5: 2.23}   # limited joints (0-indexed): 2,4,6 in 1-index
+@@ -52,6 +52,7 @@ class GeneratedApproach:
+         self.last_q = None
+         self.last_cmd = None
+         self.blocked = 0
++        self.scale = 1.0
+         self.fail = {}
+         self.t = 0
+         self.wait = 0
+@@ -162,16 +163,19 @@ class GeneratedApproach:
+         return hits
+ 
+     def _choose_yaw(self, name, xy, bottom, attempt=0):
++        """Object-axis-aligned yaw; fingers (tool x) along the smaller extent
++        when possible, avoiding neighbours."""
++        p, he = self.objs[name]
+         rad = self._yaw_for(xy)
+-        best, bv = rad, 1e9
+-        for k in range(12):
+-            y = rad + k * np.pi / 12
+-            y = y if k < 7 else y - np.pi   # prefer small deviation either side
+-            dev = min(abs(wrap(y - rad)), abs(wrap(y - rad + np.pi)))
+-            v = self._footprint_hits(name, xy, y, bottom) * 10 + dev
+-            if v < bv:
+-                bv, best = v, y
+-        return best + attempt * np.pi / 2
++        cands = []
++        for k in range(4):
++            y = k * np.pi / 2
++            finger_ext = he[0] if k % 2 == 0 else he[1]
++            hits = self._footprint_hits(name, xy, y, bottom)
++            dev = abs(wrap(y - rad))
++            cands.append((hits * 10 + (finger_ext > 0.036) * 5 + finger_ext * 10 + 0.01 * dev, y))
++        cands.sort()
++        return cands[attempt % 4][1]
+ 
+     def _yaw_for(self, xy):
+         mx = self.base[0] + 0.12 * np.cos(self.base[2])
+@@ -220,7 +224,7 @@ class GeneratedApproach:
+             m = np.max(np.abs(dq))
+             if m > MAX_DQ:
+                 dq = dq * (MAX_DQ / m)
+-            return dq
++            return dq * self.scale
+         return None
+ 
+     def _act(self, dq=None, grip=0.0):
+@@ -240,6 +244,13 @@ class GeneratedApproach:
+         if self.last_cmd is not None and np.max(np.abs(self.last_cmd[3:10])) > 1e-6:
+             if np.allclose(self.q, self.last_q, atol=1e-7):
+                 blocked = True
++        if self.last_cmd is not None and not blocked:
++            self.scale = 1.0
++        if blocked and self.scale > 1.0 / 16:
++            self.scale *= 0.5
++            blocked = False
++        elif blocked:
++            self.scale = 1.0
+         self.last_cmd = None
+ 
+         for _ in range(8):
+diff --git a/dbg2.py b/dbg2.py
+new file mode 100644
+index 0000000..bdcbabc
+--- /dev/null
++++ b/dbg2.py
+@@ -0,0 +1,14 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++from kin import fk
++seed=int(sys.argv[1]); N=int(sys.argv[2])
++env = make_env(); obs, info = env.reset(seed=seed)
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++for t in range(N):
++    a = ap.get_action(obs); obs, *_ = env.step(a)
++ap._read(obs)
++np.set_printoptions(precision=3, suppress=True)
++print('q', ap.q, 'base', ap.base, 'last a', a)
++for n,(p,he) in ap.objs.items(): print(n, p, he)
++qt,e = ap._ik(np.array([0.337,-0.362,0.15]), ap.task['yaw']); print('ik target q', qt, e, 'yaw', ap.task['yaw'])

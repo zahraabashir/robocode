@@ -1,0 +1,66 @@
+diff --git a/approach.py b/approach.py
+index 022df89..ef9df33 100644
+--- a/approach.py
++++ b/approach.py
+@@ -95,7 +95,7 @@ class GeneratedApproach:
+         best = 1e9
+         for o in others:
+             op, oh = _pose(s, o), _he(s, o)
+-            if op[2] + oh[2] < p[2] - 0.01:   # below fingertips (tips ~ centre+0.005 at grasp)
++            if op[2] + oh[2] < p[2] - 0.035:   # below fingertips
+                 continue
+             oyaw = self._obj_yaw(s, o)
+             oc, os_ = np.cos(oyaw), np.sin(oyaw)
+diff --git a/res1.txt b/res1.txt
+new file mode 100644
+index 0000000..8706006
+--- /dev/null
++++ b/res1.txt
+@@ -0,0 +1,7 @@
++(15, 5, False, 1000, 13.5)
++count 5 success 15 / 16 mean steps 337.75 max compute 13.5
++(39, 2, True, 123, 11.0)
++success 40 / 40 mean steps 83.5
++(0, 6, False, 1000, 122.1)
++(4, 6, False, 1000, 10.8)
++count 6 success 6 / 8 mean steps 526.0 max compute 122.1
+diff --git a/res2.txt b/res2.txt
+new file mode 100644
+index 0000000..a3d6c02
+--- /dev/null
++++ b/res2.txt
+@@ -0,0 +1,4 @@
++(0, 6, False, 1000, 129.2)
++(4, 6, False, 1000, 10.3)
++count 6 success 6 / 8 mean steps 526.0 max compute 129.2
++success 40 / 40 mean steps 83.5
+diff --git a/res3.txt b/res3.txt
+new file mode 100644
+index 0000000..2c3ab26
+--- /dev/null
++++ b/res3.txt
+@@ -0,0 +1,5 @@
++(4, 6, False, 1000, 10.7)
++(11, 6, False, 1000, 9.0)
++count 6 success 14 / 16 mean steps 410.8125 max compute 10.7
++(11, 5, False, 1000, 8.4)
++count 5 success 15 / 16 mean steps 353.625 max compute 8.4
+diff --git a/show3.py b/show3.py
+new file mode 100644
+index 0000000..4b9a192
+--- /dev/null
++++ b/show3.py
+@@ -0,0 +1,13 @@
++import sys
++from env_client import make_env
++from approach import GeneratedApproach
++env=make_env(); obs,info=env.reset(seed=int(sys.argv[1]), options={"object_count":int(sys.argv[2])})
++ap=GeneratedApproach(env.action_space, env.observation_space, None); ap.reset(obs,info)
++for t in range(int(sys.argv[3])):
++    obs,r,term,trunc,info=env.step(ap.get_action(obs))
++print('queue', ap.queue[:2])
++for n in sorted(obs.get_object_names()):
++    o=obs.get_object_from_name(n)
++    if n=='robot':
++        print(n,[round(obs.get(o,f),4) for f in ['finger_state','grasp_active']]); continue
++    print(n,[round(obs.get(o,f),4) for f in ['pose_x','pose_y','pose_z','half_extent_x','half_extent_y','half_extent_z','pose_qz','pose_qw']])

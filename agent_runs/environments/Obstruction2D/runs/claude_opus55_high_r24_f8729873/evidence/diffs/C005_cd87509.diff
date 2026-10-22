@@ -1,0 +1,440 @@
+diff --git a/approach.py b/approach.py
+index 2d869ed..4ee334e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -255,52 +255,65 @@ class GeneratedApproach:
+                 res.append(o)
+         return res
+ 
++    def _final_sweep(self):
++        """(rx, ry, final_bb) for the final block placement."""
++        robot, block, surf, obst = self._objs()
++        left, bottom, sb, g = self._final_placement()
++        bb = _rect_bbox(self.state, block)
++        bw, bh = bb[2] - bb[0], bb[3] - bb[1]
++        final_bb = (left, bottom, left + bw, bottom + bh)
++        return left + g, bottom + bh + TIP + 0.003, final_bb
++
+     def _find_spot(self, o):
+-        """Find (left, bottom) to park obstruction o."""
++        """Find (left, bottom) to park the (currently grasped) obstruction o."""
+         robot, block, surf, obst = self._objs()
+         s = self.state
+         ob = _rect_bbox(s, o)
+         w, h = ob[2] - ob[0], ob[3] - ob[1]
+-        # offset of grasp relative to object left
+         x, y, _, _ = self._rpos()
+         goff = x - ob[0]
++        hang = y - ob[3]  # robot y minus object top
+         sb = _rect_bbox(s, surf)
+         others = self._others_bboxes([o])
+-        left_f, bottom_f, _, _ = self._final_placement()
++        frx, fry, fbb = self._final_sweep()
++        # target block pickup sweep
++        _, _, _, g = self._final_placement()
+         bb = _rect_bbox(s, block)
+-        bw = bb[2] - bb[0]
+-        # forbidden zone around the surface / final block placement
+-        fz = (min(sb[0], left_f) - 0.13, max(sb[2], left_f + bw) + 0.13)
+-        levels = [FLOOR + 0.005]
++        brx = bb[0] + g
++        bry = bb[3] + TIP + 0.003
++        levels = [(FLOOR + 0.005, 0.0)]
++        for b in others:
++            if b[3] + 0.005 + h < 0.42:
++                levels.append((b[3] + 0.005, 1.0 + b[3]))
+         best = None
+-        xs = np.arange(WORLD_X[0] + 0.01, WORLD_X[1] - w - 0.01, 0.01)
+-        for bottom in levels:
++        xs = np.arange(WORLD_X[0] + 0.002, WORLD_X[1] - w - 0.002, 0.005)
++        for bottom, pen in levels:
+             for lx in xs:
+-                if lx < fz[1] and lx + w > fz[0]:
+-                    continue
+                 rx = lx + goff
+                 if rx < RX_MIN or rx > RX_MAX:
+                     continue
+                 cand = (lx, bottom, lx + w, bottom + h)
++                if cand[0] < sb[2] + 0.01 and cand[2] > sb[0] - 0.01:
++                    continue
+                 bad = False
+                 for b in others:
+-                    if _overlap(cand, b, 0.02):
++                    if _overlap(cand, b, 0.01):
+                         bad = True
+                         break
+                 if bad:
+                     continue
+-                ry = bottom + h + (y - ob[3])
+-                if not self._descent_free(rx, ry, cand, others, margin=0.015):
++                if not self._descent_free(frx, fry, fbb, [cand], margin=0.02):
++                    continue
++                if not self._descent_free(brx, bry, None, [cand], margin=0.02):
++                    continue
++                ry = bottom + h + hang
++                if not self._descent_free(rx, ry, cand, others, margin=0.012):
+                     continue
+-                cost = abs(rx - x)
++                cost = abs(rx - x) + pen
+                 if best is None or cost < best[0]:
+                     best = (cost, lx, bottom)
+-            if best is not None:
+-                break
+         if best is None:
+-            # fallback: park in the air high above in the far region
+-            far = WORLD_X[1] - w - 0.15 if (sb[0] + sb[2]) / 2 < WORLD_X[1] / 2 else 0.15
+-            return far, 0.45
++            return None
+         return best[1], best[2]
+ 
+     def _plan(self):
+@@ -323,7 +336,12 @@ class GeneratedApproach:
+                 if not ok:
+                     failures += 1
+                     continue
+-                left, bottom = self._find_spot(o)
++                spot = self._find_spot(o)
++                if spot is None:
++                    # put it back where it was
++                    spot = (_rect_bbox(self.state, o)[0], FLOOR + 0.005)
++                    failures += 1
++                left, bottom = spot
+                 yield from self._place_at(o, left, bottom)
+                 self.vac = 0.0
+                 yield self._act()
+diff --git a/c3.txt b/c3.txt
+new file mode 100644
+index 0000000..fc61cda
+--- /dev/null
++++ b/c3.txt
+@@ -0,0 +1,41 @@
++seed 200 nobs 3 success True steps 181 time 11.3
++seed 201 nobs 3 success True steps 176 time 12.5
++seed 202 nobs 3 success True steps 175 time 12.9
++seed 203 nobs 3 success True steps 238 time 16.9
++seed 204 nobs 3 success True steps 182 time 10.2
++seed 205 nobs 3 success True steps 217 time 14.1
++seed 206 nobs 3 success True steps 180 time 14.6
++seed 207 nobs 3 success True steps 220 time 15.3
++seed 208 nobs 3 success True steps 164 time 11.4
++seed 209 nobs 3 success True steps 94 time 6.2
++seed 210 nobs 3 success True steps 246 time 15.3
++seed 211 nobs 3 success True steps 183 time 12.6
++seed 212 nobs 3 success True steps 135 time 9.8
++seed 213 nobs 3 success True steps 162 time 8.6
++seed 214 nobs 3 success True steps 170 time 10.3
++seed 215 nobs 3 success True steps 216 time 15.3
++seed 216 nobs 3 success True steps 188 time 12.6
++seed 217 nobs 3 success True steps 153 time 8.6
++seed 218 nobs 3 success True steps 183 time 9.8
++seed 219 nobs 3 success True steps 173 time 10.1
++seed 220 nobs 3 success True steps 186 time 9.8
++seed 221 nobs 3 success True steps 179 time 11.1
++seed 222 nobs 3 success True steps 165 time 5.0
++seed 223 nobs 3 success True steps 209 time 7.3
++seed 224 nobs 3 success True steps 113 time 4.8
++seed 225 nobs 3 success True steps 175 time 4.1
++seed 226 nobs 3 success True steps 161 time 6.4
++seed 227 nobs 3 success True steps 106 time 3.2
++seed 228 nobs 3 success True steps 169 time 6.6
++seed 229 nobs 3 success True steps 223 time 8.6
++seed 230 nobs 3 success True steps 113 time 3.1
++seed 231 nobs 3 success True steps 226 time 6.4
++seed 232 nobs 3 success True steps 173 time 5.7
++seed 233 nobs 3 success True steps 123 time 5.0
++seed 234 nobs 3 success True steps 171 time 6.2
++seed 235 nobs 3 success True steps 156 time 5.0
++seed 236 nobs 3 success True steps 166 time 5.5
++seed 237 nobs 3 success True steps 197 time 6.8
++seed 238 nobs 3 success True steps 220 time 9.5
++seed 239 nobs 3 success True steps 187 time 6.1
++success 40 / 40
+diff --git a/c4.txt b/c4.txt
+new file mode 100644
+index 0000000..0cb9db7
+--- /dev/null
++++ b/c4.txt
+@@ -0,0 +1,41 @@
++seed 100 nobs 4 success True steps 232 time 17.1
++seed 101 nobs 4 success True steps 259 time 18.3
++seed 102 nobs 4 success True steps 175 time 11.2
++seed 103 nobs 4 success True steps 247 time 16.2
++seed 104 nobs 4 success True steps 246 time 17.2
++seed 105 nobs 4 success True steps 191 time 14.2
++seed 106 nobs 4 success True steps 220 time 14.8
++seed 107 nobs 4 success True steps 161 time 11.2
++seed 108 nobs 4 success True steps 203 time 11.9
++seed 109 nobs 4 success True steps 187 time 9.4
++seed 110 nobs 4 success True steps 178 time 10.9
++seed 111 nobs 4 success True steps 163 time 5.3
++seed 112 nobs 4 success True steps 173 time 5.7
++seed 113 nobs 4 success True steps 211 time 7.7
++seed 114 nobs 4 success True steps 170 time 7.2
++seed 115 nobs 4 success True steps 233 time 7.3
++seed 116 nobs 4 success True steps 249 time 8.7
++seed 117 nobs 4 success True steps 241 time 9.0
++seed 118 nobs 4 success True steps 223 time 7.0
++seed 119 nobs 4 success True steps 213 time 4.2
++seed 120 nobs 4 success True steps 250 time 3.2
++seed 121 nobs 4 success True steps 159 time 0.9
++seed 122 nobs 4 success True steps 208 time 1.1
++seed 123 nobs 4 success True steps 123 time 0.7
++seed 124 nobs 4 success True steps 274 time 1.4
++seed 125 nobs 4 success True steps 112 time 0.7
++seed 126 nobs 4 success True steps 218 time 1.2
++seed 127 nobs 4 success True steps 254 time 1.1
++seed 128 nobs 4 success True steps 217 time 1.1
++seed 129 nobs 4 success True steps 169 time 0.9
++seed 130 nobs 4 success False steps 1000 time 4.3
++seed 131 nobs 4 success True steps 93 time 0.4
++seed 132 nobs 4 success True steps 160 time 0.8
++seed 133 nobs 4 success True steps 222 time 1.1
++seed 134 nobs 4 success True steps 236 time 1.1
++seed 135 nobs 4 success True steps 205 time 1.1
++seed 136 nobs 4 success True steps 170 time 0.8
++seed 137 nobs 4 success True steps 239 time 1.0
++seed 138 nobs 4 success True steps 285 time 1.5
++seed 139 nobs 4 success True steps 234 time 1.1
++success 39 / 40
+diff --git a/c5.txt b/c5.txt
+new file mode 100644
+index 0000000..0682116
+--- /dev/null
++++ b/c5.txt
+@@ -0,0 +1,13 @@
++Traceback (most recent call last):
++  File "/sandbox/test_approach.py", line 23, in <module>
++    term, steps, n, dt = run(s, count=cnt)
++                         ^^^^^^^^^^^^^^^^^
++  File "/sandbox/test_approach.py", line 7, in run
++    obs, info = env.reset(seed=seed, options=({'object_count': count} if count is not None else None))
++                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 478, in _request
++    raise RuntimeError("Connection to the environment server was closed")
++RuntimeError: Connection to the environment server was closed
+diff --git a/cd.txt b/cd.txt
+new file mode 100644
+index 0000000..9c75310
+--- /dev/null
++++ b/cd.txt
+@@ -0,0 +1,101 @@
++seed 300 nobs 0 success True steps 50 time 2.0
++seed 301 nobs 0 success True steps 80 time 3.1
++seed 302 nobs 2 success True steps 155 time 9.5
++seed 303 nobs 1 success True steps 134 time 8.0
++seed 304 nobs 2 success True steps 169 time 5.6
++seed 305 nobs 0 success True steps 49 time 2.4
++seed 306 nobs 2 success True steps 163 time 9.5
++seed 307 nobs 2 success True steps 187 time 11.6
++seed 308 nobs 1 success True steps 110 time 7.2
++seed 309 nobs 1 success True steps 125 time 4.4
++seed 310 nobs 0 success True steps 44 time 1.7
++seed 311 nobs 1 success True steps 117 time 6.8
++seed 312 nobs 0 success True steps 74 time 5.0
++seed 313 nobs 0 success True steps 48 time 3.1
++seed 314 nobs 1 success True steps 66 time 4.0
++seed 315 nobs 1 success True steps 41 time 2.3
++seed 316 nobs 0 success True steps 48 time 2.9
++seed 317 nobs 0 success True steps 41 time 2.0
++seed 318 nobs 0 success True steps 74 time 3.2
++seed 319 nobs 2 success True steps 113 time 5.8
++seed 320 nobs 0 success True steps 39 time 1.8
++seed 321 nobs 1 success True steps 101 time 4.9
++seed 322 nobs 0 success True steps 46 time 2.3
++seed 323 nobs 2 success True steps 115 time 8.2
++seed 324 nobs 1 success True steps 132 time 7.4
++seed 325 nobs 0 success True steps 48 time 2.8
++seed 326 nobs 0 success True steps 75 time 4.2
++seed 327 nobs 1 success True steps 104 time 6.8
++seed 328 nobs 0 success True steps 40 time 1.7
++seed 329 nobs 2 success True steps 165 time 9.1
++seed 330 nobs 1 success True steps 117 time 1.9
++seed 331 nobs 0 success True steps 38 time 1.4
++seed 332 nobs 1 success True steps 103 time 6.8
++seed 333 nobs 0 success True steps 34 time 1.9
++seed 334 nobs 1 success True steps 93 time 5.4
++seed 335 nobs 0 success True steps 44 time 2.2
++seed 336 nobs 1 success True steps 119 time 6.2
++seed 337 nobs 0 success True steps 81 time 3.7
++seed 338 nobs 1 success True steps 98 time 5.9
++seed 339 nobs 0 success True steps 62 time 4.5
++seed 340 nobs 0 success True steps 42 time 1.7
++seed 341 nobs 2 success True steps 99 time 6.2
++seed 342 nobs 2 success True steps 191 time 10.7
++seed 343 nobs 0 success True steps 58 time 2.4
++seed 344 nobs 0 success True steps 59 time 3.2
++seed 345 nobs 0 success True steps 58 time 3.4
++seed 346 nobs 1 success True steps 133 time 6.3
++seed 347 nobs 2 success True steps 96 time 5.4
++seed 348 nobs 0 success True steps 52 time 1.8
++seed 349 nobs 2 success True steps 105 time 5.0
++seed 350 nobs 1 success True steps 98 time 4.9
++seed 351 nobs 1 success True steps 120 time 4.6
++seed 352 nobs 0 success True steps 61 time 2.7
++seed 353 nobs 0 success True steps 45 time 1.6
++seed 354 nobs 2 success True steps 177 time 8.0
++seed 355 nobs 1 success True steps 57 time 2.5
++seed 356 nobs 0 success True steps 54 time 1.2
++seed 357 nobs 1 success True steps 125 time 6.2
++seed 358 nobs 2 success True steps 140 time 8.1
++seed 359 nobs 1 success True steps 109 time 4.6
++seed 360 nobs 2 success True steps 155 time 4.0
++seed 361 nobs 2 success True steps 162 time 5.5
++seed 362 nobs 2 success True steps 163 time 5.2
++seed 363 nobs 0 success True steps 66 time 1.9
++seed 364 nobs 1 success True steps 108 time 1.7
++seed 365 nobs 0 success True steps 71 time 1.8
++seed 366 nobs 0 success True steps 45 time 1.1
++seed 367 nobs 2 success True steps 199 time 7.2
++seed 368 nobs 2 success True steps 151 time 3.8
++seed 369 nobs 2 success True steps 163 time 5.3
++seed 370 nobs 1 success True steps 114 time 1.8
++seed 371 nobs 2 success True steps 97 time 3.2
++seed 372 nobs 1 success True steps 137 time 3.4
++seed 373 nobs 1 success True steps 118 time 2.1
++seed 374 nobs 2 success True steps 165 time 4.7
++seed 375 nobs 0 success True steps 51 time 1.1
++seed 376 nobs 1 success True steps 118 time 4.1
++seed 377 nobs 2 success True steps 132 time 3.4
++seed 378 nobs 1 success True steps 141 time 4.5
++seed 379 nobs 2 success True steps 166 time 6.3
++seed 380 nobs 1 success True steps 123 time 2.9
++seed 381 nobs 2 success True steps 133 time 3.2
++seed 382 nobs 0 success True steps 67 time 1.4
++seed 383 nobs 0 success True steps 63 time 1.8
++seed 384 nobs 0 success True steps 64 time 2.0
++seed 385 nobs 2 success True steps 140 time 4.6
++seed 386 nobs 1 success True steps 104 time 3.3
++seed 387 nobs 1 success True steps 113 time 3.2
++seed 388 nobs 1 success True steps 106 time 3.9
++seed 389 nobs 0 success True steps 53 time 1.6
++seed 390 nobs 1 success True steps 122 time 3.7
++seed 391 nobs 0 success True steps 66 time 2.3
++seed 392 nobs 2 success True steps 101 time 3.0
++seed 393 nobs 2 success True steps 46 time 1.3
++seed 394 nobs 0 success True steps 44 time 1.5
++seed 395 nobs 1 success True steps 131 time 2.3
++seed 396 nobs 1 success True steps 134 time 2.5
++seed 397 nobs 2 success True steps 159 time 2.8
++seed 398 nobs 2 success True steps 97 time 1.0
++seed 399 nobs 2 success True steps 165 time 1.6
++success 100 / 100
+diff --git a/cnt_3.txt b/cnt_3.txt
+new file mode 100644
+index 0000000..295924d
+--- /dev/null
++++ b/cnt_3.txt
+@@ -0,0 +1,4 @@
++seed 0 nobs 3 success True steps 105 time 4.6
++seed 1 nobs 3 success True steps 177 time 9.8
++seed 2 nobs 3 success True steps 187 time 10.0
++success 3 / 3
+diff --git a/cnt_4.txt b/cnt_4.txt
+new file mode 100644
+index 0000000..c14d154
+--- /dev/null
++++ b/cnt_4.txt
+@@ -0,0 +1,4 @@
++seed 0 nobs 4 success True steps 160 time 8.6
++seed 1 nobs 4 success True steps 214 time 9.0
++seed 2 nobs 4 success True steps 179 time 6.6
++success 3 / 3
+diff --git a/cnt_6.txt b/cnt_6.txt
+new file mode 100644
+index 0000000..42485f0
+--- /dev/null
++++ b/cnt_6.txt
+@@ -0,0 +1,13 @@
++Traceback (most recent call last):
++  File "/sandbox/test_approach.py", line 23, in <module>
++    term, steps, n, dt = run(s, count=cnt)
++                         ^^^^^^^^^^^^^^^^^
++  File "/sandbox/test_approach.py", line 7, in run
++    obs, info = env.reset(seed=seed, options=({'object_count': count} if count is not None else None))
++                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 481, in _request
++    raise RuntimeError(f"Environment server error: {response['error']}")
++RuntimeError: Environment server error: ValueError: Obstruction2DEnv could not build an instance with num_obstructions=6; it likely exceeds the family's feasible object count. Lower the configured counts.
+diff --git a/cnt_8.txt b/cnt_8.txt
+new file mode 100644
+index 0000000..f18b7e3
+--- /dev/null
++++ b/cnt_8.txt
+@@ -0,0 +1,13 @@
++Traceback (most recent call last):
++  File "/sandbox/test_approach.py", line 23, in <module>
++    term, steps, n, dt = run(s, count=cnt)
++                         ^^^^^^^^^^^^^^^^^
++  File "/sandbox/test_approach.py", line 7, in run
++    obs, info = env.reset(seed=seed, options=({'object_count': count} if count is not None else None))
++                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 525, in reset
++    response = self._request({"cmd": "reset", "seed": seed, "options": options})
++               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "/sandbox/env_client.py", line 481, in _request
++    raise RuntimeError(f"Environment server error: {response['error']}")
++RuntimeError: Environment server error: ValueError: Obstruction2DEnv could not build an instance with num_obstructions=8; it likely exceeds the family's feasible object count. Lower the configured counts.
+diff --git a/dump2.py b/dump2.py
+new file mode 100644
+index 0000000..4539a4a
+--- /dev/null
++++ b/dump2.py
+@@ -0,0 +1,9 @@
++from env_client import make_env
++import sys
++env = make_env()
++seed=int(sys.argv[1]); cnt=int(sys.argv[2]) if len(sys.argv)>2 else None
++obs, info = env.reset(seed=seed, options={'object_count':cnt} if cnt else None)
++for n in sorted(obs.get_object_names()):
++    o=obs.get_object_from_name(n)
++    fs=["x","y","width","height"] if n!='robot' else ['x','y']
++    print(n, {f: round(float(obs.get(o,f)),3) for f in fs})
+diff --git a/test_approach.py b/test_approach.py
+index f2cd0e6..1457b4b 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -2,9 +2,9 @@ import sys, time
+ import numpy as np
+ from env_client import make_env
+ from approach import GeneratedApproach
+-def run(seed, verbose=False):
++def run(seed, verbose=False, count=None):
+     env = make_env()
+-    obs, info = env.reset(seed=seed)
++    obs, info = env.reset(seed=seed, options=({'object_count': count} if count is not None else None))
+     ap = GeneratedApproach(env.action_space, env.observation_space, {})
+     ap.reset(obs, info)
+     n_obs = len(obs.get_object_names()) - 3
+@@ -17,9 +17,10 @@ def run(seed, verbose=False):
+     return term, t+1, n_obs, time.time()-t0
+ if __name__ == "__main__":
+     s0, s1 = int(sys.argv[1]), int(sys.argv[2])
++    cnt = int(sys.argv[3]) if len(sys.argv) > 3 else None
+     succ=0
+     for s in range(s0, s1):
+-        term, steps, n, dt = run(s)
++        term, steps, n, dt = run(s, count=cnt)
+         succ += term
+         print(f"seed {s} nobs {n} success {term} steps {steps} time {dt:.1f}", flush=True)
+     print("success", succ, "/", s1-s0)
+diff --git a/trace.py b/trace.py
+index bddd368..4e823f8 100644
+--- a/trace.py
++++ b/trace.py
+@@ -2,8 +2,8 @@ import sys
+ import numpy as np
+ from env_client import make_env
+ from approach import GeneratedApproach
+-seed=int(sys.argv[1]); N=int(sys.argv[2]) if len(sys.argv)>2 else 300
+-env = make_env(); obs, info = env.reset(seed=seed)
++seed=int(sys.argv[1]); N=int(sys.argv[2]); C=int(sys.argv[3]) if len(sys.argv)>3 else None
++env = make_env(); obs, info = env.reset(seed=seed, options={'object_count':C} if C else None)
+ ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
+ names=sorted(obs.get_object_names())
+ for t in range(N):

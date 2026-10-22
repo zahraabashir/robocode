@@ -1,0 +1,65 @@
+diff --git a/approach.py b/approach.py
+index a224ff2..13ccbfc 100644
+--- a/approach.py
++++ b/approach.py
+@@ -168,9 +168,30 @@ class GeneratedApproach:
+                     s -= 10 + (0.25 - m) * 10
+                 if s > bs:
+                     bs, best = s, pr
++            if best is not None and bs > -5:
++                return best, dth, g
++            if best is not None and self.wall_margin(B, np.zeros(2)) > 0.45:
++                return best, dth, g
++            # recenter: move the block away from walls
++            c = np.array([2.5, 2.5]) - B.p
++            cn = np.linalg.norm(c)
++            if cn > 0.05:
++                tr = self.pick_trans(B, prims, c / cn)
++                if tr is not None:
++                    return tr, dth, B.p + c / cn * min(cn, 0.5)
+             if best is not None:
+-                return best, dth
+-        # translation: pick axis with largest error component
++                return best, dth, g
++        tr = self.pick_trans(B, prims, err)
++        if tr is not None and float(B.dir_world(tr[2]) @ err) > 0.004:
++            return tr, dth, g
++        c = np.array([2.5, 2.5]) - B.p
++        cn = np.linalg.norm(c)
++        tr2 = self.pick_trans(B, prims, c / (cn + 1e-9))
++        if tr2 is not None:
++            return tr2, dth, B.p + c / (cn + 1e-9) * min(cn, 0.3)
++        return tr, dth, g
++
++    def pick_trans(self, B, prims, err):
+         best, bs = None, -1e9
+         for pr in prims:
+             name, p, n, k, tq = pr
+@@ -184,7 +205,7 @@ class GeneratedApproach:
+                 s = s * 0.6 - 0.01
+             if s > bs:
+                 bs, best = s, pr
+-        return best, dth
++        return best
+ 
+     # ------------------------------------------------------------ navigation
+     def nav_step(self, B, rp, target):
+@@ -255,7 +276,7 @@ class GeneratedApproach:
+             res = self.choose(obs)
+             if res is None:
+                 return np.zeros(2)
+-            pr, dth = res
++            pr, dth, self.push_goal = res
+             if pr is None:
+                 if self.banned:
+                     self.banned.clear()
+@@ -300,8 +321,7 @@ class GeneratedApproach:
+                 return self._move_to(rp, wp)
+         if self.mode == 'push':
+             self.push_steps += 1
+-            g = np.array([obs[29], obs[30]])
+-            err = g - B.p
++            err = self.push_goal - B.p
+             dth = self.goal_theta(obs) - B.th
+             nw = B.dir_world(n)
+             done = False

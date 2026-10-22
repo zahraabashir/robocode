@@ -1,0 +1,368 @@
+diff --git a/approach.py b/approach.py
+index 1faa0cb..a3110a6 100644
+--- a/approach.py
++++ b/approach.py
+@@ -1,16 +1,84 @@
+-"""Policy for the Obstruction3D black-box manipulation task."""
++"""Geometry-driven policy for the Obstruction3D manipulation task."""
+ 
+ import numpy as np
++from scipy.optimize import least_squares
++from scipy.spatial.transform import Rotation
++
++_ORIGINS = (
++    ((0, 0, .15643), (np.pi, 0, 0)),
++    ((0, .005375, -.12838), (np.pi / 2, 0, 0)),
++    ((0, -.21038, -.006375), (-np.pi / 2, 0, 0)),
++    ((0, .006375, -.21038), (np.pi / 2, 0, 0)),
++    ((0, -.20843, -.006375), (-np.pi / 2, 0, 0)),
++    ((0, .00017505, -.10593), (np.pi / 2, 0, 0)),
++    ((0, -.10593, -.00017505), (-np.pi / 2, 0, 0)),
++)
++_HOME = np.array((0, -.35, -np.pi, -2.5, 0, -.87, np.pi / 2))
++
++
++def _fk(q):
++    t = np.eye(4)
++    for angle, (xyz, rpy) in zip(q, _ORIGINS):
++        a = np.eye(4)
++        a[:3, :3] = Rotation.from_euler("xyz", rpy).as_matrix()
++        a[:3, 3] = xyz
++        z = np.eye(4)
++        z[:3, :3] = Rotation.from_euler("z", angle).as_matrix()
++        t = t @ a @ z
++    a = np.eye(4)
++    a[:3, :3] = Rotation.from_euler("x", np.pi).as_matrix()
++    a[:3, 3] = (0, 0, -.061525)
++    return t @ a
+ 
+ 
+ class GeneratedApproach:
+     def __init__(self, action_space, observation_space, primitives):
+         self.action_space = action_space
+-        self.observation_space = observation_space
++
++    @staticmethod
++    def _get(state, name, feature):
++        return float(state.get(state.get_object_from_name(name), feature))
++
++    def _solve(self, xyz, seed=None):
++        start = _HOME if seed is None else seed
++        base = np.array((self.base_x, self.base_y, 0.0))
++        def residual(q):
++            t = _fk(q)
++            grasp = base + t[:3, 3] + .12 * t[:3, 2]
++            return np.r_[8 * (grasp - xyz), 1.5 * t[:2, 2], .03 * (q - _HOME)]
++        return least_squares(residual, start, max_nfev=180).x
+ 
+     def reset(self, state, info):
+-        pass
++        self.step = 0
++        self.base_x = self._get(state, "robot", "pos_base_x")
++        self.base_y = self._get(state, "robot", "pos_base_y")
++        block = np.array([self._get(state, "target_block", f"pose_{c}") for c in "xyz"])
++        region = np.array([self._get(state, "target_region", f"pose_{c}") for c in "xyz"])
++        self.pick_q = self._solve(block)
++        self.lift_q = self._solve(block + (0, 0, .18), self.pick_q)
++        self.place_q = self._solve(region + (0, 0, .08), self.lift_q)
++        self.drop_q = self._solve(region + (0, 0, .03), self.place_q)
+ 
+     def get_action(self, state):
+-        # Safe baseline; replaced as dynamics are identified.
+-        return np.zeros(self.action_space.shape, dtype=np.float32)
++        self.step += 1
++        robot = state.get_object_from_name("robot")
++        q = np.array([float(state.get(robot, f"joint_{i}")) for i in range(1, 8)])
++        grasped = float(state.get(robot, "grasp_active")) > .5
++        if self.step <= 18:
++            goal, grip = self.pick_q, 1.0
++        elif self.step <= 21:
++            goal, grip = self.pick_q, -1.0
++        elif self.step <= 35:
++            goal, grip = self.lift_q, 0.0
++        elif self.step <= 51:
++            goal, grip = self.place_q, 0.0
++        elif self.step <= 60:
++            goal, grip = self.drop_q, 0.0
++        else:
++            goal, grip = self.drop_q, 1.0
++        if 22 <= self.step <= 35 and not grasped:
++            goal, grip = self.pick_q, -1.0
++        action = np.zeros(self.action_space.shape, dtype=np.float32)
++        action[3:10] = np.clip(goal - q, -.2, .2)
++        action[10] = grip
++        return action
+diff --git a/ik_probe.py b/ik_probe.py
+new file mode 100644
+index 0000000..7019d65
+--- /dev/null
++++ b/ik_probe.py
+@@ -0,0 +1,33 @@
++from env_client import make_env
++import numpy as np
++from scipy.optimize import least_squares
++from scipy.spatial.transform import Rotation
++
++ORIGINS=[([0,0,.15643],[np.pi,0,0]),([0,.005375,-.12838],[np.pi/2,0,0]),([0,-.21038,-.006375],[-np.pi/2,0,0]),([0,.006375,-.21038],[np.pi/2,0,0]),([0,-.20843,-.006375],[-np.pi/2,0,0]),([0,.00017505,-.10593],[np.pi/2,0,0]),([0,-.10593,-.00017505],[-np.pi/2,0,0])]
++Q0=np.array([0,-.35,-np.pi,-2.5,0,-.87,np.pi/2])
++def fk(q):
++ T=np.eye(4)
++ for qi,(xyz,rpy) in zip(q,ORIGINS):
++  A=np.eye(4);A[:3,:3]=Rotation.from_euler('xyz',rpy).as_matrix();A[:3,3]=xyz
++  Z=np.eye(4);Z[:3,:3]=Rotation.from_euler('z',qi).as_matrix();T=T@A@Z
++ A=np.eye(4);A[:3,:3]=Rotation.from_euler('x',np.pi).as_matrix();A[:3,3]=[0,0,-.061525]
++ return T@A
++def ik(xyz,off):
++ def fun(q):
++  T=fk(q); grasp=T[:3,3]+off*T[:3,2]
++  return np.r_[5*(grasp-xyz), T[:2,2], .15*(q-Q0)]
++ return least_squares(fun,Q0,max_nfev=300).x
++def val(s,n,f): return float(s.get(s.get_object_from_name(n),f))
++
++for off in [.04,.08,.12,.16]:
++ e=make_env();s,_=e.reset(seed=0);xyz=np.array([val(s,'target_block',f) for f in ['pose_x','pose_y','pose_z']])
++ q=ik(xyz-np.array([-.12,0,0]),off) # base frame target
++ print('OFF',off,'q',q,'fk',fk(q)[:3,3], 'gp',fk(q)[:3,3]+off*fk(q)[:3,2])
++ for k in range(40):
++  rob=s.get_object_from_name('robot'); cur=np.array([float(s.get(rob,'joint_'+str(i))) for i in range(1,8)])
++  a=np.zeros(11,np.float32);a[3:10]=np.clip(q-cur,-.2,.2);a[10]=1
++  s,r,t,tr,info=e.step(a)
++  if np.max(np.abs(q-cur))<.01:break
++ a=np.zeros(11,np.float32);a[10]=-1;s,r,t,tr,info=e.step(a)
++ print(' grasp',val(s,'robot','grasp_active'),val(s,'target_block','grasp_active'),'obj',[val(s,'target_block',f) for f in ['pose_x','pose_y','pose_z']], 'tf',[val(s,'robot',f) for f in ['grasp_tf_x','grasp_tf_y','grasp_tf_z']])
++ e.close()
+diff --git a/inspect_env.py b/inspect_env.py
+new file mode 100644
+index 0000000..ddcb3b8
+--- /dev/null
++++ b/inspect_env.py
+@@ -0,0 +1,26 @@
++from env_client import make_env
++import numpy as np
++
++def vals(s, o):
++    feats = ['pose_x','pose_y','pose_z','half_extent_x','half_extent_y','half_extent_z',
++             'object_type','grasp_active','pos_base_x','pos_base_y','pos_base_rot',
++             'joint_1','joint_2','joint_3','joint_4','joint_5','joint_6','joint_7',
++             'finger_state','grasp_tf_x','grasp_tf_y','grasp_tf_z']
++    out={}
++    for f in feats:
++        try: out[f]=float(s.get(o,f))
++        except Exception: pass
++    return out
++
++e=make_env(); s,info=e.reset(seed=0)
++print('info', info, 'max', e.max_steps, 'names', s.get_object_names())
++for n in s.get_object_names(): print(n, vals(s,s.get_object_from_name(n)))
++for ix in range(11):
++    e2=make_env(); q,_=e2.reset(seed=0); a=np.zeros(11,np.float32); a[ix]=e2.action_space.high[ix]
++    q,r,t,tr,inf=e2.step(a)
++    rob=q.get_object_from_name('robot')
++    print('ACT',ix,'rtt',r,t,tr,'robot',vals(q,rob))
++    for n in q.get_object_names():
++        if n!='robot': print(' ',n,vals(q,q.get_object_from_name(n)))
++    e2.close()
++e.close()
+diff --git a/probe_instances.py b/probe_instances.py
+new file mode 100644
+index 0000000..2fc05ef
+--- /dev/null
++++ b/probe_instances.py
+@@ -0,0 +1,150 @@
++"""Exploration-only probes for Obstruction3DEnv."""
++import argparse
++import json
++import numpy as np
++
++from env_client import make_env
++
++
++def snapshot(state):
++    rows = {}
++    for name in state.get_object_names():
++        obj = state.get_object_from_name(name)
++        vals = {}
++        for feat in (
++            "pose_x", "pose_y", "pose_z", "pose_qx", "pose_qy", "pose_qz", "pose_qw",
++            "half_extent_x", "half_extent_y", "half_extent_z", "grasp_active", "object_type",
++            "pos_base_x", "pos_base_y", "pos_base_rot", "joint_1", "joint_2", "joint_3",
++            "joint_4", "joint_5", "joint_6", "joint_7", "finger_state", "grasp_tf_x",
++            "grasp_tf_y", "grasp_tf_z",
++        ):
++            try:
++                vals[feat] = float(state.get(obj, feat))
++            except Exception:
++                pass
++        rows[name] = vals
++    return rows
++
++
++def resets(n):
++    env = make_env()
++    records = []
++    try:
++        for seed in range(n):
++            s, info = env.reset(seed=seed)
++            rows = snapshot(s)
++            rec = {"seed": seed, "names": list(rows), "info": info}
++            for name, vals in rows.items():
++                rec[name] = vals
++            records.append(rec)
++    finally:
++        env.close()
++    print(json.dumps(records, separators=(",", ":")))
++
++
++def effects(seed, index, value, steps):
++    env = make_env()
++    try:
++        s, info = env.reset(seed=seed)
++        print("initial", json.dumps(snapshot(s), separators=(",", ":")))
++        action = np.zeros(env.action_space.shape, dtype=np.float32)
++        action[index] = value
++        for t in range(steps):
++            s, reward, term, trunc, info = env.step(action)
++            print(t + 1, reward, term, trunc, json.dumps(snapshot(s), separators=(",", ":")))
++            if term or trunc:
++                break
++    finally:
++        env.close()
++
++
++def effect_all(seed):
++    for idx in range(11):
++        env = make_env()
++        try:
++            s0, _ = env.reset(seed=seed)
++            b = snapshot(s0)
++            action = np.zeros(11, dtype=np.float32)
++            action[idx] = 1.0 if idx == 10 else 0.2
++            s1, reward, term, trunc, info = env.step(action)
++            a = snapshot(s1)
++            changed = {}
++            for name in a:
++                d = {k: round(v - b[name].get(k, v), 6) for k, v in a[name].items()
++                     if isinstance(v, float) and abs(v - b[name].get(k, v)) > 1e-6}
++                if d:
++                    changed[name] = d
++            print(idx, changed)
++        finally:
++            env.close()
++
++
++def target_scan(seed, limit):
++    """Coordinate sweeps around the tabletop-ready home posture."""
++    env = make_env()
++    try:
++        s, _ = env.reset(seed=seed)
++        target = snapshot(s)["target_block"]
++        # Align the mobile base laterally with the target first.
++        a = np.zeros(11, dtype=np.float32)
++        a[1] = np.clip(target["pose_y"], -0.2, 0.2)
++        a[10] = 1.0
++        s, *_ = env.step(a)
++        names = [n for n in s.get_object_names() if n != "robot"]
++        home = np.array([0., -.35, -np.pi, -2.5, 0., -.87, np.pi / 2])
++        # Most vertical tabletop motion is generated by shoulder/elbow/wrist pitch.
++        candidates = []
++        for bx in (-.12, -.22, -.32, -.42):
++            for q2 in (-1.15, -.95, -.75, -.55, -.35, -.15, .05, .25):
++                for q4 in (-3.1, -2.9, -2.7, -2.5, -2.3, -2.1, -1.9):
++                    for q6 in (-1.47, -1.27, -1.07, -.87, -.67, -.47, -.27):
++                        q = home.copy(); q[1] = q2; q[3] = q4; q[5] = q6
++                        candidates.append((bx, q))
++        # Nearby configurations first.
++        candidates.sort(key=lambda z: abs(z[0] + .12) + np.sum(abs(z[1] - home)))
++        t = 1
++        for ci, (bx, q) in enumerate(candidates):
++            robot = snapshot(s)["robot"]
++            cur = np.array([robot[f"joint_{i}"] for i in range(1, 8)])
++            # Move toward candidate, gripper open. Each delta is already legal.
++            while max(abs(q - cur).max(), abs(bx - robot["pos_base_x"])) > .02:
++                a = np.zeros(11, dtype=np.float32)
++                a[0] = np.clip(bx - robot["pos_base_x"], -.2, .2)
++                a[3:10] = np.clip(q - cur, -.2, .2)
++                a[10] = 1.
++                s, _, term, trunc, _ = env.step(a); t += 1
++                robot = snapshot(s)["robot"]
++                cur = np.array([robot[f"joint_{i}"] for i in range(1, 8)])
++                if t >= limit or term or trunc: return print("LIMIT", t)
++            a = np.zeros(11, dtype=np.float32); a[10] = -1.
++            s, _, term, trunc, _ = env.step(a); t += 1
++            snap = snapshot(s)
++            moved = [n for n in names if snap[n]["grasp_active"] > .5]
++            if snap["robot"]["grasp_active"] > .5 or moved:
++                print("GRASP", "t", t, "candidate", ci, "bx", bx, "q", q.tolist(),
++                      "held", moved, "robot", snap["robot"], "objects", {n:snap[n] for n in moved})
++                return
++            if t >= limit or term or trunc: return print("LIMIT", t)
++        print("NO_GRASP", t)
++    finally:
++        env.close()
++
++
++if __name__ == "__main__":
++    p = argparse.ArgumentParser()
++    p.add_argument("mode", choices=("resets", "effects", "effect_all", "target_scan"))
++    p.add_argument("--n", type=int, default=20)
++    p.add_argument("--seed", type=int, default=0)
++    p.add_argument("--index", type=int, default=0)
++    p.add_argument("--value", type=float, default=0.2)
++    p.add_argument("--steps", type=int, default=1)
++    p.add_argument("--limit", type=int, default=280)
++    a = p.parse_args()
++    if a.mode == "resets":
++        resets(a.n)
++    elif a.mode == "effects":
++        effects(a.seed, a.index, a.value, a.steps)
++    elif a.mode == "effect_all":
++        effect_all(a.seed)
++    else:
++        target_scan(a.seed, a.limit)
+diff --git a/quick_probe.py b/quick_probe.py
+new file mode 100644
+index 0000000..8651278
+--- /dev/null
++++ b/quick_probe.py
+@@ -0,0 +1,18 @@
++from env_client import make_env
++import numpy as np
++
++def get(s,n,f): return float(s.get(s.get_object_from_name(n),f))
++def snap(s):
++    names=sorted(s.get_object_names())
++    rob=[get(s,'robot',f) for f in ['pos_base_x','pos_base_y','pos_base_rot','joint_1','joint_2','joint_3','joint_4','joint_5','joint_6','joint_7','finger_state','grasp_active','grasp_tf_x','grasp_tf_y','grasp_tf_z']]
++    objs={n:[get(s,n,f) for f in ['pose_x','pose_y','pose_z','grasp_active']] for n in names if n!='robot'}
++    return rob,objs
++
++e=make_env(); s,_=e.reset(seed=0); print('start',snap(s))
++seq=[]
++a=np.zeros(11,np.float32); a[10]=-1; seq.append(a)
++for idx in range(10):
++    a=np.zeros(11,np.float32); a[idx]=.2; seq.append(a)
++for k,a in enumerate(seq):
++    s,r,t,tr,i=e.step(a); print(k, snap(s), r,t,tr)
++e.close()
+diff --git a/scan_grasp.py b/scan_grasp.py
+new file mode 100644
+index 0000000..ef8ac0c
+--- /dev/null
++++ b/scan_grasp.py
+@@ -0,0 +1,17 @@
++from env_client import make_env
++import numpy as np
++
++def v(s,n,f): return float(s.get(s.get_object_from_name(n),f))
++e=make_env();s,_=e.reset(seed=0)
++tx=v(s,'target_block','pose_x');ty=v(s,'target_block','pose_y')
++print('target',tx,ty,v(s,'target_block','pose_z'))
++for bx in [-.12,-.22,-.32,-.42,-.52,-.62]:
++ for yo in [0,-.04,.04]:
++  # absolute positioning by observed robot state
++  for grip in [1,-1]:
++   r=s.get_object_from_name('robot');cx=float(s.get(r,'pos_base_x'));cy=float(s.get(r,'pos_base_y'))
++   a=np.zeros(11,np.float32);a[0]=np.clip(bx-cx,-.2,.2);a[1]=np.clip(ty+yo-cy,-.2,.2);a[10]=grip
++   s,re,te,tr,info=e.step(a)
++  print(bx,yo,'robot',v(s,'robot','pos_base_x'),v(s,'robot','pos_base_y'),'grasp',v(s,'robot','grasp_active'),v(s,'target_block','grasp_active'),[v(s,'robot',f) for f in ['grasp_tf_x','grasp_tf_y','grasp_tf_z']])
++  if v(s,'robot','grasp_active')>0: raise SystemExit
++e.close()

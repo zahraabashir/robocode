@@ -1,0 +1,27 @@
+diff --git a/approach.py b/approach.py
+index 06e44f9..ebb8e97 100644
+--- a/approach.py
++++ b/approach.py
+@@ -98,7 +98,7 @@ class GeneratedApproach:
+                 self.attached = True
+             # A modest vertical park is enough to clear the ground while still
+             # leaving room above it for a later verified re-grasp.
+-            park_y = 0.35 if obj.type.name == "target_block" else max(0.38, 0.55 - 0.10 * self.index)
++            park_y = 0.35
+             parked_high_enough = (not is_target and self.attached and oy >= park_y)
+             if ry < 0.74 and not parked_high_enough:
+                 return self._action(dy=0.05, vac=1.0)
+@@ -123,10 +123,9 @@ class GeneratedApproach:
+                 tx = ox
+             else:
+                 origin_x = self.initial_x[obj.name]
+-                target_name = state.get_objects(self.types["target_block"])[0].name
+-                target_x = self.initial_x[target_name]
+-                direction = 1.0 if origin_x >= target_x else -1.0
+-                tx = origin_x + direction * (0.25 + 0.12 * self.index)
++                surface_x = state.get(surface, "x")
++                direction = 1.0 if origin_x >= surface_x else -1.0
++                tx = origin_x + direction * (0.45 + 0.12 * self.index)
+             if abs(tx - rx) > 0.004:
+                 if self.last_robot_x is not None and abs(rx - self.last_robot_x) < 0.001:
+                     self.stalled += 1

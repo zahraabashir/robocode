@@ -1,0 +1,80 @@
+diff --git a/approach.py b/approach.py
+index 731a453..9dae5e3 100644
+--- a/approach.py
++++ b/approach.py
+@@ -222,27 +222,43 @@ class GeneratedApproach:
+             wps.append(np.array([tool[0], tool[1], zt]))
+         wps.append(np.array([p[0], p[1], max(zt, tool[2]) if tool[2] < zt + 0.05 else zt]))
+         wps.append(np.array([p[0], p[1], gz]))
+-        self._set_path(state, wps, self.grasp_yaw, final_grip=-1.0)
++        self._set_path(state, wps, self.grasp_yaw, final_grip=-1.0, flip=True)
+         self.phase = 'to_grasp'
+ 
+-    def _set_path(self, state, wps, yaw, final_grip=0.0, res=0.01):
+-        """Cartesian waypoints -> dense joint path (IK warm-started)."""
++    def _set_path(self, state, wps, yaw, final_grip=0.0, res=0.01, flip=False):
++        """Cartesian waypoints -> dense joint path (IK warm-started).
++        Yaw is interpolated from the current tool yaw over all but the last segment."""
+         q = self._q(state)
+         base = self._base(state)
+-        cur = tool_fk(q, base)[:3, 3]
+-        R = down_R(yaw)
++        T0 = tool_fk(q, base)
++        cur = T0[:3, 3]
++        y0 = np.arctan2(T0[1, 0], T0[0, 0])
++        dy = _wrap(yaw - y0)
++        if flip and abs(dy) > np.pi / 2:
++            dy = dy - np.sign(dy) * np.pi
++        yaw = y0 + dy
++        pts = [cur]
++        for w in wps:
++            pts.append(np.asarray(w, dtype=float))
++        seg = [np.linalg.norm(pts[i + 1] - pts[i]) for i in range(len(wps))]
++        rot_len = sum(seg[:-1]) if len(seg) > 1 and sum(seg[:-1]) > 0.02 else sum(seg)
++        rot_len = max(rot_len, 1e-6)
+         path = []
+         self.corners = set()
+         qc = q.copy()
+-        for w in wps:
+-            d = np.linalg.norm(w - cur)
+-            n = max(1, int(np.ceil(d / res)))
++        travelled = 0.0
++        for i, w in enumerate(wps):
++            w = pts[i + 1]
++            d = seg[i]
++            n = max(1, int(np.ceil(d / res)), int(np.ceil(abs(dy) * min(d, rot_len) / rot_len / 0.1)))
+             for k in range(1, n + 1):
+                 pt = cur + (w - cur) * k / n
+-                qn, ok = tool_ik(qc, pt, R, base, iters=40)
++                f = min(1.0, (travelled + d * k / n) / rot_len)
++                qn, ok = tool_ik(qc, pt, down_R(y0 + f * dy), base, iters=40)
+                 qn = qc + _wrap(qn - qc)
+                 path.append(qn)
+                 qc = qn
++            travelled += d
+             self.corners.add(len(path) - 1)
+             cur = w
+         self.qpath = path
+@@ -391,7 +407,7 @@ class GeneratedApproach:
+             self.phase = 'done'
+             return self._noop()
+         tool = self._tool(state)[:3, 3]
+-        self._set_path(state, [tool + np.array([0, 0, 0.03])], self.wp_yaw)
++        self._set_path(state, [tool + np.array([0, 0, 0.03])], self.wp_yaw, flip=True)
+         self.phase = 'retreat'
+         a = self._track(state)
+         return a if a is not None else self._noop()
+diff --git a/dbg_pos.py b/dbg_pos.py
+new file mode 100644
+index 0000000..ac157c1
+--- /dev/null
++++ b/dbg_pos.py
+@@ -0,0 +1,8 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach, _yaw_of_quat as yq
++env=make_env(); obs,info=env.reset(seed=int(sys.argv[1]))
++ap=GeneratedApproach(env.action_space,env.observation_space,{}); ap.reset(obs,info)
++for n in ap.names: print(n,np.round(ap._pose(obs,n)[0],3),np.round(ap._pose(obs,n)[2],3), round(float(np.degrees(yq(ap._pose(obs,n)[1]))),1))
++print('yaw',ap.grasp_yaw,'q0',np.round(ap._q(obs),2))
++for qp in ap.qpath[::3]: print(np.round(qp,2))

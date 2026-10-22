@@ -1,0 +1,15 @@
+diff --git a/approach.py b/approach.py
+index 6d48354..ec2e470 100644
+--- a/approach.py
++++ b/approach.py
+@@ -244,7 +244,9 @@ class GeneratedApproach:
+             if self.last_motion[i] is not None and math.dist(pos,self.lastpos[i])<.0005:
+                 bx,by=self.last_motion[i]
+                 if not any(math.dist((bx,by),(r[0],r[1]))<.08 for r in self.extra_rects[i]):
+-                    self.extra_rects[i].append((bx,by,.07,.07))
++                    # _free adds the rover-radius pad, so a negative raw half-size
++                    # represents a small learned blocked cell rather than a pillar.
++                    self.extra_rects[i].append((bx,by,-.14,-.14))
+                     self.extra_rects[i]=self.extra_rects[i][-12:]
+                 self.paths[i]=[]; self.targets[i]=None
+             rects=base_rects+self.extra_rects[i]

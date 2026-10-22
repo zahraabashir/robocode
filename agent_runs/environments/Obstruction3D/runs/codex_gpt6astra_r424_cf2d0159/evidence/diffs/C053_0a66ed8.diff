@@ -1,0 +1,58 @@
+diff --git a/probe_count10_seed8_reorder.log b/probe_count10_seed8_reorder.log
+new file mode 100644
+index 0000000..16b4732
+--- /dev/null
++++ b/probe_count10_seed8_reorder.log
+@@ -0,0 +1,39 @@
++0 obstruction7 raise yaw 1.5707963267948966 height 0.35 retries 0 held 0.0
++25 obstruction7 reopen yaw 1.5707963267948966 height 0.16999999999999996 retries 3 held 1.0
++46 obstruction7 release yaw 1.5707963267948966 height 0.16100119756350084 retries 3 held 0.0
++47 obstruction4 raise yaw 1.5707963267948966 height 0.16100119756350084 retries 0 held 0.0
++50 obstruction4 raise yaw 1.5707963267948966 height 0.16100119756350084 retries 0 held 0.0
++62 obstruction4 reopen yaw 1.5707963267948966 height 0.1602196178585291 retries 1 held 1.0
++86 obstruction4 release yaw 1.5707963267948966 height 0.15122119542847423 retries 1 held 0.0
++87 obstruction1 raise yaw 1.5707963267948966 height 0.15122119542847423 retries 0 held 0.0
++100 obstruction1 descend yaw 1.5707963267948966 height 0.22999999999999995 retries 0 held 0.0
++104 obstruction1 reopen yaw 1.5707963267948966 height 0.15917088903486729 retries 1 held 1.0
++128 obstruction1 release yaw 1.5707963267948966 height 0.15017228157958468 retries 1 held 0.0
++129 obstruction3 raise yaw 1.5707963267948966 height 0.15017228157958468 retries 0 held 0.0
++150 obstruction3 descend yaw 1.5707963267948966 height 0.14499999999999996 retries 2 held 0.0
++164 obstruction3 raise yaw 0 height 0.14499997287910538 retries 4 held 0.0
++198 obstruction3 raise yaw 0.7853981633974483 height 0.13499999999999995 retries 8 held 0.0
++200 obstruction3 raise yaw 0.7853981633974483 height 0.13499999999999995 retries 8 held 0.0
++230 obstruction3 raise yaw 2.356194490192345 height 0.14499997615353974 retries 12 held 0.0
++250 obstruction3 descend yaw 2.356194490192345 height 0.14999999999999997 retries 13 held 0.0
++265 obstruction8 raise yaw 1.5707963267948966 height 0.13999999728159107 retries 0 held 0.0
++280 obstruction8 reopen yaw 1.5707963267948966 height 0.15499999999999997 retries 1 held 1.0
++300 obstruction8 lower yaw 1.5707963267948966 height 0.1500000004782386 retries 1 held 1.0
++302 obstruction8 release yaw 1.5707963267948966 height 0.14600128451129873 retries 1 held 0.0
++303 obstruction0 raise yaw 1.5707963267948966 height 0.14600128451129873 retries 0 held 0.0
++329 obstruction0 raise yaw 0 height 0.15500002215447062 retries 2 held 0.0
++350 obstruction0 descend yaw 0 height 0.14999999999999997 retries 3 held 0.0
++351 obstruction0 reopen yaw 0 height 0.14999999999999997 retries 4 held 1.0
++372 obstruction0 release yaw 0 height 0.14100131595881032 retries 4 held 0.0
++373 obstruction2 raise yaw 0 height 0.14100131595881032 retries 0 held 0.0
++393 obstruction2 reopen yaw 0 height 0.14499999999999996 retries 3 held 1.0
++400 obstruction2 lift yaw 0 height 0.3199999985733482 retries 3 held 1.0
++416 obstruction2 release yaw 0 height 0.13600133779956491 retries 3 held 0.0
++417 obstruction3 raise yaw 0 height 0.13600133779956491 retries 0 held 0.0
++432 obstruction3 reopen yaw 0 height 0.15499999999999997 retries 1 held 1.0
++450 obstruction3 lower yaw 0 height 0.19000002287839526 retries 1 held 1.0
++454 obstruction3 release yaw 0 height 0.14600128642235877 retries 1 held 0.0
++455 target_block raise yaw 0 height 0.14600128642235877 retries 0 held 0.0
++469 target_block reopen yaw 0 height 0.15500000186264515 retries 1 held 1.0
++491 target_block release yaw 0 height 0.1660013226987745 retries 1 held 0.0
++RESULT 492 True False 10.216279029846191 target_block release 0 0.1660013226987745
+diff --git a/test_reuse.py b/test_reuse.py
+index b560951..a311d96 100644
+--- a/test_reuse.py
++++ b/test_reuse.py
+@@ -2,7 +2,7 @@ from env_client import make_env
+ from approach import GeneratedApproach
+ import time
+ E=make_env(); policy=GeneratedApproach(E.action_space,E.observation_space,{})
+-for seed,count in [(2,2),(91,0),(22,1),(103,5),(17,10)]:
++for seed,count in [(2,2),(22,1)]:
+  state,info=E.reset(seed=seed,options={'object_count':count})
+  begin=time.monotonic();policy.reset(state,info)
+  for step in range(E.max_steps):

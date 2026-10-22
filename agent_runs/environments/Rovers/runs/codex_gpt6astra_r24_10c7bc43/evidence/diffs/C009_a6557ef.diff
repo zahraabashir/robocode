@@ -1,0 +1,19 @@
+diff --git a/test_approach.py b/test_approach.py
+new file mode 100644
+index 0000000..5614344
+--- /dev/null
++++ b/test_approach.py
+@@ -0,0 +1,13 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import time,sys,json
++seeds=[int(x) for x in sys.argv[1:]] or list(range(10))
++for seed in seeds:
++ e=make_env();s,info=e.reset(seed=seed);p=GeneratedApproach(e.action_space,e.observation_space,{})
++ start=time.time();p.reset(s,info); trace=[]
++ for step in range(1000):
++  a=p.get_action(s);s,r,term,trunc,inf=e.step(a)
++  if step%50==0:trace.append((step,[[s.get(ro,k) for k in ['x','y','store_full','calibrated','at_home']] for ro in p.rovers],[[s.get(ob,k) for k in ['received_image','have_image_rover0','have_image_rover1']] for ob in p.objs],a.tolist()))
++  if term or trunc:break
++ print(json.dumps({'seed':seed,'n':info.get('object_count'),'steps':step+1,'success':term,'seconds':round(time.time()-start,2),'trace':trace if not term else []}),flush=True)
++ e.close()

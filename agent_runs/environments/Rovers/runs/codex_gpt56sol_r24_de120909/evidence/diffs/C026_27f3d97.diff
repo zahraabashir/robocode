@@ -1,0 +1,13 @@
+diff --git a/debug_rollout.py b/debug_rollout.py
+index 0adb950..de314cd 100644
+--- a/debug_rollout.py
++++ b/debug_rollout.py
+@@ -4,7 +4,7 @@ from approach import GeneratedApproach
+ env=make_env(); s,info=env.reset(seed=int(sys.argv[1]) if len(sys.argv)>1 else 0)
+ ap=GeneratedApproach(env.action_space,env.observation_space,env.make_primitives()); ap.reset(s,info)
+ for step in range(160):
+-    if step%10==0:
++    if step < 25 or step%10==0:
+         vals=[]
+         for i,n in enumerate(ap.names):
+             r=s.get_object_from_name(n); p=(s.get(r,"x"),s.get(r,"y"))

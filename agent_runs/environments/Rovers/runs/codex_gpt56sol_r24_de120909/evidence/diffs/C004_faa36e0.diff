@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 9f53796..8068d7e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -187,7 +187,7 @@ class GeneratedApproach:
+                 while self.paths[i] and math.dist(pos,self.paths[i][0])<.05: self.paths[i].pop(0)
+                 if self.paths[i]:
+                     wp=self.paths[i][0]
+-                    a[4*i]=max(-.2,min(.2,wp[0]-pos)); a[4*i+1]=max(-.2,min(.2,wp[1]-pos))
++                    a[4*i]=max(-.2,min(.2,wp[0]-pos[0])); a[4*i+1]=max(-.2,min(.2,wp[1]-pos[1]))
+             a[4*i+3]=self.OPS[op]
+             moved=math.dist(pos,self.lastpos[i])>.03
+             self.stalls[i]=0 if moved or (abs(a[4*i])+abs(a[4*i+1])<.01) else self.stalls[i]+1

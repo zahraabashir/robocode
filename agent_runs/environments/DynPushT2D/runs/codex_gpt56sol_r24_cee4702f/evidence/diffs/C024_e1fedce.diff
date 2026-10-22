@@ -1,0 +1,18 @@
+diff --git a/test_approach.py b/test_approach.py
+index 9521ace..40f9978 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -10,8 +10,13 @@ def run(seed, verbose=False):
+     policy = GeneratedApproach(env.action_space, env.observation_space, {})
+     policy.reset(obs, info)
+     initial = obs.copy()
++    old_mode = policy.mode
+     for step in range(env.max_steps):
+         obs, reward, term, trunc, info = env.step(policy.get_action(obs))
++        if verbose and policy.mode != old_mode:
++            print(' transition', step, old_mode, '->', policy.mode,
++                  'nav', [np.round(x, 2).tolist() for x in policy.nav])
++            old_mode = policy.mode
+         if verbose and step % 50 == 0:
+             print(' ', step, policy.mode, 'pose', np.round(obs[:3], 3),
+                   'robot', np.round(obs[16:18], 3))

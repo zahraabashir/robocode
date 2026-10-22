@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 3ef4b4a..efe7f22 100644
+--- a/approach.py
++++ b/approach.py
+@@ -75,7 +75,7 @@ class GeneratedApproach:
+                 a += self.B@np.clip(u,-.035,.035)
+             a[10]=1.; self.release_t+=1; return a
+         goals=[np.array([pos[0],pos[1],.24]),np.array([self.region[0],self.region[1],.24]),
+-               np.array([self.region[0],self.region[1],.110])]
++               np.array([self.region[0],self.region[1],.115])]
+         goal=goals[self.waypoint]; poserr=goal-pos
+         err=np.r_[poserr, -feat[3:]]
+         tol=.012 if self.waypoint<2 else .004

@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 111b37e..9ab1875 100644
+--- a/approach.py
++++ b/approach.py
+@@ -335,7 +335,7 @@ class GeneratedApproach:
+             if off <= 0.065:
+                 send &= ~(((bear >= -7) & (bear <= 31) & (Dl >= 1.5)) |
+                           ((bear >= 83) & (bear <= 109) & (Dl >= 0.55)))
+-            if off <= 0.14:
++            elif off <= 0.14:
+                 between = (sx - lx) * (CX - lx) + (sy - ly) * (CY - ly) > 0
+                 send &= ~(between & (seg_point_dist(CX, CY, lx, ly, sx, sy) < 0.045))
+         for (px, py, phx, phy) in pillars:

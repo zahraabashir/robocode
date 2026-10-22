@@ -1,0 +1,344 @@
+[
+  {
+    "id": "C001",
+    "commit": "042f626ce1e87762a3719d4de001cd1dcd298d9e",
+    "parents": [],
+    "date": "2026-09-30T16:51:42+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".claude/settings.json",
+      ".claude/validate_sandbox.py",
+      ".gitignore",
+      "CLAUDE.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_042f626.diff",
+    "diff_sha256": "568b256f2382eb79dfea476042376c85acce0a6a7239fee9d6f225485e7c5a75",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "006fef5a37b4db13517bb8777ab8772bc1e84118",
+    "parents": [
+      "042f626ce1e87762a3719d4de001cd1dcd298d9e"
+    ],
+    "date": "2026-09-30T17:04:50+02:00",
+    "title": "Model-based push planner v1 + push model + tests",
+    "files": [
+      "approach.py",
+      "data_1.npz",
+      "data_2.npz",
+      "data_3.npz",
+      "data_4.npz",
+      "e0.py",
+      "e1.py",
+      "e10.py",
+      "e11.py",
+      "e2.py",
+      "e3.py",
+      "e4.py",
+      "e5.py",
+      "e6.py",
+      "e7.py",
+      "e8.py",
+      "e9.py",
+      "eval2.py",
+      "eval_model.py",
+      "eval_roll.py",
+      "explore1.py",
+      "explore2.py",
+      "gen_data.py",
+      "geom.py",
+      "pm_util.py",
+      "push_model.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C002_006fef5.diff",
+    "diff_sha256": "e1f5452017aff97cbaa43dc6dcfd7a3025516200918968d785073f5b77c391ef",
+    "events": [
+      {
+        "event": "E0174",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "237fb79168914d87a0443379a3d51cc2209c80526a1d04a7a2cff68ec8cb9e73",
+    "version": "evidence/versions/C002_006fef5_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "343f45d54e3112960cec0b2c8f18a1d140b33191",
+    "parents": [
+      "006fef5a37b4db13517bb8777ab8772bc1e84118"
+    ],
+    "date": "2026-09-30T17:06:05+02:00",
+    "title": "parametrize",
+    "files": [
+      "approach.py",
+      "tune.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C003_343f45d.diff",
+    "diff_sha256": "f135521dc69abb521695dfbb7c72cc2e06db37b7c569e9da8f66b6cd020a6d87",
+    "events": [
+      {
+        "event": "E0187",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1594722cf156b90cb08e1f45fdd9b02c391ad3e766ff9468dfb2099d7bf262a3",
+    "version": "evidence/versions/C003_343f45d_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C004",
+    "commit": "4e9e8249367063ed06943b2ba7bdaec568adde22",
+    "parents": [
+      "343f45d54e3112960cec0b2c8f18a1d140b33191"
+    ],
+    "date": "2026-09-30T17:14:10+02:00",
+    "title": "Fix goal angle: env compares theta raw (unwrapped); target clipped interval",
+    "files": [
+      "approach.py",
+      "collect_term.py",
+      "fit_term.py",
+      "seq_term.py",
+      "term_data.npy",
+      "trace.py",
+      "tune.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C004_4e9e824.diff",
+    "diff_sha256": "289da032bae74df226e5a57479303d04d8085406cdc7ef1b497768f5ce8f1229",
+    "events": [
+      {
+        "event": "E0239",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1bc3160ee934205a7a07cc8d89d7f9281feaf38b219867941f5bf843f88693cc",
+    "version": "evidence/versions/C004_4e9e824_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "6fb871aa422ceaab6507657339f2d673bdaceeff",
+    "parents": [
+      "4e9e8249367063ed06943b2ba7bdaec568adde22"
+    ],
+    "date": "2026-09-30T17:15:44+02:00",
+    "title": "Two-stage lookahead planner",
+    "files": [
+      "approach.py",
+      "new_plan.py",
+      "timing.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C005_6fb871a.diff",
+    "diff_sha256": "9c936587bd865fc0af2d59817b707ff9c732b74f68a77d06eb6d4358a5eb9d24",
+    "events": [
+      {
+        "event": "E0255",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "f5cea16410772e10370a1af48ddb6e22adf9fa12825d9afe57504656a4db1ba3",
+    "version": "evidence/versions/C005_6fb871a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C006",
+    "commit": "214da58f5c2a5031116f3f4d2b9af7e0995690c2",
+    "parents": [
+      "6fb871aa422ceaab6507657339f2d673bdaceeff"
+    ],
+    "date": "2026-09-30T17:19:31+02:00",
+    "title": "Grid Dijkstra nav cost + nav paths",
+    "files": [
+      "approach.py",
+      "breakdown.py",
+      "navgrid.py",
+      "t_nav.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C006_214da58.diff",
+    "diff_sha256": "732e2a03fe1a9e7b3d91cd2af0090af2f33273537e221a8b6955e36a1dda1b31",
+    "events": [
+      {
+        "event": "E0282",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "406dbf16f4d04a19f498153c63002e05da247909fb10719f7d95af22126ea4ea",
+    "version": "evidence/versions/C006_214da58_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "8284b125f4c7dc18b01a7f672e93fc2b0fd8d5a7",
+    "parents": [
+      "214da58f5c2a5031116f3f4d2b9af7e0995690c2"
+    ],
+    "date": "2026-09-30T17:21:01+02:00",
+    "title": "curved push option",
+    "files": [
+      "approach.py",
+      "breakdown2.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C007_8284b12.diff",
+    "diff_sha256": "eaed1f15fb81b78905db6a11dfcdb1fdd3508d83c035e735ad93601daff6b06c",
+    "events": [
+      {
+        "event": "E0299",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "e4fd04cbe2c94231486eccd1861fafc082f5b2774f213a34fa1544bee215efae",
+    "version": "evidence/versions/C007_8284b12_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C008",
+    "commit": "5e42bbdd7d1f6b0145589d6e9f4f8ca5ddaa6ec1",
+    "parents": [
+      "8284b125f4c7dc18b01a7f672e93fc2b0fd8d5a7"
+    ],
+    "date": "2026-09-30T17:22:12+02:00",
+    "title": "stage2 curvs param",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C008_5e42bbd.diff",
+    "diff_sha256": "540ee101c063b6caee01d90242e2627144538904e37ca1220450df026e788a13",
+    "events": [
+      {
+        "event": "E0306",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "becd248ee316cf3821fbe837c51f8ddf343702b0dcac3982e2a0fa6c872e4d5d",
+    "version": "evidence/versions/C008_5e42bbd_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C009",
+    "commit": "6bd49cfd2abdad1690e6c61fba63a11fd4f97f43",
+    "parents": [
+      "5e42bbdd7d1f6b0145589d6e9f4f8ca5ddaa6ec1"
+    ],
+    "date": "2026-09-30T17:23:05+02:00",
+    "title": "defaults: curved pushes, LOOK 15",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C009_6bd49cf.diff",
+    "diff_sha256": "f0aaca99f9bf73cd7dfbac951ec66c699e1de95594765e64458ee1030db95408",
+    "events": [
+      {
+        "event": "E0315",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "243741fc2324f0d363d06559abf3eb04596f5fce66a870f756e231e4f333db55",
+    "version": "evidence/versions/C009_6bd49cf_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C010",
+    "commit": "7734cf0921e1c361d3537833232ee09cbf06c451",
+    "parents": [
+      "6bd49cfd2abdad1690e6c61fba63a11fd4f97f43"
+    ],
+    "date": "2026-09-30T17:25:17+02:00",
+    "title": "time guard + stagnation fallback",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C010_7734cf0.diff",
+    "diff_sha256": "e4251bef554dd0b4777f457c76d01b96d01773d3a667a620b88546a183dae9b1",
+    "events": [
+      {
+        "event": "E0397",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "cd2e89ec63706936c9d612d0921e91896de1d9eaf1c7e4b0d0c83563d8f80753",
+    "version": "evidence/versions/C010_7734cf0_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C011",
+    "commit": "cbb89235844112d3b2072ebf48704bf4d1897739",
+    "parents": [
+      "7734cf0921e1c361d3537833232ee09cbf06c451"
+    ],
+    "date": "2026-09-30T17:25:52+02:00",
+    "title": "TC_THR param",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C011_cbb8923.diff",
+    "diff_sha256": "e7bd960e43edbdf283697071758761c953ceaabf68d121f21cfb4c0c207850e8",
+    "events": [
+      {
+        "event": "E0406",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "881b6f33605909c3394d71a5528d87155ce41cedd09492b348a957a0700adcde",
+    "version": "evidence/versions/C011_cbb8923_approach.py",
+    "same_policy_as_earlier": []
+  }
+]

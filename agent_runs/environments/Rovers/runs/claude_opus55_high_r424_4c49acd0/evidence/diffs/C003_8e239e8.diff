@@ -1,0 +1,332 @@
+diff --git a/approach.py b/approach.py
+index e9dde3e..d0b001f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -100,6 +100,7 @@ def to_cell(x, y):
+ class GeneratedApproach:
+     def __init__(self, action_space, observation_space, primitives):
+         self.action_space = action_space
++        self.topk = 12
+         self.observation_space = observation_space
+ 
+     # ------------------------------------------------------------------ setup
+@@ -312,31 +313,138 @@ class GeneratedApproach:
+     def _plan(self):
+         tasks = {r: self._rover_tasks(r) for r in self.rovers}
+         hk = {r: self._held_karp(r, tasks[r]) for r in self.rovers}
+-        best = (INF, None)
+         objs = self.objs
+         r0, r1 = self.rovers
++        cands = []
+         for m0, (c0, ord0) in hk[r0].items():
+             s0 = set(t for t in ord0)
+             for m1, (c1, ord1) in hk[r1].items():
+                 s1 = set(t for t in ord1)
++                if s0 & s1:
++                    continue
+                 allt = s0 | s1
+                 ok = all(("obj", o) in allt for o in objs)
+                 ok = ok and any(t[0] == "stone" for t in allt) and any(t[0] == "soil" for t in allt)
+                 if not ok:
+                     continue
+-                # penalize duplicates slightly
+-                cost = max(c0, c1) + 0.01 * (c0 + c1) + 0.001 * len(s0 & s1)
+-                if cost < best[0]:
+-                    best = (cost, (ord0, ord1))
+-        if best[1] is None:
++                cost = max(c0, c1) + 0.01 * (c0 + c1)
++                cands.append((cost, tuple(ord0), tuple(ord1)))
++        cands.sort(key=lambda c: c[0])
++        self._field_cache = {}
++        best = None
++        for cost, ord0, ord1 in cands[:self.topk]:
++            fields = {r0: self._get_stage_fields(r0, ord0), r1: self._get_stage_fields(r1, ord1)}
++            self.fields = fields
++            steps = self._simulate(self.d0)
++            key = (steps, cost)
++            if best is None or key < best[0]:
++                best = (key, fields, {r0: list(ord0), r1: list(ord1)})
++        if best is None:
+             self.orders = {r: [] for r in self.rovers}
++            self.fields = {r: self._stage_fields(r, []) for r in self.rovers}
++            self.plan_cost = INF
+         else:
+-            self.orders = {r0: list(best[1][0]), r1: list(best[1][1])}
+-        self.plan_cost = best[0]
+-        # exact stage fields per rover (backward DP)
+-        self.fields = {}
++            self.fields = best[1]
++            self.orders = best[2]
++            self.plan_cost = best[0][0]
++
++    def _get_stage_fields(self, r, order):
++        key = (r, tuple(order))
++        if key not in self._field_cache:
++            self._field_cache[key] = self._stage_fields(r, list(order))
++        return self._field_cache[key]
++
++    # ------------------------------------------------------------ model sim
++    def _free_pt(self, r, x, y):
++        if abs(x) > 2.27 or abs(y) > 2.27 or abs(x) < 0.228:
++            return False
++        for m in self.mounds:
++            dx = max(abs(x - m["x"]) - m["half_x"], 0)
++            dy = max(abs(y - m["y"]) - m["half_y"], 0)
++            if math.hypot(dx, dy) < 0.178:
++                return False
++        for p in self.pillars:
++            if math.hypot(x - p["x"], y - p["y"]) < 0.28:
++                return False
++        if math.hypot(x - self.lander[0], y - self.lander[1]) < 0.72:
++            return False
++        return True
++
++    def _goal(self, d):
++        if not all(o["received_image"] > 0.5 for _, o in d["objective"]):
++            return False
++        st = any(s["received_analysis"] > 0.5 and s["is_soil"] < 0.5 for _, s in d["sample"])
++        so = any(s["received_analysis"] > 0.5 and s["is_soil"] > 0.5 for _, s in d["sample"])
++        if not (st and so):
++            return False
+         for r in self.rovers:
+-            self.fields[r] = self._stage_fields(r, self.orders[r])
++            ro = d["rover"][r]
++            if ro["store_full"] > 0.5 or ro["at_home"] < 0.5:
++                return False
++        return True
++
++    def _model_step(self, d, act):
++        import copy
++        d2 = copy.deepcopy(d)
++        for k, r in enumerate(self.rovers):
++            ro = d2["rover"][r]
++            dx = float(np.clip(act[4 * k], -0.2, 0.2))
++            dy = float(np.clip(act[4 * k + 1], -0.2, 0.2))
++            nx, ny = ro["x"] + dx, ro["y"] + dy
++            if self._free_pt(r, nx, ny):
++                ro["x"], ro["y"] = nx, ny
++        for k, r in enumerate(self.rovers):
++            ro = d2["rover"][r]
++            other = d2["rover"][[q for q in self.rovers if q != r][0]]
++            sel = float(act[4 * k + 3])
++            band = min(int((sel + 1.0) * 3.0), 5)
++            x, y, th = ro["x"], ro["y"], ro["theta"]
++            if band == 0:
++                if ro["store_full"] < 0.5:
++                    bestd, bn = 0.25, None
++                    for n, sm in d2["sample"]:
++                        dd = math.hypot(sm["x"] - x, sm["y"] - y)
++                        if dd <= bestd:
++                            bestd, bn = dd, sm
++                    if bn is not None:
++                        bn["analyzed_" + r] = 1.0
++                        ro["store_full"] = 1.0
++            elif band == 1:
++                if self._visible_objs(r, x, y, th):
++                    ro["calibrated"] = 1.0
++            elif band == 2:
++                vis = self._visible_objs(r, x, y, th)
++                if ro["calibrated"] > 0.5 and vis:
++                    ro["calibrated"] = 0.0
++                    for dd, on in vis:
++                        ob = [o for n, o in d2["objective"] if n == on][0]
++                        if ob["have_image_" + r] < 0.5:
++                            ob["have_image_" + r] = 1.0
++                            break
++            elif band == 4:
++                if self._lander_visible(r, x, y, th, (other["x"], other["y"])):
++                    for _, o in d2["objective"]:
++                        if o["have_image_" + r] > 0.5:
++                            o["received_image"] = 1.0
++                    for _, sm in d2["sample"]:
++                        if sm["analyzed_" + r] > 0.5:
++                            sm["received_analysis"] = 1.0
++            elif band == 5:
++                ro["store_full"] = 0.0
++        for r in self.rovers:
++            ro = d2["rover"][r]
++            hx, hy, hth = self.home[r]
++            dth = abs((ro["theta"] - hth + math.pi) % (2 * math.pi) - math.pi)
++            ro["at_home"] = 1.0 if (math.hypot(ro["x"] - hx, ro["y"] - hy) < 0.25 and dth < 0.4) else 0.0
++        return d2
++
++    def _simulate(self, d, max_steps=150):
++        for t in range(max_steps):
++            act = self._policy(d)
++            d = self._model_step(d, act)
++            if self._goal(d):
++                return t + 1
++        return max_steps + 100
+ 
+     def _stage_fields(self, r, order):
+         """fields[i] = cost-to-go when tasks order[i:] remain (then send+home)."""
+@@ -410,6 +518,11 @@ class GeneratedApproach:
+ 
+     def get_action(self, state):
+         d = parse(state)
++        act = self._policy(d)
++        self.t += 1
++        return act
++
++    def _policy(self, d):
+         act = np.zeros(8, dtype=np.float32)
+         for k, r in enumerate(self.rovers):
+             other = [q for q in self.rovers if q != r][0]
+@@ -420,7 +533,6 @@ class GeneratedApproach:
+             act[4 * k + 1] = dy
+             act[4 * k + 2] = 0.0
+             act[4 * k + 3] = SEL[op]
+-        self.t += 1
+         return act
+ 
+     def _rover_action(self, d, r, ro, other_xy):
+diff --git a/dbg.py b/dbg.py
+new file mode 100644
+index 0000000..86b9001
+--- /dev/null
++++ b/dbg.py
+@@ -0,0 +1,10 @@
++import numpy as np
++from env_client import make_env
++from approach import *
++env = make_env(); obs, info = env.reset(seed=10)
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++i,j = to_cell(0.30,-0.45)
++np.set_printoptions(linewidth=200)
++print(ap.V_send['rover0'][i-2:i+5, j-5:j+3].T[::-1])
++print(ap.V_home['rover0'][i-2:i+5, j-5:j+3].T[::-1])
++print(ap.send_reg['rover0'][i-2:i+5, j-5:j+3].T[::-1].astype(int))
+diff --git a/pD_dump.py b/pD_dump.py
+new file mode 100644
+index 0000000..a595117
+--- /dev/null
++++ b/pD_dump.py
+@@ -0,0 +1,6 @@
++from pB_lib import *
++s=Sim(0)
++for n in sorted(s.obs.get_object_names()):
++    o=s.obs.get_object_from_name(n)
++    print(n,s.obs.vec([o]).round(3).tolist())
++o=s.obs.get_object_from_name('rover0'); print(dir(o.type))
+diff --git a/pD_lib.py b/pD_lib.py
+new file mode 100644
+index 0000000..ca86f89
+--- /dev/null
++++ b/pD_lib.py
+@@ -0,0 +1,35 @@
++import numpy as np
++from pB_lib import Sim, objf, gp
++SEED=44
++def prep(s0):
++    s=Sim(SEED)
++    assert gp(s,0,[(1.0,0.7)]),'r0 path'
++    s.act(a0=(0,0,0,'cal')); s.act(a0=(0,0,0,'img'))
++    k=[k for k in range(3) if objf(s,k,'have_image_rover0')==1]
++    assert k,'noimg'
++    s.k=k[0]
++    assert gp(s,0,[(s0[0],s0[1])],th=s0[2]),'r0 to S'
++    return s
++def place1(s,p):
++    # move rover1 to p: go via y=-0.3 corridor first
++    pts=[(-1.0,-0.6),(p[0],-0.6),(p[0],p[1])] if p[1]>-1.4 or True else [(p[0],p[1])]
++    s.goto(1,-1.0,-0.6); s.goto(1,p[0],max(p[1],-0.6) if p[1]>-0.6 else -0.6)
++    ok=s.goto(1,p[0],p[1],th=p[2])
++    r=s.r(1); return ok and abs(r['x']-p[0])<1e-3 and abs(r['y']-p[1])<1e-3
++def send(s):
++    s.act(a0=(0,0,0,'send'))
++    return objf(s,s.k,'received_image')==1
++def trial(args):
++    s0,p=args
++    s=prep(s0)
++    if p is not None:
++        if not place1(s,p): return None
++    else: s.goto(1,-1.0,-0.3)
++    return send(s)
++def sensept(s0):
++    x,y,th=s0; c,sn=np.cos(th),np.sin(th)
++    return np.array([x+c*-0.087-sn*-0.012, y+sn*-0.087+c*-0.012])
++L=np.array([-1.9,-2.0])
++def pos_on_line(s0,t,off,th=0.0):
++    a=sensept(s0); d=L-a; n=np.linalg.norm(d); u=d/n; perp=np.array([-u[1],u[0]])
++    q=a+t*d+off*perp; return (float(q[0]),float(q[1]),th)
+diff --git a/pD_scan.py b/pD_scan.py
+new file mode 100644
+index 0000000..81bc205
+--- /dev/null
++++ b/pD_scan.py
+@@ -0,0 +1,11 @@
++from pB_lib import *
++env=make_env()
++for seed in range(60):
++    obs,_=env.reset(seed=seed)
++    P=[]; O=[]
++    for n in obs.get_object_names():
++        v=obs.vec([obs.get_object_from_name(n)])
++        if n.startswith('obstacle') and abs(v[3]-0.05)<1e-3: P.append((round(v[0],2),round(v[1],2)))
++        if n.startswith('objective'): O.append((round(v[0],2),round(v[1],2)))
++    bad=[p for p in P if -2.1<p[0]<1.3 and -2.3<p[1]<0.5]
++    if len(bad)==0: print(seed,'objs',O,'pillars',P)
+diff --git a/pD_t1.py b/pD_t1.py
+new file mode 100644
+index 0000000..4ce4405
+--- /dev/null
++++ b/pD_t1.py
+@@ -0,0 +1,5 @@
++from pD_lib import *
++S=(0.4,-0.6,np.pi)
++print('baseline',trial((S,None)))
++print('on line mid',trial((S,pos_on_line(S,0.6,0.0))))
++print(pos_on_line(S,0.6,0.0))
+diff --git a/pD_t2.py b/pD_t2.py
+new file mode 100644
+index 0000000..b654d7e
+--- /dev/null
++++ b/pD_t2.py
+@@ -0,0 +1,18 @@
++import sys
++from multiprocessing import Pool
++from pD_lib import *
++def bis(job):
++    S,t,side,th=job
++    lo,hi=0.0,0.5  # lo blocked, hi free
++    if trial((S,pos_on_line(S,t,side*hi,th))) is not True: return job,'hi not free'
++    for _ in range(8):
++        m=(lo+hi)/2; r=trial((S,pos_on_line(S,t,side*m,th)))
++        if r is None: return job,('placefail',m)
++        if r: hi=m
++        else: lo=m
++    return job,(round(lo,4),round(hi,4))
++if __name__=='__main__':
++    S=(0.4,-0.6,np.pi)
++    jobs=[(S,t,sd,th) for t in [0.35,0.5,0.65,0.72] for sd in [1,-1] for th in [0.0,np.pi/4]]
++    with Pool(8) as p:
++        for j,r in p.imap(bis,jobs): print('t=%.2f side=%+d th=%.2f'%j[1:],r,flush=True)
+diff --git a/trace.py b/trace.py
+new file mode 100644
+index 0000000..5130f1f
+--- /dev/null
++++ b/trace.py
+@@ -0,0 +1,23 @@
++import sys
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach, parse
++seed=int(sys.argv[1])
++env = make_env(); obs, info = env.reset(seed=seed)
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++print('orders', ap.orders, 'plan', ap.plan_cost)
++names={-5/6:'sample',-0.5:'cal',-1/6:'img',0:'-',0.5:'send',5/6:'drop'}
++def opn(v): return min(names.items(), key=lambda kv: abs(kv[0]-v))[1]
++for k in range(200):
++    d=parse(obs)
++    a = ap.get_action(obs)
++    obs, r, te, tr, info = env.step(a)
++    d2=parse(obs)
++    line=[]
++    for i,rv in enumerate(['rover0','rover1']):
++        p=d['rover'][rv]; q=d2['rover'][rv]
++        moved = abs(q['x']-p['x']-a[4*i])<1e-4 and abs(q['y']-p['y']-a[4*i+1])<1e-4
++        line.append(f"{rv}({p['x']:.2f},{p['y']:.2f})+({a[4*i]:.2f},{a[4*i+1]:.2f}){'' if moved else 'BLOCK'} {opn(a[4*i+3])} c{int(q['calibrated'])}s{int(q['store_full'])}")
++    rec=sum(o['received_image'] for _,o in d2['objective']); ra=sum(s['received_analysis'] for _,s in d2['sample'])
++    print(k, ' | '.join(line), f"recImg={rec:.0f} recAn={ra:.0f}")
++    if te or tr: break

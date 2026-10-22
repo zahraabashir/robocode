@@ -1,0 +1,945 @@
+diff --git a/dbg/approach.py b/dbg/approach.py
+new file mode 100644
+index 0000000..7d7e6a2
+--- /dev/null
++++ b/dbg/approach.py
+@@ -0,0 +1,21 @@
++import numpy as np
++from kin import ik, down_R
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives): pass
++    def reset(self, state, info):
++        self.t=0
++        R=state.get_object_from_name("robot"); B=state.get_object_from_name("target_block")
++        self.R=R
++        q=np.array([state.get(R,f'joint_{i}') for i in range(1,8)])
++        bx,by=state.get(B,'pose_x'),state.get(B,'pose_y')
++        self.wps=[]
++        for z in [0.4,0.33,0.255]:
++            q,_=ik(q,np.array([bx,by,z]),down_R(0),(-0.12,0,0)); self.wps.append(q)
++    def get_action(self, state):
++        self.t+=1
++        q=np.array([state.get(self.R,f'joint_{i}') for i in range(1,8)])
++        a=np.zeros(11,np.float32)
++        while self.wps and np.max(np.abs(self.wps[0]-q))<1e-4: self.wps.pop(0)
++        if self.wps: a[3:10]=np.clip(self.wps[0]-q,-.2,.2)
++        else: a[10]=-1
++        return a
+diff --git a/dbg/kin.py b/dbg/kin.py
+new file mode 100644
+index 0000000..19ed11b
+--- /dev/null
++++ b/dbg/kin.py
+@@ -0,0 +1,80 @@
++import numpy as np
++
++def rpy_mat(r, p, y):
++    cr, sr, cp, sp, cy, sy = np.cos(r), np.sin(r), np.cos(p), np.sin(p), np.cos(y), np.sin(y)
++    return np.array([[cy*cp, cy*sp*sr - sy*cr, cy*sp*cr + sy*sr],
++                     [sy*cp, sy*sp*sr + cy*cr, sy*sp*cr - cy*sr],
++                     [-sp, cp*sr, cp*cr]])
++
++def tf(xyz, rpy):
++    T = np.eye(4); T[:3, :3] = rpy_mat(*rpy); T[:3, 3] = xyz; return T
++
++def rotz(q):
++    c, s = np.cos(q), np.sin(q)
++    T = np.eye(4); T[0, 0] = c; T[0, 1] = -s; T[1, 0] = s; T[1, 1] = c; return T
++
++PI = np.pi
++JOINTS = [
++    tf([0, 0, 0.15643], [PI, 0, 0]),
++    tf([0, 0.005375, -0.12838], [PI/2, 0, 0]),
++    tf([0, -0.21038, -0.006375], [-PI/2, 0, 0]),
++    tf([0, 0.006375, -0.21038], [PI/2, 0, 0]),
++    tf([0, -0.20843, -0.006375], [-PI/2, 0, 0]),
++    tf([0, 0.00017505, -0.10593], [PI/2, 0, 0]),
++    tf([0, -0.10593, -0.00017505], [-PI/2, 0, 0]),
++]
++EE = tf([0, 0, -0.061525], [PI, 0, 0])
++
++def fk_all(q, base=(0, 0, 0), base_z=0.0, tool=0.0):
++    T = np.eye(4)
++    T[:3, :3] = rpy_mat(0, 0, base[2]); T[:3, 3] = [base[0], base[1], base_z]
++    frames = [T.copy()]
++    for i in range(7):
++        T = T @ JOINTS[i] @ rotz(q[i])
++        frames.append(T.copy())
++    T = T @ EE
++    frames.append(T.copy())
++    Tt = T.copy(); Tt[:3, 3] = T[:3, 3] + T[:3, 2] * tool
++    frames.append(Tt)
++    return frames
++
++def ee_pose(q, base, base_z=0.0, tool=0.0):
++    return fk_all(q, base, base_z, tool)[-1]
++
++def pose_err(T, pos, R):
++    ep = pos - T[:3, 3]
++    Re = R @ T[:3, :3].T
++    # axis-angle of Re
++    ang = np.array([Re[2, 1] - Re[1, 2], Re[0, 2] - Re[2, 0], Re[1, 0] - Re[0, 1]]) * 0.5
++    return np.concatenate([ep, ang])
++
++def down_R(yaw):
++    # z axis pointing down, x axis along yaw
++    c, s = np.cos(yaw), np.sin(yaw)
++    x = np.array([c, s, 0.0]); z = np.array([0, 0, -1.0]); y = np.cross(z, x)
++    return np.stack([x, y, z], axis=1)
++
++def ik(q0, pos, R, base, base_z=0.0, tool=0.0, iters=200, wrot=0.3, tol=1e-4):
++    q = np.array(q0, dtype=float)
++    W = np.array([1, 1, 1, wrot, wrot, wrot])
++    for it in range(iters):
++        T = ee_pose(q, base, base_z, tool)
++        e = pose_err(T, pos, R) * W
++        if np.linalg.norm(e) < tol:
++            break
++        J = np.zeros((6, 7)); h = 1e-6
++        for i in range(7):
++            dq = q.copy(); dq[i] += h
++            J[:, i] = (pose_err(ee_pose(dq, base, base_z, tool), pos, R) * W - e) / -h
++        lam = 1e-3
++        step = J.T @ np.linalg.solve(J @ J.T + lam * np.eye(6), e)
++        n = np.linalg.norm(step)
++        if n > 0.3: step *= 0.3 / n
++        q += step
++    return q, np.linalg.norm(e)
++
++from scipy.spatial.transform import Rotation as _Rot
++def pose_err(T, pos, R):
++    ep = pos - T[:3, 3]
++    ang = _Rot.from_matrix(R @ T[:3, :3].T).as_rotvec()
++    return np.concatenate([ep, ang])
+diff --git a/grid_0.txt b/grid_0.txt
+new file mode 100644
+index 0000000..ca53324
+--- /dev/null
++++ b/grid_0.txt
+@@ -0,0 +1,12 @@
++yaw 0.0 center 0.27 0.173 step 0.02
+++0.370 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230
+++0.350 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230
+++0.330 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230
+++0.310 0.230 0.230 0.230 0.230 0.260 0.260 0.260 0.230 0.230 0.230 0.230
+++0.290 0.230 0.230 0.230 0.230 0.280 0.280 0.280 0.230 0.230 0.230 0.230
+++0.270 0.230 0.230 0.230 0.230 0.280 0.280 0.280 0.230 0.230 0.230 0.230
+++0.250 0.230 0.230 0.230 0.230 0.280 0.280 0.280 0.230 0.230 0.230 0.230
+++0.230 0.230 0.230 0.230 0.230 0.280 0.280 0.280 0.230 0.230 0.230 0.230
+++0.210 0.230 0.230 0.230 0.230 0.235 0.235 0.235 0.230 0.230 0.230 0.230
+++0.190 0.230 0.230 0.230 0.230 0.280 0.280 0.280 0.230 0.230 0.230 0.230
+++0.170 0.230 0.230 0.230 0.230 0.280 0.280 0.280 0.230 0.230 0.230 0.230
+diff --git a/grid_1.5708.txt b/grid_1.5708.txt
+new file mode 100644
+index 0000000..2650025
+--- /dev/null
++++ b/grid_1.5708.txt
+@@ -0,0 +1,12 @@
++yaw 1.5708 center 0.27 0.173 step 0.02
+++0.370 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230
+++0.350 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230
+++0.330 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230
+++0.310 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230
+++0.290 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230
+++0.270 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230 0.230
+++0.250 0.230 0.270 0.280 0.280 0.240 0.230 0.240 0.280 0.280 0.270 0.230
+++0.230 0.230 0.270 0.280 0.280 0.240 0.230 0.240 0.280 0.280 0.270 0.230
+++0.210 0.230 0.270 0.280 0.280 0.240 0.230 0.240 0.280 0.280 0.270 0.230
+++0.190 0.230 0.270 0.280 0.280 0.240 0.230 0.240 0.280 0.280 0.270 0.230
+++0.170 0.230 0.230 0.240 0.240 0.235 0.230 0.235 0.240 0.240 0.230 0.230
+diff --git a/kin.py b/kin.py
+new file mode 100644
+index 0000000..19ed11b
+--- /dev/null
++++ b/kin.py
+@@ -0,0 +1,80 @@
++import numpy as np
++
++def rpy_mat(r, p, y):
++    cr, sr, cp, sp, cy, sy = np.cos(r), np.sin(r), np.cos(p), np.sin(p), np.cos(y), np.sin(y)
++    return np.array([[cy*cp, cy*sp*sr - sy*cr, cy*sp*cr + sy*sr],
++                     [sy*cp, sy*sp*sr + cy*cr, sy*sp*cr - cy*sr],
++                     [-sp, cp*sr, cp*cr]])
++
++def tf(xyz, rpy):
++    T = np.eye(4); T[:3, :3] = rpy_mat(*rpy); T[:3, 3] = xyz; return T
++
++def rotz(q):
++    c, s = np.cos(q), np.sin(q)
++    T = np.eye(4); T[0, 0] = c; T[0, 1] = -s; T[1, 0] = s; T[1, 1] = c; return T
++
++PI = np.pi
++JOINTS = [
++    tf([0, 0, 0.15643], [PI, 0, 0]),
++    tf([0, 0.005375, -0.12838], [PI/2, 0, 0]),
++    tf([0, -0.21038, -0.006375], [-PI/2, 0, 0]),
++    tf([0, 0.006375, -0.21038], [PI/2, 0, 0]),
++    tf([0, -0.20843, -0.006375], [-PI/2, 0, 0]),
++    tf([0, 0.00017505, -0.10593], [PI/2, 0, 0]),
++    tf([0, -0.10593, -0.00017505], [-PI/2, 0, 0]),
++]
++EE = tf([0, 0, -0.061525], [PI, 0, 0])
++
++def fk_all(q, base=(0, 0, 0), base_z=0.0, tool=0.0):
++    T = np.eye(4)
++    T[:3, :3] = rpy_mat(0, 0, base[2]); T[:3, 3] = [base[0], base[1], base_z]
++    frames = [T.copy()]
++    for i in range(7):
++        T = T @ JOINTS[i] @ rotz(q[i])
++        frames.append(T.copy())
++    T = T @ EE
++    frames.append(T.copy())
++    Tt = T.copy(); Tt[:3, 3] = T[:3, 3] + T[:3, 2] * tool
++    frames.append(Tt)
++    return frames
++
++def ee_pose(q, base, base_z=0.0, tool=0.0):
++    return fk_all(q, base, base_z, tool)[-1]
++
++def pose_err(T, pos, R):
++    ep = pos - T[:3, 3]
++    Re = R @ T[:3, :3].T
++    # axis-angle of Re
++    ang = np.array([Re[2, 1] - Re[1, 2], Re[0, 2] - Re[2, 0], Re[1, 0] - Re[0, 1]]) * 0.5
++    return np.concatenate([ep, ang])
++
++def down_R(yaw):
++    # z axis pointing down, x axis along yaw
++    c, s = np.cos(yaw), np.sin(yaw)
++    x = np.array([c, s, 0.0]); z = np.array([0, 0, -1.0]); y = np.cross(z, x)
++    return np.stack([x, y, z], axis=1)
++
++def ik(q0, pos, R, base, base_z=0.0, tool=0.0, iters=200, wrot=0.3, tol=1e-4):
++    q = np.array(q0, dtype=float)
++    W = np.array([1, 1, 1, wrot, wrot, wrot])
++    for it in range(iters):
++        T = ee_pose(q, base, base_z, tool)
++        e = pose_err(T, pos, R) * W
++        if np.linalg.norm(e) < tol:
++            break
++        J = np.zeros((6, 7)); h = 1e-6
++        for i in range(7):
++            dq = q.copy(); dq[i] += h
++            J[:, i] = (pose_err(ee_pose(dq, base, base_z, tool), pos, R) * W - e) / -h
++        lam = 1e-3
++        step = J.T @ np.linalg.solve(J @ J.T + lam * np.eye(6), e)
++        n = np.linalg.norm(step)
++        if n > 0.3: step *= 0.3 / n
++        q += step
++    return q, np.linalg.norm(e)
++
++from scipy.spatial.transform import Rotation as _Rot
++def pose_err(T, pos, R):
++    ep = pos - T[:3, 3]
++    ang = _Rot.from_matrix(R @ T[:3, :3].T).as_rotvec()
++    return np.concatenate([ep, ang])
+diff --git a/m1.txt b/m1.txt
+new file mode 100644
+index 0000000..5ed9af9
+--- /dev/null
++++ b/m1.txt
+@@ -0,0 +1,14 @@
++y -0.12 0.22499999999999992
++y -0.1 0.22499999999999992
++y -0.08 0.22499999999999992
++y -0.06 0.22499999999999992
++y -0.04 0.22499999999999992
++y -0.02 0.27499999999999997
++y 0.0 0.27499999999999997
++y 0.02 0.27499999999999997
++y 0.04 0.22499999999999992
++y 0.06 0.22499999999999992
++y 0.08 0.22499999999999992
++y 0.1 0.22499999999999992
++y 0.12 0.22499999999999992
++21.0484561920166
+diff --git a/m2.txt b/m2.txt
+new file mode 100644
+index 0000000..4552f1e
+--- /dev/null
++++ b/m2.txt
+@@ -0,0 +1,14 @@
++x -0.12 0.23499999999999993
++x -0.1 0.22499999999999992
++x -0.08 0.22499999999999992
++x -0.06 0.22499999999999992
++x -0.04 0.22499999999999992
++x -0.02 0.22499999999999992
++x 0.0 0.22499999999999992
++x 0.02 0.22499999999999992
++x 0.04 0.22499999999999992
++x 0.06 0.22499999999999992
++x 0.08 0.22499999999999992
++x 0.1 0.22499999999999992
++x 0.12 0.22499999999999992
++19.209277629852295
+diff --git a/m3.txt b/m3.txt
+new file mode 100644
+index 0000000..2f426fc
+--- /dev/null
++++ b/m3.txt
+@@ -0,0 +1,14 @@
++y -0.12 0.22499999999999992
++y -0.1 0.22499999999999992
++y -0.08 0.22499999999999992
++y -0.06 0.22499999999999992
++y -0.04 0.23499999999999993
++y -0.02 0.23499999999999993
++y 0.0 0.23499999999999993
++y 0.02 0.23499999999999993
++y 0.04 0.22499999999999992
++y 0.06 0.22499999999999992
++y 0.08 0.22499999999999992
++y 0.1 0.22499999999999992
++y 0.12 0.22499999999999992
++23.501456022262573
+diff --git a/probe0.py b/probe0.py
+new file mode 100644
+index 0000000..a101ae8
+--- /dev/null
++++ b/probe0.py
+@@ -0,0 +1,11 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++def dump(obs):
++    for o in sorted(obs.data, key=lambda o:o.name):
++        f = obs.type_features[o.type]
++        print(o.name, {k: round(float(v),4) for k,v in zip(f, obs.data[o])})
++for seed in [0,1,2]:
++    obs, info = env.reset(seed=seed)
++    print("seed",seed); dump(obs)
++env.close()
+diff --git a/probe1.py b/probe1.py
+new file mode 100644
+index 0000000..e0d12c3
+--- /dev/null
++++ b/probe1.py
+@@ -0,0 +1,24 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=0)
++R = obs.get_object_from_name("robot")
++F = obs.type_features[R.type]
++def rv(o): return np.round(o.data[R],4)
++print(F)
++print(rv(obs))
++a = np.zeros(11, dtype=np.float32)
++a[3]=0.1; a[4]=0.3
++obs,r,te,tr,_ = env.step(a); print("j1+.1 j2+.3(clipped?)", rv(obs), r)
++a = np.zeros(11, dtype=np.float32); a[0]=0.1; a[2]=0.1
++obs,r,te,tr,_ = env.step(a); print("base", rv(obs))
++a = np.zeros(11, dtype=np.float32); a[10]=-1
++obs,r,te,tr,_ = env.step(a); print("close", rv(obs))
++a = np.zeros(11, dtype=np.float32); a[10]=1
++obs,r,te,tr,_ = env.step(a); print("open", rv(obs))
++a = np.zeros(11, dtype=np.float32); a[4]=0.2
++for i in range(15):
++    obs,r,te,tr,_ = env.step(a)
++    print(i, rv(obs)[:10])
++print(env.max_steps)
++env.close()
+diff --git a/probe_base_1.py b/probe_base_1.py
+new file mode 100644
+index 0000000..2b442ab
+--- /dev/null
++++ b/probe_base_1.py
+@@ -0,0 +1,19 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++def rob(obs):
++    R = obs.get_object_from_name("robot"); return np.array(obs.data[R][:10], dtype=float)
++def A(**kw):
++    a = np.zeros(11, dtype=np.float32)
++    for k,v in kw.items(): a[int(k[1:])] = v
++    return a
++tests = [("x+.1",A(i0=.1)),("x-.1",A(i0=-.1)),("y+.1",A(i1=.1)),("y-.1",A(i1=-.1)),("rot+.1",A(i2=.1)),("rot-.1",A(i2=-.1)),
++         ("x+.01",A(i0=.01)),("x-.05",A(i0=-.05)),("y+.05",A(i1=.05)),("rot.05",A(i2=.05)),("x-.1y.1rot.1",A(i0=-.1,i1=.1,i2=.1)),
++         ("x+.5 clip?",A(i0=.5)),("x-.5",A(i0=-.5))]
++for name,a in tests:
++    obs,_ = env.reset(seed=1)
++    s0 = rob(obs)
++    obs,*_ = env.step(a); s1 = rob(obs)
++    obs,*_ = env.step(a); s2 = rob(obs)
++    print(name, "d1", np.round(s1-s0,5)[:3], "d2", np.round(s2-s1,5)[:3], "other", np.abs(s2-s0)[3:].max().round(5))
++env.close()
+diff --git a/probe_base_10.py b/probe_base_10.py
+new file mode 100644
+index 0000000..ac5afbc
+--- /dev/null
++++ b/probe_base_10.py
+@@ -0,0 +1,31 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++def A(**kw):
++    a = np.zeros(11, dtype=np.float32)
++    for k,v in kw.items(): a[int(k[1:])] = v
++    return a
++def objs(obs): return {o.name: np.array(obs.data[o][:3],dtype=float) for o in obs.data if o.name!="robot"}
++# j2 limit off-table
++obs,_=env.reset(seed=1); R=obs.get_object_from_name("robot")
++for _ in range(10): obs,*_=env.step(A(i1=.2))
++for _ in range(50):
++    j=obs.get(R,"joint_2"); obs,*_=env.step(A(i4=.05))
++    if abs(obs.get(R,"joint_2")-j)<1e-6: break
++print("off-table (y=2) j2 stops at", obs.get(R,"joint_2"))
++rng=np.random.default_rng(1)
++tot=rej=0; moves=[]
++for seed in range(5):
++    obs,_=env.reset(seed=seed); o0=objs(obs)
++    obs,*_=env.step(A(i0=.05))
++    for t in range(400):
++        a=np.zeros(11,np.float32); a[3:10]=rng.uniform(-.2,.2,7); a[10]=1
++        a[4]+=0.03  # bias downward
++        s=np.array(obs.data[R][:10]); obs,*_=env.step(a); tot+=1
++        if np.allclose(np.array(obs.data[R][:10]),s): rej+=1
++        o=objs(obs)
++        for k in o0:
++            if np.abs(o[k]-o0[k]).max()>1e-6: moves.append((seed,t,k,np.round(o[k]-o0[k],3)))
++        o0=o
++print("steps",tot,"rejected",rej,"object moves",len(moves)); print(moves[:10])
++env.close()
+diff --git a/probe_base_2.py b/probe_base_2.py
+new file mode 100644
+index 0000000..c4e188c
+--- /dev/null
++++ b/probe_base_2.py
+@@ -0,0 +1,39 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++def rob(obs):
++    R = obs.get_object_from_name("robot"); return np.array(obs.data[R][:10], dtype=float)
++def A(**kw):
++    a = np.zeros(11, dtype=np.float32)
++    for k,v in kw.items(): a[int(k[1:])] = v
++    return a
++for seed in [0,1]:
++    obs,_ = env.reset(seed=seed); s=rob(obs)
++    for i in range(30):
++        obs,*_ = env.step(A(i0=.01)); n=rob(obs)
++        if np.allclose(n,s): print("seed",seed,"x+ stops at base_x",n[0]); break
++        s=n
++    # exactness
++    obs,_=env.reset(seed=seed); s0=rob(obs)
++    obs,*_=env.step(A(i1=0.0123456,i2=-0.0333,i3=0.0777)); s1=rob(obs)
++    print("exact diff", (s1-s0)[:4]-np.array([0,0.0123456,-0.0333,0.0777],dtype=np.float32))
++# rejection whole action: x+.1 (rejected) combined with y+.1 and j1+.1
++for name,a in [("x+.1 & y+.1",A(i0=.1,i1=.1)),("x+.1 & j1+.1",A(i0=.1,i3=.1)),("x+.1 & rot.1",A(i0=.1,i2=.1))]:
++    obs,_=env.reset(seed=1); s0=rob(obs); obs,*_=env.step(a); print(name, np.round(rob(obs)-s0,4))
++# base x limit when moving away / y wide range
++obs,_=env.reset(seed=1); s=rob(obs)
++for i in range(60):
++    obs,*_=env.step(A(i0=-.2)); n=rob(obs)
++    if np.allclose(n,s): break
++    s=n
++print("x- stops at", n[0], "after", i)
++obs,_=env.reset(seed=1); s=rob(obs)
++for i in range(60):
++    obs,*_=env.step(A(i1=.2)); n=rob(obs)
++    if np.allclose(n,s): break
++    s=n
++print("y+ stops at", n[1], "after", i)
++obs,_=env.reset(seed=1); 
++for i in range(40): obs,*_=env.step(A(i2=.2))
++print("rot after 40*0.2 =", rob(obs)[2], "(8.0 raw)")
++env.close()
+diff --git a/probe_base_3.py b/probe_base_3.py
+new file mode 100644
+index 0000000..ae5027c
+--- /dev/null
++++ b/probe_base_3.py
+@@ -0,0 +1,30 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++def rob(obs):
++    R = obs.get_object_from_name("robot"); return np.array(obs.data[R][:10], dtype=float)
++def A(**kw):
++    a = np.zeros(11, dtype=np.float32)
++    for k,v in kw.items(): a[int(k[1:])] = v
++    return a
++def push(seed, idx, d, n=80, pre=()):
++    obs,_=env.reset(seed=seed)
++    for p in pre: obs,*_=env.step(p)
++    s=rob(obs); k=0
++    for i in range(n):
++        obs,*_=env.step(A(**{f"i{idx}":d})); m=rob(obs)
++        if np.allclose(m,s): break
++        s=m; k+=1
++    return s, k
++# x+ at y=2 (off table?)
++s,k=push(1,0,.01,pre=[A(i1=.2)]*10); print("x+ at y=2 stops at x",s[0],k)
++s,k=push(1,0,.01,pre=[A(i2=.2)]*16); print("x+ at rot=pi stops at x",s[0],k)
++for j in range(1,8):
++    idx=2+j
++    for d in (.2,-.2):
++        s,k=push(1,idx,d,n=40)
++        # find fine limit with 0.01
++        obs,_=env.reset(seed=1)
++        s2,k2=None,None
++        print(f"j{j} d{d:+}: stops at {s[idx]:.4f} after {k} steps")
++env.close()
+diff --git a/probe_base_4.py b/probe_base_4.py
+new file mode 100644
+index 0000000..3db101a
+--- /dev/null
++++ b/probe_base_4.py
+@@ -0,0 +1,42 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++def rob(obs):
++    R = obs.get_object_from_name("robot"); return np.array(obs.data[R][:10], dtype=float)
++def objs(obs):
++    return {o.name: np.array(obs.data[o][:3],dtype=float) for o in obs.data if o.name not in ("robot",)}
++def A(**kw):
++    a = np.zeros(11, dtype=np.float32)
++    for k,v in kw.items(): a[int(k[1:])] = v
++    return a
++obs,_=env.reset(seed=1)
++for _ in range(3): obs,*_=env.step(A(i4=.2))
++s0=rob(obs); print("j2 now",s0[4])
++obs,*_=env.step(A(i4=.2,i3=.1)); print("j2+.2(rej)&j1+.1:",np.round(rob(obs)-s0,4))
++obs,_=env.reset(seed=1); s0=rob(obs)
++obs,*_=env.step(A(i3=.7)); print("j1 +0.7 ->",np.round(rob(obs)-s0,4)[3])
++obs,_=env.reset(seed=1); s0=rob(obs)
++obs,*_=env.step(A(i6=-.1)); print("j4 -0.1 ->",np.round(rob(obs)-s0,4)[6])
++obs,*_=env.step(A(i6=-.1)); print("j4 another -0.1 ->",np.round(rob(obs)-s0,4)[6])
++# fine j2 limit via 0.01
++obs,_=env.reset(seed=1); s=rob(obs)
++for i in range(200):
++    obs,*_=env.step(A(i4=.01)); m=rob(obs)
++    if np.allclose(m,s): break
++    s=m
++print("j2 fine stop", s[4])
++# random exploration for object movement
++rng=np.random.default_rng(0)
++moved=0; tot=0
++for seed in range(4):
++    obs,_=env.reset(seed=seed); o0=objs(obs)
++    for t in range(300):
++        a=rng.uniform(-.2,.2,11).astype(np.float32); a[10]=1.0
++        a[0]=abs(a[0])*0.3 if t<100 else a[0]*0.3
++        obs,*_=env.step(a); tot+=1
++        o=objs(obs)
++        for k in o0:
++            if np.abs(o[k]-o0[k]).max()>1e-6:
++                moved+=1; print("seed",seed,"t",t,k,"moved",np.round(o[k]-o0[k],4)); o0=o; break
++print("moves",moved,"of steps",tot)
++env.close()
+diff --git a/probe_base_5.py b/probe_base_5.py
+new file mode 100644
+index 0000000..3afbf5b
+--- /dev/null
++++ b/probe_base_5.py
+@@ -0,0 +1,30 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++def rob(obs):
++    R = obs.get_object_from_name("robot"); return np.array(obs.data[R][:10], dtype=float)
++def objs(obs):
++    return {o.name: np.array(obs.data[o][:3],dtype=float) for o in obs.data if o.name!="robot"}
++def A(**kw):
++    a = np.zeros(11, dtype=np.float32)
++    for k,v in kw.items(): a[int(k[1:])] = v
++    return a
++obs,_=env.reset(seed=1)
++for _ in range(5): obs,*_=env.step(A(i4=.2))
++s0=rob(obs); print("j2 now",s0[4])
++obs,*_=env.step(A(i4=.2,i3=.1)); print("j2+.2(rej)&j1+.1:",np.round(rob(obs)-s0,4))
++obs,*_=env.step(A(i4=.01,i3=.1)); print("j2+.01&j1+.1:",np.round(rob(obs)-s0,4))
++# sweeps: for each seed, lower arm, then sweep j1 and base y, record rejections + object moves
++for seed in range(6):
++    obs,_=env.reset(seed=seed); o0=objs(obs)
++    for _ in range(5): obs,*_=env.step(A(i4=.2))
++    rej=0; mv=set()
++    seq=[A(i3=.05)]*40+[A(i3=-.05)]*80+[A(i1=.05)]*20+[A(i1=-.05)]*40+[A(i0=.02)]*10+[A(i3=.05)]*80
++    for a in seq:
++        s=rob(obs); obs,*_=env.step(a)
++        if np.allclose(rob(obs),s): rej+=1
++        o=objs(obs)
++        for k in o0:
++            if np.abs(o[k]-o0[k]).max()>1e-6: mv.add(k)
++    print("seed",seed,"rejected",rej,"/",len(seq),"moved objs",mv, "final j1",round(rob(obs)[3],2))
++env.close()
+diff --git a/probe_base_6.py b/probe_base_6.py
+new file mode 100644
+index 0000000..7764ed8
+--- /dev/null
++++ b/probe_base_6.py
+@@ -0,0 +1,12 @@
++from env_client import make_env
++import numpy as np, json
++env = make_env()
++def A(**kw):
++    a = np.zeros(11, dtype=np.float32)
++    for k,v in kw.items(): a[int(k[1:])] = v
++    return a
++obs,_=env.reset(seed=1)
++for _ in range(5): obs,*_=env.step(A(i4=.2))
++for _ in range(3): obs,*_=env.step(A(i4=.02))
++print(type(obs), [m for m in dir(obs) if not m.startswith('_')][:30])
++env.close()
+diff --git a/probe_base_7.py b/probe_base_7.py
+new file mode 100644
+index 0000000..a2ad2da
+--- /dev/null
++++ b/probe_base_7.py
+@@ -0,0 +1,35 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++def A(**kw):
++    a = np.zeros(11, dtype=np.float32)
++    for k,v in kw.items(): a[int(k[1:])] = v
++    return a
++obs,_=env.reset(seed=1)
++for _ in range(5): obs,*_=env.step(A(i4=.2))
++for _ in range(6): obs,*_=env.step(A(i4=.01))
++st=env.get_state(); print(type(st))
++R=st.get_object_from_name("robot"); print("j2",st.get(R,"joint_2"))
++res=[]
++for ob in ["obstruction0","target_block"]:
++  for x in np.arange(0.0,0.8,0.1):
++    for y in np.arange(-0.6,0.61,0.2):
++        s=st.copy(); O=s.get_object_from_name(ob)
++        s.set(O,"pose_x",x); s.set(O,"pose_y",y)
++        # move other objects far away
++        for n in s.get_object_names():
++            if n not in ("robot",ob,"target_region"):
++                o2=s.get_object_from_name(n); s.set(o2,"pose_y",5.0)
++        env.set_state(s)
++        o=env.get_state(); p0=np.array([o.get(O,"pose_x"),o.get(O,"pose_y"),o.get(O,"pose_z")])
++        rej=0
++        for k in range(126):
++            o=env.get_state(); jr=o.get(R,"joint_1")
++            obs,*_=env.step(A(i3=.05))
++            if abs(obs.get(R,"joint_1")-jr)<1e-6: rej+=1; break
++        p1=np.array([obs.get(O,"pose_x"),obs.get(O,"pose_y"),obs.get(O,"pose_z")])
++        mv=np.abs(p1-p0).max()
++        if rej or mv>1e-6: res.append((ob,round(x,2),round(y,2),rej,round(mv,4),round(obs.get(R,"joint_1"),2)))
++for r in res: print(r)
++print("n events",len(res))
++env.close()
+diff --git a/probe_base_8.py b/probe_base_8.py
+new file mode 100644
+index 0000000..f7dff9e
+--- /dev/null
++++ b/probe_base_8.py
+@@ -0,0 +1,16 @@
++from env_client import make_env
++import numpy as np, json
++env = make_env()
++def A(**kw):
++    a = np.zeros(11, dtype=np.float32)
++    for k,v in kw.items(): a[int(k[1:])] = v
++    return a
++obs,_=env.reset(seed=1)
++for _ in range(5): obs,*_=env.step(A(i4=.2))
++for _ in range(6): obs,*_=env.step(A(i4=.01))
++print([o.name for o in obs.data])
++try: v=env.observation_space.vectorize(obs); print("vec ok")
++except Exception as e: v=obs.vec(list(obs.data)); print("fallback",e)
++json.dump([float(x) for x in v], open("probe_base_vec.json","w"))
++print(len(v))
++env.close()
+diff --git a/probe_base_9.py b/probe_base_9.py
+new file mode 100644
+index 0000000..8f912ee
+--- /dev/null
++++ b/probe_base_9.py
+@@ -0,0 +1,29 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++def A(**kw):
++    a = np.zeros(11, dtype=np.float32)
++    for k,v in kw.items(): a[int(k[1:])] = v
++    return a
++def objs(obs): return {o.name: np.array(obs.data[o][:3],dtype=float) for o in obs.data if o.name!="robot"}
++R=None
++events=[]
++for seed in [1,2]:
++  for bx in [-0.07,-0.2,-0.35]:
++    for by in [-0.3,0.0,0.3]:
++      for j2 in [0.3,0.5,0.7]:
++        obs,_=env.reset(seed=seed); R=obs.get_object_from_name("robot")
++        steps=[A(i0=bx+0.12)] if abs(bx+0.12)>1e-9 else []
++        for a in steps+[A(i1=by)]: obs,*_=env.step(a)
++        n=int(round((j2+0.35)/0.1))
++        for _ in range(n): obs,*_=env.step(A(i4=.1))
++        o0=objs(obs); jj=obs.get(R,"joint_2")
++        rej=0
++        for d in [0.1]*32+[-0.1]*64:
++            j=obs.get(R,"joint_1"); obs,*_=env.step(A(i3=d))
++            if abs(obs.get(R,"joint_1")-j)<1e-6: rej+=1
++        o=objs(obs); mv={k:np.round(o[k]-o0[k],3) for k in o0 if np.abs(o[k]-o0[k]).max()>1e-6}
++        if rej or mv: events.append((seed,bx,by,round(jj,2),rej,mv))
++for e in events: print(e)
++print(len(events))
++env.close()
+diff --git a/probe_base_vec.json b/probe_base_vec.json
+new file mode 100644
+index 0000000..5b10326
+--- /dev/null
++++ b/probe_base_vec.json
+@@ -0,0 +1 @@
++[0.419426292181015, -0.14254437386989594, 0.10106389969587326, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.013297317549586296, 0.017884286120533943, 0.01606389693915844, -0.11999999731779099, 0.0, 0.0, 0.0, 0.7100000381469727, -3.1415927410125732, -2.5, 0.0, -0.8700000047683716, 1.5707963705062866, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.13774842023849487, 0.18313223123550415, 0.10000000149011612, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.02828371897339821, 0.038811128586530685, 0.02500000037252903, 0.44773608446121216, -0.132277250289917, 0.07999999821186066, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.035354647785425186, 0.04851391166448593, 0.004999999888241291]
+\ No newline at end of file
+diff --git a/probe_grasp.py b/probe_grasp.py
+new file mode 100644
+index 0000000..b323201
+--- /dev/null
++++ b/probe_grasp.py
+@@ -0,0 +1,41 @@
++from env_client import make_env
++from kin import *
++import numpy as np, sys
++env = make_env()
++obs, info = env.reset(seed=0)
++R = obs.get_object_from_name("robot"); B = obs.get_object_from_name("target_block")
++def q_of(o): return np.array([o.get(R,f'joint_{i}') for i in range(1,8)])
++def goto(obs, qt, grip=0.0, maxn=40):
++    for _ in range(maxn):
++        q = q_of(obs)
++        d = qt - q
++        if np.max(np.abs(d)) < 1e-4: break
++        d = np.clip(d, -0.2, 0.2)
++        a = np.zeros(11, np.float32); a[3:10] = d; a[10] = grip
++        obs2, r, te, tr, _ = env.step(a)
++        if np.allclose(q_of(obs2), q): return obs2, False
++        obs = obs2
++    return obs, True
++yaw = float(sys.argv[1]) if len(sys.argv)>1 else 0.0
++bx, by = obs.get(B,'pose_x'), obs.get(B,'pose_y')
++base = (-0.12,0,0)
++q = q_of(obs)
++for z in [0.45,0.40,0.36,0.34,0.32,0.30,0.29,0.28,0.27,0.26,0.25,0.24,0.235,0.23,0.225,0.22,0.215,0.21,0.205,0.20]:
++    qt, e = ik(q, np.array([bx,by,z]), down_R(yaw), base)
++    obs, ok = goto(obs, qt)
++    q = q_of(obs)
++    print(z, ok, round(e,5), np.round(obs.data[B][:3],4))
++    if not ok: break
++# close
++a = np.zeros(11, np.float32); a[10] = -1
++for k in range(3):
++    obs,_,_,_,_ = env.step(a); print('close', k, np.round(obs.data[R][10:12],3))
++print("after close robot", np.round(obs.data[R][10:],4), "block", np.round(obs.data[B],4))
++T = ee_pose(q_of(obs), base)
++print("EE", np.round(T,4))
++# lift
++qt,e = ik(q_of(obs), T[:3,3]+[0,0,0.1], T[:3,:3], base)
++obs, ok = goto(obs, qt)
++print("lift", ok, np.round(obs.data[B][:7],4), np.round(obs.data[R][10:],4))
++T = ee_pose(q_of(obs), base); print("EE", np.round(T[:3,3],4))
++env.close()
+diff --git a/probe_grasp2.py b/probe_grasp2.py
+new file mode 100644
+index 0000000..155b42b
+--- /dev/null
++++ b/probe_grasp2.py
+@@ -0,0 +1,30 @@
++from env_client import make_env
++from kin import *
++import numpy as np, sys
++env = make_env()
++R=None
++def q_of(o): return np.array([o.get(R,f'joint_{i}') for i in range(1,8)])
++def goto(obs, qt, grip=0.0, maxn=40):
++    for _ in range(maxn):
++        q = q_of(obs); d = qt - q
++        if np.max(np.abs(d)) < 1e-4: break
++        a = np.zeros(11, np.float32); a[3:10] = np.clip(d,-.2,.2); a[10] = grip
++        obs2, r, te, tr, info = env.step(a)
++        if np.allclose(q_of(obs2), q): return obs2, False
++        obs = obs2
++    return obs, True
++base=(-0.12,0,0)
++yaw=float(sys.argv[1])
++for zc in [0.235,0.245,0.255,0.265,0.28]:
++    obs, info = env.reset(seed=0)
++    R = obs.get_object_from_name("robot"); B = obs.get_object_from_name("target_block")
++    bx, by = obs.get(B,'pose_x'), obs.get(B,'pose_y')
++    q=q_of(obs)
++    for z in [0.4,0.33,zc]:
++        qt,e = ik(q, np.array([bx,by,z]), down_R(yaw), base); obs,ok=goto(obs,qt); q=q_of(obs)
++    res=[]
++    for g in [-1,-1,-1]:
++        a=np.zeros(11,np.float32); a[10]=g
++        obs,r,te,tr,info=env.step(a); res.append(tuple(np.round(obs.data[R][10:12],3)))
++    print(zc, ok, res, info)
++env.close()
+diff --git a/probe_grasp3.py b/probe_grasp3.py
+new file mode 100644
+index 0000000..dcc0ce6
+--- /dev/null
++++ b/probe_grasp3.py
+@@ -0,0 +1,32 @@
++from env_client import make_env
++from kin import *
++import numpy as np, sys
++env = make_env()
++R=None
++def q_of(o): return np.array([o.get(R,f'joint_{i}') for i in range(1,8)])
++def goto(obs, qt, grip=0.0, maxn=40):
++    for _ in range(maxn):
++        q = q_of(obs); d = qt - q
++        if np.max(np.abs(d)) < 1e-4: break
++        a = np.zeros(11, np.float32); a[3:10] = np.clip(d,-.2,.2); a[10] = grip
++        obs2, r, te, tr, info = env.step(a)
++        if np.allclose(q_of(obs2), q): return obs2, False
++        obs = obs2
++    return obs, True
++base=(0,0,0)
++yaw=float(sys.argv[1]); zc=float(sys.argv[2])
++obs, info = env.reset(seed=0)
++R = obs.get_object_from_name("robot"); B = obs.get_object_from_name("target_block")
++bx, by = obs.get(B,'pose_x'), obs.get(B,'pose_y')
++q=q_of(obs)
++for z in [0.4,0.33,zc]:
++    qt,e = ik(q, np.array([bx,by,z]), down_R(yaw), base); obs,ok=goto(obs,qt); q=q_of(obs)
++print("reached", ok)
++a=np.zeros(11,np.float32); a[10]=-1
++obs,r,te,tr,info=env.step(a); print("close", np.round(obs.data[R][10:],4))
++T=ee_pose(q,base); print("EE", np.round(T,4))
++print("block", np.round(obs.data[B][:8],4))
++qt,e=ik(q,T[:3,3]+[0,0,0.1],T[:3,:3],base); obs,ok=goto(obs,qt)
++print("lift", ok, np.round(obs.data[B][:8],4))
++T2=ee_pose(q_of(obs),base); print("EE2", np.round(T2[:3,3],4))
++env.close()
+diff --git a/probe_grid.py b/probe_grid.py
+new file mode 100644
+index 0000000..381ae47
+--- /dev/null
++++ b/probe_grid.py
+@@ -0,0 +1,39 @@
++from env_client import make_env
++from kin import *
++import numpy as np, sys, time, json
++env = make_env()
++seed=int(sys.argv[1]); yaw=float(sys.argv[2]); cx=float(sys.argv[3]); cy=float(sys.argv[4]); step=float(sys.argv[5]); n=int(sys.argv[6])
++obs, info = env.reset(seed=seed)
++R = obs.get_object_from_name("robot")
++def q_of(o): return np.array([o.get(R,f'joint_{i}') for i in range(1,8)])
++def goto(obs, qt, maxn=40):
++    for _ in range(maxn):
++        q = q_of(obs); d = qt - q
++        if np.max(np.abs(d)) < 1e-4: break
++        a = np.zeros(11, np.float32); a[3:10] = np.clip(d,-.2,.2)
++        obs2, r, te, tr, _ = env.step(a)
++        if np.allclose(q_of(obs2), q): return obs2, False
++        obs = obs2
++    return obs, True
++base=(-0.12,0,0)
++q=q_of(obs)
++qhome,_=ik(q,np.array([cx,cy,0.36]),down_R(yaw),base)
++obs,ok=goto(obs,qhome); q=q_of(obs)
++out={}
++for i in range(-n,n+1):
++  for j in range(-n,n+1):
++    x,y=cx+i*step, cy+j*step
++    qa,_=ik(qhome,np.array([x,y,0.34]),down_R(yaw),base); obs,ok=goto(obs,qa); q=q_of(obs)
++    stop=None
++    for z in np.arange(0.33,0.22,-0.005):
++        qt,_=ik(q,np.array([x,y,z]),down_R(yaw),base); obs,ok=goto(obs,qt); q=q_of(obs)
++        if not ok: stop=round(z+0.005,3); break
++    out[(i,j)]=stop
++    for zz in np.arange(ee_pose(q,base)[2,3],0.345,0.02):
++        qt,_=ik(q,np.array([x,y,zz]),down_R(yaw),base); obs,ok=goto(obs,qt); q=q_of(obs)
++    obs,ok=goto(obs,qhome); q=q_of(obs)
++# print map: rows = x (i), cols = y (j)
++print("yaw",yaw,"center",cx,cy,"step",step)
++for i in range(n,-n-1,-1):
++    print("%+.3f "%(cx+i*step)+" ".join("  -  " if out[(i,j)] is None else "%.3f"%out[(i,j)] for j in range(-n,n+1)))
++env.close()
+diff --git a/probe_grip3.py b/probe_grip3.py
+new file mode 100644
+index 0000000..bca2e3c
+--- /dev/null
++++ b/probe_grip3.py
+@@ -0,0 +1,10 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=3)
++R = obs.get_object_from_name("robot")
++for g in [1,1,-1,-1,-0.7,-1,1,0,-1]:
++    a=np.zeros(11,np.float32); a[10]=g; a[3]=0.01
++    obs,r,te,tr,info=env.step(a); print(g, np.round(obs.data[R][3:12],3))
++print(env.action_space.low, env.action_space.high)
++env.close()
+diff --git a/probe_map.py b/probe_map.py
+new file mode 100644
+index 0000000..c24c94c
+--- /dev/null
++++ b/probe_map.py
+@@ -0,0 +1,34 @@
++from env_client import make_env
++from kin import *
++import numpy as np, sys, time
++env = make_env()
++obs, info = env.reset(seed=0)
++R = obs.get_object_from_name("robot"); B = obs.get_object_from_name("target_block")
++def q_of(o): return np.array([o.get(R,f'joint_{i}') for i in range(1,8)])
++def goto(obs, qt, maxn=40):
++    for _ in range(maxn):
++        q = q_of(obs); d = qt - q
++        if np.max(np.abs(d)) < 1e-4: break
++        a = np.zeros(11, np.float32); a[3:10] = np.clip(d,-.2,.2)
++        obs2, r, te, tr, _ = env.step(a)
++        if np.allclose(q_of(obs2), q): return obs2, False
++        obs = obs2
++    return obs, True
++base=(-0.12,0,0)
++bx,by=obs.get(B,'pose_x'),obs.get(B,'pose_y')
++q=q_of(obs); t=time.time()
++axis=sys.argv[1]; bx+=float(sys.argv[2]); by+=float(sys.argv[3])
++for d in np.arange(-0.12,0.121,0.02):
++    x,y = (bx+d,by) if axis=='x' else (bx,by+d)
++    cur=ee_pose(q,base)[:3,3]
++    for zz in np.arange(cur[2],0.34,0.02):
++        qt,_=ik(q,np.array([cur[0],cur[1],zz]),down_R(0),base); obs,ok=goto(obs,qt); q=q_of(obs)
++    qt,_=ik(q,np.array([x,y,0.34]),down_R(0),base); obs,ok=goto(obs,qt); q=q_of(obs)
++    if not ok: print('move fail')
++    stop=None
++    for z in np.arange(0.32,0.22,-0.005):
++        qt,_=ik(q,np.array([x,y,z]),down_R(0),base); obs,ok=goto(obs,qt); q=q_of(obs)
++        if not ok: stop=z; break
++    print(axis, round(d,3), stop)
++print(time.time()-t)
++env.close()
+diff --git a/probe_table.py b/probe_table.py
+new file mode 100644
+index 0000000..8847d4f
+--- /dev/null
++++ b/probe_table.py
+@@ -0,0 +1,24 @@
++from env_client import make_env
++from kin import *
++import numpy as np, sys
++env = make_env()
++obs, info = env.reset(seed=0)
++R = obs.get_object_from_name("robot")
++def q_of(o): return np.array([o.get(R,f'joint_{i}') for i in range(1,8)])
++def goto(obs, qt, grip=0.0, maxn=40):
++    for _ in range(maxn):
++        q = q_of(obs); d = qt - q
++        if np.max(np.abs(d)) < 1e-4: break
++        a = np.zeros(11, np.float32); a[3:10] = np.clip(d,-.2,.2); a[10] = grip
++        obs2, r, te, tr, _ = env.step(a)
++        if np.allclose(q_of(obs2), q): return obs2, False
++        obs = obs2
++    return obs, True
++base=(-0.12,0,0); q=q_of(obs)
++x,y = float(sys.argv[1]), float(sys.argv[2])
++for z in np.arange(0.40,0.10,-0.005):
++    qt,e = ik(q, np.array([x,y,z]), down_R(0), base)
++    obs, ok = goto(obs, qt); q=q_of(obs)
++    if not ok or e>1e-3: print("stop at", round(z,3), ok, e); break
++print("EE z", ee_pose(q,base)[2,3])
++env.close()

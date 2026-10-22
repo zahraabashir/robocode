@@ -1,0 +1,151 @@
+diff --git a/approach.py b/approach.py
+index 7e94b75..bc0a4a0 100644
+--- a/approach.py
++++ b/approach.py
+@@ -8,8 +8,8 @@ import math
+ import numpy as np
+ 
+ FLOOR = 0.1
+-X_MIN, X_MAX = 0.1005, 1.5175   # robot base x limits
+-Y_MAX = 0.895                   # robot base y limit
++X_MIN, X_MAX = 0.1001, 1.5179   # robot base x limits
++Y_MAX = 0.8995                  # robot base y limit
+ WORLD_X = 1.618
+ GAP = 0.0015                    # gripper gap above object when grasping
+ PLACE_GAP = 0.004               # object gap above floor when releasing
+diff --git a/steps_0.txt b/steps_0.txt
+new file mode 100644
+index 0000000..4a3841f
+--- /dev/null
++++ b/steps_0.txt
+@@ -0,0 +1,25 @@
++0 True 52 2
++1 True 39 1
++2 True 61 2
++3 True 37 2
++4 True 47 2
++5 True 66 2
++6 True 37 1
++7 True 87 2
++8 True 51 2
++9 True 79 1
++10 True 44 2
++11 True 38 0
++12 True 68 1
++13 True 42 2
++14 True 20 0
++15 True 22 2
++16 True 17 1
++17 True 49 2
++18 True 36 2
++19 True 35 1
++20 True 46 2
++21 True 45 0
++22 True 66 2
++23 True 35 0
++24 True 40 1
+diff --git a/steps_1.txt b/steps_1.txt
+new file mode 100644
+index 0000000..a143bb4
+--- /dev/null
++++ b/steps_1.txt
+@@ -0,0 +1,25 @@
++25 True 36 1
++26 True 44 2
++27 True 13 0
++28 True 38 1
++29 True 19 2
++30 True 18 0
++31 True 32 1
++32 True 51 2
++33 True 39 2
++34 True 25 0
++35 True 24 0
++36 True 23 1
++37 True 25 0
++38 True 15 0
++39 True 43 2
++40 True 46 1
++41 True 26 1
++42 True 25 0
++43 True 21 1
++44 True 40 2
++45 True 53 2
++46 True 32 1
++47 True 31 0
++48 True 15 0
++49 True 14 0
+diff --git a/steps_2.txt b/steps_2.txt
+new file mode 100644
+index 0000000..49abb40
+--- /dev/null
++++ b/steps_2.txt
+@@ -0,0 +1,25 @@
++50 True 53 2
++51 True 26 1
++52 True 43 2
++53 True 43 2
++54 True 23 0
++55 True 22 2
++56 True 48 1
++57 True 11 0
++58 True 36 1
++59 True 48 2
++60 True 20 0
++61 True 46 1
++62 True 48 1
++63 True 26 1
++64 True 22 1
++65 True 13 0
++66 True 36 2
++67 True 29 2
++68 True 25 1
++69 True 30 0
++70 True 28 1
++71 True 19 2
++72 True 83 2
++73 True 49 2
++74 True 18 0
+diff --git a/steps_3.txt b/steps_3.txt
+new file mode 100644
+index 0000000..90a88c6
+--- /dev/null
++++ b/steps_3.txt
+@@ -0,0 +1,25 @@
++75 True 52 1
++76 True 26 1
++77 True 15 0
++78 True 66 2
++79 True 27 0
++80 True 64 2
++81 True 19 0
++82 True 32 2
++83 True 59 2
++84 True 48 1
++85 True 38 2
++86 True 24 2
++87 True 32 1
++88 True 43 1
++89 True 41 2
++90 True 50 1
++91 True 23 2
++92 True 34 1
++93 True 63 2
++94 True 17 0
++95 True 42 1
++96 True 27 2
++97 True 29 0
++98 True 44 1
++99 True 46 2
+diff --git a/steps_list.py b/steps_list.py
+new file mode 100644
+index 0000000..2503c20
+--- /dev/null
++++ b/steps_list.py
+@@ -0,0 +1,6 @@
++import sys
++from test_approach import run
++s0,s1=int(sys.argv[1]),int(sys.argv[2])
++for s in range(s0,s1):
++    ok,n,c=run(s)
++    print(s,ok,n,c,flush=True)

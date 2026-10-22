@@ -1,0 +1,177 @@
+diff --git a/approach.py b/approach.py
+index 8664548..eca7767 100644
+--- a/approach.py
++++ b/approach.py
+@@ -7,6 +7,7 @@ LO, HI = 0.1 + 1e-3, 4.9 - 1e-3
+ POS_TOL, ANG_TOL = 0.03, np.deg2rad(8.0)
+ K_ANG = 0.8
+ LOOKAHEAD = 8
++LOCAL_FAMILY = True
+ 
+ 
+ def cost(bx, by, bt, goal):
+@@ -24,6 +25,7 @@ class GeneratedApproach:
+         self.queue = []
+         self.g = None
+         self.lookahead = LOOKAHEAD
++        self.local_family = LOCAL_FAMILY
+ 
+     def reset(self, state, info):
+         self.queue = []
+@@ -179,12 +181,19 @@ class GeneratedApproach:
+         nwx = -(c * pts[idx, 2] - s * pts[idx, 3])
+         nwy = -(s * pts[idx, 2] + c * pts[idx, 3])
+         angs = self.angs
+-        K = len(idx) * len(angs)
+-        ci = np.repeat(np.arange(len(idx)), len(angs))
+-        aa = np.tile(angs, len(idx))
++        nf = 2 if self.local_family else 1
++        na = len(angs)
++        K = len(idx) * na * nf
++        ci = np.tile(np.repeat(np.arange(len(idx)), na), nf)
++        aa = np.tile(angs, len(idx) * nf)
++        fam = np.repeat(np.arange(nf), len(idx) * na)
+         dirx = np.cos(aa) * nwx[ci] - np.sin(aa) * nwy[ci]
+         diry = np.sin(aa) * nwx[ci] + np.cos(aa) * nwy[ci]
+         ux, uy = dirx * step, diry * step
++        # local-frame direction (for family 1)
++        lux0 = c * ux + s * uy
++        luy0 = -s * ux + c * uy
++        isloc = fam == 1
+         bx = np.full(K, pose[0]); by = np.full(K, pose[1]); bt = np.full(K, pose[2])
+         rx = wcx[idx][ci].copy(); ry = wcy[idx][ci].copy()
+         valid = np.isfinite(tdist[ci])
+@@ -198,7 +207,13 @@ class GeneratedApproach:
+         fin = np.zeros((K, 5))
+         alive = valid.copy()
+         for k in range(1, nsteps + 1):
+-            bx, by, bt, rx, ry = sim_step(g, bx, by, bt, rx, ry, ux, uy)
++            if nf > 1:
++                cb, sb = np.cos(bt), np.sin(bt)
++                uxk = np.where(isloc, cb * lux0 - sb * luy0, ux)
++                uyk = np.where(isloc, sb * lux0 + cb * luy0, uy)
++            else:
++                uxk, uyk = ux, uy
++            bx, by, bt, rx, ry = sim_step(g, bx, by, bt, rx, ry, uxk, uyk)
+             alive &= (rx > LO) & (rx < HI) & (ry > LO) & (ry < HI)
+             cxw, cyw = corners_world(g, bx, by, bt)
+             mm = np.minimum(np.minimum(cxw.min(0), cyw.min(0)), np.minimum(5 - cxw.max(0), 5 - cyw.max(0)))
+@@ -217,7 +232,7 @@ class GeneratedApproach:
+                 fin[upd] = np.stack([bx, by, bt, rx, ry], 1)[upd]
+         steps_n = best_n if not fine else np.ceil(best_n / 3.0)
+         return dict(J0=J0, score=best_score, n=best_n, J=best_J, fin=fin, ci=ci, idx=idx,
+-                    ux=ux, uy=uy, travel=travel, tot=travel + steps_n + 1.0, pathf=pathf,
++                    ux=ux, uy=uy, lux=lux0, luy=luy0, fam=fam, travel=travel, tot=travel + steps_n + 1.0, pathf=pathf,
+                     retreat=retreat, wc=np.stack([wcx, wcy], 1), fine=fine)
+ 
+     def _plan(self, obs):
+@@ -254,9 +269,11 @@ class GeneratedApproach:
+                     fine2 = J1 + 0.0 < 0.12
+                     E2 = self._eval(f[0:3], f[3:5], fine2)
+                     if E2 is not None:
+-                        s2 = (E['J0'] - E2['J']) / (t1 + E2['tot'])
+-                        s2 = np.where(E2['score'] > -np.inf, s2, -np.inf)
+-                        val = max(val, float(np.max(s2)))
++                        with np.errstate(invalid='ignore'):
++                            s2 = (E['J0'] - E2['J']) / (t1 + E2['tot'])
++                        ok2 = (E2['score'] > -np.inf) & np.isfinite(E2['tot'])
++                        if ok2.any():
++                            val = max(val, float(np.max(s2[ok2])))
+                 if val > best_val:
+                     best_val, best_j = val, int(jj)
+             j = best_j
+@@ -281,7 +298,14 @@ class GeneratedApproach:
+                 acts.append(('nav', d / nst))
+             cur = w.copy()
+         a = np.array([E['ux'][j], E['uy'][j]])
+-        if E['fine']:
++        if E['fam'][j] == 1:
++            la = np.array([E['lux'][j], E['luy'][j]])
++            if E['fine']:
++                la = la * 3
++                n = int(np.ceil(n / 3.0))
++            for _ in range(n):
++                acts.append(('pushL', la.copy()))
++        elif E['fine']:
+             tot = a * n
+             L = np.hypot(*tot)
+             nst = max(1, int(np.ceil(L / AMAX - 1e-9)))
+@@ -310,5 +334,9 @@ class GeneratedApproach:
+             d = pose[0:2] - obs[16:18]
+             return np.clip(d, -AMAX, AMAX)
+         kind, a = self.queue.pop(0)
++        if kind == 'pushL':
++            cb, sb = np.cos(pose[2]), np.sin(pose[2])
++            a = np.array([cb * a[0] - sb * a[1], sb * a[0] + cb * a[1]])
++        self.last_kind = kind
+         self.expect = pose.copy()
+         return np.clip(a, -AMAX, AMAX)
+diff --git a/la_0_0_25.txt b/la_0_0_25.txt
+new file mode 100644
+index 0000000..ab5c260
+--- /dev/null
++++ b/la_0_0_25.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 117.72
+diff --git a/la_0_25_50.txt b/la_0_25_50.txt
+new file mode 100644
+index 0000000..219d6cc
+--- /dev/null
++++ b/la_0_25_50.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 125.04
+diff --git a/la_0_50_75.txt b/la_0_50_75.txt
+new file mode 100644
+index 0000000..063e34f
+--- /dev/null
++++ b/la_0_50_75.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 138.88
+diff --git a/la_0_75_100.txt b/la_0_75_100.txt
+new file mode 100644
+index 0000000..b95ac24
+--- /dev/null
++++ b/la_0_75_100.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 131.12
+diff --git a/la_8_0_25.txt b/la_8_0_25.txt
+new file mode 100644
+index 0000000..217129f
+--- /dev/null
++++ b/la_8_0_25.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 105.4
+diff --git a/la_8_25_50.txt b/la_8_25_50.txt
+new file mode 100644
+index 0000000..101b4dd
+--- /dev/null
++++ b/la_8_25_50.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 111.72
+diff --git a/la_8_50_75.txt b/la_8_50_75.txt
+new file mode 100644
+index 0000000..732fcc5
+--- /dev/null
++++ b/la_8_50_75.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 128.84
+diff --git a/la_8_75_100.txt b/la_8_75_100.txt
+new file mode 100644
+index 0000000..93a7c5c
+--- /dev/null
++++ b/la_8_75_100.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 121.28
+diff --git a/sweep.py b/sweep.py
+index 81cde69..c9db88c 100644
+--- a/sweep.py
++++ b/sweep.py
+@@ -1,7 +1,7 @@
+ import sys, time, numpy as np
+ from env_client import make_env
+ import approach
+-K=float(sys.argv[1]); approach.K_ANG=K; approach.LOOKAHEAD=int(sys.argv[3]) if len(sys.argv)>3 else 8
++K=float(sys.argv[1]); approach.K_ANG=K; approach.LOOKAHEAD=int(sys.argv[3]) if len(sys.argv)>3 else 8; approach.LOCAL_FAMILY=(sys.argv[4]=="1") if len(sys.argv)>4 else True
+ seeds=[int(x) for x in sys.argv[2].split(',')] if ',' in sys.argv[2] else range(*map(int,sys.argv[2].split(':')))
+ env=make_env(); res=[]; steps=[]
+ for sd in seeds:

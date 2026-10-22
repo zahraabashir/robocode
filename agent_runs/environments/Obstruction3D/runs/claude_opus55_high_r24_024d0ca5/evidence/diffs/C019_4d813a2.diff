@@ -1,0 +1,1986 @@
+diff --git a/approach.py b/approach.py
+index eedb988..e410e51 100644
+--- a/approach.py
++++ b/approach.py
+@@ -9,7 +9,7 @@ Empirical facts (black-box probing):
+ - Release (open) succeeds only if the held object rests within a few mm of a surface.
+ """
+ import numpy as np
+-from kin import tool_fk, tool_ik, down_R, wb_fk, wb_ik
++from kin import tool_fk, tool_ik, down_R, wb_fk, wb_ik, wb_ik2
+ 
+ JN = [f'joint_{i}' for i in range(1, 8)]
+ MERGE_GRIP = True
+@@ -87,7 +87,7 @@ class GeneratedApproach:
+ 
+     def _ik(self, xc, pt, R):
+         if WB:
+-            return wb_ik(xc, pt, R, iters=40)
++            return wb_ik2(xc, pt, R, iters=40)
+         q, ok = tool_ik(xc[3:], pt, R, tuple(xc[:3]), iters=40)
+         return np.concatenate([xc[:3], q]), ok
+ 
+diff --git a/kin.py b/kin.py
+index cb079c6..b360a71 100644
+--- a/kin.py
++++ b/kin.py
+@@ -126,3 +126,47 @@ def wb_ik(x0, p, R, iters=40, tol=1e-5, q_nom=None, k_null=0.3, w_by=1.0, w_br=1
+         x[1:] += dv
+     ok = np.linalg.norm(p - wb_fk(x)[:3, 3]) < 1e-3
+     return x, ok
++
++
++Q_NOM = np.array([0.0, 0.3, -np.pi, -2.15, 0.0, -0.69, 0.0])
++K_NOM = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0])
++
++
++def wb_ik2(x0, p, R, iters=40, tol=1e-5, k_null=0.3, bx_max=-0.12, w_base=1.0):
++    """Whole-body IK over base x (<= bx_max), y, rot and the 7 arm joints.
++    Null space pulls the arm to an extended nominal posture Q_NOM."""
++    x = np.array(x0, dtype=float)
++    ez = np.array([0.0, 0.0, 1.0])
++    for it in range(iters):
++        T, axes = _chain(x[3:], x[:3])
++        pt = T[:3, 3]
++        e = np.concatenate([p - pt, _rot_err(T[:3, :3], R)])
++        if np.linalg.norm(e[:3]) < tol and np.linalg.norm(e[3:]) < 1e-4:
++            return x, True
++        J = np.zeros((6, 10))
++        J[0, 0] = 1.0
++        J[1, 1] = 1.0
++        J[:3, 2] = np.cross(ez, pt - np.array([x[0], x[1], 0.0]))
++        J[3:, 2] = ez
++        for j, (z, o) in enumerate(axes):
++            J[:3, 3 + j] = np.cross(z, pt - o)
++            J[3:, 3 + j] = z
++        dn = np.zeros(10)
++        dn[3:] = k_null * K_NOM * ((Q_NOM - x[3:] + np.pi) % (2 * np.pi) - np.pi)
++        W = np.array([w_base, w_base, w_base] + [1.0] * 7)
++        for _ in range(2):
++            JW = J * W
++            Jp = W[:, None] * (JW.T @ np.linalg.inv(JW @ J.T + 1e-6 * np.eye(6)))
++            dv = Jp @ e + dn - Jp @ (J @ dn)
++            n = np.max(np.abs(dv))
++            if n > 0.3:
++                dv *= 0.3 / n
++            if x[0] + dv[0] > bx_max + 1e-9 and W[0] > 0:
++                W[0] = 0.0
++                x[0] = min(x[0], bx_max)
++                continue
++            break
++        x += dv
++        x[0] = min(x[0], bx_max) if x0[0] <= bx_max + 1e-9 else x[0]
++    ok = np.linalg.norm(p - wb_fk(x)[:3, 3]) < 1e-3
++    return x, ok
+diff --git a/probe52.py b/probe52.py
+new file mode 100644
+index 0000000..fd4227f
+--- /dev/null
++++ b/probe52.py
+@@ -0,0 +1,24 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++from kin import tool_fk, tool_ik, down_R, wb_ik, wb_fk
++seed=int(sys.argv[1]); T=int(sys.argv[2])
++def replay():
++    env=make_env(); obs,info=env.reset(seed=seed)
++    ap=GeneratedApproach(env.action_space,env.observation_space,{}); ap.reset(obs,info)
++    for t in range(T):
++        a=ap.get_action(obs); obs,*_=env.step(a)
++    return env,obs,ap
++env,obs,ap=replay()
++x=ap._x(obs); Tt=wb_fk(x); yaw=np.arctan2(Tt[1,0],Tt[0,0])
++print('x',np.round(x,3),'tool',np.round(Tt[:3,3],3),'yaw',round(yaw,2))
++for mode in ['arm','wb']:
++  for dz in [0.005,0.02]:
++    env.close(); env,obs,ap=replay()
++    tgt=Tt[:3,3]+np.array([0,0,dz])
++    if mode=='arm':
++        q,ok=tool_ik(x[3:],tgt,down_R(yaw),tuple(x[:3])); xn=np.concatenate([x[:3],q])
++    else:
++        xn,ok=wb_ik(x,tgt,down_R(yaw))
++    a=np.zeros(11,dtype=np.float32); a[0:10]=np.clip(xn-x,-0.2,0.2)
++    obs2,*_=env.step(a); print(mode,dz,'moved',not np.allclose(ap._x(obs2),x),np.round(xn-x,3))
+diff --git a/res_c4c.txt b/res_c4c.txt
+new file mode 100644
+index 0000000..4a8399e
+--- /dev/null
++++ b/res_c4c.txt
+@@ -0,0 +1,13 @@
++seed 47: success=True steps=24 time=22.1s nobs=4 phase=to_place
++seed 48: success=True steps=31 time=27.4s nobs=4 phase=to_place
++seed 43: success=True steps=30 time=28.7s nobs=4 phase=to_place
++seed 46: success=True steps=48 time=57.1s nobs=4 phase=to_place
++seed 44: success=True steps=46 time=56.3s nobs=4 phase=to_place
++seed 45: success=True steps=51 time=77.4s nobs=4 phase=to_place
++seed 42: success=True steps=64 time=81.8s nobs=4 phase=to_place
++seed 49: success=True steps=59 time=74.5s nobs=4 phase=to_place
++seed 41: success=True steps=70 time=79.9s nobs=4 phase=to_place
++seed 40: success=True steps=70 time=96.4s nobs=4 phase=to_place
++seed 50: success=True steps=61 time=69.9s nobs=4 phase=to_place
++seed 51: success=True steps=53 time=56.9s nobs=4 phase=to_place
++Terminated
+diff --git a/res_c4d.txt b/res_c4d.txt
+new file mode 100644
+index 0000000..0185009
+--- /dev/null
++++ b/res_c4d.txt
+@@ -0,0 +1,40 @@
++seed 47: success=True steps=19 time=29.5s nobs=4 phase=to_place
++seed 43: success=True steps=26 time=61.2s nobs=4 phase=to_place
++seed 48: success=True steps=27 time=46.4s nobs=4 phase=to_place
++seed 44: success=True steps=32 time=75.1s nobs=4 phase=to_place
++seed 45: success=True steps=41 time=75.6s nobs=4 phase=to_place
++seed 40: success=True steps=50 time=92.8s nobs=4 phase=to_place
++seed 42: success=True steps=48 time=83.6s nobs=4 phase=to_place
++seed 46: success=True steps=46 time=78.0s nobs=4 phase=to_place
++seed 49: success=True steps=49 time=81.0s nobs=4 phase=to_place
++seed 41: success=True steps=82 time=116.9s nobs=4 phase=to_place
++seed 51: success=True steps=44 time=57.3s nobs=4 phase=to_place
++seed 50: success=True steps=49 time=64.2s nobs=4 phase=to_place
++seed 53: success=True steps=43 time=59.6s nobs=4 phase=to_place
++seed 54: success=True steps=36 time=50.0s nobs=4 phase=to_place
++seed 58: success=True steps=29 time=39.8s nobs=4 phase=to_place
++seed 52: success=True steps=55 time=76.6s nobs=4 phase=to_place
++seed 56: success=True steps=38 time=48.1s nobs=4 phase=to_place
++seed 55: success=True steps=39 time=52.9s nobs=4 phase=to_place
++seed 57: success=True steps=39 time=61.0s nobs=4 phase=to_place
++seed 60: success=True steps=30 time=45.7s nobs=4 phase=to_place
++seed 59: success=True steps=39 time=59.5s nobs=4 phase=to_place
++seed 63: success=True steps=28 time=40.9s nobs=4 phase=to_place
++seed 64: success=True steps=29 time=39.4s nobs=4 phase=to_place
++seed 61: success=True steps=53 time=68.5s nobs=4 phase=to_place
++seed 68: success=True steps=36 time=38.1s nobs=4 phase=to_place
++seed 69: success=True steps=27 time=31.1s nobs=4 phase=to_place
++seed 66: success=True steps=42 time=45.8s nobs=4 phase=to_place
++seed 65: success=True steps=42 time=52.1s nobs=4 phase=to_place
++seed 67: success=True steps=43 time=54.1s nobs=4 phase=to_place
++seed 62: success=True steps=64 time=89.9s nobs=4 phase=to_place
++seed 70: success=True steps=38 time=50.7s nobs=4 phase=to_place
++seed 73: success=True steps=26 time=34.4s nobs=4 phase=to_place
++seed 71: success=True steps=50 time=53.9s nobs=4 phase=to_place
++seed 72: success=True steps=50 time=50.1s nobs=4 phase=to_place
++seed 78: success=True steps=35 time=16.3s nobs=4 phase=to_place
++seed 76: success=True steps=45 time=25.7s nobs=4 phase=to_place
++seed 74: success=True steps=47 time=38.4s nobs=4 phase=to_place
++seed 79: success=True steps=41 time=16.2s nobs=4 phase=to_place
++seed 75: success=True steps=94 time=33.3s nobs=4 phase=to_place
++seed 77: success=False steps=1000 time=73.2s nobs=4 phase=to_place
+diff --git a/res_d5.txt b/res_d5.txt
+index c9d33a1..74687b4 100644
+--- a/res_d5.txt
++++ b/res_d5.txt
+@@ -70,3 +70,31 @@ seed 66: success=True steps=29 time=49.2s nobs=2 phase=to_place
+ seed 74: success=True steps=14 time=16.1s nobs=0 phase=to_place
+ seed 67: success=True steps=37 time=52.2s nobs=2 phase=to_place
+ seed 77: success=True steps=13 time=8.0s nobs=0 phase=to_place
++seed 70: success=True steps=31 time=41.5s nobs=1 phase=to_place
++seed 73: success=True steps=29 time=36.3s nobs=2 phase=to_place
++seed 75: success=True steps=21 time=32.2s nobs=1 phase=to_place
++seed 79: success=True steps=12 time=25.9s nobs=0 phase=to_place
++seed 81: success=True steps=13 time=23.9s nobs=0 phase=to_place
++seed 78: success=True steps=22 time=40.5s nobs=2 phase=to_place
++seed 76: success=True steps=34 time=49.8s nobs=1 phase=to_place
++seed 72: success=True steps=45 time=74.3s nobs=2 phase=to_place
++seed 83: success=True steps=21 time=35.1s nobs=2 phase=to_place
++seed 71: success=True steps=56 time=82.1s nobs=2 phase=to_place
++seed 80: success=True steps=27 time=47.3s nobs=2 phase=to_place
++seed 84: success=True steps=27 time=28.5s nobs=1 phase=to_place
++seed 82: success=True steps=40 time=63.1s nobs=2 phase=to_place
++seed 85: success=True steps=29 time=39.1s nobs=2 phase=to_place
++seed 90: success=True steps=20 time=22.2s nobs=1 phase=to_place
++seed 86: success=True steps=33 time=43.6s nobs=2 phase=to_place
++seed 88: success=True steps=28 time=33.9s nobs=1 phase=to_place
++seed 94: success=True steps=17 time=23.2s nobs=0 phase=to_place
++seed 92: success=True steps=22 time=30.3s nobs=1 phase=to_place
++seed 87: success=True steps=44 time=52.3s nobs=1 phase=to_place
++seed 97: success=True steps=16 time=11.0s nobs=0 phase=to_place
++seed 91: success=True steps=30 time=40.3s nobs=2 phase=to_place
++seed 95: success=True steps=27 time=23.6s nobs=1 phase=to_place
++seed 89: success=True steps=44 time=52.2s nobs=2 phase=to_place
++seed 93: success=True steps=43 time=38.7s nobs=2 phase=to_place
++seed 98: success=True steps=37 time=14.7s nobs=1 phase=to_place
++seed 96: success=True steps=45 time=26.2s nobs=2 phase=to_place
++seed 99: success=True steps=41 time=12.3s nobs=2 phase=to_place
+diff --git a/res_d6.txt b/res_d6.txt
+new file mode 100644
+index 0000000..0fe37f0
+--- /dev/null
++++ b/res_d6.txt
+@@ -0,0 +1,100 @@
++seed 9: success=True steps=18 time=29.7s nobs=1 phase=to_place
++seed 6: success=True steps=20 time=35.9s nobs=1 phase=to_place
++seed 1: success=True steps=24 time=45.9s nobs=1 phase=to_place
++seed 3: success=True steps=19 time=44.1s nobs=2 phase=to_place
++seed 7: success=True steps=20 time=35.8s nobs=2 phase=to_place
++seed 2: success=True steps=28 time=62.7s nobs=2 phase=to_place
++seed 0: success=True steps=28 time=48.1s nobs=2 phase=to_place
++seed 11: success=True steps=10 time=9.9s nobs=0 phase=to_place
++seed 8: success=True steps=29 time=50.7s nobs=2 phase=to_place
++seed 4: success=True steps=41 time=67.6s nobs=2 phase=to_place
++seed 10: success=True steps=18 time=23.6s nobs=2 phase=to_place
++seed 14: success=True steps=8 time=4.8s nobs=0 phase=to_place
++seed 5: success=True steps=38 time=59.6s nobs=2 phase=to_place
++seed 12: success=True steps=17 time=20.8s nobs=1 phase=to_place
++seed 13: success=True steps=24 time=29.9s nobs=2 phase=to_place
++seed 16: success=True steps=19 time=20.3s nobs=1 phase=to_place
++seed 15: success=True steps=20 time=26.4s nobs=2 phase=to_place
++seed 21: success=True steps=8 time=9.6s nobs=0 phase=to_place
++seed 18: success=True steps=20 time=29.7s nobs=2 phase=to_place
++seed 19: success=True steps=21 time=25.3s nobs=1 phase=to_place
++seed 23: success=True steps=8 time=10.4s nobs=0 phase=to_place
++seed 17: success=True steps=26 time=37.5s nobs=2 phase=to_place
++seed 24: success=True steps=10 time=14.3s nobs=1 phase=to_place
++seed 22: success=True steps=17 time=26.7s nobs=2 phase=to_place
++seed 20: success=True steps=26 time=41.1s nobs=2 phase=to_place
++seed 27: success=True steps=9 time=8.7s nobs=0 phase=to_place
++seed 29: success=True steps=7 time=11.6s nobs=2 phase=to_place
++seed 25: success=True steps=21 time=29.0s nobs=1 phase=to_place
++seed 30: success=True steps=9 time=9.6s nobs=0 phase=to_place
++seed 26: success=True steps=20 time=29.8s nobs=2 phase=to_place
++seed 34: success=True steps=9 time=12.4s nobs=0 phase=to_place
++seed 28: success=True steps=30 time=39.4s nobs=1 phase=to_place
++seed 35: success=True steps=10 time=11.7s nobs=0 phase=to_place
++seed 31: success=True steps=21 time=34.5s nobs=1 phase=to_place
++seed 37: success=True steps=10 time=12.9s nobs=0 phase=to_place
++seed 38: success=True steps=9 time=8.4s nobs=0 phase=to_place
++seed 36: success=True steps=15 time=21.1s nobs=1 phase=to_place
++seed 32: success=True steps=30 time=46.8s nobs=2 phase=to_place
++seed 33: success=True steps=28 time=49.8s nobs=2 phase=to_place
++seed 42: success=True steps=9 time=23.2s nobs=0 phase=to_place
++seed 47: success=True steps=7 time=13.7s nobs=0 phase=to_place
++seed 48: success=True steps=8 time=12.9s nobs=0 phase=to_place
++seed 49: success=True steps=8 time=11.7s nobs=0 phase=to_place
++seed 41: success=True steps=21 time=42.8s nobs=1 phase=to_place
++seed 43: success=True steps=19 time=41.9s nobs=1 phase=to_place
++seed 46: success=True steps=15 time=32.9s nobs=1 phase=to_place
++seed 39: success=True steps=30 time=66.9s nobs=2 phase=to_place
++seed 40: success=True steps=35 time=63.7s nobs=1 phase=to_place
++seed 44: success=True steps=25 time=61.3s nobs=2 phase=to_place
++seed 54: success=True steps=10 time=18.6s nobs=0 phase=to_place
++seed 57: success=True steps=8 time=11.1s nobs=0 phase=to_place
++seed 51: success=True steps=19 time=39.3s nobs=1 phase=to_place
++seed 45: success=True steps=34 time=69.1s nobs=2 phase=to_place
++seed 58: success=True steps=8 time=16.9s nobs=1 phase=to_place
++seed 56: success=True steps=16 time=27.3s nobs=1 phase=to_place
++seed 60: success=True steps=10 time=12.9s nobs=0 phase=to_place
++seed 50: success=True steps=34 time=67.5s nobs=2 phase=to_place
++seed 53: success=True steps=29 time=59.7s nobs=2 phase=to_place
++seed 55: success=True steps=29 time=51.9s nobs=2 phase=to_place
++seed 61: success=True steps=19 time=25.9s nobs=1 phase=to_place
++seed 62: success=True steps=16 time=24.1s nobs=1 phase=to_place
++seed 65: success=True steps=9 time=8.5s nobs=0 phase=to_place
++seed 63: success=True steps=18 time=24.5s nobs=1 phase=to_place
++seed 59: success=True steps=30 time=49.7s nobs=2 phase=to_place
++seed 64: success=True steps=21 time=28.4s nobs=1 phase=to_place
++seed 68: success=True steps=10 time=12.1s nobs=1 phase=to_place
++seed 69: success=True steps=9 time=7.8s nobs=0 phase=to_place
++seed 66: success=True steps=27 time=34.8s nobs=2 phase=to_place
++seed 67: success=True steps=24 time=31.3s nobs=2 phase=to_place
++seed 74: success=True steps=9 time=9.8s nobs=0 phase=to_place
++seed 70: success=True steps=23 time=24.5s nobs=1 phase=to_place
++seed 77: success=True steps=9 time=8.5s nobs=0 phase=to_place
++seed 79: success=True steps=9 time=7.3s nobs=0 phase=to_place
++seed 72: success=True steps=29 time=39.6s nobs=2 phase=to_place
++seed 76: success=True steps=21 time=27.1s nobs=1 phase=to_place
++seed 73: success=True steps=26 time=38.2s nobs=2 phase=to_place
++seed 75: success=True steps=19 time=23.2s nobs=1 phase=to_place
++seed 71: success=True steps=38 time=48.3s nobs=2 phase=to_place
++seed 81: success=True steps=8 time=6.6s nobs=0 phase=to_place
++seed 78: success=True steps=32 time=38.5s nobs=2 phase=to_place
++seed 80: success=True steps=26 time=33.9s nobs=2 phase=to_place
++seed 83: success=True steps=19 time=27.2s nobs=2 phase=to_place
++seed 84: success=True steps=27 time=27.4s nobs=1 phase=to_place
++seed 88: success=True steps=20 time=18.8s nobs=1 phase=to_place
++seed 85: success=True steps=24 time=30.3s nobs=2 phase=to_place
++seed 87: success=True steps=25 time=28.4s nobs=1 phase=to_place
++seed 82: success=True steps=36 time=45.3s nobs=2 phase=to_place
++seed 86: success=True steps=27 time=36.0s nobs=2 phase=to_place
++seed 90: success=True steps=17 time=18.3s nobs=1 phase=to_place
++seed 91: success=True steps=18 time=25.4s nobs=2 phase=to_place
++seed 94: success=True steps=9 time=8.9s nobs=0 phase=to_place
++seed 89: success=True steps=31 time=41.2s nobs=2 phase=to_place
++seed 92: success=True steps=19 time=25.8s nobs=1 phase=to_place
++seed 97: success=True steps=11 time=7.3s nobs=0 phase=to_place
++seed 95: success=True steps=18 time=16.4s nobs=1 phase=to_place
++seed 96: success=True steps=27 time=15.3s nobs=2 phase=to_place
++seed 93: success=True steps=39 time=30.1s nobs=2 phase=to_place
++seed 98: success=True steps=22 time=6.5s nobs=1 phase=to_place
++seed 99: success=True steps=29 time=8.8s nobs=2 phase=to_place
++seed 52: success=False steps=1000 time=248.6s nobs=2 phase=to_place
+diff --git a/snap/approach.py b/snap/approach.py
+index 76599d7..eedb988 100644
+--- a/snap/approach.py
++++ b/snap/approach.py
+@@ -9,10 +9,11 @@ Empirical facts (black-box probing):
+ - Release (open) succeeds only if the held object rests within a few mm of a surface.
+ """
+ import numpy as np
+-from kin import tool_fk, tool_ik, down_R
++from kin import tool_fk, tool_ik, down_R, wb_fk, wb_ik
+ 
+ JN = [f'joint_{i}' for i in range(1, 8)]
+ MERGE_GRIP = True
++WB = True
+ CUT_CORNERS = True
+ STEP = 0.2             # max joint delta per step
+ FINGER_DOWN = 0.036    # fingertips below tool frame
+@@ -81,6 +82,15 @@ class GeneratedApproach:
+     def _q(self, state):
+         return np.array([state.get(self.robot, f) for f in JN])
+ 
++    def _x(self, state):
++        return np.concatenate([np.array(self._base(state)), self._q(state)])
++
++    def _ik(self, xc, pt, R):
++        if WB:
++            return wb_ik(xc, pt, R, iters=40)
++        q, ok = tool_ik(xc[3:], pt, R, tuple(xc[:3]), iters=40)
++        return np.concatenate([xc[:3], q]), ok
++
+     def _base(self, state):
+         return (state.get(self.robot, 'pos_base_x'), state.get(self.robot, 'pos_base_y'),
+                 state.get(self.robot, 'pos_base_rot'))
+@@ -291,9 +301,9 @@ class GeneratedApproach:
+     def _set_path(self, state, wps, yaw, final_grip=0.0, res=0.01, flip=False, rot_start=0):
+         """Cartesian waypoints -> dense joint path (IK warm-started).
+         Yaw is interpolated from the current tool yaw over all but the last segment."""
+-        q = self._q(state)
++        q = self._x(state)
+         base = self._base(state)
+-        T0 = tool_fk(q, base)
++        T0 = wb_fk(q)
+         cur = T0[:3, 3]
+         y0 = np.arctan2(T0[1, 0], T0[0, 0])
+         dy = _wrap(yaw - y0)
+@@ -320,7 +330,7 @@ class GeneratedApproach:
+             for k in range(1, n + 1):
+                 pt = cur + (w - cur) * k / n
+                 f = min(1.0, max(0.0, travelled + d * k / n - rot0) / rot_len)
+-                qn, ok = tool_ik(qc, pt, down_R(y0 + f * dy), base, iters=40)
++                qn, ok = self._ik(qc, pt, down_R(y0 + f * dy))
+                 qn = qc + _wrap(qn - qc)
+                 path.append(qn)
+                 qc = qn
+@@ -337,7 +347,7 @@ class GeneratedApproach:
+     # ------------------------------------------------------------ control
+     def _track(self, state):
+         """Step along the precomputed joint path; None if done."""
+-        q = self._q(state)
++        q = self._x(state)
+         while self.qpath and np.max(np.abs(_wrap(self.qpath[0] - q))) < 1e-4:
+             self.qpath.pop(0)
+             self.popped += 1
+@@ -362,13 +372,13 @@ class GeneratedApproach:
+             self.popped += k
+             k = 0
+             d = _wrap(self.qpath[0] - q)
+-            a[3:10] = d
++            a[0:10] = d
+             a[10] = self.travel_grip
+             if MERGE_GRIP and len(self.qpath) == 1 and self.final_grip != 0.0:
+                 a[10] = self.final_grip
+         else:
+             d = _wrap(self.qpath[0] - q)
+-            a[3:10] = d * (self.look / np.max(np.abs(d)))
++            a[0:10] = d * (self.look / np.max(np.abs(d)))
+         return a
+ 
+     def _safe_move(self, state, q0, q1):
+@@ -385,7 +395,7 @@ class GeneratedApproach:
+         boxes = [self._box(state, n) for n in self.names if n != held]
+         dq = _wrap(q1 - q0)
+         for f in (0.25, 0.5, 0.75, 1.0):
+-            pt = tool_fk(q0 + f * dq, base)[:3, 3]
++            pt = wb_fk(q0 + f * dq)[:3, 3]
+             low = pt[2] - depth
+             if low < self.table_z + 0.01:
+                 return False
+@@ -400,9 +410,9 @@ class GeneratedApproach:
+         return a
+ 
+     def get_action(self, state):
+-        q = self._q(state)
++        q = self._x(state)
+         moved = self.last_q is None or not np.allclose(q, self.last_q, atol=1e-7)
+-        attempted = self.last_a is not None and np.any(np.abs(self.last_a[3:10]) > 1e-9)
++        attempted = self.last_a is not None and np.any(np.abs(self.last_a[0:10]) > 1e-9)
+         self.blocked = attempted and not moved
+         if self.blocked:
+             self.look = max(0.02, self.look * 0.35)
+@@ -565,10 +575,10 @@ class GeneratedApproach:
+ 
+     def _append_descent(self, state, tgt, yaw):
+         base = self._base(state)
+-        qc = self.qpath[-1] if self.qpath else self._q(state)
++        qc = self.qpath[-1] if self.qpath else self._x(state)
+         R = down_R(yaw)
+         for dz in (0.008, 0.003, 0.0):
+-            qn, ok = tool_ik(qc, tgt + np.array([0, 0, dz]), R, base, iters=40)
++            qn, ok = self._ik(qc, tgt + np.array([0, 0, dz]), R)
+             qn = qc + _wrap(qn - qc)
+             self.qpath.append(qn)
+             qc = qn
+diff --git a/snap/kin.py b/snap/kin.py
+index a00201a..cb079c6 100644
+--- a/snap/kin.py
++++ b/snap/kin.py
+@@ -86,3 +86,43 @@ def down_R(yaw):
+     c, s = np.cos(yaw), np.sin(yaw)
+     x = np.array([c, s, 0.0]); z = np.array([0, 0, -1.0]); y = np.cross(z, x)
+     return np.stack([x, y, z], axis=1)
++
++
++def wb_fk(x):
++    """x = [bx, by, br, q1..q7] -> tool transform."""
++    return _chain(x[3:], x[:3])[0]
++
++
++def wb_ik(x0, p, R, iters=40, tol=1e-5, q_nom=None, k_null=0.3, w_by=1.0, w_br=1.0):
++    """Whole-body IK over base y, base rot and the 7 arm joints (base x fixed)."""
++    x = np.array(x0, dtype=float)
++    if q_nom is None:
++        q_nom = HOME
++    W = np.array([w_by, w_br] + [1.0] * 7)
++    for it in range(iters):
++        T, axes = _chain(x[3:], x[:3])
++        pt = T[:3, 3]
++        e = np.concatenate([p - pt, _rot_err(T[:3, :3], R)])
++        if np.linalg.norm(e[:3]) < tol and np.linalg.norm(e[3:]) < 1e-4:
++            return x, True
++        J = np.zeros((6, 9))
++        J[1, 0] = 1.0
++        ez = np.array([0.0, 0.0, 1.0])
++        J[:3, 1] = np.cross(ez, pt - np.array([x[0], x[1], 0.0]))
++        J[3:, 1] = ez
++        for j, (z, o) in enumerate(axes):
++            J[:3, 2 + j] = np.cross(z, pt - o)
++            J[3:, 2 + j] = z
++        JW = J * W
++        Jp = JW.T @ np.linalg.inv(JW @ J.T + 1e-6 * np.eye(6))
++        Jp = W[:, None] * Jp
++        dv = Jp @ e
++        dn = np.zeros(9)
++        dn[2:] = k_null * ((q_nom - x[3:] + np.pi) % (2 * np.pi) - np.pi)
++        dv += dn - Jp @ (J @ dn)
++        n = np.max(np.abs(dv))
++        if n > 0.3:
++            dv *= 0.3 / n
++        x[1:] += dv
++    ok = np.linalg.norm(p - wb_fk(x)[:3, 3]) < 1e-3
++    return x, ok
+diff --git a/snapw/approach.py b/snapw/approach.py
+new file mode 100644
+index 0000000..3e4e678
+--- /dev/null
++++ b/snapw/approach.py
+@@ -0,0 +1,584 @@
++"""Obstruction3D approach: clear obstructions off the target region, then place
++the target block on it.  Uses a calibrated Kinova Gen3 FK/IK model (kin.py).
++
++Empirical facts (black-box probing):
++- Arm mount is +0.12m along base x; the grasp/tool frame is 0.12m past the flange.
++- Gripper fingers lie along the tool x axis, extending ~0.07m from the centre and
++  ~0.035m below the tool frame.  Robot/held object collisions reject a step.
++- Grasp (close) succeeds when tool z in [bottom+0.044, top+0.033] over the object.
++- Release (open) succeeds only if the held object rests within a few mm of a surface.
++"""
++import numpy as np
++from kin import tool_fk, tool_ik, down_R, wb_fk, wb_ik
++
++JN = [f'joint_{i}' for i in range(1, 8)]
++MERGE_GRIP = True
++WB = True
++CUT_CORNERS = True
++STEP = 0.2             # max joint delta per step
++FINGER_DOWN = 0.036    # fingertips below tool frame
++F_OFF, F_HL, F_HW = 0.046, 0.024, 0.013   # finger centre offset, half length, half width
++
++
++def _q2R(x, y, z, w):
++    return np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
++                     [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
++                     [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
++
++
++def _T(p, q):
++    M = np.eye(4); M[:3, :3] = _q2R(*q); M[:3, 3] = p
++    return M
++
++
++def _yaw_of_quat(q):
++    x, y, z, w = q
++    return np.arctan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
++
++
++def _wrap(a):
++    return (a + np.pi) % (2 * np.pi) - np.pi
++
++
++def _aabb_of_rect(c, hx, hy, yaw):
++    c_, s_ = abs(np.cos(yaw)), abs(np.sin(yaw))
++    return np.array(c), np.array([c_ * hx + s_ * hy, s_ * hx + c_ * hy])
++
++
++def _gap(c1, h1, c2, h2):
++    """Signed separation between two AABBs (positive = apart)."""
++    return np.max(np.abs(np.asarray(c1) - np.asarray(c2)) - np.asarray(h1) - np.asarray(h2))
++
++
++def _finger_boxes(xy, yaw):
++    d = np.array([np.cos(yaw), np.sin(yaw)])
++    out = []
++    for sgn in (1, -1):
++        out.append(_aabb_of_rect(np.asarray(xy) + sgn * F_OFF * d, F_HL, F_HW, yaw))
++    return out
++
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.action_space = action_space
++        self.observation_space = observation_space
++
++    # ------------------------------------------------------------ helpers
++    def _obj(self, state, name):
++        return state.get_object_from_name(name)
++
++    def _pose(self, state, name):
++        o = self._obj(state, name)
++        return (np.array([state.get(o, f) for f in ('pose_x', 'pose_y', 'pose_z')]),
++                np.array([state.get(o, f) for f in ('pose_qx', 'pose_qy', 'pose_qz', 'pose_qw')]),
++                np.array([state.get(o, f) for f in ('half_extent_x', 'half_extent_y', 'half_extent_z')]))
++
++    def _box(self, state, name):
++        """(centre_xy, half_xy AABB, bottom z, top z)"""
++        p, q, h = self._pose(state, name)
++        c, hh = _aabb_of_rect(p[:2], h[0], h[1], _yaw_of_quat(q))
++        return c, hh, p[2] - h[2], p[2] + h[2]
++
++    def _q(self, state):
++        return np.array([state.get(self.robot, f) for f in JN])
++
++    def _x(self, state):
++        return np.concatenate([np.array(self._base(state)), self._q(state)])
++
++    def _ik(self, xc, pt, R):
++        if WB:
++            return wb_ik(xc, pt, R, iters=40, w_by=3.0, w_br=3.0)
++        q, ok = tool_ik(xc[3:], pt, R, tuple(xc[:3]), iters=40)
++        return np.concatenate([xc[:3], q]), ok
++
++    def _base(self, state):
++        return (state.get(self.robot, 'pos_base_x'), state.get(self.robot, 'pos_base_y'),
++                state.get(self.robot, 'pos_base_rot'))
++
++    def _tool(self, state):
++        return tool_fk(self._q(state), self._base(state))
++
++    def _grasped_name(self, state):
++        for n in self.names:
++            if state.get(self._obj(state, n), 'grasp_active') > 0.5:
++                return n
++        return None
++
++    def _max_top(self, state, exclude=()):
++        t = self.table_z
++        for n in self.names:
++            if n in exclude:
++                continue
++            t = max(t, self._box(state, n)[3])
++        return t
++
++    # ------------------------------------------------------------ planning
++    def reset(self, state, info):
++        self.robot = state.get_object_from_name('robot')
++        self.names = sorted(n for n in state.get_object_names() if n != 'robot')
++        self.obstructions = sorted(n for n in self.names if n.startswith('obstruction'))
++        rp, _, rh = self._pose(state, 'target_region')
++        self.table_z = rp[2] - rh[2]
++        self.region = (rp, rh)
++        self.tasks = [(n, 'clear') for n in self._blocking_obstructions(state)]
++        self.tasks.append(('target_block', 'goal'))
++        self.phase = None
++        self.qpath = []
++        self.last_q = None
++        self.last_a = None
++        self.blocked = False
++        self.look = STEP
++        self.fails = {}
++        self.blk_moves = {}
++        self.stuck = 0
++        self.descent_len = 0
++        self.release_tries = 0
++        self.grasp_attempt = 0
++        self.total_fail = 0
++        self.final_grip = 0.0
++        self.wp_yaw = 0.0
++        self._start_task(state)
++
++    def _blocking_obstructions(self, state, margin=0.003):
++        rp, rh = self.region
++        out = []
++        for n in self.obstructions:
++            c, hh, _, _ = self._box(state, n)
++            if _gap(c, hh, rp[:2], rh[:2]) < margin:
++                out.append(n)
++        return out
++
++    def _finger_clearance(self, state, xy, yaw, tip_z, exclude):
++        """Min xy gap between finger boxes and objects whose top is above tip_z."""
++        clear = 1.0
++        fbs = _finger_boxes(xy, yaw)
++        for n in self.names:
++            if n in exclude:
++                continue
++            c, hh, bot, top = self._box(state, n)
++            if top < tip_z - 0.002:
++                continue
++            for fc, fh in fbs:
++                g = _gap(fc, fh, c, hh)
++                if g < clear:
++                    clear = g
++                    if g < 0.005:
++                        self._blocker = n
++        return clear
++
++    def _choose_yaw(self, state, name, kind, attempt):
++        sc = self._yaw_scores(state, name, kind)
++        c = sc[attempt % len(sc)]
++        self.grasp_z = c[3]
++        return c[1]
++
++    def _yaw_scores(self, state, name, kind):
++        """Sorted [(clearance score, yaw, blocker, grasp z)] for grasp candidates."""
++        p, q, h = self._pose(state, name)
++        oy = _yaw_of_quat(q)
++        lo = p[2] - h[2] + 0.045
++        hi = p[2] + h[2] + 0.032
++        gzs = [self._grasp_z(p, h)]
++        if hi - 0.004 > gzs[0] + 0.004:
++            gzs.append(hi - 0.004)
++        cands = [oy, oy + np.pi / 2, oy + np.pi / 4, oy - np.pi / 4]
++        T = self._tool(state)
++        ty = np.arctan2(T[1, 0], T[0, 0])
++        scored = []
++        for j, gz in enumerate(gzs):
++            for i, y in enumerate(cands):
++                y = _wrap(2 * y) / 2  # modulo pi
++                self._blocker = None
++                c = self._finger_clearance(state, p[:2], y, gz - FINGER_DOWN, exclude=(name,))
++                blk = self._blocker
++                if kind == 'goal':
++                    rp, rh = self.region
++                    surf = rp[2] + rh[2]
++                    tip = surf + 0.001 + (gz - (p[2] - h[2])) - FINGER_DOWN
++                    c = min(c, self._finger_clearance(state, rp[:2], y, tip,
++                                                      exclude=(name, 'target_region')))
++                rot = abs(_wrap(2 * (y - ty)) / 2)   # rotation needed (mod pi), <= pi/2
++                scored.append((min(c, 0.02) - 0.0005 * i - 0.004 * j - 0.004 * rot, y, blk, gz))
++        scored.sort(key=lambda t: -t[0])
++        return scored
++
++    def _select_task(self, state):
++        """Reorder tasks so the front one is graspable; add blockers if needed."""
++        for _ in range(len(self.names)):
++            name, kind = self.tasks[0]
++            f = self.fails.get(name, 0)
++            sc = self._yaw_scores(state, name, kind)
++            if sc[0][0] > 0.002 and f < 4:
++                return
++            # try another pending clear task that is more graspable
++            best = None
++            for t in self.tasks:
++                if t[1] != 'clear' or t[0] == name:
++                    continue
++                s2 = self._yaw_scores(state, t[0], 'clear')[0][0] - 0.01 * self.fails.get(t[0], 0)
++                if best is None or s2 > best[0]:
++                    best = (s2, t)
++            if best is not None and best[0] > sc[0][0] - 0.01 * f + 0.001:
++                self.tasks.remove(best[1])
++                self.tasks.insert(0, best[1])
++                continue
++            # add the obstruction blocking the fingers as a new task
++            blk = sc[0][2]
++            if (blk is not None and blk.startswith('obstruction')
++                    and all(t[0] != blk for t in self.tasks)
++                    and self.blk_moves.get(blk, 0) < 2
++                    and self._yaw_scores(state, blk, 'clear')[0][0] > 0.002):
++                self.blk_moves[blk] = self.blk_moves.get(blk, 0) + 1
++                self.tasks.insert(0, (blk, 'clear'))
++                continue
++            return
++
++    def _grasp_z(self, p, h):
++        lo = p[2] - h[2] + 0.045
++        hi = p[2] + h[2] + 0.032
++        return 0.5 * (lo + hi) if hi > lo else hi - 0.001
++
++    def _free_spot(self, state, name, yaw, hold_off):
++        """Pick a table spot clear of region/other objects (object + fingers)."""
++        p0, _, _ = self._pose(state, name)
++        c0, h, _, _ = self._box(state, name)
++        others = []
++        for n in self.names:
++            if n == name:
++                continue
++            others.append(self._box(state, n))
++        rp, rh = self.region
++        tip = self.table_z + 0.001 + hold_off - FINGER_DOWN
++        best, best_score = None, 1e9
++        fb, fb_score = None, -1e9
++        for x in np.linspace(0.2, 0.5, 16):
++            for y in np.linspace(-0.34, 0.34, 35):
++                c = np.array([x, y])
++                clear = _gap(c, h, rp[:2], rh[:2]) - 0.03
++                fbs = _finger_boxes(c, yaw)
++                for oc, oh, bot, top in others:
++                    clear = min(clear, _gap(c, h, oc, oh) - 0.02)
++                    if top > tip - 0.002:
++                        for fc, fh in fbs:
++                            clear = min(clear, _gap(fc, fh, oc, oh) - 0.008)
++                if clear > fb_score:
++                    fb, fb_score = c, clear
++                if clear >= 0:
++                    score = np.linalg.norm(c - p0[:2])
++                    if score < best_score:
++                        best, best_score = c, score
++        return best if best is not None else fb
++
++    def _transit_z(self, state, hold_off=0.0, exclude=()):
++        top = self._max_top(state, exclude)
++        return max(top + 0.03 + max(FINGER_DOWN, hold_off), 0.2)
++
++    def _start_task(self, state):
++        if not self.tasks:
++            self.phase = 'done'
++            return
++        try:
++            self._select_task(state)
++        except Exception:
++            pass
++        name, kind = self.tasks[0]
++        p, q, h = self._pose(state, name)
++        self.cur_obj = name
++        self.grasp_yaw = self._choose_yaw(state, name, kind, self.fails.get(name, 0))
++        gz = self.grasp_z
++        zt = self._transit_z(state)
++        tool = self._tool(state)[:3, 3]
++        wps = []
++        rs = 0
++        if tool[2] < zt - 0.01:
++            wps.append(np.array([tool[0], tool[1], zt]))
++            rs = 1
++        wps.append(np.array([p[0], p[1], max(zt, tool[2]) if tool[2] < zt + 0.05 else zt]))
++        wps.append(np.array([p[0], p[1], gz]))
++        self._set_path(state, wps, self.grasp_yaw, final_grip=-1.0, flip=True, rot_start=rs)
++        self.phase = 'to_grasp'
++
++    def _set_path(self, state, wps, yaw, final_grip=0.0, res=0.01, flip=False, rot_start=0):
++        """Cartesian waypoints -> dense joint path (IK warm-started).
++        Yaw is interpolated from the current tool yaw over all but the last segment."""
++        q = self._x(state)
++        base = self._base(state)
++        T0 = wb_fk(q)
++        cur = T0[:3, 3]
++        y0 = np.arctan2(T0[1, 0], T0[0, 0])
++        dy = _wrap(yaw - y0)
++        if flip and abs(dy) > np.pi / 2:
++            dy = dy - np.sign(dy) * np.pi
++        yaw = y0 + dy
++        pts = [cur]
++        for w in wps:
++            pts.append(np.asarray(w, dtype=float))
++        seg = [np.linalg.norm(pts[i + 1] - pts[i]) for i in range(len(wps))]
++        if len(seg) - 1 <= rot_start:
++            rot_start = 0
++        rot0 = sum(seg[:rot_start])
++        rot_len = sum(seg[rot_start:-1]) if len(seg) > 1 and sum(seg[rot_start:-1]) > 0.02 else sum(seg[rot_start:])
++        rot_len = max(rot_len, 1e-6)
++        path = []
++        self.corners = set()
++        qc = q.copy()
++        travelled = 0.0
++        for i, w in enumerate(wps):
++            w = pts[i + 1]
++            d = seg[i]
++            n = max(1, int(np.ceil(d / res)), int(np.ceil(abs(dy) * min(d, rot_len) / rot_len / 0.04)))
++            for k in range(1, n + 1):
++                pt = cur + (w - cur) * k / n
++                f = min(1.0, max(0.0, travelled + d * k / n - rot0) / rot_len)
++                qn, ok = self._ik(qc, pt, down_R(y0 + f * dy))
++                qn = qc + _wrap(qn - qc)
++                path.append(qn)
++                qc = qn
++            travelled += d
++            self.corners.add(len(path) - 1)
++            cur = w
++        self.qpath = path
++        self.popped = 0
++        self.wp_yaw = yaw
++        self.final_grip = final_grip
++        self.travel_grip = 1.0 if final_grip < 0 else 0.0
++        self.stuck = 0
++
++    # ------------------------------------------------------------ control
++    def _track(self, state):
++        """Step along the precomputed joint path; None if done."""
++        q = self._x(state)
++        while self.qpath and np.max(np.abs(_wrap(self.qpath[0] - q))) < 1e-4:
++            self.qpath.pop(0)
++            self.popped += 1
++        if not self.qpath:
++            return None
++        k = -1
++        crossed = False
++        for i, qp in enumerate(self.qpath):
++            if np.max(np.abs(_wrap(qp - q))) <= self.look:
++                if crossed and not self._safe_move(state, q, qp):
++                    break
++                k = i
++                if (i + self.popped) in self.corners:
++                    if not CUT_CORNERS or self.blocked or self.look < STEP:
++                        break
++                    crossed = True
++            else:
++                break
++        a = np.zeros(11, dtype=np.float32)
++        if k >= 0:
++            self.qpath = self.qpath[k:]
++            self.popped += k
++            k = 0
++            d = _wrap(self.qpath[0] - q)
++            a[0:10] = d
++            a[10] = self.travel_grip
++            if MERGE_GRIP and len(self.qpath) == 1 and self.final_grip != 0.0:
++                a[10] = self.final_grip
++        else:
++            d = _wrap(self.qpath[0] - q)
++            a[0:10] = d * (self.look / np.max(np.abs(d)))
++        return a
++
++    def _safe_move(self, state, q0, q1):
++        """Check the joint-linear move q0->q1 keeps tool/fingers/held object
++        above all nearby objects (used when cutting path corners)."""
++        base = self._base(state)
++        held = self._grasped_name(state)
++        depth, rad = FINGER_DOWN, 0.075
++        if held is not None:
++            p, _, h = self._pose(state, held)
++            tz = self._tool(state)[2, 3]
++            depth = max(depth, tz - (p[2] - h[2]))
++            rad = max(rad, np.hypot(h[0], h[1]) + 0.01)
++        boxes = [self._box(state, n) for n in self.names if n != held]
++        dq = _wrap(q1 - q0)
++        for f in (0.25, 0.5, 0.75, 1.0):
++            pt = wb_fk(q0 + f * dq)[:3, 3]
++            low = pt[2] - depth
++            if low < self.table_z + 0.01:
++                return False
++            for c, hh, bot, top in boxes:
++                dxy = np.maximum(np.abs(pt[:2] - c) - hh, 0.0)
++                if np.hypot(dxy[0], dxy[1]) < rad and low < top + 0.012:
++                    return False
++        return True
++
++    def _noop(self, grip=0.0):
++        a = np.zeros(11, dtype=np.float32); a[10] = grip
++        return a
++
++    def get_action(self, state):
++        q = self._x(state)
++        moved = self.last_q is None or not np.allclose(q, self.last_q, atol=1e-7)
++        attempted = self.last_a is not None and np.any(np.abs(self.last_a[0:10]) > 1e-9)
++        self.blocked = attempted and not moved
++        if self.blocked:
++            self.look = max(0.02, self.look * 0.35)
++        elif attempted:
++            self.look = min(STEP, self.look * 1.5)
++        self.last_q = q.copy()
++        try:
++            a = self._policy(state)
++        except Exception:
++            a = self._noop()
++        a = np.asarray(a, dtype=np.float32).copy()
++        a[:10] = np.clip(a[:10], -STEP, STEP)
++        a[10] = np.clip(a[10], -1, 1)
++        self.last_a = a
++        return a
++
++    def _policy(self, state):
++        ph = self.phase
++        if ph == 'done':
++            if self._grasped_name(state) is None and self.tasks:
++                self._start_task(state)
++            return self._noop()
++
++        if ph == 'to_grasp':
++            g = self._grasped_name(state)
++            if g is not None:
++                return self._on_grasped(state, g)
++            if self.blocked:
++                self.stuck += 1
++                if self.stuck >= 2:
++                    if self._tool(state)[2, 3] > self.grasp_z + 0.012:
++                        # cannot get down to the grasp: try something else
++                        self.fails[self.cur_obj] = self.fails.get(self.cur_obj, 0) + 1
++                        self._start_task(state)
++                        a = self._track(state)
++                        return a if a is not None else self._noop()
++                    self.qpath = []
++            a = self._track(state)
++            if a is not None:
++                return a
++            self.phase = 'close'
++            return self._noop(-1.0)
++
++        if ph == 'close':
++            g = self._grasped_name(state)
++            if g is None:
++                self.grasp_attempt += 1
++                self.fails[self.cur_obj] = self.fails.get(self.cur_obj, 0) + 1
++                self.total_fail += 1
++                self._start_task(state)
++                return self._track(state) if self.qpath else self._noop()
++            return self._on_grasped(state, g)
++
++        if ph == 'to_place':
++            if self._grasped_name(state) is None:
++                return self._on_released(state)
++            if self.blocked:
++                self.stuck += 1
++                if len(self.qpath) <= self.descent_len:
++                    self.qpath = []
++                elif self.stuck >= 3:
++                    self._plan_place(state, replan=True)
++            a = self._track(state)
++            if a is not None:
++                return a
++            self.phase = 'open'
++            return self._noop(1.0)
++
++        if ph == 'open':
++            if self._grasped_name(state) is None:
++                return self._on_released(state)
++            self.release_tries += 1
++            tool = self._tool(state)[:3, 3]
++            self._set_path(state, [tool - np.array([0, 0, 0.002])], self.wp_yaw, final_grip=1.0)
++            self.descent_len = 2
++            self.phase = 'to_place'
++            if self.release_tries > 12:
++                self.release_tries = 0
++                self._plan_place(state, replan=True)
++            a = self._track(state)
++            return a if a is not None else self._noop(1.0)
++
++        if ph == 'retreat':
++            if self.blocked:
++                self.stuck += 1
++                if self.stuck >= 2:
++                    self.qpath = []
++            a = self._track(state)
++            if a is not None:
++                return a
++            self._next_task(state)
++            a = self._track(state) if self.phase == 'to_grasp' else None
++            return a if a is not None else self._noop()
++
++        return self._noop()
++
++    def _on_grasped(self, state, g):
++        self.grasp_attempt = 0
++        if g != self.cur_obj:
++            self.tasks.insert(0, (g, 'clear'))
++            self.cur_obj = g
++        self._plan_place(state)
++        a = self._track(state)
++        return a if a is not None else self._noop()
++
++    def _on_released(self, state):
++        self.release_tries = 0
++        name, kind = self.tasks.pop(0) if self.tasks else (None, None)
++        if kind == 'goal':
++            self.phase = 'done'
++            return self._noop()
++        self._next_task(state)
++        a = self._track(state) if self.phase == 'to_grasp' else None
++        return a if a is not None else self._noop()
++
++    def _next_task(self, state):
++        if self.tasks and self.tasks[0][1] == 'goal':
++            for n in self._blocking_obstructions(state):
++                if all(t[0] != n for t in self.tasks):
++                    self.tasks.insert(0, (n, 'clear'))
++        self._start_task(state)
++
++    def _plan_place(self, state, replan=False):
++        name = self.cur_obj
++        p, qo, h = self._pose(state, name)
++        r = self.robot
++        tf = _T([state.get(r, 'grasp_tf_x'), state.get(r, 'grasp_tf_y'), state.get(r, 'grasp_tf_z')],
++                [state.get(r, 'grasp_tf_qx'), state.get(r, 'grasp_tf_qy'), state.get(r, 'grasp_tf_qz'),
++                 state.get(r, 'grasp_tf_qw')])
++        kind = self.tasks[0][1] if self.tasks and self.tasks[0][0] == name else 'clear'
++        Ttool_now = self._tool(state)
++        hold_off = Ttool_now[2, 3] - (p[2] - h[2])   # tool height above held-object bottom
++        yaw = np.arctan2(Ttool_now[1, 0], Ttool_now[0, 0])
++        if kind == 'goal':
++            rp, rh = self.region
++            xy = rp[:2]
++            surf = rp[2] + rh[2]
++        else:
++            xy = self._free_spot(state, name, yaw, hold_off)
++            if replan:
++                xy = xy + np.random.uniform(-0.03, 0.03, 2)
++            surf = self.table_z
++        Tobj = _T([xy[0], xy[1], surf + h[2] + 0.001], qo)
++        Ttool = Tobj @ np.linalg.inv(tf)
++        tgt = Ttool[:3, 3]
++        tyaw = np.arctan2(Ttool[1, 0], Ttool[0, 0])
++        zt = self._transit_z(state, hold_off, exclude=(name,))
++        tool = Ttool_now[:3, 3]
++        wps = []
++        if tool[2] < zt - 0.005:
++            wps.append(np.array([tool[0], tool[1], zt]))
++        wps += [np.array([tgt[0], tgt[1], max(zt, tool[2]) if tool[2] < zt + 0.05 else zt]),
++                np.array([tgt[0], tgt[1], tgt[2] + 0.015])]
++        self._set_path(state, wps, tyaw)
++        n_before = len(self.qpath)
++        self._append_descent(state, tgt, tyaw)
++        self.descent_len = len(self.qpath) - n_before + 2
++        self.final_grip = 1.0
++        self.phase = 'to_place'
++
++    def _append_descent(self, state, tgt, yaw):
++        base = self._base(state)
++        qc = self.qpath[-1] if self.qpath else self._x(state)
++        R = down_R(yaw)
++        for dz in (0.008, 0.003, 0.0):
++            qn, ok = self._ik(qc, tgt + np.array([0, 0, dz]), R)
++            qn = qc + _wrap(qn - qc)
++            self.qpath.append(qn)
++            qc = qn
+diff --git a/snapw/env_client.py b/snapw/env_client.py
+new file mode 100644
+index 0000000..108c884
+--- /dev/null
++++ b/snapw/env_client.py
+@@ -0,0 +1,737 @@
++"""Client for the black-box environment server.
++
++This file is copied into the agent sandbox. Import it in test and
++exploration scripts to interact with the environment without access to its
++source code::
++
++    from env_client import make_env
++
++    env = make_env()
++    obs, info = env.reset(seed=0)
++    obs, reward, terminated, truncated, info = env.step(action)
++    state = env.get_state()
++    env.set_state(state)
++    primitives = env.make_primitives()  # same dict the eval harness passes
++    env.close()
++
++Each call to ``make_env()`` creates a fresh, independent environment
++instance on the server, so parallel test scripts are safe.
++
++The list above is the legacy blackbox interface. When ``env_spaces.json`` has
++``"strict": true``, only reset, step, rendering, close, and generic space metadata
++are supported; the host server rejects every other helper command independently.
++
++NOTE: ``approach.py`` must NOT import this module. It is evaluated by a
++separate harness that calls it directly with real observations; this client
++is only for test and exploration scripts.
++
++This module must stay importable with only the standard library and numpy.
++"""
++
++from __future__ import annotations
++
++import importlib
++import json
++import socket
++import sys
++from pathlib import Path
++from typing import Any
++
++import numpy as np
++
++_METADATA_PATH = Path(__file__).resolve().parent / "env_spaces.json"
++_NDARRAY_TAG = "__ndarray__"
++_HANDLE_TAG = "__handle__"
++_MODULE_TAG = "__module__"
++_SET_TAG = "__set__"
++_OCS_TAG = "__ocs__"
++
++
++# ---------------------------------------------------------------------------
++# Local ObjectCentricState mirror
++#
++# A variable-count env hands the program an ObjectCentricState. This sandbox module
++# must stay importable with only the standard library and numpy, so rather than import
++# relational_structs it reconstructs a faithful local mirror from the self-contained
++# codec payload (which embeds the type hierarchy). The mirror implements the subset of
++# the ObjectCentricState API a generated program uses, with the same semantics -- most
++# importantly `is_instance` over the ancestor chain and `get(obj, feature)` by name --
++# so a program tested here behaves as it will at eval against the real state.
++# ---------------------------------------------------------------------------
++
++
++class _Type:
++    """A local mirror of relational_structs.Type (name + optional parent)."""
++
++    def __init__(self, name: str, parent: "_Type | None" = None) -> None:
++        self.name = name
++        self.parent = parent
++
++    def get_ancestors(self) -> set["_Type"]:
++        """Return this type and all of its ancestors (parents, grandparents, ...)."""
++        ancestors: set[_Type] = set()
++        cur: _Type | None = self
++        while cur is not None:
++            ancestors.add(cur)
++            cur = cur.parent
++        return ancestors
++
++    def __eq__(self, other: Any) -> bool:
++        return isinstance(other, _Type) and other.name == self.name
++
++    def __hash__(self) -> int:
++        return hash(self.name)
++
++    def __repr__(self) -> str:
++        # Match relational_structs.Type's dataclass repr, including name quoting.
++        # Policies must see the same strings during synthesis and evaluation.
++        return f"Type(name={self.name!r})"
++
++
++class _Object:
++    """A local mirror of relational_structs.Object (name + type)."""
++
++    def __init__(self, name: str, typ: _Type) -> None:
++        self.name = name
++        self.type = typ
++
++    def is_instance(self, typ: _Type) -> bool:
++        """True if this object's type is *typ* or a descendant of it."""
++        return typ in self.type.get_ancestors()
++
++    def __eq__(self, other: Any) -> bool:
++        return isinstance(other, _Object) and other.name == self.name
++
++    def __hash__(self) -> int:
++        return hash(self.name)
++
++    def __repr__(self) -> str:
++        return f"{self.name}:{self.type.name}"
++
++
++class _ObjectCentricState:
++    """A local mirror of relational_structs.ObjectCentricState.
++
++    Holds ``{Object: feature ndarray}`` as ``data`` plus ``{Type: [feature names]}`` as
++    ``type_features`` (both public, matching the real state) and exposes the read/write
++    API a program uses. Iteration yields the objects, sorted by name for determinism.
++    """
++
++    def __init__(
++        self,
++        data: dict[_Object, np.ndarray],
++        type_features: dict[_Type, list[str]],
++    ) -> None:
++        self.data = data
++        self.type_features = type_features
++
++    def __iter__(self) -> Any:
++        return iter(sorted(self.data, key=lambda o: o.name))
++
++    def get_object_names(self) -> set[str]:
++        """The set of object names in this state."""
++        return {o.name for o in self.data}
++
++    def get_object_from_name(self, name: str) -> _Object:
++        """The object with the given name."""
++        for obj in self.data:
++            if obj.name == name:
++                return obj
++        raise ValueError(f"No object named {name!r}")
++
++    def get_objects(self, typ: _Type) -> list[_Object]:
++        """Objects that are instances of *typ* (its subtypes included), by name."""
++        return sorted(
++            (o for o in self.data if o.is_instance(typ)), key=lambda o: o.name
++        )
++
++    def _feature_index(self, obj: _Object, feature: str) -> int:
++        return self.type_features[obj.type].index(feature)
++
++    def get(self, obj: _Object, feature: str) -> float:
++        """Read a named feature of an object."""
++        return float(self.data[obj][self._feature_index(obj, feature)])
++
++    def set(self, obj: _Object, feature: str, value: float) -> None:
++        """Write a named feature of an object in place."""
++        self.data[obj][self._feature_index(obj, feature)] = value
++
++    def vec(self, objects: Any) -> np.ndarray:
++        """Concatenate the feature vectors of the given objects."""
++        return (
++            np.concatenate([self.data[o] for o in objects]) if objects else np.array([])
++        )
++
++    def copy(self) -> "_ObjectCentricState":
++        """A deep copy of this state."""
++        return _ObjectCentricState(
++            {o: arr.copy() for o, arr in self.data.items()},
++            {t: list(f) for t, f in self.type_features.items()},
++        )
++
++    def allclose(self, other: "_ObjectCentricState") -> bool:
++        """True if *other* has the same objects with numerically-close features."""
++        if self.get_object_names() != other.get_object_names():
++            return False
++        return all(
++            np.allclose(self.data[o], other.data[other.get_object_from_name(o.name)])
++            for o in self.data
++        )
++
++
++def _build_local_types(
++    types_payload: list[dict[str, Any]],
++) -> tuple[dict[str, _Type], dict[_Type, list[str]]]:
++    """Rebuild local {name: _Type} and {_Type: [features]} (parents-first payload)."""
++    type_by_name: dict[str, _Type] = {}
++    type_features: dict[_Type, list[str]] = {}
++    for entry in types_payload:
++        parent = type_by_name[entry["parent"]] if entry["parent"] is not None else None
++        typ = _Type(entry["name"], parent)
++        type_by_name[entry["name"]] = typ
++        type_features[typ] = list(entry["features"])
++    return type_by_name, type_features
++
++
++def _ocs_from_payload(payload: dict[str, Any]) -> _ObjectCentricState:
++    """Reconstruct a local ObjectCentricState from a self-contained codec payload."""
++    type_by_name, type_features = _build_local_types(payload["types"])
++    data: dict[_Object, np.ndarray] = {}
++    for entry in payload["objects"]:
++        obj = _Object(entry["name"], type_by_name[entry["type"]])
++        data[obj] = np.array(entry["features"], dtype=np.float32)
++    return _ObjectCentricState(data, type_features)
++
++
++def _ocs_to_payload(state: _ObjectCentricState) -> dict[str, Any]:
++    """Encode a local ObjectCentricState back to the self-contained codec payload."""
++
++    def depth(t: _Type) -> int:
++        n, p = 0, t.parent
++        while p is not None:
++            n, p = n + 1, p.parent
++        return n
++
++    types = sorted(state.type_features, key=lambda t: (depth(t), t.name))
++    return {
++        "types": [
++            {
++                "name": t.name,
++                "parent": t.parent.name if t.parent is not None else None,
++                "features": list(state.type_features[t]),
++            }
++            for t in types
++        ],
++        "objects": [
++            {
++                "name": o.name,
++                "type": o.type.name,
++                "features": [float(v) for v in state.data[o]],
++            }
++            for o in sorted(state.data, key=lambda o: o.name)
++        ],
++    }
++
++
++def _encode(obj: Any) -> Any:
++    """Encode values as tagged JSON (mirrors robocode.utils.env_server)."""
++    if isinstance(obj, _ObjectCentricState):
++        return {_OCS_TAG: _ocs_to_payload(obj)}
++    if isinstance(obj, np.generic):
++        return obj.item()
++    if isinstance(obj, np.ndarray):
++        return {_NDARRAY_TAG: obj.tolist(), "dtype": str(obj.dtype)}
++    if isinstance(obj, dict):
++        return {key: _encode(value) for key, value in obj.items()}
++    if isinstance(obj, (list, tuple)):
++        return [_encode(value) for value in obj]
++    return obj
++
++
++def _decode(obj: Any) -> Any:
++    """Decode tagged JSON (mirrors robocode.utils.env_server)."""
++    if isinstance(obj, dict):
++        if _OCS_TAG in obj:
++            return _ocs_from_payload(obj[_OCS_TAG])
++        if _NDARRAY_TAG in obj:
++            return np.array(obj[_NDARRAY_TAG], dtype=np.dtype(obj["dtype"]))
++        return {key: _decode(value) for key, value in obj.items()}
++    if isinstance(obj, list):
++        return [_decode(value) for value in obj]
++    return obj
++
++
++def _encode_ref(obj: Any) -> Any:
++    """Encode args/targets for the remote-object proxy commands.
++
++    Same as ``_encode`` but ``_RemoteHandle`` objects serialize to their
++    ``{"__handle__": id}`` token so the host resolves them from its registry.
++    Used only by devectorize/vectorize/getattr/call requests.
++    """
++    if isinstance(obj, _RemoteHandle):
++        return {_HANDLE_TAG: obj._handle_id}  # pylint: disable=protected-access
++    if isinstance(obj, _ObjectCentricState):
++        return {_OCS_TAG: _ocs_to_payload(obj)}
++    if isinstance(obj, np.generic):
++        return obj.item()
++    if isinstance(obj, np.ndarray):
++        return {_NDARRAY_TAG: obj.tolist(), "dtype": str(obj.dtype)}
++    if isinstance(obj, dict):
++        return {key: _encode_ref(value) for key, value in obj.items()}
++    if isinstance(obj, (list, tuple)):
++        return [_encode_ref(value) for value in obj]
++    if isinstance(obj, (set, frozenset)):
++        return {_SET_TAG: [_encode_ref(value) for value in obj]}
++    return obj
++
++
++class SpaceInfo:
++    """Metadata for a Box space: shape, low, high, dtype, and sample()."""
++
++    def __init__(self, spec: dict[str, Any]) -> None:
++        if spec["type"] != "Box":
++            raise TypeError(
++                f"Unsupported space type {spec['type']!r}; extend SpaceInfo "
++                "alongside the server's serialize_space"
++            )
++        self.shape: tuple[int, ...] = tuple(spec["shape"])
++        self.dtype: np.dtype[Any] = np.dtype(spec["dtype"])
++        self.low: np.ndarray = np.array(spec["low"], dtype=self.dtype)
++        self.high: np.ndarray = np.array(spec["high"], dtype=self.dtype)
++
++    def sample(self, rng: np.random.Generator | None = None) -> np.ndarray:
++        """Sample uniformly between low and high."""
++        if rng is None:
++            rng = np.random.default_rng()
++        return rng.uniform(self.low, self.high).astype(self.dtype)
++
++
++class _RemoteHandle:
++    """A reference to a host-side object, used over the env server.
++
++    Attribute access and calls are proxied to the host: ``handle.method(...)``
++    issues a ``getattr`` (returning another handle for the bound method) then a
++    ``call``. Returned values are decoded the same way as any response, so a
++    scalar/ndarray comes back inline and another object comes back as a nested
++    ``_RemoteHandle``. Private/dunder attributes are refused client-side, both
++    to avoid surprise round-trips and to mirror the host security guard.
++    """
++
++    def __init__(self, client: "BlackboxEnv", handle_id: str) -> None:
++        # Use object.__setattr__-free plain assignment; __getattr__ only fires
++        # for names not found normally, and these two are set here.
++        self._client = client
++        self._handle_id = handle_id
++
++    def __getattr__(self, name: str) -> Any:
++        if name.startswith("_"):
++            raise AttributeError(
++                f"refusing private/dunder attribute access on remote handle: "
++                f"{name!r}"
++            )
++        response = self._client._request(  # pylint: disable=protected-access
++            {
++                "cmd": "getattr",
++                "target": {_HANDLE_TAG: self._handle_id},
++                "name": name,
++            }
++        )
++        return self._client._decode_ref(  # pylint: disable=protected-access
++            response["result"]
++        )
++
++    def __call__(self, *args: Any, **kwargs: Any) -> Any:
++        response = self._client._request(  # pylint: disable=protected-access
++            {
++                "cmd": "call",
++                "target": {_HANDLE_TAG: self._handle_id},
++                "args": _encode_ref(list(args)),
++                "kwargs": _encode_ref(kwargs),
++            }
++        )
++        return self._client._decode_ref(  # pylint: disable=protected-access
++            response["result"]
++        )
++
++
++class _RemoteModule:
++    """A reference to a whitelisted host module (e.g. crv_motion_planning).
++
++    Attribute access proxies a ``getattr`` against the ``{"__module__": name}``
++    target, so ``module.plan_crv_actions`` returns a callable handle the agent
++    can invoke. Mirrors how a remote-module primitive is used at eval time,
++    where ``primitives['crv_motion_planning']`` is the real module.
++    """
++
++    def __init__(self, client: "BlackboxEnv", short_name: str) -> None:
++        self._client = client
++        self._short_name = short_name
++
++    def __getattr__(self, name: str) -> Any:
++        if name.startswith("_"):
++            raise AttributeError(
++                f"refusing private/dunder attribute access on remote module: "
++                f"{name!r}"
++            )
++        response = self._client._request(  # pylint: disable=protected-access
++            {
++                "cmd": "getattr",
++                "target": {_MODULE_TAG: self._short_name},
++                "name": name,
++            }
++        )
++        return self._client._decode_ref(  # pylint: disable=protected-access
++            response["result"]
++        )
++
++
++class _BlackboxObservationSpace(SpaceInfo):
++    """Box-space metadata plus client-backed devectorize/vectorize.
++
++    Stands in for the eval-time ``ObjectCentricBoxSpace``: it keeps the
++    shape/low/high/dtype/sample() of a plain ``SpaceInfo`` and adds
++    ``devectorize(obs)`` / ``vectorize(ocs)`` that proxy to the host. The agent
++    writes ``observation_space.devectorize(obs)`` exactly as it would at eval.
++    """
++
++    def __init__(self, spec: dict[str, Any], client: "BlackboxEnv") -> None:
++        super().__init__(spec)
++        self._client = client
++
++    def devectorize(self, obs: Any) -> Any:
++        """Return an object-centric view of *obs* as a remote handle."""
++        return self._client.devectorize(obs)
++
++    def vectorize(self, state: Any) -> np.ndarray:
++        """Return the flat observation vector for an object-centric state."""
++        return self._client.vectorize(state)
++
++
++class _ObjectCentricObservationSpace:
++    """Client-side view of a variable-count env's ObjectCentricStateSpace.
++
++    The observation is already an object-centric state (reconstructed locally from the
++    wire), so this space has no fixed shape/vector: it exposes the domain ``types`` and
++    ``type_features`` the program needs to enumerate objects, matching the eval-time
++    ``observation_space.types``. There is no ``devectorize`` -- the state is not a
++    vector.
++    """
++
++    def __init__(self, spec: dict[str, Any]) -> None:
++        self._type_by_name, self._type_features = _build_local_types(spec["types"])
++
++    @property
++    def types(self) -> set[_Type]:
++        """The domain object types (matches the eval-time observation_space.types)."""
++        return set(self._type_features)
++
++    @property
++    def type_features(self) -> dict[_Type, list[str]]:
++        """Feature names for each type."""
++        return {t: list(f) for t, f in self._type_features.items()}
++
++    def get_type(self, name: str) -> _Type:
++        """The domain type with the given name (e.g. ``"rectangle"``)."""
++        return self._type_by_name[name]
++
++
++class BlackboxEnv:
++    """A live environment instance, accessed over the wire."""
++
++    def __init__(self, meta: dict[str, Any], sandbox_root: Any = None) -> None:
++        obs_spec = meta["observation_space"]
++        self._strict = bool(meta.get("strict", False))
++        # A variable-count env sends object-centric states, reconstructed locally; a
++        # fixed-count env sends Box vectors as before.
++        self._object_centric = obs_spec.get("type") == "ObjectCentric"
++        if self._object_centric:
++            self.observation_space: Any = _ObjectCentricObservationSpace(obs_spec)
++        elif self._strict:
++            # Strict blackbox exposes only generic array metadata. In particular,
++            # do not attach the host-backed devectorize/vectorize helpers that make
++            # the legacy blackbox convenient but confound the isolation ablation.
++            self.observation_space = SpaceInfo(obs_spec)
++        else:
++            self.observation_space = _BlackboxObservationSpace(obs_spec, self)
++        self.action_space = SpaceInfo(meta["action_space"])
++        self.max_steps: int | None = meta["max_steps"]
++        # How make_primitives rebuilds the eval-time primitives dict (see
++        # robocode.primitives.blackbox_primitive_manifest). Empty when the
++        # run configures no primitives.
++        self._primitive_manifest: list[dict[str, Any]] = meta.get("primitives", [])
++        # Where render_policy looks for approach.py and make_primitives imports
++        # generic primitive sources; the sandbox dir in real runs (set by
++        # make_env), the current dir for ad-hoc construction.
++        self._sandbox_root = (
++            Path(sandbox_root) if sandbox_root is not None else Path.cwd()
++        )
++        self._token: str = meta["token"]
++        self._sock = socket.create_connection((meta["host"], meta["port"]))
++        self._file = self._sock.makefile("rwb")
++
++    def _request(self, payload: dict[str, Any]) -> dict[str, Any]:
++        payload["token"] = self._token
++        self._file.write(json.dumps(payload).encode("utf-8") + b"\n")
++        self._file.flush()
++        line = self._file.readline()
++        if not line:
++            raise RuntimeError("Connection to the environment server was closed")
++        response = json.loads(line)
++        if "error" in response:
++            raise RuntimeError(f"Environment server error: {response['error']}")
++        return _decode(response)
++
++    def _decode_ref(self, obj: Any) -> Any:
++        """Decode a remote-command result, mapping handles to _RemoteHandle.
++
++        ``_request`` already ran ``_decode`` over the response (so ndarrays are
++        arrays), but it leaves ``{"__handle__": id}`` dicts intact since it does
++        not know the handle tag. Here we turn those into ``_RemoteHandle``
++        objects and recurse through the remaining containers.
++        """
++        if isinstance(obj, dict):
++            if _HANDLE_TAG in obj:
++                return _RemoteHandle(self, obj[_HANDLE_TAG])
++            if _SET_TAG in obj:
++                return {self._decode_ref(value) for value in obj[_SET_TAG]}
++            return {key: self._decode_ref(value) for key, value in obj.items()}
++        if isinstance(obj, list):
++            return [self._decode_ref(value) for value in obj]
++        return obj
++
++    def devectorize(self, obs: Any) -> _RemoteHandle:
++        """Return an object-centric view of *obs* (a remote ObjectCentricState).
++
++        Proxies ``observation_space.devectorize`` to the host. The returned
++        handle exposes the public ObjectCentricState API (``get_object_names``,
++        ``get_object_from_name``, ``get_objects``, ``get``, ``set``, ``copy``,
++        ...) over the wire. Pass it straight to the CRV planners from
++        ``make_primitives``.
++        """
++        response = self._request(
++            {"cmd": "devectorize", "obs": _encode(np.asarray(obs))}
++        )
++        return self._decode_ref(response["result"])
++
++    def vectorize(self, state: Any) -> np.ndarray:
++        """Return the flat observation vector for an object-centric state handle."""
++        response = self._request({"cmd": "vectorize", "state": _encode_ref(state)})
++        return self._decode_ref(response["result"])
++
++    def reset(
++        self, seed: int | None = None, options: dict[str, Any] | None = None
++    ) -> tuple[np.ndarray, dict[str, Any]]:
++        """Reset the environment; returns (obs, info)."""
++        response = self._request({"cmd": "reset", "seed": seed, "options": options})
++        return response["obs"], response["info"]
++
++    def step(self, action: Any) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
++        """Step the environment; returns (obs, reward, terminated, truncated, info)."""
++        action = np.asarray(action, dtype=self.action_space.dtype)
++        response = self._request({"cmd": "step", "action": _encode(action)})
++        return (
++            response["obs"],
++            response["reward"],
++            response["terminated"],
++            response["truncated"],
++            response["info"],
++        )
++
++    def get_state(self) -> Any:
++        """Return a snapshot of the full environment state.
++
++        A Box vector for a fixed-count env; a local ObjectCentricState for a
++        variable-count env (reconstructed by ``_decode``).
++        """
++        return self._request({"cmd": "get_state"})["state"]
++
++    def _encode_state(self, state: Any) -> Any:
++        """Encode a state for the wire: an object-centric state or a Box vector."""
++        if isinstance(state, _ObjectCentricState):
++            return _encode(state)
++        return _encode(np.asarray(state))
++
++    def render_state(
++        self,
++        seed: int = 42,
++        state: Any = None,
++        label: str = "",
++        object_count: int | None = None,
++    ) -> str:
++        """Render a state on the host; returns a PNG path inside the sandbox.
++
++        Either pass ``seed`` to render the initial state after a reset (with
++        ``object_count`` to pin a variable-count env's object count), or ``state`` (a
++        flat list of floats, as from ``get_state().tolist()``) to render an arbitrary
++        state. The path is relative to the sandbox dir.
++        """
++        if isinstance(state, _ObjectCentricState):
++            state = _encode(state)  # tagged object-centric payload, decoded host-side
++        elif isinstance(state, np.ndarray):
++            state = state.tolist()
++        return self._request(
++            {
++                "cmd": "render_state",
++                "seed": seed,
++                "state": state,
++                "label": label,
++                "object_count": object_count,
++            }
++        )["path"]
++
++    def render_policy(
++        self,
++        seed: int = 42,
++        max_steps: int = 1000,
++        max_frames: int = 100,
++        approach_path: Any = None,
++        object_count: int | None = None,
++    ) -> list[str]:
++        """Run an episode of approach.py here and render the visited states.
++
++        The policy runs in this process: only ``get_action`` (which needs the
++        observation alone) executes locally, while each visited state is
++        rendered on the host via ``render_state``. No approach code runs on the
++        host, so a black-box agent cannot reach the env source through rendering.
++        ``object_count`` pins a variable-count env's object count on the rollout reset.
++        Returns the PNG paths (relative to the sandbox dir).
++        """
++        path = (
++            Path(approach_path)
++            if approach_path is not None
++            else self._sandbox_root / "approach.py"
++        )
++        approach = _load_generated_approach(
++            path, self.action_space, self.observation_space, self.make_primitives()
++        )
++        options = {"object_count": object_count} if object_count is not None else None
++        obs, info = self.reset(seed=seed, options=options)
++        approach.reset(obs, info)
++        # Strict mode deliberately withholds raw state snapshots. Its observations
++        # are nevertheless renderable, so use them to visualize a policy without
++        # opening the get_state channel to agent scripts.
++        states = [obs if self._strict else self.get_state()]
++        for _ in range(max_steps):
++            obs, reward, terminated, truncated, info = self.step(
++                approach.get_action(obs)
++            )
++            if hasattr(approach, "update"):
++                approach.update(obs, reward, terminated or truncated, info)
++            states.append(obs if self._strict else self.get_state())
++            if terminated or truncated:
++                break
++        return [
++            self.render_state(state=state, label=f"policy_seed{seed}_{i:04d}")
++            for i, state in enumerate(states[:max_frames])
++        ]
++
++    def set_state(self, state: Any) -> None:
++        """Restore a state snapshot previously returned by get_state()."""
++        self._request({"cmd": "set_state", "state": self._encode_state(state)})
++
++    def check_action_collision(self, state: Any, action: Any) -> bool:
++        """Return True if taking *action* in *state* causes a collision.
++
++        Runs the env-dependent collision primitive on the host (the sandbox
++        lacks the env source), against this connection's env. Mirrors the
++        eval-time ``primitives['check_action_collision']`` callable, so test
++        scripts that get it from ``make_primitives`` call it the same way.
++        """
++        response = self._request(
++            {
++                "cmd": "check_action_collision",
++                "state": self._encode_state(state),
++                "action": _encode(np.asarray(action, dtype=self.action_space.dtype)),
++            }
++        )
++        return response["collision"]
++
++    def make_primitives(self) -> dict[str, Any]:
++        """Build the eval-time primitives dict for this black-box env.
++
++        Black-box counterpart of ``robocode.primitives.build_primitives``:
++        env-dependent primitives proxy to the host, while generic ones are
++        imported from their copies under ``primitives/`` in the sandbox. Use
++        it in test scripts so they exercise exactly the primitives the harness
++        passes to ``GeneratedApproach`` at evaluation time::
++
++            from env_client import make_env
++
++            env = make_env()
++            primitives = env.make_primitives()
++        """
++        sandbox_dir = str(self._sandbox_root.resolve())
++        if sandbox_dir not in sys.path:
++            sys.path.insert(0, sandbox_dir)
++        primitives: dict[str, Any] = {}
++        for spec in self._primitive_manifest:
++            if spec["kind"] == "host_proxy":
++                primitives[spec["name"]] = getattr(self, spec["name"])
++            elif spec["kind"] == "remote_module":
++                # The module source is withheld from the sandbox; reach it on
++                # the host via a remote-module proxy (e.g. crv_motion_planning).
++                primitives[spec["name"]] = _RemoteModule(self, spec["module"])
++            else:
++                module = importlib.import_module(f"primitives.{spec['module']}")
++                primitives[spec["name"]] = (
++                    module if spec["attr"] is None else getattr(module, spec["attr"])
++                )
++        return primitives
++
++    def close(self) -> None:
++        """Close the connection (and the server-side environment)."""
++        try:
++            self._file.write(
++                json.dumps({"cmd": "close", "token": self._token}).encode("utf-8")
++                + b"\n"
++            )
++            self._file.flush()
++        finally:
++            # makefile() wraps a dup of the socket; close it too so the buffered
++            # file object does not leak (ResourceWarning) when close() runs.
++            self._file.close()
++            self._sock.close()
++
++    def __enter__(self) -> "BlackboxEnv":
++        return self
++
++    def __exit__(self, *exc_info: Any) -> None:
++        self.close()
++
++
++def _load_generated_approach(
++    path: Path, action_space: Any, observation_space: Any, primitives: dict[str, Any]
++) -> Any:
++    """Exec ``approach.py`` and instantiate its ``GeneratedApproach``.
++
++    Mirrors ``robocode.utils.episode.load_generated_approach``; duplicated here
++    (like the codec above) because this module must stay importable with only
++    the standard library and numpy, since it is copied standalone into the
++    sandbox. Used only by ``render_policy`` for visual debugging.
++    """
++    sandbox_dir = str(path.resolve().parent)
++    added = sandbox_dir not in sys.path
++    if added:
++        sys.path.insert(0, sandbox_dir)
++    try:
++        namespace: dict[str, Any] = {"__file__": str(path)}
++        exec(  # pylint: disable=exec-used
++            compile(path.read_text(encoding="utf-8"), str(path), "exec"), namespace
++        )
++    finally:
++        if added:
++            sys.path.remove(sandbox_dir)
++    return namespace["GeneratedApproach"](
++        action_space, observation_space, primitives=primitives
++    )
++
++
++def make_env(metadata_path: Any = None) -> BlackboxEnv:
++    """Connect to the environment server; returns a fresh env instance.
++
++    *metadata_path* defaults to ``env_spaces.json`` next to this module
++    (the agent's sandbox copy); the MCP server passes an explicit path.
++    """
++    path = Path(metadata_path) if metadata_path is not None else _METADATA_PATH
++    meta = json.loads(path.read_text(encoding="utf-8"))
++    return BlackboxEnv(meta, sandbox_root=path.parent)
+diff --git a/snapw/env_spaces.json b/snapw/env_spaces.json
+new file mode 100644
+index 0000000..dff8dfd
+--- /dev/null
++++ b/snapw/env_spaces.json
+@@ -0,0 +1 @@
++{"host": "127.0.0.1", "port": 18081, "token": "6eefef35bfaa192f7898ebf189cf2b7d", "observation_space": {"type": "ObjectCentric", "types": [{"name": "Kinematic3DCuboid", "parent": null, "features": ["pose_x", "pose_y", "pose_z", "pose_qx", "pose_qy", "pose_qz", "pose_qw", "grasp_active", "object_type", "half_extent_x", "half_extent_y", "half_extent_z"]}, {"name": "Kinematic3DFixture", "parent": null, "features": ["pose_x", "pose_y", "pose_z", "pose_qx", "pose_qy", "pose_qz", "pose_qw"]}, {"name": "Kinematic3DPoint", "parent": null, "features": ["x", "y", "z"]}, {"name": "Kinematic3DRobot", "parent": null, "features": ["pos_base_x", "pos_base_y", "pos_base_rot", "joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6", "joint_7", "finger_state", "grasp_active", "grasp_tf_x", "grasp_tf_y", "grasp_tf_z", "grasp_tf_qx", "grasp_tf_qy", "grasp_tf_qz", "grasp_tf_qw"]}, {"name": "Kinematic3DTriangle", "parent": null, "features": ["pose_x", "pose_y", "pose_z", "pose_qx", "pose_qy", "pose_qz", "pose_qw", "grasp_active", "triangle_type", "side_a", "side_b", "depth"]}]}, "action_space": {"type": "Box", "shape": [11], "low": [-0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -1.0], "high": [0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 1.0], "dtype": "float32"}, "max_steps": 1000, "primitives": [], "strict": true}
+\ No newline at end of file
+diff --git a/snapw/kin.py b/snapw/kin.py
+new file mode 100644
+index 0000000..cb079c6
+--- /dev/null
++++ b/snapw/kin.py
+@@ -0,0 +1,128 @@
++import numpy as np
++
++def _rpy(r, p, y):
++    cr, sr, cp, sp, cy, sy = np.cos(r), np.sin(r), np.cos(p), np.sin(p), np.cos(y), np.sin(y)
++    return np.array([[cy*cp, cy*sp*sr - sy*cr, cy*sp*cr + sy*sr],
++                     [sy*cp, sy*sp*sr + cy*cr, sy*sp*cr - cy*sr],
++                     [-sp, cp*sr, cp*cr]])
++
++def _T(xyz, rpy):
++    T = np.eye(4); T[:3, :3] = _rpy(*rpy); T[:3, 3] = xyz; return T
++
++PI = np.pi
++H = PI / 2
++JOINTS = [
++    _T((0, 0, 0.15643), (PI, 0, 0)),
++    _T((0, 0.005375, -0.12838), (H, 0, 0)),
++    _T((0, -0.21038, -0.006375), (-H, 0, 0)),
++    _T((0, 0.006375, -0.21038), (H, 0, 0)),
++    _T((0, -0.20843, -0.006375), (-H, 0, 0)),
++    _T((0, 0.00017505, -0.10593), (H, 0, 0)),
++    _T((0, -0.10593, -0.00017505), (-H, 0, 0)),
++]
++EE = _T((0, 0, -0.061525), (PI, 0, 0))
++MOUNT = (0.12, 0.0, -0.0052)
++TOOL = 0.12
++HOME = np.array([0.0, -0.35, -np.pi, -2.5, 0.0, -0.87, np.pi / 2])
++
++def _rz(q):
++    c, s = np.cos(q), np.sin(q)
++    T = np.eye(4); T[0, 0] = c; T[0, 1] = -s; T[1, 0] = s; T[1, 1] = c; return T
++
++def mount_base(base):
++    bx, by, br = base
++    c, s = np.cos(br), np.sin(br)
++    return (bx + c * MOUNT[0] - s * MOUNT[1], by + s * MOUNT[0] + c * MOUNT[1], br)
++
++def _chain(q, base):
++    """Returns tool transform and list of (axis, origin) of joints in world."""
++    bx, by, br = mount_base(base)
++    T = _rz(br); T[0, 3] = bx; T[1, 3] = by; T[2, 3] = MOUNT[2]
++    axes = []
++    for Tj, qj in zip(JOINTS, q):
++        T = T @ Tj
++        axes.append((T[:3, 2].copy(), T[:3, 3].copy()))
++        T = T @ _rz(qj)
++    T = T @ EE
++    Tt = np.eye(4); Tt[2, 3] = TOOL
++    return T @ Tt, axes
++
++def tool_fk(q, base):
++    return _chain(q, base)[0]
++
++def _rot_err(Rc, Rd):
++    Re = Rd @ Rc.T
++    v = 0.5 * np.array([Re[2, 1] - Re[1, 2], Re[0, 2] - Re[2, 0], Re[1, 0] - Re[0, 1]])
++    return v
++
++def tool_ik(q0, p, R, base, iters=60, tol=1e-5, q_nom=None, k_null=0.3):
++    q = np.array(q0, dtype=float)
++    if q_nom is None:
++        q_nom = HOME
++    for it in range(iters):
++        T, axes = _chain(q, base)
++        e = np.concatenate([p - T[:3, 3], _rot_err(T[:3, :3], R)])
++        if np.linalg.norm(e[:3]) < tol and np.linalg.norm(e[3:]) < 1e-4:
++            return q, True
++        J = np.zeros((6, 7))
++        pt = T[:3, 3]
++        for j, (z, o) in enumerate(axes):
++            J[:3, j] = np.cross(z, pt - o)
++            J[3:, j] = z
++        JJt = J @ J.T + 1e-6 * np.eye(6)
++        Jp = J.T @ np.linalg.inv(JJt)
++        dq = Jp @ e
++        dn = (q_nom - q + np.pi) % (2 * np.pi) - np.pi
++        dq += (np.eye(7) - Jp @ J) @ (k_null * dn)
++        n = np.max(np.abs(dq))
++        if n > 0.3:
++            dq *= 0.3 / n
++        q = q + dq
++    T, _ = _chain(q, base)
++    ok = np.linalg.norm(p - T[:3, 3]) < 1e-3
++    return q, ok
++
++def down_R(yaw):
++    c, s = np.cos(yaw), np.sin(yaw)
++    x = np.array([c, s, 0.0]); z = np.array([0, 0, -1.0]); y = np.cross(z, x)
++    return np.stack([x, y, z], axis=1)
++
++
++def wb_fk(x):
++    """x = [bx, by, br, q1..q7] -> tool transform."""
++    return _chain(x[3:], x[:3])[0]
++
++
++def wb_ik(x0, p, R, iters=40, tol=1e-5, q_nom=None, k_null=0.3, w_by=1.0, w_br=1.0):
++    """Whole-body IK over base y, base rot and the 7 arm joints (base x fixed)."""
++    x = np.array(x0, dtype=float)
++    if q_nom is None:
++        q_nom = HOME
++    W = np.array([w_by, w_br] + [1.0] * 7)
++    for it in range(iters):
++        T, axes = _chain(x[3:], x[:3])
++        pt = T[:3, 3]
++        e = np.concatenate([p - pt, _rot_err(T[:3, :3], R)])
++        if np.linalg.norm(e[:3]) < tol and np.linalg.norm(e[3:]) < 1e-4:
++            return x, True
++        J = np.zeros((6, 9))
++        J[1, 0] = 1.0
++        ez = np.array([0.0, 0.0, 1.0])
++        J[:3, 1] = np.cross(ez, pt - np.array([x[0], x[1], 0.0]))
++        J[3:, 1] = ez
++        for j, (z, o) in enumerate(axes):
++            J[:3, 2 + j] = np.cross(z, pt - o)
++            J[3:, 2 + j] = z
++        JW = J * W
++        Jp = JW.T @ np.linalg.inv(JW @ J.T + 1e-6 * np.eye(6))
++        Jp = W[:, None] * Jp
++        dv = Jp @ e
++        dn = np.zeros(9)
++        dn[2:] = k_null * ((q_nom - x[3:] + np.pi) % (2 * np.pi) - np.pi)
++        dv += dn - Jp @ (J @ dn)
++        n = np.max(np.abs(dv))
++        if n > 0.3:
++            dv *= 0.3 / n
++        x[1:] += dv
++    ok = np.linalg.norm(p - wb_fk(x)[:3, 3]) < 1e-3
++    return x, ok
+diff --git a/snapw/test_approach.py b/snapw/test_approach.py
+new file mode 100644
+index 0000000..d238650
+--- /dev/null
++++ b/snapw/test_approach.py
+@@ -0,0 +1,33 @@
++import sys, time
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++
++def run(seed, verbose=False, max_steps=None, count=None):
++    env = make_env()
++    obs, info = env.reset(seed=seed, options={'object_count': count} if count else None)
++    ap = GeneratedApproach(env.action_space, env.observation_space, {})
++    t0 = time.time()
++    ap.reset(obs, info)
++    ms = max_steps or env.max_steps
++    steps = 0
++    term = False
++    for steps in range(1, ms + 1):
++        a = ap.get_action(obs)
++        obs, r, term, trunc, info = env.step(a)
++        if term or trunc:
++            break
++    dt = time.time() - t0
++    nobs = len([n for n in obs.get_object_names() if n.startswith('obstruction')])
++    env.close()
++    return term, steps, dt, nobs, ap.phase
++
++if __name__ == '__main__':
++    seeds = range(int(sys.argv[1]), int(sys.argv[2]))
++    count = int(sys.argv[3]) if len(sys.argv) > 3 else None
++    ok = 0
++    for s in seeds:
++        term, steps, dt, n, ph = run(s, count=count)
++        ok += term
++        print(f'seed {s}: success={term} steps={steps} time={dt:.1f}s nobs={n} phase={ph}', flush=True)
++    print(f'{ok}/{len(seeds)}')

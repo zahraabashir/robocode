@@ -1,0 +1,14 @@
+diff --git a/probe_grasp.py b/probe_grasp.py
+index 6e07967..fdd70a4 100644
+--- a/probe_grasp.py
++++ b/probe_grasp.py
+@@ -230,9 +230,6 @@ def perturb_grasp(seed=0):
+             after = snapshot(state)
+             delta = tuple(after["target_block"]["pose_" + c] -
+                           before["target_block"]["pose_" + c] for c in "xyz")
+-            robot_delta = after["robot"].get(
+-                ["pos_base_x", "pos_base_y", "pos_base_rot"] +
+-                ["joint_" + str(i) for i in range(1, 8)][max(0, index - 3)], 0)
+             print("PERTURB", index, amount, "delta", delta,
+                   "still_held", after["robot"]["grasp_active"],
+                   "robot", after["robot"], "done", term, trunc)

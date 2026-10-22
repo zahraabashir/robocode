@@ -1,0 +1,47 @@
+diff --git a/approach.py b/approach.py
+index a81f832..47b1112 100644
+--- a/approach.py
++++ b/approach.py
+@@ -298,8 +298,9 @@ class GeneratedApproach:
+             vis = (d <= OBJ_RANGE) & free & ~badv
+             vlib = d <= OBJ_RANGE_LIB
+             for (px, py, phx, phy) in pillars:
+-                vis &= ~seg_hits_box(CX, CY, ox, oy, px, py, phx, phy)
+-                vlib &= ~seg_hits_box(CX, CY, ox, oy, px, py, phx - LOS_MARGIN - 0.004, phy - LOS_MARGIN - 0.004)
++                dseg = seg_point_dist(CX, CY, ox, oy, px, py)
++                vis &= dseg > phx
++                vlib &= dseg > phx - LOS_MARGIN - 0.004
+             odist[ob.name] = d
+             ovis_lib[ob.name] = vlib
+             vany |= vis
+@@ -323,7 +324,7 @@ class GeneratedApproach:
+         lx, ly = g(w.lander, "x"), g(w.lander, "y")
+         send = (np.hypot(CX - lx, CY - ly) <= LANDER_RANGE) & free
+         for (px, py, phx, phy) in pillars:
+-            send &= ~seg_hits_box(CX, CY, lx, ly, px, py, phx, phy)
++            send &= seg_point_dist(CX, CY, lx, ly, px, py) > phx
+         for (bx, by) in self.bad_send[r]:
+             send &= np.hypot(X - bx, Y - by) > 0.04
+         for other in rnames:
+diff --git a/dbg4.py b/dbg4.py
+new file mode 100644
+index 0000000..90745e5
+--- /dev/null
++++ b/dbg4.py
+@@ -0,0 +1,16 @@
++import sys, math
++import numpy as np
++from env_client import make_env
++from approach import seg_hits_box
++env=make_env(); obs,_=env.reset(seed=int(sys.argv[1]))
++T=lambda n: env.observation_space.get_type(n)
++cx,cy=float(sys.argv[2]),float(sys.argv[3]); on=sys.argv[4]
++ob=[o for o in obs.get_objects(T('objective')) if o.name==on][0]
++ox,oy=obs.get(ob,'x'),obs.get(ob,'y')
++for p in obs.get_objects(T('obstacle')):
++    px,py,hx,hy=[obs.get(p,f) for f in ('x','y','half_x','half_y')]
++    for m in (0.0,0.012):
++        if seg_hits_box(np.array(cx),np.array(cy),ox,oy,px,py,hx+m,hy+m):
++            # fraction along
++            L=math.hypot(ox-cx,oy-cy); s=((px-cx)*(ox-cx)+(py-cy)*(oy-cy))/L**2
++            print(p.name,'margin',m,'s=',round(s,3),'perp',round(abs((px-cx)*(oy-cy)-(py-cy)*(ox-cx))/L,3), 'hz',obs.get(p,'half_z'))

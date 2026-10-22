@@ -1,0 +1,13 @@
+diff --git a/debug_rollout.py b/debug_rollout.py
+index 6aab3b3..0adb950 100644
+--- a/debug_rollout.py
++++ b/debug_rollout.py
+@@ -1,6 +1,7 @@
++import sys
+ from env_client import make_env
+ from approach import GeneratedApproach
+-env=make_env(); s,info=env.reset(seed=0)
++env=make_env(); s,info=env.reset(seed=int(sys.argv[1]) if len(sys.argv)>1 else 0)
+ ap=GeneratedApproach(env.action_space,env.observation_space,env.make_primitives()); ap.reset(s,info)
+ for step in range(160):
+     if step%10==0:

@@ -1,0 +1,15 @@
+diff --git a/approach.py b/approach.py
+index 4aeab0d..c9bccf5 100644
+--- a/approach.py
++++ b/approach.py
+@@ -118,7 +118,9 @@ class GeneratedApproach:
+             self.count += 1
+             moved = float(np.linalg.norm(obj - self.start_pose[:2]))
+             now_ae = abs(self._angle(goal_theta - theta))
+-            if moved > 0.14 or self.count >= 18 or now_ae > 0.13:
++            # Much of the stroke is free travel from the guaranteed-clear
++            # staging radius to the actual outline (especially at the stem).
++            if moved > 0.14 or self.count >= 48 or now_ae > 0.13:
+                 self.mode = "move_retreat"
+             speed = 0.012 if pd < 0.12 else 0.025
+             return self._safe((com + self.push_dir * 0.20) - robot, speed)

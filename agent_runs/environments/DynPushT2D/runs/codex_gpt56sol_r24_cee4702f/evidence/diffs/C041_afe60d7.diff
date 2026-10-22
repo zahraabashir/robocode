@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index f303591..6fe2cf5 100644
+--- a/approach.py
++++ b/approach.py
+@@ -177,7 +177,7 @@ class GeneratedApproach:
+                 speed = 0.014 if crowded else 0.022
+                 return self._safe(force, speed)
+             if np.linalg.norm(robot - far) < 0.04:
+-                if pd > self.start_pd + 0.18:
++                if pd > 0.30 and pd > self.start_pd + 0.18:
+                     self.force_move = True
+                 self.mode = "choose"
+             return self._safe(far - robot, 0.035)

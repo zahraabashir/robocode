@@ -1,0 +1,47 @@
+diff --git a/approach.py b/approach.py
+index d239065..cb04053 100644
+--- a/approach.py
++++ b/approach.py
+@@ -61,7 +61,7 @@ class GeneratedApproach:
+         grip=0
+         if self.phase=='above':dest=np.r_[model[:2],.34]
+         elif self.phase=='align':dest=np.r_[bp[:2],.34]
+-        elif self.phase=='grasp':dest=bp+[0,0,.055];grip=-1
++        elif self.phase=='grasp':dest=bp+[0,0,.025];grip=-1
+         elif self.phase=='lift':dest=np.r_[self.lift_xy,.30]
+         elif self.phase=='carry':dest=np.r_[self.destination[:2],.30]
+         elif self.phase=='lower':dest=self.destination.copy()
+@@ -69,7 +69,7 @@ class GeneratedApproach:
+         if held:dest=dest+model-bp
+         if self.phase=='above':dest[2]=.34
+         # Preserve a vertical wrist throughout travel and use the mobile base for XY.
+-        dz=np.clip(dest[2]-model[2],-.025,.025)
++        dz=np.clip(dest[2]-model[2],-.008 if self.phase=='grasp' and model[2]-bp[2]<.09 else -.025,.025)
+         z=model[2]+dz
+         key=round(float(z),7)
+         if key not in self.cache:self.cache[key]=ik(.50,z)
+diff --git a/probe_dispose.out b/probe_dispose.out
+index 52e39ea..84d6522 100644
+--- a/probe_dispose.out
++++ b/probe_dispose.out
+@@ -2,3 +2,7 @@ GRASP blocktop 1.0 0.14499999999999985 [ 0.     0.494 -3.142 -1.871  0.    -0.77
+ DROP blocktop desired 0.33598166704177856 0.17328143119812012 0.1360547717884183 actual [0.33598169684410095, 0.17328104376792908, 0.13605476915836334] held 1.0
+ GRASP table 1.0 0.14499999999999985 [ 0.     0.494 -3.142 -1.871  0.    -0.777  0.   ] [0.42  0.001 0.145] -0.4365674555301666 0.2470032125711441
+ DROP table desired 0.4 -0.25 0.08605476992577314 actual [0.40000003576278687, -0.24999986588954926, 0.08605478703975677] held 0.0
++GRASP offtable075 1.0 0.14499999999999985 [ 0.     0.494 -3.142 -1.871  0.    -0.777  0.   ] [0.42  0.001 0.145] -0.4365674555301666 0.2470032125711441
++DROP offtable075 desired 0.4 -0.6 0.08605476992577314 actual [0.4000000059604645, -0.5999999046325684, 0.08605477213859558] held 1.0
++GRASP offtablezero 1.0 0.14499999999999985 [ 0.     0.494 -3.142 -1.871  0.    -0.777  0.   ] [0.42  0.001 0.145] -0.4365674555301666 0.2470032125711441
++DROP offtablezero desired 0.4 -0.6 0.011054769925773145 actual [0.40000003576278687, -0.5999990701675415, 0.011054784059524536] held 1.0
+diff --git a/test_approach.py b/test_approach.py
+index 8744991..13056a1 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -3,7 +3,7 @@ from approach import GeneratedApproach
+ import time,sys
+ for seed in map(int,sys.argv[1:] or ['0','1','2']):
+  E=make_env();s,info=E.reset(seed=seed);p=GeneratedApproach(E.action_space,E.observation_space,{});p.reset(s,info);start=time.monotonic();last=None
+- for t in range(min(E.max_steps,150)):
++ for t in range(min(E.max_steps,350)):
+   a=p.get_action(s);s,r,term,trunc,inf=E.step(a)
+   if p.phase!=last:
+    print(seed,t,p.phase,'block',p.pos(s,p.block).round(3),'held',s.get(p.robot,'grasp_active'),flush=True);last=p.phase

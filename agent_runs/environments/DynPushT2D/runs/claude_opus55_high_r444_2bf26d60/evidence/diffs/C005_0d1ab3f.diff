@@ -1,0 +1,53 @@
+diff --git a/approach.py b/approach.py
+index 227a351..9434ee4 100644
+--- a/approach.py
++++ b/approach.py
+@@ -169,6 +169,8 @@ class GeneratedApproach:
+         self.push = None
+         self.push_left = 0
+         self.stall = 0
++        self.last_cmd = None
++        self.last_robot = None
+ 
+     # ------------------------------------------------------------------
+     def cost(self, pose):
+@@ -217,6 +219,7 @@ class GeneratedApproach:
+         ds = dist_to_T_local(to_local(sw, pose), self.model.rects)
+         dp = dist_to_T_local(to_local(pre, pose), self.model.rects)
+         ok &= (ds > R_ROBOT + 0.005) & (dp > R_ROBOT + 0.035)
++        ok &= np.all((pre > WALL_LO + R_ROBOT + 0.02) & (pre < WALL_HI - R_ROBOT - 0.02), 1)
+         if np.any(ok):
+             sw, dw = sw[ok], dw[ok]
+         N = len(sw)
+@@ -265,7 +268,7 @@ class GeneratedApproach:
+             [0, e], [0, -w - lv - e],
+         ])
+         nodes = list(to_world(nodes_local, pose))
+-        nodes = [p for p in nodes if np.all(p > WALL_LO + R_ROBOT) and np.all(p < WALL_HI - R_ROBOT)]
++        nodes = [p for p in nodes if np.all(p > WALL_LO + R_ROBOT + 0.01) and np.all(p < WALL_HI - R_ROBOT - 0.01)]
+         pts = [np.asarray(robot)] + nodes + [np.asarray(target)]
+         n = len(pts)
+         dist = [np.inf] * n
+@@ -315,6 +318,22 @@ class GeneratedApproach:
+         robot = s[16:18].copy()
+         if self.model is None:
+             self.reset(state, {})
++        if self.last_cmd is not None and self.mode == "nav":
++            moved = np.linalg.norm(robot - self.last_robot)
++            if moved < 0.3 * np.linalg.norm(self.last_cmd) and np.linalg.norm(self.last_cmd) > 1e-3:
++                self.stall += 1
++            else:
++                self.stall = 0
++            if self.stall >= 3:
++                self.stall = 0
++                self.mode = "plan"
++        self.last_robot = robot
++        a = self._act(pose, robot)
++        a = np.clip(np.asarray(a, float), -MAXD, MAXD)
++        self.last_cmd = a
++        return a
++
++    def _act(self, pose, robot):
+         for _ in range(4):
+             if self.mode == "plan":
+                 st, d, k, sc, c0 = self.plan_push(pose, robot)

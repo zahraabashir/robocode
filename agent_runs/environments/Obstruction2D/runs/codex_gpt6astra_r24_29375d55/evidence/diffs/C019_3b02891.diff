@@ -1,0 +1,85 @@
+diff --git a/VALIDATION.md b/VALIDATION.md
+new file mode 100644
+index 0000000..ed93b9e
+--- /dev/null
++++ b/VALIDATION.md
+@@ -0,0 +1,10 @@
++The policy enumerates typed objects, chooses a collision-free target placement and grasp offset, clears obstructing grasp dependencies, and transports blocks above the observed obstacles. Parking preserves the target pickup column. A tilted-gripper recovery handles objects at the workspace edges.
++
++Validation results:
++
++- Core policy: 500/500 default seeds and 100/100 four-obstruction scenes.
++- Three-obstruction sweep: one wall-edge failure among 100 scenes; fixed and checked with 20/20 passing regressions.
++- Final implementation: 140/140 regression episodes and 7/7 forced tilted-gripper recovery episodes.
++- Maximum measured final policy computation: 0.0475 seconds per episode.
++
++Run `/opt/robocode-strict/bin/python validate.py --count 4 --start 0 --stop 100 --out validation.jsonl` or `/opt/robocode-strict/bin/python test_edge_recovery.py` to reproduce tests. See `validation_summary.json` and the referenced JSONL files for detailed results.
+diff --git a/final_forced_edges.jsonl b/final_forced_edges.jsonl
+new file mode 100644
+index 0000000..34bb98d
+--- /dev/null
++++ b/final_forced_edges.jsonl
+@@ -0,0 +1,7 @@
++{"seed": 0, "offset": null, "success": true, "steps": 127}
++{"seed": 1, "offset": null, "success": true, "steps": 116}
++{"seed": 2, "offset": null, "success": true, "steps": 113}
++{"seed": 7, "offset": null, "success": true, "steps": 174}
++{"seed": 0, "offset": -0.05, "success": true, "steps": 127}
++{"seed": 0, "offset": -0.055, "success": true, "steps": 127}
++{"seed": 0, "offset": -0.06, "success": true, "steps": 127}
+diff --git a/validation_summary.json b/validation_summary.json
+new file mode 100644
+index 0000000..e73f8ef
+--- /dev/null
++++ b/validation_summary.json
+@@ -0,0 +1,50 @@
++{
++  "approach_sha256": "c7c9db30a99eb3764bb063ed6b03030573cfa8e0d5623c189cac5c65e31afb38",
++  "suites": {
++    "final_defaults.jsonl": {
++      "episodes": 500,
++      "passed": 500,
++      "max_policy_seconds": 0.026
++    },
++    "final_count4.jsonl": {
++      "episodes": 100,
++      "passed": 100,
++      "max_policy_seconds": 0.0456
++    },
++    "final_count3.jsonl": {
++      "episodes": 100,
++      "passed": 99,
++      "max_policy_seconds": 0.0309
++    },
++    "final_edge_regression.jsonl": {
++      "episodes": 20,
++      "passed": 20,
++      "max_policy_seconds": 0.0289
++    },
++    "final_smoke_defaults.jsonl": {
++      "episodes": 100,
++      "passed": 100,
++      "max_policy_seconds": 0.0232
++    },
++    "final_smoke_count3.jsonl": {
++      "episodes": 20,
++      "passed": 20,
++      "max_policy_seconds": 0.0348
++    },
++    "final_smoke_count4.jsonl": {
++      "episodes": 20,
++      "passed": 20,
++      "max_policy_seconds": 0.0475
++    },
++    "final_forced_edges.jsonl": {
++      "episodes": 7,
++      "passed": 7,
++      "max_policy_seconds": 0
++    }
++  },
++  "notes": [
++    "The broad default and count4 sweeps tested ffca88e before the isolated edge-recovery extension.",
++    "The original count3 sweep failed seed386; expanded wall-edge grasp bounds fixed it, and all20 edge regression cases passed.",
++    "The final implementation passed100 default,20 count3,20 count4 and7 forced tilted-gripper regressions."
++  ]
++}

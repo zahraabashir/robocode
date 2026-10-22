@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 1a8cedf..45af65d 100644
+--- a/approach.py
++++ b/approach.py
+@@ -191,7 +191,7 @@ class GeneratedApproach:
+             # First ensure the full stem can sweep without striking a wall.
+             clearance = min(1.55, lv + w + 0.20)
+             anchor = np.clip(s[0:2], clearance, 5.0 - clearance)
+-            if np.linalg.norm(anchor - s[0:2]) > 0.055:
++            if not self.has_oriented and np.linalg.norm(anchor - s[0:2]) > 0.055:
+                 preposition_delta = anchor - s[0:2]
+             else:
+                 self.pair_sign = 1.0 if angle_error > 0 else -1.0

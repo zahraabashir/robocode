@@ -1,0 +1,16 @@
+diff --git a/approach.py b/approach.py
+index 22a1384..4f7031b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -122,9 +122,9 @@ class GeneratedApproach:
+                 self.attached = True
+             # A modest vertical park is enough to clear the ground while still
+             # leaving room above it for a later verified re-grasp.
+-            park_y = 0.35
++            park_y = 0.45 if (obj.type.name == "target_block" and not is_target) else 0.35
+             parked_high_enough = (not is_target and self.attached and oy >= park_y)
+-            lift_limit = self.safe_y - 0.025 if is_target else 0.74
++            lift_limit = self.safe_y if is_target else 0.74
+             if ry < lift_limit and not parked_high_enough:
+                 return self._action(dy=min(0.05, self.safe_y - ry), vac=1.0)
+             if not self.attached:

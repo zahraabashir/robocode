@@ -1,0 +1,1047 @@
+[
+  {
+    "id": "C001",
+    "commit": "7701bbc3292d4f83d0d0cddefa29dd28a5e26eb2",
+    "parents": [],
+    "date": "2026-09-21T22:01:48+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".gitignore",
+      "AGENTS.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_7701bbc.diff",
+    "diff_sha256": "014cc2bae7a6b6ca81d691de35615ea2810faa078529069e0b70609539245015",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "378927f98bb60d2e18ec47e6e6f56cbc688b2c7a",
+    "parents": [
+      "7701bbc3292d4f83d0d0cddefa29dd28a5e26eb2"
+    ],
+    "date": "2026-09-21T22:03:40+02:00",
+    "title": "Add independent visibility and operator probe",
+    "files": [
+      "inspect_env.py",
+      "probe_motion.py",
+      "probe_shape.py",
+      "probe_visibility.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C002_378927f.diff",
+    "diff_sha256": "d8b4d61a736cd0466c21e371984d9804c4a0c8d35d70bdb9e5c9ae72ee48974a",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C003",
+    "commit": "18ba3c49b0fb0791a401f4a7ff6c873ee09f0611",
+    "parents": [
+      "378927f98bb60d2e18ec47e6e6f56cbc688b2c7a"
+    ],
+    "date": "2026-09-21T22:04:07+02:00",
+    "title": "Probe cross-divider camera visibility",
+    "files": [
+      "probe_crosslos.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C003_18ba3c4.diff",
+    "diff_sha256": "a72fbabe610656ee58bb7ea042361017379df00fdda5d863b571be3876e335ea",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C004",
+    "commit": "a7bf7fd9a6e6a29b23e8478d2abb92c0b964399c",
+    "parents": [
+      "18ba3c49b0fb0791a401f4a7ff6c873ee09f0611"
+    ],
+    "date": "2026-09-21T22:04:30+02:00",
+    "title": "Implement initial object-centric navigation and cooperative task policy",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C004_a7bf7fd.diff",
+    "diff_sha256": "5bec0d3f1f6ecc0a10eba67eb51f5e08f028818684e3407e45f342f1f65195d8",
+    "events": [
+      {
+        "event": "E0018",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "e2b28238fce8b688d250b55c2397ff22d99b6c16d804221843ba643ec28b845e",
+    "version": "evidence/versions/C004_a7bf7fd_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "1d68b469bdfbc952768e2221ec21d6f027e4f5f1",
+    "parents": [
+      "a7bf7fd9a6e6a29b23e8478d2abb92c0b964399c"
+    ],
+    "date": "2026-09-21T22:05:00+02:00",
+    "title": "Use measured circular clearance and ignore divider for visibility",
+    "files": [
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C005_1d68b46.diff",
+    "diff_sha256": "fa0ee1cfbdf62775dda2571379fbc219108d8e3070610c05be51553eed1ced65",
+    "events": [
+      {
+        "event": "E0020",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C006",
+    "commit": "b6f4ab5dd349144cc916babddd5bcce53b6d150e",
+    "parents": [
+      "1d68b469bdfbc952768e2221ec21d6f027e4f5f1"
+    ],
+    "date": "2026-09-21T22:05:28+02:00",
+    "title": "Correct measured collision model and waypoint advancement",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C006_b6f4ab5.diff",
+    "diff_sha256": "e5c32f56811b64ac9705e12a856bb175cc897341a97db87f495d8b6b50cd4333",
+    "events": [
+      {
+        "event": "E0022",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "151b08957056c5dc3d796884224166c697276abf6c7510f74017ec9625157b87",
+    "version": "evidence/versions/C006_b6f4ab5_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "49b61ec7cf7b038108ad1f8971d959c615428e9d",
+    "parents": [
+      "b6f4ab5dd349144cc916babddd5bcce53b6d150e"
+    ],
+    "date": "2026-09-21T22:06:24+02:00",
+    "title": "Add targeted LOS failure probes",
+    "files": [
+      "probe_los_details.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C007_49b61ec.diff",
+    "diff_sha256": "e0ff62117671c61446d778efee47e193674aa54469aa7dbf46aa2c8d01ea3725",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C008",
+    "commit": "a8268521380e8410f70f4de5064ba1446e852ee6",
+    "parents": [
+      "49b61ec7cf7b038108ad1f8971d959c615428e9d"
+    ],
+    "date": "2026-09-21T22:06:26+02:00",
+    "title": "Replan after refused camera and radio operators",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C008_a826852.diff",
+    "diff_sha256": "38eddb4a8e000a480a384f9b38876222bfb175886046262f89eaa015c264b0c6",
+    "events": [
+      {
+        "event": "E0026",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6d2666e765aeffab08f1a7912285671590e3a42dc420ad3b0e931332d1ece556",
+    "version": "evidence/versions/C008_a826852_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C009",
+    "commit": "6f08fb938dca82e5e4bd83a862dae0772733d474",
+    "parents": [
+      "a8268521380e8410f70f4de5064ba1446e852ee6"
+    ],
+    "date": "2026-09-21T22:06:43+02:00",
+    "title": "Correct operator recovery dispatch and syntax",
+    "files": [
+      "approach.py",
+      "test_results.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C009_6f08fb9.diff",
+    "diff_sha256": "d235deb4a3d08f8a9ec97c2628894fe4fd7358fe064cb9c3231dc5a881bb2bbc",
+    "events": [
+      {
+        "event": "E0031",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "4481b3243ed666591a9b138375e2830557df7d790a7a83732d85818e609f4276",
+    "version": "evidence/versions/C009_6f08fb9_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C010",
+    "commit": "4581e651025a7513e21f15a918cd728c1da73649",
+    "parents": [
+      "6f08fb938dca82e5e4bd83a862dae0772733d474"
+    ],
+    "date": "2026-09-21T22:07:10+02:00",
+    "title": "Measure LOS clearance at failed viewpoints",
+    "files": [
+      "probe_los_threshold.py",
+      "test_results.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C010_4581e65.diff",
+    "diff_sha256": "270431900468b49e9613a8c005d99b0e6307acbf7b0af1baaa6dbd9ac56aa227",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C011",
+    "commit": "bffd3d54005bbc2dd748c49b87ffa4dffd17ebec",
+    "parents": [
+      "4581e651025a7513e21f15a918cd728c1da73649"
+    ],
+    "date": "2026-09-21T22:07:33+02:00",
+    "title": "Freeze failing policy for reproducible LOS probes",
+    "files": [
+      "debug_policy.py",
+      "probe_los_threshold.py",
+      "probe_policy_old.py",
+      "test_results.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C011_bffd3d5.diff",
+    "diff_sha256": "7150c1d3b3552c38bb45e30dd7da1173ecfd7b81dbb24c970b2113e454cf67d7",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C012",
+    "commit": "269b560e32832bf6ddcecf3a34d078aaf75a4d82",
+    "parents": [
+      "bffd3d54005bbc2dd748c49b87ffa4dffd17ebec"
+    ],
+    "date": "2026-09-21T22:07:45+02:00",
+    "title": "Abandon inaccessible sample targets after collision recovery",
+    "files": [
+      "approach.py",
+      "probe_lander.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C012_269b560.diff",
+    "diff_sha256": "c4d49724d7053a85b6cd88db921de51ff15656e4a313e01f83b7b65d2f4c1547",
+    "events": [
+      {
+        "event": "E0052",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "849f14447fefacf0f0d1f5656cb0ef60373735a4e9c394506747fded7b498123",
+    "version": "evidence/versions/C012_269b560_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C013",
+    "commit": "439dd02e5a24e3c67ac01de7468b1eae99f66292",
+    "parents": [
+      "269b560e32832bf6ddcecf3a34d078aaf75a4d82"
+    ],
+    "date": "2026-09-21T22:07:53+02:00",
+    "title": "Test other rover as radio occluder",
+    "files": [
+      "probe_rover_los.py",
+      "test_results_more.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C013_439dd02.diff",
+    "diff_sha256": "c7b80bc40295d6346912bb3505d3958637626e5a7aceb097a045029771e6e817",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C014",
+    "commit": "54bd720c7e2f22cb31c900febe88a4f00a2b030e",
+    "parents": [
+      "439dd02e5a24e3c67ac01de7468b1eae99f66292"
+    ],
+    "date": "2026-09-21T22:08:52+02:00",
+    "title": "Measure radio distance cutoff and complete obstacle clearances",
+    "files": [
+      "probe_lander_exact.py",
+      "probe_send_distance.py",
+      "test_results_more.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C014_54bd720.diff",
+    "diff_sha256": "e7a18fbdeefd9f5077e63904e44f4cffe267a8e489fc0313a196154adfe0cda3",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C015",
+    "commit": "664920063601e1cededb90bea4f888f3c00af913",
+    "parents": [
+      "54bd720c7e2f22cb31c900febe88a4f00a2b030e"
+    ],
+    "date": "2026-09-21T22:09:06+02:00",
+    "title": "Refine lander footprint and sight clearance; shorten return paths",
+    "files": [
+      "approach.py",
+      "approach_backup.py",
+      "probe_lander_exact.py",
+      "test_results_more.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C015_6649200.diff",
+    "diff_sha256": "16850c4c36173357f1da789a4c4e4b3025dde4d7c2f1f3024052401b5886c291",
+    "events": [
+      {
+        "event": "E0065",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "30158445baa8e8e9ba447a0711d69208f519e0823a323afe67756168d0e4495d",
+    "version": "evidence/versions/C015_6649200_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C016",
+    "commit": "cd725ec000d10e9ec0e6dab50a666f3a39c08ab1",
+    "parents": [
+      "664920063601e1cededb90bea4f888f3c00af913"
+    ],
+    "date": "2026-09-21T22:09:35+02:00",
+    "title": "Record lander footprint probes for accurate rover navigation",
+    "files": [
+      "test_many.txt",
+      "test_refined.txt",
+      "test_results_more.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C016_cd725ec.diff",
+    "diff_sha256": "ab93b17108cf9ee70d6645342d6d9a45b07f685e9f4d3c3ee5bdb30c92e96906",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C017",
+    "commit": "85c2ab808c7d046a7d4a55d15017f6b747814855",
+    "parents": [
+      "cd725ec000d10e9ec0e6dab50a666f3a39c08ab1"
+    ],
+    "date": "2026-09-21T22:10:40+02:00",
+    "title": "Avoid ambiguous sample pickups and clear stores before resampling",
+    "files": [
+      "approach.py",
+      "test_many.txt",
+      "test_refined.txt",
+      "test_results_more.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C017_85c2ab8.diff",
+    "diff_sha256": "e23ad83c632c935eba7e651043002ab8fe109e804492e30bed5ffcac80f97085",
+    "events": [
+      {
+        "event": "E0054",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "3b65ce465fd133856e991a32a13256fbb88b7871682759724f397baea7a5444c",
+    "version": "evidence/versions/C017_85c2ab8_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C018",
+    "commit": "d8327f3677a399c5526266a3bc4c31b66682e6e3",
+    "parents": [
+      "85c2ab808c7d046a7d4a55d15017f6b747814855"
+    ],
+    "date": "2026-09-21T22:11:35+02:00",
+    "title": "Add seed-sweep diagnostics for rejected operators and policy time",
+    "files": [
+      "test_many.txt",
+      "test_refined.txt",
+      "test_stats.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C018_d8327f3.diff",
+    "diff_sha256": "1fe8f806bb66801efda9a615700be235283b32794469e5749c6bba93fbe3eeec",
+    "events": [
+      {
+        "event": "E0094",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C019",
+    "commit": "26c1504e34cf137c2c31527fbe83ca5651a80dad",
+    "parents": [
+      "d8327f3677a399c5526266a3bc4c31b66682e6e3"
+    ],
+    "date": "2026-09-21T22:13:55+02:00",
+    "title": "Plan cooperative task tours to balance rover completion times",
+    "files": [
+      "approach.py",
+      "approach_greedy.py",
+      "stats200.txt",
+      "task_planner.py",
+      "test_many.txt",
+      "test_refined.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C019_26c1504.diff",
+    "diff_sha256": "692e96c097daa0a5fac88d99d5415184435a16d6e5580980764d74c10a3840e0",
+    "events": [
+      {
+        "event": "E0091",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "07425a67db4ae50c19c0c5434d72755e4ab5298b80610400989a7e5928fa039d",
+    "version": "evidence/versions/C019_26c1504_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C020",
+    "commit": "3c218ac1b7ecaf788fb7134393be700c39bd8ee2",
+    "parents": [
+      "26c1504e34cf137c2c31527fbe83ca5651a80dad"
+    ],
+    "date": "2026-09-21T22:15:24+02:00",
+    "title": "Keep viewpoints beside objectives near pillars and plan consecutive samples",
+    "files": [
+      "approach.py",
+      "inspect_seed.py",
+      "stats200.txt",
+      "stats_planned.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C020_3c218ac.diff",
+    "diff_sha256": "287243191dfb7efe10f987905f04c87163f4e1d4a53a57227bf3ac5e77aac2db",
+    "events": [
+      {
+        "event": "E0080",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "cda01404239e188f68d506a46bf1c39be7baabc1724c3116a6b9681b51dec6c9",
+    "version": "evidence/versions/C020_3c218ac_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C021",
+    "commit": "f656838f0d4fc308be2f74b9215c0fb5ed56b076",
+    "parents": [
+      "3c218ac1b7ecaf788fb7134393be700c39bd8ee2"
+    ],
+    "date": "2026-09-21T22:15:47+02:00",
+    "title": "Add controlled comparison against updated greedy task allocation",
+    "files": [
+      "approach_no_plan.py",
+      "stats200.txt",
+      "stats_planned.txt",
+      "test_stats.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C021_f656838.diff",
+    "diff_sha256": "e15a753e9f0031b0c613f6894762743e2e3e4fe8959920e21d9e7f452bc91813",
+    "events": [
+      {
+        "event": "E0109",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C022",
+    "commit": "a0bdce6b2f38af51632f7b6271413bc176de4892",
+    "parents": [
+      "f656838f0d4fc308be2f74b9215c0fb5ed56b076"
+    ],
+    "date": "2026-09-21T22:17:45+02:00",
+    "title": "Reassign work globally when a scheduled route proves inaccessible",
+    "files": [
+      "approach.py",
+      "inspect_collision.py",
+      "probe_pillar.py",
+      "stats200.json",
+      "stats200.txt",
+      "stats_greedy.txt",
+      "stats_planned.json",
+      "stats_planned.txt",
+      "stats_planned2.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C022_a0bdce6.diff",
+    "diff_sha256": "cb3998bbe502953f3c1809d3c7554567b1262a48e7bd5ab7bd9d348f23347b39",
+    "events": [
+      {
+        "event": "E0096",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "fd5c3664d5692764a2fdad33e9e9be174b3bf3e48e5a2abaa79e34725325bc0a",
+    "version": "evidence/versions/C022_a0bdce6_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C023",
+    "commit": "71a6844130c1f5f22c09a0ffc7064940e9284f9b",
+    "parents": [
+      "a0bdce6b2f38af51632f7b6271413bc176de4892"
+    ],
+    "date": "2026-09-21T22:18:37+02:00",
+    "title": "Pipeline photographs and transmissions into travel toward home",
+    "files": [
+      "approach.py",
+      "approach_planned_before_pipeline.py",
+      "stats_greedy.txt",
+      "stats_planned2.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C023_71a6844.diff",
+    "diff_sha256": "23377a35caba1b61aaae897d5c3e86f9b2b9bb2ed8babc3dd2894d0191621997",
+    "events": [
+      {
+        "event": "E0111",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "767b46a144468974aef9290a19bda9956b7e0efe8a388c49e1195299297ff4d6",
+    "version": "evidence/versions/C023_71a6844_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C024",
+    "commit": "e59551ba7b1f59471e14be0b5f22ca496a3fc8e2",
+    "parents": [
+      "71a6844130c1f5f22c09a0ffc7064940e9284f9b"
+    ],
+    "date": "2026-09-21T22:20:43+02:00",
+    "title": "Add black-box probes of tall pillar collision footprint",
+    "files": [
+      "probe_pillar_axis.py",
+      "probe_pillar_shape.py",
+      "stats_greedy.json",
+      "stats_greedy.txt",
+      "stats_pipeline.txt",
+      "stats_planned2.json",
+      "stats_planned2.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C024_e59551b.diff",
+    "diff_sha256": "90e06b9871ca8518324366b5f7c981c461695349702c0776ba6a9d8795d32bdf",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C025",
+    "commit": "fb1bd7628ea108fa7f0014b6bf2dffb3ff448d74",
+    "parents": [
+      "e59551ba7b1f59471e14be0b5f22ca496a3fc8e2"
+    ],
+    "date": "2026-09-21T22:21:04+02:00",
+    "title": "Model the measured octagonal rover clearance around tall pillars",
+    "files": [
+      "approach.py",
+      "approach_pipeline.py",
+      "stats_pipeline.json",
+      "stats_pipeline.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C025_fb1bd76.diff",
+    "diff_sha256": "490d6863a03ff7bba8ae5b37ec9bb30cc6dcc1dace324b25605b89aa3319d427",
+    "events": [
+      {
+        "event": "E0126",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "c327cd68c40ad4349483b1b58ee534483115543ca0fa71c5e2fbc0e486293799",
+    "version": "evidence/versions/C025_fb1bd76_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C026",
+    "commit": "f862c530b34f0fa06ba64fc7a8541b3df13b55be",
+    "parents": [
+      "fb1bd7628ea108fa7f0014b6bf2dffb3ff448d74"
+    ],
+    "date": "2026-09-21T22:22:56+02:00",
+    "title": "Bound tour enumeration for larger objective-count variants",
+    "files": [
+      "stats_final2000.txt",
+      "stats_final4.txt",
+      "stats_final400.txt",
+      "stats_octagon.txt",
+      "task_planner.py"
+    ],
+    "file_roles": [
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C026_f862c53.diff",
+    "diff_sha256": "1b073dcbbc0470ed1d915e34155910db082ed1c47cb4e2da48d6fd0b379fc0ed",
+    "events": [
+      {
+        "event": "E0124",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C027",
+    "commit": "fc2780d0093a9fe680dbde5af036d9fd8793fffc",
+    "parents": [
+      "f862c530b34f0fa06ba64fc7a8541b3df13b55be"
+    ],
+    "date": "2026-09-21T22:23:36+02:00",
+    "title": "Add reset-state screening for tight or unreachable configurations",
+    "files": [
+      "scan_states.py",
+      "stats_final2000.txt",
+      "stats_final4.txt",
+      "stats_final400.txt",
+      "stats_octagon.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C027_fc2780d.diff",
+    "diff_sha256": "b95115832d87982f975bffdb0ed78bd42c8a8c496c8e3112fd2b0d59961de5ac",
+    "events": [
+      {
+        "event": "E0136",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C028",
+    "commit": "26a6f98d7bc8ecf6b12afbccc663d3f851c37a0e",
+    "parents": [
+      "fc2780d0093a9fe680dbde5af036d9fd8793fffc"
+    ],
+    "date": "2026-09-21T22:27:00+02:00",
+    "title": "Recover from exhausted viewpoints and stalled local navigation",
+    "files": [
+      "approach.py",
+      "scan_results.json",
+      "scan_results.txt",
+      "stats_final2000.json",
+      "stats_final2000.txt",
+      "stats_final4.json",
+      "stats_final4.txt",
+      "stats_final400.txt",
+      "stats_octagon.json",
+      "stats_octagon.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C028_26a6f98.diff",
+    "diff_sha256": "1bcbc4bc056de9324e1c78b40c651b258e5d75399567f57fd67bee40adaf2051",
+    "events": [
+      {
+        "event": "E0140",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "f04441cb36f922d516a3c20c222a45c4035f344b82a08c6ee133e9187e1f5a00",
+    "version": "evidence/versions/C028_26a6f98_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C029",
+    "commit": "614fb3cb82fe599ac3eebc7e77870c6e0a535cb9",
+    "parents": [
+      "26a6f98d7bc8ecf6b12afbccc663d3f851c37a0e"
+    ],
+    "date": "2026-09-21T22:29:55+02:00",
+    "title": "Probe lander-trapped stones across rover headings on seed 5828",
+    "files": [
+      "probe_trapped_samples.py",
+      "stats_final400.json",
+      "stats_final400.txt",
+      "stats_recovery.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C029_614fb3c.diff",
+    "diff_sha256": "8b52284779310104707ceb2b099581defc307a1fb358b15044c62028020e3ff1",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C030",
+    "commit": "460ec4ff028f6d224da92eb198f38a5e427ab0ae",
+    "parents": [
+      "614fb3cb82fe599ac3eebc7e77870c6e0a535cb9"
+    ],
+    "date": "2026-09-21T22:34:22+02:00",
+    "title": "Remember successful radio locations for later sample transmissions",
+    "files": [
+      "approach.py",
+      "stats_recovery.json",
+      "stats_recovery.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C030_460ec4f.diff",
+    "diff_sha256": "5f500121948927485c40a33ebe0197d52ff64133d7090731ab7310c10f04fa14",
+    "events": [
+      {
+        "event": "E0170",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a1d60c1788e36a5483216c43ac6d2501a5b10a6462d5e09ca4fceb5367fc5e5f",
+    "version": "evidence/versions/C030_460ec4f_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C031",
+    "commit": "1829c5e3d78f639633465da743ee0806204eead6",
+    "parents": [
+      "460ec4ff028f6d224da92eb198f38a5e427ab0ae"
+    ],
+    "date": "2026-09-21T22:35:04+02:00",
+    "title": "Attribute confirmed radio visibility only to uniquely held results",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C031_1829c5e.diff",
+    "diff_sha256": "7ff86a505785567728782290b0ad3714d2f6b4ab30613f390bcce734d1301a25",
+    "events": [
+      {
+        "event": "E0172",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a72346e2908add9bdd51fa1855b20ad58e915262b664042769bc86b9948fe467",
+    "version": "evidence/versions/C031_1829c5e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C032",
+    "commit": "adfe95630c555598fc1e63f2322eb05264c4aaa1",
+    "parents": [
+      "1829c5e3d78f639633465da743ee0806204eead6"
+    ],
+    "date": "2026-09-21T22:36:35+02:00",
+    "title": "Distinguish opportunistic radio attempts from failures at planned viewpoints",
+    "files": [
+      "approach.py",
+      "probe_dynamic_radio.py",
+      "probe_radio_memory.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C032_adfe956.diff",
+    "diff_sha256": "99ea2b2a6669fdf0bc4b96043026ff8a6ec3b1eb29fd411833a2a32086a7f576",
+    "events": [
+      {
+        "event": "E0178",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "0741c08bc9b0fcee8de2ccb3eb78970e10154433df1fc857b15f31ce477e8f59",
+    "version": "evidence/versions/C032_adfe956_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C033",
+    "commit": "637c0df37ef8cff40e5654710f94e8d8bde04a28",
+    "parents": [
+      "adfe95630c555598fc1e63f2322eb05264c4aaa1"
+    ],
+    "date": "2026-09-21T22:37:08+02:00",
+    "title": "Verify radio viewpoints remain valid with second rover parked at home",
+    "files": [
+      "probe_dynamic_radio.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C033_637c0df.diff",
+    "diff_sha256": "b2b64e34649a255b7433ba446906ed403ff817dee766422413e5cc1f0022b88b",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C034",
+    "commit": "3bb0c6108ad22c6ad73458be12e600ac565fb824",
+    "parents": [
+      "637c0df37ef8cff40e5654710f94e8d8bde04a28"
+    ],
+    "date": "2026-09-21T22:38:31+02:00",
+    "title": "Add action-contract and repeated-reset validation",
+    "files": [
+      "stats_final_latest.txt",
+      "stats_final_latest4.txt",
+      "test_reuse.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C034_3bb0c61.diff",
+    "diff_sha256": "ab09d82e840bfe751fbb663842bc9701c7f562c71c4f0821a76a54ca5a968d5e",
+    "events": [
+      {
+        "event": "E0187",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C035",
+    "commit": "2e041446fb4c20abbfb43617f36c0d85d060e7b8",
+    "parents": [
+      "3bb0c6108ad22c6ad73458be12e600ac565fb824"
+    ],
+    "date": "2026-09-21T22:39:24+02:00",
+    "title": "Keep final policy, reproducible tests, and validation evidence",
+    "files": [
+      "approach_backup.py",
+      "approach_greedy.py",
+      "approach_no_plan.py",
+      "approach_pipeline.py",
+      "approach_planned_before_pipeline.py",
+      "debug_policy.py",
+      "inspect_collision.py",
+      "inspect_env.py",
+      "inspect_seed.py",
+      "probe_crosslos.py",
+      "probe_dynamic_radio.py",
+      "probe_lander.py",
+      "probe_lander_exact.py",
+      "probe_los_details.py",
+      "probe_los_threshold.py",
+      "probe_motion.py",
+      "probe_pillar.py",
+      "probe_pillar_axis.py",
+      "probe_pillar_shape.py",
+      "probe_policy_old.py",
+      "probe_radio_memory.py",
+      "probe_rover_los.py",
+      "probe_send_distance.py",
+      "probe_shape.py",
+      "probe_visibility.py",
+      "scan_results.txt",
+      "stats200.json",
+      "stats200.txt",
+      "stats_final2000.txt",
+      "stats_final4.txt",
+      "stats_final400.txt",
+      "stats_final_latest.txt",
+      "stats_final_latest4.txt",
+      "stats_greedy.txt",
+      "stats_octagon.txt",
+      "stats_pipeline.json",
+      "stats_pipeline.txt",
+      "stats_planned.json",
+      "stats_planned.txt",
+      "stats_planned2.json",
+      "stats_planned2.txt",
+      "stats_recovery.txt",
+      "test_many.txt",
+      "test_refined.txt",
+      "test_results.txt",
+      "test_results_more.txt",
+      "test_stats.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C035_2e04144.diff",
+    "diff_sha256": "fee52fd3a0ef3235b88798cc336e1474ed44d92bfd29d554a11d47ce73f24aa6",
+    "events": [
+      {
+        "event": "E0191",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C036",
+    "commit": "59cede108d9b8ec993ea1bcbee23185ea28a15dd",
+    "parents": [
+      "2e041446fb4c20abbfb43617f36c0d85d060e7b8"
+    ],
+    "date": "2026-09-21T22:41:31+02:00",
+    "title": "Try nearby radio alternatives before revisiting a distant confirmed location",
+    "files": [
+      "approach.py",
+      "stats_final_latest.json",
+      "stats_final_latest.txt",
+      "stats_final_latest4.json",
+      "stats_final_latest4.txt"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C036_59cede1.diff",
+    "diff_sha256": "648e516a94f92c16aaa6535560f3b1382eb51ee5855e4e8a49315025eb1cafc2",
+    "events": [
+      {
+        "event": "E0200",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "ea6d21baf4eeb001ee0f8985caed48cf41b12a364764596f37603c05126a6af8",
+    "version": "evidence/versions/C036_59cede1_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C037",
+    "commit": "b628d28c623684c715c78b2e702a5d8c7f273a4d",
+    "parents": [
+      "59cede108d9b8ec993ea1bcbee23185ea28a15dd"
+    ],
+    "date": "2026-09-21T22:45:05+02:00",
+    "title": "Record final release validation and the empirically infeasible sample layout",
+    "files": [
+      "VALIDATION.md",
+      "stats_final_latest.json",
+      "stats_final_latest.txt",
+      "stats_final_latest4.json",
+      "stats_final_latest4.txt",
+      "stats_release.json",
+      "stats_release4.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C037_b628d28.diff",
+    "diff_sha256": "c02ee967231d847216cb58dd4b6635d7f9a30c4dbd30bcaca1308e9ef26ba643",
+    "events": [
+      {
+        "event": "E0215",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {}
+  }
+]

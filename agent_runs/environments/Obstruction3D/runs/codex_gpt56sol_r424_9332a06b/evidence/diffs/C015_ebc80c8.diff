@@ -1,0 +1,35 @@
+diff --git a/approach.py b/approach.py
+index 5ef88b8..93052a9 100644
+--- a/approach.py
++++ b/approach.py
+@@ -9,9 +9,9 @@ class GeneratedApproach:
+     def reset(self,state,info):
+         self.region=self._xyz(state,"target_region"); self.object_name="target_block"
+         self.mode="pick"; self.pick_i=self.pick_t=0
+-        self.B=np.zeros((11,4)); self.B[1,0]=1.; self.B[4,1]=1.
+-        self.B[6,2]=1.; self.B[8,3]=1.
+-        self.J=np.zeros((6,4)); self.cal_i=0; self.cal_sign=1; self.last_pos=None
++        self.B=np.zeros((11,5)); self.B[0,0]=1.; self.B[1,1]=1.; self.B[4,2]=1.
++        self.B[6,3]=1.; self.B[8,4]=1.
++        self.J=np.zeros((6,5)); self.cal_i=0; self.cal_sign=1; self.last_pos=None
+         self.last_delta=0.; self.move_count=0; self.waypoint=0
+         x=self._v(state,self.object_name,"pose_x")
+         if x<.23: base=(.18,-2.50,-.75)
+@@ -63,7 +63,7 @@ class GeneratedApproach:
+             else: self.J[:,self.cal_i]=col; self.cal_sign=-1
+             self.last_delta=0.
+         if self.mode=="calibrate":
+-            if self.cal_i>=4: self.mode="move"; self.move_count=0
++            if self.cal_i>=5: self.mode="move"; self.move_count=0
+             else:
+                 d=.04*self.cal_sign; a += self.B[:,self.cal_i]*d; a[10]=-1.
+                 self.last_pos=feat; self.last_delta=d; return a
+@@ -84,7 +84,7 @@ class GeneratedApproach:
+             a[10]=1.
+             self.release_t+=1
+             return a
+-        u=np.linalg.solve(self.J.T@self.J+1e-5*np.eye(4),self.J.T@np.clip(err,-.06,.06))
++        u=np.linalg.solve(self.J.T@self.J+1e-5*np.eye(5),self.J.T@np.clip(err,-.06,.06))
+         u=np.clip(u,-.10,.10)
+         a += self.B@u
+         a[10]=-1.; self.move_count+=1

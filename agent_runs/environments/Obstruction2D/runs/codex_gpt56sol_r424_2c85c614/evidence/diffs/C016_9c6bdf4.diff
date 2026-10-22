@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index ceb03a5..81cc7e9 100644
+--- a/approach.py
++++ b/approach.py
+@@ -138,7 +138,7 @@ class GeneratedApproach:
+             self.phase = "retreat"
+         if self.phase == "retreat":
+             if ry < self.safe_y - 0.004:
+-                return self._action(dy=0.05)
++                return self._action(dy=min(0.05, self.safe_y - ry))
+             self.index += 1
+             self.retry, self.attached, self.release_wait = 0, False, 0
+             self.phase = "align" if self.index < len(self.todo) else "done"

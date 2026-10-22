@@ -1,0 +1,71 @@
+diff --git a/approach2.py b/approach2.py
+index 3748e9e..b6e2421 100644
+--- a/approach2.py
++++ b/approach2.py
+@@ -57,8 +57,10 @@ def _shift_or(A, a, b):
+ 
+ 
+ class RoverBFS:
+-    def __init__(self, scene, idx, home, img_r=IMG_R):
++    def __init__(self, scene, idx, home, img_r=IMG_R, home_th=0.0, other_home=None):
+         self.sc = scene
++        self.home_th = home_th
++        self.other_home = other_home
+         self.idx = idx
+         self.home = np.array(home, dtype=float)
+         side = 1.0 if home[0] > 0 else -1.0
+@@ -109,7 +111,21 @@ class RoverBFS:
+         both = stone & soil
+         self.stone_m = stone & ~both & self.free
+         self.soil_m = soil & ~both & self.free
+-        self.send_m = ((X - sc.lpos[0]) ** 2 + (Y - sc.lpos[1]) ** 2 <= SEND_R ** 2) & self.free
++        inr = ((X - sc.lpos[0]) ** 2 + (Y - sc.lpos[1]) ** 2 <= SEND_R ** 2) & self.free
++        ok = np.zeros(self.shape, bool)
++        if self.other_home is not None:
++            away = np.arctan2(Y - sc.lpos[1], X - sc.lpos[0])
++            ok |= np.abs(_wrap(self.home_th - away)) <= np.radians(60)
++            for (i, j) in zip(*np.nonzero(inr & ~ok)):
++                p = np.array([self.xs[i], self.ys[j]])
++                if _seg_dist(self.other_home, p, sc.lpos) < 0.29:
++                    continue
++                if any(_seg_dist(pc, p, sc.lpos) < 0.14 for pc in sc.pillars):
++                    continue
++                ok[i, j] = True
++        else:
++            ok[:] = True
++        self.send_m = inr & ok
+         self._img_cache = {}
+ 
+     def pos(self, c):
+@@ -272,7 +288,8 @@ class GeneratedApproach:
+         g = state.get
+         self.homes = [np.array([g(r, "x"), g(r, "y")]) for r in sc.rovers]
+         self.home_th = [g(r, "theta") for r in sc.rovers]
+-        self.bfs = [RoverBFS(sc, i, self.homes[i]) for i in range(2)]
++        self.bfs = [RoverBFS(sc, i, self.homes[i], home_th=self.home_th[i], other_home=self.homes[1 - i])
++                    for i in range(2)]
+         nobj = len(sc.objectives)
+         n = nobj + 2
+         full = (1 << n) - 1
+diff --git a/dbg2.py b/dbg2.py
+index 98f9cc5..130309e 100644
+--- a/dbg2.py
++++ b/dbg2.py
+@@ -1,14 +1,14 @@
+ import sys
+ import numpy as np
+ from env_client import make_env
+-from approach import GeneratedApproach
++import os, importlib; GeneratedApproach = importlib.import_module(os.environ.get("APP", "approach")).GeneratedApproach
+ seed = int(sys.argv[1]); N = int(sys.argv[2])
+ env = make_env()
+ obs, info = env.reset(seed=seed)
+ ap = GeneratedApproach(env.action_space, env.observation_space, {})
+ ap.reset(obs, info)
+-print("mytasks", ap.my_tasks)
+-for i in range(2): print(i, "visits", ap.plans[i]['visits'], "len", len(ap.plans[i]['path']))
++print("req", getattr(ap, "my_req", None))
++for i in range(2): print(i, [(tuple(np.round(ap.bfs[i].pos(c),2)), op) for c, op, L in ap.plans[i]["steps"]])
+ names = {v:k for k,v in {"sample": -5/6, "calibrate": -0.5, "image": -1/6, "noop": 1/6, "send": 0.5, "drop": 5/6}.items()}
+ for step in range(N):
+     a = ap.get_action(obs)

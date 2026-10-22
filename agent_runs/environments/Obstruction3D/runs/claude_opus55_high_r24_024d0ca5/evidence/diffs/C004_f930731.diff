@@ -1,0 +1,196 @@
+diff --git a/approach.py b/approach.py
+index c3cb75d..3500d44 100644
+--- a/approach.py
++++ b/approach.py
+@@ -74,7 +74,7 @@ class GeneratedApproach:
+         self.last_q = None
+         self.stuck = 0
+         self.release_tries = 0
+-        self.grasp_tries = 0
++        self.grasp_attempt = 0
+         self.placed_spots = []
+         self.prev_was_motion = False
+         self.descent_len = 0
+@@ -123,14 +123,16 @@ class GeneratedApproach:
+         name, kind = self.tasks[0]
+         p, q, h = self._pose(state, name)
+         self.cur_obj = name
+-        self.grasp_yaw = self._pick_yaw(q)
++        yaws = [0.0, np.pi / 2, np.pi / 4, -np.pi / 4]
++        self.grasp_yaw = self._pick_yaw(q) + yaws[self.grasp_attempt % len(yaws)]
++        self.grasp_yaw = (self.grasp_yaw + np.pi / 2) % np.pi - np.pi / 2
+         top = p[2] + h[2]
+         tool = self._tool(state)[:3, 3]
+         wps = []
+         if tool[2] < Z_SAFE - 0.01:
+             wps.append(np.array([tool[0], tool[1], Z_SAFE]))
+         wps.append(np.array([p[0], p[1], Z_SAFE]))
+-        wps.append(np.array([p[0], p[1], top + 0.005]))
++        wps.append(np.array([p[0], p[1], top + 0.02]))
+         self._set_path(state, wps, self.grasp_yaw)
+         self.phase = 'to_grasp'
+ 
+@@ -203,18 +205,11 @@ class GeneratedApproach:
+         if ph == 'close':
+             g = self._grasped_name(state)
+             if g is None:
+-                # descend a bit more and retry
+-                self.grasp_tries += 1
+-                p, _, h = self._pose(state, self.cur_obj)
+-                tool = self._tool(state)[:3, 3]
+-                self._set_path(state, [np.array([p[0], p[1], tool[2] - 0.01])], self.grasp_yaw)
+-                self.phase = 'to_grasp'
+-                self.prev_was_motion = False
+-                if self.grasp_tries > 6:
+-                    self.grasp_tries = 0
+-                    self._start_task(state)
++                # failed: retry with a different yaw
++                self.grasp_attempt += 1
++                self._start_task(state)
+                 return self._noop()
+-            self.grasp_tries = 0
++            self.grasp_attempt = 0
+             self.held = g
+             if g != self.cur_obj:
+                 # grabbed wrong object: treat it as an obstruction to clear
+diff --git a/debug_run.py b/debug_run.py
+new file mode 100644
+index 0000000..7b5a4d0
+--- /dev/null
++++ b/debug_run.py
+@@ -0,0 +1,23 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++from kin import tool_fk
++seed=int(sys.argv[1]); ms=int(sys.argv[2]) if len(sys.argv)>2 else 300
++env=make_env(); obs,info=env.reset(seed=seed)
++for n in sorted(obs.get_object_names()):
++    if n=='robot': continue
++    o=obs.get_object_from_name(n); print(n,[round(obs.get(o,f),3) for f in ['pose_x','pose_y','pose_z','half_extent_x','half_extent_y','half_extent_z']])
++ap=GeneratedApproach(env.action_space,env.observation_space,{}); ap.reset(obs,info)
++print('tasks',ap.tasks)
++prev=None
++for t in range(ms):
++    a=ap.get_action(obs)
++    q0=ap._q(obs)
++    obs,r,term,trunc,info=env.step(a)
++    moved=not np.allclose(ap._q(obs),q0,atol=1e-7)
++    tool=ap._tool(obs)[:3,3]
++    key=(ap.phase, moved)
++    if key!=prev or t%25==0:
++        print(t,ap.phase,'moved',moved,'tool',np.round(tool,3),'grip',a[10],'held',ap._grasped_name(obs),'nwp',len(ap.waypoints),'task',ap.tasks[0] if ap.tasks else None)
++    prev=key
++    if term: print('SUCCESS',t); break
+diff --git a/explore15.py b/explore15.py
+new file mode 100644
+index 0000000..5f11697
+--- /dev/null
++++ b/explore15.py
+@@ -0,0 +1,38 @@
++from env_client import make_env
++import numpy as np, sys
++from kin import tool_fk, tool_ik, down_R
++env = make_env()
++seed=0; name=sys.argv[1]; dz=float(sys.argv[2]); yaw=float(sys.argv[3])
++jn=[f'joint_{i}' for i in range(1,8)]
++def q_of(o): return np.array([o.get(R,f) for f in jn])
++def goto(qt,g=0):
++    global obs
++    for _ in range(60):
++        q=q_of(obs); d=qt-q
++        d=(d+np.pi)%(2*np.pi)-np.pi
++        if np.max(np.abs(d))<1e-5: return True
++        a=np.zeros(11,dtype=np.float32); a[3:10]=np.clip(d,-0.2,0.2); a[10]=g
++        obs,r,te,tr,info=env.step(a)
++        if np.allclose(q_of(obs),q,atol=1e-7): return False
++    return False
++def move(p, n=6):
++    cur=tool_fk(q_of(obs),base)[:3,3]
++    for k in range(1,n+1):
++        qt,ok=tool_ik(q_of(obs),cur+(p-cur)*k/n,down_R(yaw),base)
++        if not goto(qt): return False
++    return True
++obs,_=env.reset(seed=seed); R=obs.get_object_from_name('robot'); B=obs.get_object_from_name(name)
++base=(obs.get(R,'pos_base_x'), obs.get(R,'pos_base_y'), obs.get(R,'pos_base_rot'))
++bp=np.array([obs.get(B,f) for f in ['pose_x','pose_y','pose_z']]); h=[obs.get(B,f) for f in ['half_extent_x','half_extent_y','half_extent_z']]
++print(name,bp,h)
++rows=[]
++for dy in np.arange(-0.07,0.071,0.01):
++    row=''
++    for dx in np.arange(-0.07,0.071,0.01):
++        obs,_=env.reset(seed=seed)
++        move(bp+[dx,dy,0.12]); r=move(bp+[dx,dy,h[2]+dz])
++        a=np.zeros(11,dtype=np.float32); a[10]=-1; obs,*_=env.step(a)
++        g=[n for n in sorted(obs.get_object_names()) if n!='robot' and obs.get(obs.get_object_from_name(n),'grasp_active')>0]
++        row+=('.' if not g else ('G' if g[0]==name else g[0][0]))+('' if r else '!')+' '
++    print(round(dy,2),row,flush=True)
++env.close()
+diff --git a/explore16.py b/explore16.py
+new file mode 100644
+index 0000000..19a6262
+--- /dev/null
++++ b/explore16.py
+@@ -0,0 +1,35 @@
++from env_client import make_env
++import numpy as np, sys
++from kin import tool_fk, tool_ik, down_R
++env = make_env()
++seed=int(sys.argv[1]); name=sys.argv[2]; yaw=float(sys.argv[3])
++jn=[f'joint_{i}' for i in range(1,8)]
++def q_of(o): return np.array([o.get(R,f) for f in jn])
++def goto(qt,g=0):
++    global obs
++    for _ in range(60):
++        q=q_of(obs); d=qt-q
++        d=(d+np.pi)%(2*np.pi)-np.pi
++        if np.max(np.abs(d))<1e-5: return True
++        a=np.zeros(11,dtype=np.float32); a[3:10]=np.clip(d,-0.2,0.2); a[10]=g
++        obs,r,te,tr,info=env.step(a)
++        if np.allclose(q_of(obs),q,atol=1e-7): return False
++    return False
++def move(p, n=6):
++    cur=tool_fk(q_of(obs),base)[:3,3]
++    for k in range(1,n+1):
++        qt,ok=tool_ik(q_of(obs),cur+(p-cur)*k/n,down_R(yaw),base)
++        if not goto(qt): return False
++    return True
++obs,_=env.reset(seed=seed); R=obs.get_object_from_name('robot'); B=obs.get_object_from_name(name)
++base=(obs.get(R,'pos_base_x'), obs.get(R,'pos_base_y'), obs.get(R,'pos_base_rot'))
++bp=np.array([obs.get(B,f) for f in ['pose_x','pose_y','pose_z']]); h=[obs.get(B,f) for f in ['half_extent_x','half_extent_y','half_extent_z']]
++print(name,bp,h)
++for dz in np.arange(0.05,-0.03,-0.004):
++    obs,_=env.reset(seed=seed)
++    move(bp+[0,0,h[2]+0.08]); r=move(bp+[0,0,h[2]+dz],n=20)
++    tz=tool_fk(q_of(obs),base)[2,3]
++    a=np.zeros(11,dtype=np.float32); a[10]=-1; obs,*_=env.step(a)
++    g=[n for n in sorted(obs.get_object_names()) if n!='robot' and obs.get(obs.get_object_from_name(n),'grasp_active')>0]
++    print('dz',round(dz,3),'reached',r,'tool-top',round(tz-bp[2]-h[2],4),'grasp',g, round(obs.get(R,'finger_state'),3),flush=True)
++env.close()
+diff --git a/o16b.txt b/o16b.txt
+new file mode 100644
+index 0000000..aef1d61
+--- /dev/null
++++ b/o16b.txt
+@@ -0,0 +1,21 @@
++obstruction1 [0.10313927 0.20900817 0.10099424] [0.018631789833307266, 0.015414612367749214, 0.0159942377358675]
++dz 0.05 reached True tool-top 0.05 grasp [] 0.0
++dz 0.046 reached True tool-top 0.046 grasp [] 0.0
++dz 0.042 reached True tool-top 0.042 grasp [] 0.0
++dz 0.038 reached True tool-top 0.038 grasp [] 0.0
++dz 0.034 reached True tool-top 0.034 grasp ['obstruction1'] 0.55
++dz 0.03 reached True tool-top 0.03 grasp ['obstruction1'] 0.55
++dz 0.026 reached True tool-top 0.026 grasp [] 0.0
++dz 0.022 reached True tool-top 0.022 grasp [] 0.0
++dz 0.018 reached True tool-top 0.0181 grasp [] 0.0
++dz 0.014 reached False tool-top 0.0174 grasp [] 0.0
++dz 0.01 reached False tool-top 0.0206 grasp [] 0.0
++dz 0.006 reached False tool-top 0.0209 grasp [] 0.0
++dz 0.002 reached False tool-top 0.0177 grasp [] 0.0
++dz -0.002 reached False tool-top 0.0185 grasp [] 0.0
++dz -0.006 reached False tool-top 0.0198 grasp [] 0.0
++dz -0.01 reached False tool-top 0.0215 grasp [] 0.0
++dz -0.014 reached False tool-top 0.0189 grasp [] 0.0
++dz -0.018 reached False tool-top 0.0212 grasp [] 0.0
++dz -0.022 reached False tool-top 0.0188 grasp [] 0.0
++dz -0.026 reached False tool-top 0.0217 grasp [] 0.0

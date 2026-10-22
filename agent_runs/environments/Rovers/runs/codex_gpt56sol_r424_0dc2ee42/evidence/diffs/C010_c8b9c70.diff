@@ -1,0 +1,10 @@
+diff --git a/probe_motion_design.py b/probe_motion_design.py
+index 8b830a9..e24e373 100644
+--- a/probe_motion_design.py
++++ b/probe_motion_design.py
+@@ -28,3 +28,5 @@ def run(seed, commands):
+ 
+ run(0, [("north", (0, .2), 22), ("west", (-.2, 0), 18), ("south", (0, -.2), 22)])
+ run(1, [("west", (-.2, 0), 18), ("north", (0, .2), 22), ("east", (.2, 0), 22)])
++for south_steps in range(0, 4):
++    run(20 + south_steps, [("south-gap", (0, -.2), south_steps), ("cross-west", (-.2, 0), 7)])

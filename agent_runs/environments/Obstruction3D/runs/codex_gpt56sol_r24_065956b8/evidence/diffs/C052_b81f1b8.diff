@@ -1,0 +1,15 @@
+diff --git a/approach.py b/approach.py
+index 341a170..8ef43da 100644
+--- a/approach.py
++++ b/approach.py
+@@ -154,8 +154,8 @@ class GeneratedApproach:
+             if self.using_generic:
+                 self.generic_objects.discard(self.object)
+                 self.goal_q = _HOME.copy()
+-                self.pick_bx = self.pick_xyz[0]-.4559817 if self.pick_xyz[0] <= .3359817 else -.12
+-                self.pick_by = self.pick_xyz[1]
++                self.pick_bx = -.12
++                self.pick_by = 0.0
+                 self.phase, self.phase_steps = "prepick_base", 0
+             if self.object.startswith("obstruction") and not self.using_generic:
+                 # Pinch near the top: center-height grasps can put fingertips

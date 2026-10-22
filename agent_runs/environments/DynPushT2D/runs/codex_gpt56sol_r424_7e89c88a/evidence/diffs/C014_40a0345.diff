@@ -1,0 +1,17 @@
+diff --git a/approach.py b/approach.py
+index 8e52236..ba422cd 100644
+--- a/approach.py
++++ b/approach.py
+@@ -24,9 +24,9 @@ class GeneratedApproach:
+             direction = np.array([1.0, 0.0])
+         else:
+             direction = delta / distance
+-        # Conservative clearance for the initial positioning phase.
+-        staging = block - direction * 0.13
+-        target = staging if np.linalg.norm(robot - staging) > 0.035 else block + direction * 0.08
++        # Aim through the block. Collision constrains the robot at the boundary;
++        # continuing toward a point beyond the centre supplies the push.
++        target = block + direction * 0.5
+         # The server checks the open interval despite the advertised Box bounds.
+         move = np.clip(target - robot, self.low + 1e-6, self.high - 1e-6)
+         self.step += 1

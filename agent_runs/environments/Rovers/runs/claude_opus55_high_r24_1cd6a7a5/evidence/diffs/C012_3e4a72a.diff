@@ -1,0 +1,25 @@
+diff --git a/approach2.py b/approach2.py
+index f6c9959..fd3529a 100644
+--- a/approach2.py
++++ b/approach2.py
+@@ -538,7 +538,11 @@ class GeneratedApproach:
+                 op_ok = not store
+             if not (pos_ok and op_ok):
+                 plan["fail"] += 1
+-                if plan["fail"] > 4 or (not pos_ok and plan["fail"] > 2):
++                Lpre = steps[k - 2][2] if k >= 2 else plan.get("L0", 0)
++                mask = ((1 << B.n) - 1) | B.CALB | B.STOREB
++                Lact = S | (B.CALB if cal else 0) | (B.STOREB if store else 0)
++                changed = (Lact & mask) != (Lpre & mask)
++                if plan["fail"] > 4 or (not pos_ok and plan["fail"] > 2) or (pos_ok and changed):
+                     self._replan(state, i, cur)
+                     plan = self.plans[i]
+                     steps = plan["steps"]
+diff --git a/res_approach2_d.json b/res_approach2_d.json
+new file mode 100644
+index 0000000..58478cd
+--- /dev/null
++++ b/res_approach2_d.json
+@@ -0,0 +1 @@
++{"0": 25, "1": 20, "2": 19, "3": 21, "4": 26, "5": 25, "6": 20, "7": 21, "8": 21, "9": 22, "10": 22, "11": 19, "12": 23, "13": 23, "14": 29, "15": 23, "16": 22, "17": 21, "18": 21, "19": 25, "20": 27, "21": 20, "22": 23, "23": 18, "24": 19, "25": 20, "26": 21, "27": 21, "28": 22, "29": 21, "30": 22, "31": 25, "32": 20, "33": 23, "34": 19, "35": 18, "36": 21, "37": 18, "38": 23, "39": 22, "40": 21, "41": 19, "42": 22, "43": 25, "44": 20, "45": 21, "46": 20, "47": 19}
+\ No newline at end of file

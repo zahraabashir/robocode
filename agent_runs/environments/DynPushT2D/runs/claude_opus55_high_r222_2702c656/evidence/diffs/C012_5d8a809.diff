@@ -1,0 +1,58 @@
+diff --git a/approach.py b/approach.py
+index c1e8d7b..3cee2a9 100644
+--- a/approach.py
++++ b/approach.py
+@@ -80,6 +80,7 @@ class GeneratedApproach:
+         self.pos_tol = 0.012
+         self.ang_tol = math.radians(3.5)
+         self.lam = 0.3
++        self.obl = math.radians(30)
+         self.lam_t = 0.3
+ 
+     def goal_theta(self, obs):
+@@ -186,7 +187,7 @@ class GeneratedApproach:
+             if best is not None:
+                 return best, dth, g
+         tr = self.pick_trans(B, prims, err)
+-        if tr is not None and float(B.dir_world(tr[2]) @ err) > 0.004:
++        if tr is not None and float(self.push_dir(B, tr, err) @ err) > 0.004:
+             return tr, dth, g
+         c = np.array([2.5, 2.5]) - B.p
+         cn = np.linalg.norm(c)
+@@ -195,6 +196,19 @@ class GeneratedApproach:
+             return tr2, dth, B.p + c / (cn + 1e-9) * min(cn, 0.3)
+         return tr, dth, g
+ 
++    def push_dir(self, B, pr, err):
++        name, p, n, k, tq = pr
++        nw = B.dir_world(n)
++        if name not in ('T+x', 'T-x') or self.obl <= 0:
++            return nw
++        en = float(np.linalg.norm(err))
++        if en < 1e-9 or float(nw @ err) <= 0:
++            return nw
++        a = math.atan2(nw[0] * err[1] - nw[1] * err[0], float(nw @ err))
++        a = max(-self.obl, min(self.obl, a))
++        c, s_ = math.cos(a), math.sin(a)
++        return np.array([c * nw[0] - s_ * nw[1], s_ * nw[0] + c * nw[1]])
++
+     def pick_trans(self, B, prims, err):
+         cands = []
+         for pr in prims:
+@@ -203,7 +217,7 @@ class GeneratedApproach:
+                 continue
+             if not self.reachable(B, p, n):
+                 continue
+-            nw = B.dir_world(n)
++            nw = self.push_dir(B, pr, err)
+             s = float(nw @ err)
+             if k == 'f':
+                 s = s * 0.6 - 0.01
+@@ -350,6 +364,7 @@ class GeneratedApproach:
+             nw = B.dir_world(n)
+             done = False
+             if k in ('t', 'f'):
++                nw = self.push_dir(B, self.push, err)
+                 rem = float(nw @ err)
+                 if rem < 0.004:
+                     done = True

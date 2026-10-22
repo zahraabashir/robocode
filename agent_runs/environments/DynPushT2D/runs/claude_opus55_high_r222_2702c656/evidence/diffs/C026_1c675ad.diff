@@ -1,0 +1,66 @@
+diff --git a/approach.py b/approach.py
+index 40abfdf..a959d1f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -95,6 +95,7 @@ class GeneratedApproach:
+         self.ang_tol = math.radians(3.5)
+         self.lam = 0.3
+         self.kres = 1.2
++        self.pre_off = 0.04
+         self.lookahead = True
+         self.rot_la = True
+         self.goal_mode = False
+@@ -191,7 +192,7 @@ class GeneratedApproach:
+         return m
+ 
+     def reachable(self, B, p, n):
+-        pre = B.to_world(p - n * (R_ROBOT + 0.04))
++        pre = B.to_world(p - n * (R_ROBOT + self.pre_off))
+         return LO <= pre[0] <= HI and LO <= pre[1] <= HI
+ 
+     def choose(self, obs):
+@@ -232,7 +233,7 @@ class GeneratedApproach:
+                 Rr = np.array([[c_, -s_], [s_, c_]])
+                 pf = cw + Rr @ (B.p - cw)
+                 resid = float(np.linalg.norm(g - pf))
+-                path = self.path_len(B, self.rp, B.to_world(p - n * (R_ROBOT + 0.04)))
++                path = self.path_len(B, self.rp, B.to_world(p - n * (R_ROBOT + self.pre_off)))
+                 if self.rot_la:
+                     B1 = B.moved(pf, B.th + dth)
+                     rob1 = B1.to_world(p - n * R_ROBOT)
+@@ -306,7 +307,7 @@ class GeneratedApproach:
+                 continue
+             if self.lam_t > 0 and smax > 0.02:
+                 p, n = pr[1], pr[2]
+-                s = s - self.lam_t * self.path_len(B, self.rp, B.to_world(p - n * (R_ROBOT + 0.04)))
++                s = s - self.lam_t * self.path_len(B, self.rp, B.to_world(p - n * (R_ROBOT + self.pre_off)))
+             if s > bs:
+                 bs, best = s, pr
+         return best
+@@ -352,7 +353,7 @@ class GeneratedApproach:
+             d = min(dm, float(nw @ err))
+             if d <= 0.004:
+                 continue
+-            path1 = self.path_len(B, rp, B.to_world(p - n * (R_ROBOT + 0.04)))
++            path1 = self.path_len(B, rp, B.to_world(p - n * (R_ROBOT + self.pre_off)))
+             c1 = (path1 + d + 0.04) / 0.05 + (6.0 if k == 'f' else 0.0) + 2.0
+             p1 = B.p + nw * d
+             B1 = B.moved(p1, B.th)
+@@ -368,7 +369,7 @@ class GeneratedApproach:
+                     d2 = float(nw2 @ e1)
+                     if d2 <= 0.004 or name2 == name:
+                         continue
+-                    path2 = self.path_len(B1, rob1, B1.to_world(p2 - n2 * (R_ROBOT + 0.04)))
++                    path2 = self.path_len(B1, rob1, B1.to_world(p2 - n2 * (R_ROBOT + self.pre_off)))
+                     e2 = np.linalg.norm(e1 - nw2 * d2)
+                     cc = (path2 + d2 + 0.04) / 0.05 + (6.0 if k2 == 'f' else 0.0) + 2.0
+                     if e2 > 0.015:
+@@ -504,7 +505,7 @@ class GeneratedApproach:
+                 self.banned.add(name)
+                 self.mode = 'plan'
+                 return None
+-            pre = B.to_world(p - n * (R_ROBOT + 0.04))
++            pre = B.to_world(p - n * (R_ROBOT + self.pre_off))
+             if np.linalg.norm(pre - rp) < 0.004:
+                 self.mode = 'push'
+                 self.push_steps = 0

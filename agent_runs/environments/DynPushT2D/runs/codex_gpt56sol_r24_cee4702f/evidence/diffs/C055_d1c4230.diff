@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index a10eb09..3928c80 100644
+--- a/approach.py
++++ b/approach.py
+@@ -191,7 +191,7 @@ class GeneratedApproach:
+                 if (current_ae * self.turn_sign < 0.0 or abs(current_ae) < 0.055
+                         or turned > turn_limit or self.count >= count_limit):
+                     self.mode = "rot_retreat"
+-                speed = 0.014 if crowded else 0.022
++                speed = 0.014 if crowded else (0.028 if abs(current_ae) > 1.0 else 0.022)
+                 return self._safe(force, speed)
+             if np.linalg.norm(robot - far) < 0.04:
+                 if pd > 0.30 and pd > self.start_pd + 0.18:

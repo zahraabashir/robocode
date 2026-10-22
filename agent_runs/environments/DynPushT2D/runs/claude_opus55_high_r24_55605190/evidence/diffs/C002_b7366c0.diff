@@ -1,0 +1,1055 @@
+diff --git a/approach.py b/approach.py
+new file mode 100644
+index 0000000..80210c9
+--- /dev/null
++++ b/approach.py
+@@ -0,0 +1,328 @@
++"""Model-based greedy push planner for DynPushT2D.
++
++Block model: quasi-static, sticking point contact (mu~1), ellipsoidal limit surface
++about the centre of mass with c^2 = I/m of a uniform T.
++Body frame: origin = obs[0:2]; bar x in [-L/2,L/2], y in [-w,0]; stem x in [-w/2,w/2], y in [-w-Lv,-w].
++"""
++import heapq
++import numpy as np
++
++RAD = 0.1
++AMAX = 0.049
++LO, HI = 0.1, 4.9
++
++
++def wrap(a):
++    return (a + np.pi) % (2 * np.pi) - np.pi
++
++
++def rot(t):
++    c, s = np.cos(t), np.sin(t)
++    return np.array([[c, -s], [s, c]])
++
++
++class Geom:
++    def __init__(self, w, L, Lv):
++        self.w, self.L, self.Lv = w, L, Lv
++        a1, a2 = w * L, w * Lv
++        y1, y2 = -w / 2, -w - Lv / 2
++        yc = (a1 * y1 + a2 * y2) / (a1 + a2)
++        I = a1 * ((L * L + w * w) / 12 + (y1 - yc) ** 2) + a2 * ((w * w + Lv * Lv) / 12 + (y2 - yc) ** 2)
++        self.C = np.array([0.0, yc])
++        self.c2 = I / (a1 + a2)
++        self.rects = np.array([[-L / 2, L / 2, -w, 0.0], [-w / 2, w / 2, -w - Lv, -w]])
++        self.corners = np.array([[-L / 2, 0], [L / 2, 0], [L / 2, -w], [-L / 2, -w],
++                                 [-w / 2, -w - Lv], [w / 2, -w - Lv]])
++        # contact candidates: (point, outward normal)
++        cands = []
++        h = L / 2
++        for x in np.linspace(-h + 0.03, h - 0.03, 9):
++            cands.append(((x, 0.0), (0, 1)))
++        for x in np.linspace(w / 2 + 0.03, h - 0.03, 4):
++            cands.append(((x, -w), (0, -1)))
++            cands.append(((-x, -w), (0, -1)))
++        cands.append(((h, -w / 2), (1, 0)))
++        cands.append(((-h, -w / 2), (-1, 0)))
++        for y in np.linspace(-w - 0.08, -w - Lv + 0.03, 6):
++            cands.append(((w / 2, y), (1, 0)))
++            cands.append(((-w / 2, y), (-1, 0)))
++        cands.append(((0.0, -w - Lv), (0, -1)))
++        self.cq = np.array([c[0] for c in cands], dtype=float)
++        self.cn = np.array([c[1] for c in cands], dtype=float)
++
++    def dist_body(self, P):
++        """min distance from body-frame points P (N,2) to T (0 inside)."""
++        best = None
++        for (x0, x1, y0, y1) in self.rects:
++            dx = np.maximum(np.maximum(x0 - P[:, 0], P[:, 0] - x1), 0)
++            dy = np.maximum(np.maximum(y0 - P[:, 1], P[:, 1] - y1), 0)
++            d = np.hypot(dx, dy)
++            best = d if best is None else np.minimum(best, d)
++        return best
++
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.action_space = action_space
++        self.plan = []
++
++    def reset(self, state, info):
++        s = np.asarray(state, dtype=float)
++        self.g = Geom(s[12], s[13], s[14])
++        self.plan = []
++        self.last_pose = None
++
++    # ---------------- helpers ----------------
++    def err(self, ref, th, goal):
++        g = self.g
++        gref, gth = goal[0:2], goal[2]
++        Rg = rot(gth)
++        gcom = gref + Rg @ g.C
++        dth = wrap(th - gth)
++        # com position
++        c, s = np.cos(th), np.sin(th)
++        comx = ref[..., 0] - s * g.C[1]
++        comy = ref[..., 1] + c * g.C[1]
++        e_ref = np.hypot(ref[..., 0] - gref[0], ref[..., 1] - gref[1])
++        e_com = np.hypot(comx - gcom[0], comy - gcom[1])
++        return e_ref + e_com + 0.6 * np.abs(dth)
++
++    def seg_free(self, pose, a, b, clear):
++        n = max(2, int(np.linalg.norm(b - a) / 0.01) + 1)
++        t = np.linspace(0, 1, n)[:, None]
++        P = a[None] + t * (b - a)[None]
++        Pb = (P - pose[0:2]) @ rot(pose[2])  # world->body: R^T (p - o)
++        return bool(np.all(self.g.dist_body(Pb) > clear))
++
++    def nav_path(self, pose, start, target):
++        """visibility-graph shortest path; returns (waypoints, cost) or (None, inf)."""
++        clear = RAD + 0.012
++        if self.seg_free(pose, start, target, clear):
++            return [target], self._plen([start, target])
++        nodes = self.nodes
++        pts = [start] + nodes + [target]
++        N = len(pts)
++        dist = [np.inf] * N
++        prev = [-1] * N
++        dist[0] = 0.0
++        pq = [(0.0, 0)]
++        while pq:
++            d, i = heapq.heappop(pq)
++            if d > dist[i]:
++                continue
++            if i == N - 1:
++                break
++            for j in range(1, N):
++                if j == i:
++                    continue
++                key = (min(i, j), max(i, j))
++                if i > 0 and j < N - 1:
++                    ok = self.node_vis.get(key)
++                    if ok is None:
++                        ok = self.seg_free(pose, pts[i], pts[j], clear)
++                        self.node_vis[key] = ok
++                else:
++                    ok = self.seg_free(pose, pts[i], pts[j], clear)
++                if not ok:
++                    continue
++                nd = d + self._plen([pts[i], pts[j]])
++                if nd < dist[j]:
++                    dist[j] = nd
++                    prev[j] = i
++                    heapq.heappush(pq, (nd, j))
++        if not np.isfinite(dist[N - 1]):
++            return None, np.inf
++        path = []
++        k = N - 1
++        while k > 0:
++            path.append(pts[k])
++            k = prev[k]
++        return path[::-1], dist[N - 1]
++
++    @staticmethod
++    def _plen(pts):
++        s = 0.0
++        for a, b in zip(pts[:-1], pts[1:]):
++            s += np.max(np.abs(b - a)) / AMAX
++        return s
++
++    def build_nodes(self, pose):
++        g = self.g
++        R = rot(pose[2])
++        d = RAD + 0.05
++        nodes = []
++        for (x0, x1, y0, y1) in g.rects:
++            for (x, y) in [(x0 - d, y0 - d), (x0 - d, y1 + d), (x1 + d, y0 - d), (x1 + d, y1 + d)]:
++                nodes.append(np.array([x, y]))
++        nb = np.array(nodes)
++        ok = g.dist_body(nb) > RAD + 0.02
++        out = []
++        for p, o in zip(nb, ok):
++            if not o:
++                continue
++            w = pose[0:2] + R @ p
++            if LO + 0.01 <= w[0] <= HI - 0.01 and LO + 0.01 <= w[1] <= HI - 0.01:
++                out.append(w)
++        self.nodes = out
++        self.node_vis = {}
++
++    # ---------------- planning ----------------
++    def plan_push(self, s):
++        g = self.g
++        pose = s[0:3].copy()
++        goal = s[29:32]
++        robot = s[16:18].copy()
++        E0 = float(self.err(pose[0:2], pose[2], goal))
++
++        angs = np.deg2rad([-35, -18, 0, 18, 35])
++        Q = np.repeat(g.cq, len(angs), 0)
++        Nn = np.repeat(g.cn, len(angs), 0)
++        A = np.tile(angs, len(g.cq))
++        K = len(Q)
++        R0 = rot(pose[2])
++        # push direction in body frame (inward normal rotated), then world
++        inn = -Nn
++        ca, sa = np.cos(A), np.sin(A)
++        ub = np.stack([ca * inn[:, 0] - sa * inn[:, 1], sa * inn[:, 0] + ca * inn[:, 1]], 1)
++        uw = ub @ R0.T
++        pb_body = Q + Nn * RAD
++        r = Q - g.C
++        c2 = g.c2
++        a11 = 1 + r[:, 1] ** 2 / c2
++        a22 = 1 + r[:, 0] ** 2 / c2
++        a12 = -r[:, 0] * r[:, 1] / c2
++        det = a11 * a22 - a12 * a12
++        tb = np.stack([-Nn[:, 1], Nn[:, 0]], 1)
++
++        com = np.tile(pose[0:2] + R0 @ g.C, (K, 1))
++        th = np.full(K, pose[2])
++        valid = np.ones(K, bool)
++        ds = 0.01
++        nsteps = 100
++        best = (-np.inf, None)
++        # travel cost to each candidate start
++        standoff = 0.04
++        pre = pose[0:2] + pb_body @ R0.T - uw * standoff
++        travel = np.full(K, np.inf)
++        paths = [None] * K
++        self.build_nodes(pose)
++        start = robot.copy()
++        # retreat if touching
++        rb = (robot - pose[0:2]) @ R0
++        dd = g.dist_body(rb[None])[0]
++        prefix = []
++        if dd < RAD + 0.03:
++            # outward direction approx: numeric gradient
++            eps = 1e-3
++            gx = g.dist_body((rb + [eps, 0])[None])[0] - g.dist_body((rb - [eps, 0])[None])[0]
++            gy = g.dist_body((rb + [0, eps])[None])[0] - g.dist_body((rb - [0, eps])[None])[0]
++            gv = np.array([gx, gy])
++            if np.linalg.norm(gv) < 1e-9:
++                gv = rb - g.C
++            gv = R0 @ (gv / np.linalg.norm(gv))
++            st = np.clip(robot + gv * (RAD + 0.035 - dd), LO + 0.005, HI - 0.005)
++            prefix = [st]
++            start = st
++        pre_body = (pre - pose[0:2]) @ R0
++        pre_ok = g.dist_body(pre_body) > RAD + 0.015
++        pre_ok &= np.all((pre >= LO + 0.005) & (pre <= HI - 0.005), 1)
++        valid &= pre_ok
++        # lower bound travel (straight line) for pruning
++        lb = np.max(np.abs(pre - start), 1) / AMAX + len(prefix)
++
++        pusher = pre.copy()
++        results_len = np.zeros(K)
++        results_E = np.full(K, np.inf)
++        stepcnt = standoff / ds
++        for k in range(1, nsteps + 1):
++            c, sn = np.cos(th), np.sin(th)
++            # world->body of push dir
++            db = np.stack([c * uw[:, 0] + sn * uw[:, 1], -sn * uw[:, 0] + c * uw[:, 1]], 1) * ds
++            f0 = (a22 * db[:, 0] - a12 * db[:, 1]) / det
++            f1 = (-a12 * db[:, 0] + a11 * db[:, 1]) / det
++            fn = -(f0 * Nn[:, 0] + f1 * Nn[:, 1])
++            ft = f0 * tb[:, 0] + f1 * tb[:, 1]
++            valid &= (fn > 0) & (np.abs(ft) <= 0.85 * fn)
++            om = (r[:, 0] * f1 - r[:, 1] * f0) / c2
++            com = com + np.stack([c * f0 - sn * f1, sn * f0 + c * f1], 1)
++            th = th + om
++            c, sn = np.cos(th), np.sin(th)
++            ref = com - np.stack([-sn * g.C[1], c * g.C[1]], 1)
++            # wall check on corners
++            cx = ref[:, 0][:, None] + c[:, None] * g.corners[None, :, 0] - sn[:, None] * g.corners[None, :, 1]
++            cy = ref[:, 1][:, None] + sn[:, None] * g.corners[None, :, 0] + c[:, None] * g.corners[None, :, 1]
++            valid &= (cx.min(1) > 0.03) & (cx.max(1) < 4.97) & (cy.min(1) > 0.03) & (cy.max(1) < 4.97)
++            pw = pre + uw * (standoff + k * ds)
++            valid &= np.all((pw >= LO + 0.005) & (pw <= HI - 0.005), 1)
++            if not valid.any():
++                break
++            E = self.err(ref, th, goal)
++            better = valid & (E < results_E - 1e-9)
++            results_E = np.where(better, E, results_E)
++            results_len = np.where(better, k * ds, results_len)
++
++        imp = E0 - results_E
++        # rate = improvement / steps, with lower bound travel first
++        push_steps = results_len / AMAX + 3
++        order = np.argsort(-(imp / (lb + push_steps + 4)))
++        best_i, best_rate, best_path = None, -np.inf, None
++        for i in order[:25]:
++            if not np.isfinite(results_E[i]) or imp[i] <= 1e-4:
++                continue
++            ub_rate = imp[i] / (lb[i] + push_steps[i] + 4)
++            if ub_rate <= best_rate:
++                break
++            path, cost = self.nav_path(pose, start, pre[i])
++            if path is None:
++                continue
++            rate = imp[i] / (cost + len(prefix) + push_steps[i] + 4)
++            if rate > best_rate:
++                best_rate, best_i, best_path = rate, i, path
++        if best_i is None:
++            return None
++        i = best_i
++        return dict(path=prefix + best_path, u=uw[i], L=results_len[i] + standoff,
++                    Epred=results_E[i], E0=E0)
++
++    # ---------------- execution ----------------
++    def build_actions(self, robot, plan):
++        acts = []
++        p = robot.copy()
++        for wp in plan['path']:
++            while True:
++                d = wp - p
++                m = np.max(np.abs(d))
++                if m < 1e-6:
++                    break
++                a = d if m <= AMAX else d * (AMAX / m)
++                acts.append(('nav', a))
++                p = p + a
++        u = plan['u']
++        Ltot = plan['L']
++        done = 0.0
++        while done < Ltot - 1e-6:
++            rem = Ltot - done
++            st = AMAX if rem > 0.15 else max(0.01, min(AMAX, rem / 3))
++            st = min(st, rem)
++            acts.append(('push', u * st / max(abs(u[0]), abs(u[1]), 1e-9) * max(abs(u[0]), abs(u[1]))))
++            done += st
++        return acts
++
++    def get_action(self, state):
++        s = np.asarray(state, dtype=float)
++        if not self.plan:
++            p = self.plan_push(s)
++            if p is None:
++                # fallback: small random-ish wiggle away
++                a = np.array([0.0, 0.0])
++                return self._safe(s, a)
++            self.plan = self.build_actions(s[16:18], p)
++        _, a = self.plan.pop(0)
++        return self._safe(s, a)
++
++    def _safe(self, s, a):
++        a = np.clip(np.asarray(a, dtype=float), -AMAX, AMAX)
++        rob = s[16:18]
++        nxt = np.clip(rob + a, LO + 1e-3, HI - 1e-3)
++        a = np.clip(nxt - rob, -AMAX, AMAX)
++        return a.astype(np.float64)
+diff --git a/dyn_fit.py b/dyn_fit.py
+new file mode 100644
+index 0000000..6f101db
+--- /dev/null
++++ b/dyn_fit.py
+@@ -0,0 +1,19 @@
++from dyn_push import *
++from scipy.optimize import least_squares
++import pickle
++cases=[ # start_b, dir_b, normal(outward) for contact point
++ ([0.2,0.6],[0,-1],[0,1]),([0.4,0.6],[0,-1],[0,1]),([0.55,0.6],[0,-1],[0,1]),([-0.3,0.6],[0,-1],[0,1]),
++ ([-0.8,-0.5],[1,0],[-1,0]),([-0.8,-0.8],[1,0],[-1,0]),([-0.8,-1.1],[1,0],[-1,0]),
++ ([0.8,-0.4],[-1,0],[1,0]),([0.8,-0.9],[-1,0],[1,0]),
++ ([0.4,-0.8],[0,1],[0,-1]),([0.25,-0.8],[0,1],[0,-1]),
++ ([0.03,-1.8],[0,1],[0,-1]),([0.0,-1.8],[0,1],[0,-1]),
++ ([1.0,-0.065],[-1,0],[1,0]),
++]
++data=[]
++for sb,d,n in cases:
++    out,e=push(0,sb,d,0.01,5)
++    cb,tw=out[3]
++    u=np.array(d,float)*0.01
++    cp=cb-0.1*np.array(n)
++    data.append((cp,u,tw)); print(sb,d,'contact',cp,'twist',tw)
++pickle.dump(data,open('dyn_fitdata.pkl','wb'))
+diff --git a/dyn_fit2.py b/dyn_fit2.py
+new file mode 100644
+index 0000000..3928296
+--- /dev/null
++++ b/dyn_fit2.py
+@@ -0,0 +1,15 @@
++import numpy as np, pickle
++from scipy.optimize import least_squares
++data=pickle.load(open('dyn_fitdata.pkl','rb'))
++data=[d for i,d in enumerate(data) if i!=10]
++def pred(params,cp,u):
++    xc,yc,c2=params
++    rx,ry=cp[0]-xc,cp[1]-yc
++    A=np.array([[1+ry**2/c2,-rx*ry/c2],[-rx*ry/c2,1+rx**2/c2]])
++    f=np.linalg.solve(A,u)
++    w=(rx*f[1]-ry*f[0])/c2
++    return np.array([f[0]+w*yc, f[1]-w*xc, w])
++def res(p): return np.concatenate([pred(p,cp,u)-tw for cp,u,tw in data])*1000
++for fix in [None]:
++    r=least_squares(res,[0,-0.3,0.2]); print('fit xc,yc,c2',r.x,'rms(1e-3)',np.sqrt(np.mean(r.fun**2)))
++    for cp,u,tw in data: print(cp.round(3),u,tw,pred(r.x,cp,u).round(5))
+diff --git a/dyn_fric.py b/dyn_fric.py
+new file mode 100644
+index 0000000..0503add
+--- /dev/null
++++ b/dyn_fric.py
+@@ -0,0 +1,12 @@
++from dyn_push import *
++import sys
++sys.path.insert(0,'.')
++from dyn_fit2 import pred
++P=[0,-0.375,0.2129]
++for a in [0,5,10,15,20,25,30,40]:
++    ar=np.radians(a); d=np.array([np.sin(ar),-np.cos(ar)])
++    out,e=push(0,[-0.2*np.sin(ar)/np.cos(ar)*0,0.6],d,0.005,6)
++    for k in [1,3]:
++        cb,tw=out[k]; cb2=out[k+1][0]
++        cp=cb-[0,0.1]; u=d*0.005
++        print(f'a={a} k={k} cp={cp.round(4)} slip_x/step={cb2[0]-cb[0]:.5f} ut={u[0]:.5f} twist={tw} stickpred={pred(P,cp,u).round(5)}')
+diff --git a/dyn_fric2.py b/dyn_fric2.py
+new file mode 100644
+index 0000000..0d2ad58
+--- /dev/null
++++ b/dyn_fric2.py
+@@ -0,0 +1,12 @@
++from dyn_push import *
++from dyn_fit2 import pred
++P=[0,-0.375,0.2129]
++for a in [40,50,55,60,65,70,75]:
++    ar=np.radians(a); d=np.array([np.sin(ar),-np.cos(ar)])
++    out,e=push(0,[-np.tan(ar)*0.5,0.6],d,0.005,8)
++    for k in [0,1,3,6]:
++        cb,tw=out[k]
++        cp=cb-[0,0.1]; u=d*0.005
++        rx,ry=cp[0],cp[1]+0.375; c2=0.2129
++        A=np.array([[1+ry**2/c2,-rx*ry/c2],[-rx*ry/c2,1+rx**2/c2]]); f=np.linalg.solve(A,u)
++        print(f'a={a} k={k} cp={cp.round(4)} twist={tw} stickpred={pred(P,cp,u).round(5)} |ft/fn|={abs(f[0]/f[1]):.3f}')
+diff --git a/dyn_gap.py b/dyn_gap.py
+new file mode 100644
+index 0000000..f37c21d
+--- /dev/null
++++ b/dyn_gap.py
+@@ -0,0 +1,11 @@
++from dyn_lib import *
++for s in [0.005,0.02,0.035,0.049]:
++    e=E(0); e.goto_safe([0,0.1+s*3.5+1e-4]); o0=e.obs.copy(); dw=R(o0[2])@np.array([0,-1.0])
++    rows=[]
++    for k in range(8):
++        ob=e.obs.copy(); o=e.step(dw*s)
++        rows.append((to_body(ob,ob[16:18])[1]-0.1, R(ob[2]).T@(o[0:2]-ob[0:2])))
++    print('step',s,' '.join(f'[gap {g:.4f} dy {d[1]:.4f}]' for g,d in rows))
++    # then change step size to s/2 and 0
++    for s2 in [s/2,0.0,s]:
++        ob=e.obs.copy(); o=e.step(dw*s2); print('   next step',s2,'dy',(R(ob[2]).T@(o[0:2]-ob[0:2]))[1].round(5),'gap after',(to_body(o,o[16:18])[1]-0.1).round(5))
+diff --git a/dyn_lib.py b/dyn_lib.py
+new file mode 100644
+index 0000000..0e12781
+--- /dev/null
++++ b/dyn_lib.py
+@@ -0,0 +1,31 @@
++from env_client import make_env
++import numpy as np
++np.set_printoptions(precision=5, suppress=True, linewidth=200)
++def R(t): c,s=np.cos(t),np.sin(t); return np.array([[c,-s],[s,c]])
++def to_body(obs,p): return R(obs[2]).T@(np.asarray(p)-obs[0:2])
++def to_world(obs,pb): return obs[0:2]+R(obs[2])@np.asarray(pb)
++class E:
++    def __init__(s,seed=0):
++        s.env=make_env(); s.obs,_=s.env.reset(seed=seed); s.n=0
++    def step(s,a):
++        a=np.clip(np.asarray(a,float),-0.049,0.049)
++        s.obs,r,te,tr,_=s.env.step(a); s.n+=1; return s.obs
++    def goto(s,tgt,maxstep=0.049,n=400):
++        for _ in range(n):
++            d=np.asarray(tgt)-s.obs[16:18]
++            if np.linalg.norm(d)<1e-7: break
++            m=np.max(np.abs(d)); a=d if m<=maxstep else d*maxstep/m
++            s.step(a)
++        return s.obs
++    def goto_safe(s,tgt_body):
++        # move radially out to radius 1.6 from block center, go around circle, then to target (in body frame)
++        o=s.obs; c=o[0:2]; p=o[16:18]
++        tw=to_world(o,tgt_body)
++        Rr=1.7
++        v=p-c; a0=np.arctan2(v[1],v[0])
++        if np.linalg.norm(v)<Rr: s.goto(c+Rr*np.array([np.cos(a0),np.sin(a0)]))
++        vt=tw-c; a1=np.arctan2(vt[1],vt[0])
++        da=(a1-a0+np.pi)%(2*np.pi)-np.pi
++        for k in range(1,21):
++            a=a0+da*k/20; s.goto(c+Rr*np.array([np.cos(a),np.sin(a)]))
++        s.goto(tw); return s.obs
+diff --git a/dyn_model.py b/dyn_model.py
+new file mode 100644
+index 0000000..8859919
+--- /dev/null
++++ b/dyn_model.py
+@@ -0,0 +1,68 @@
++"""Approximate quasi-static push model for the T block (fitted to env).
++Body frame: origin = obs[0:2]; bar: x in [-L/2,L/2], y in [-w,0]; stem: x in [-w/2,w/2], y in [-w-Lv,-w].
++Motion: sticking/sliding point contact (mu=1), ellipsoidal limit surface == free body impulse model about CoM,
++c^2 = I/m of uniform-density T."""
++import numpy as np
++MU=1.0; RP=0.1
++def Rm(t): c,s=np.cos(t),np.sin(t); return np.array([[c,-s],[s,c]])
++def geom(w,L,Lv):
++    a1,a2=w*L,w*Lv; y1,y2=-w/2,-w-Lv/2
++    yc=(a1*y1+a2*y2)/(a1+a2)
++    I=a1*((L*L+w*w)/12+(y1-yc)**2)+a2*((w*w+Lv*Lv)/12+(y2-yc)**2)
++    return dict(w=w,L=L,Lv=Lv,C=np.array([0.0,yc]),c2=I/(a1+a2),
++                rects=[(-L/2,L/2,-w,0.0),(-w/2,w/2,-w-Lv,-w)])
++def closest(g,p):
++    """closest point on T boundary to p (body frame), signed distance, outward normal"""
++    best=None
++    for (x0,x1,y0,y1) in g['rects']:
++        q=np.array([min(max(p[0],x0),x1),min(max(p[1],y0),y1)])
++        d=np.linalg.norm(p-q)
++        if d>1e-12: n=(p-q)/d; sd=d
++        else:  # inside rect
++            ds=[p[0]-x0,x1-p[0],p[1]-y0,y1-p[1]]; k=int(np.argmin(ds)); sd=-ds[k]
++            n=[np.array([-1,0.]),np.array([1,0.]),np.array([0,-1.]),np.array([0,1.])][k]
++            q=p-n*sd
++        if best is None or sd<best[0]: best=(sd,q,n)
++    return best
++def twist_from_force(g,cp,f):
++    r=cp-g['C']; w=(r[0]*f[1]-r[1]*f[0])/g['c2']
++    return np.array([f[0],f[1]]),w   # velocity of C, omega
++def contact_vel(v,w,r): return v+w*np.array([-r[1],r[0]])
++def sim_substep(g,pose,pb_world,dp_world,rp=RP):
++    """pose=(x,y,th). pusher moves by dp. returns new pose"""
++    x,y,th=pose; Rt=Rm(th)
++    p_new=Rt.T@(pb_world+dp_world-np.array([x,y]))
++    sd,q,n=closest(g,p_new)
++    pen=rp-sd
++    if pen<=0: return np.array(pose,float)
++    u=Rt.T@dp_world  # pusher velocity body
++    r=q-g['C']; c2=g['c2']
++    # sticking
++    A=np.array([[1+r[1]**2/c2,-r[0]*r[1]/c2],[-r[0]*r[1]/c2,1+r[0]**2/c2]])
++    un=np.dot(u,n)
++    # required contact displacement: normal component = penetration removal
++    t=np.array([-n[1],n[0]])
++    utan=np.dot(u,t)
++    dcont=-pen*n + utan*t   # want contact pt to move by this (normal: remove penetration)
++    f=np.linalg.solve(A,dcont)
++    fn=-np.dot(f,n); ft=np.dot(f,t)
++    if fn<=0: return np.array(pose,float)
++    if abs(ft)>MU*fn:
++        fdir=-n+MU*np.sign(ft)*t
++        v1,w1=twist_from_force(g,q,fdir); cv=contact_vel(v1,w1,r)
++        lam=pen/(-np.dot(cv,n)); f=lam*fdir
++    v,w=twist_from_force(g,q,f)
++    # displacement of origin in body frame: v_C + w x (0-C)
++    vo=v+w*np.array([g['C'][1],-g['C'][0]])
++    # integrate exactly as rotation about ICR-ish (small): use midpoint rotation
++    dpos=Rm(th+w/2)@vo
++    return np.array([x+dpos[0],y+dpos[1],th+w])
++KAPPA=0.265  # block ends each step separated by extra KAPPA*normal pusher step (velocity-dependent gap)
++def sim_step(g,pose,pb_world,action,nsub=10,kappa=KAPPA):
++    pose=np.array(pose,float); pb=np.array(pb_world,float); a=np.asarray(action,float); d=a/nsub
++    sd,q,n=closest(g,Rm(pose[2]).T@(pb+a-pose[0:2]))
++    un=max(0.0,-np.dot(Rm(pose[2]).T@a,n))
++    rp=RP+kappa*un
++    for _ in range(nsub):
++        pose=sim_substep(g,pose,pb,d,rp); pb=pb+d
++    return pose,pb
+diff --git a/dyn_obs.py b/dyn_obs.py
+new file mode 100644
+index 0000000..f86a414
+--- /dev/null
++++ b/dyn_obs.py
+@@ -0,0 +1,6 @@
++from env_client import make_env
++import numpy as np
++np.set_printoptions(precision=4, suppress=True, linewidth=200)
++env=make_env()
++for s in range(3):
++    o,_=env.reset(seed=s); print(s,o)
+diff --git a/dyn_probe.py b/dyn_probe.py
+new file mode 100644
+index 0000000..f5084cb
+--- /dev/null
++++ b/dyn_probe.py
+@@ -0,0 +1,24 @@
++from dyn_lib import *
++import sys
++# probe surface: approach along body-frame direction, detect first block motion
++def probe(seed, start_b, dir_b, step=0.002):
++    e=E(seed); e.goto_safe(start_b); o0=e.obs.copy()
++    d=np.asarray(dir_b,float); d/=np.linalg.norm(d)
++    dw=R(o0[2])@d
++    for i in range(1500):
++        p_before=e.obs[16:18].copy()
++        o=e.step(dw*step)
++        if np.linalg.norm(o[0:3]-o0[0:3])>1e-9:
++            return to_body(o0,p_before), o[0:3]-o0[0:3]
++    return None,None
++for s in [0,1]:
++  for x in [0.0,0.3,0.5,-0.5]:
++    pb,dp=probe(s,[x,1.0],[0,-1]); print('seed',s,'bar top x',x,'contact robot body',pb,dp)
++  for x in [0.0]:
++    pb,dp=probe(s,[x,-1.8],[0,1]); print('seed',s,'stem end',x,pb,dp)
++    pb,dp=probe(s,[x,-0.3],[0,1]) if False else (None,None)
++  for y in [-0.3,-0.6]:
++    pb,dp=probe(s,[1.0,y],[-1,0]); print('seed',s,'stem side y',y,pb,dp)
++  pb,dp=probe(s,[1.2,0.0],[-1,0]); print('seed',s,'bar end +x',pb,dp)
++  pb,dp=probe(s,[0.4,-0.6],[0,1]); print('seed',s,'bar bottom x=.4',pb,dp)
++  print('dims',E(s).obs[12:15])
+diff --git a/dyn_push.py b/dyn_push.py
+new file mode 100644
+index 0000000..0a51ff2
+--- /dev/null
++++ b/dyn_push.py
+@@ -0,0 +1,28 @@
++from dyn_lib import *
++import sys
++def body_twist(o0,o1):
++    dpw=o1[0:2]-o0[0:2]; dth=(o1[2]-o0[2]+np.pi)%(2*np.pi)-np.pi
++    return np.r_[R(o0[2]).T@dpw, dth]
++def push(seed, start_b, dir_b, step, nsteps, verbose=False):
++    e=E(seed); e.goto_safe(start_b); o0=e.obs.copy()
++    d=np.asarray(dir_b,float); d/=np.linalg.norm(d)
++    # approach slowly until contact
++    for i in range(2000):
++        o=e.step(R(e.obs[2])@d*0.001)
++        if np.linalg.norm(o[0:3]-o0[0:3])>1e-9: break
++    out=[]
++    for k in range(nsteps):
++        ob=e.obs.copy()
++        o=e.step(R(ob[2])@d*step)   # direction fixed in body frame
++        tw=body_twist(ob,o)
++        cb=to_body(ob,ob[16:18])  # pusher pos in body frame before step
++        out.append((cb,tw))
++    return out,e
++if __name__=='__main__':
++    for x in [0.0,0.2,0.4,0.55]:
++        out,e=push(0,[x,0.6],[0,-1],0.01,12)
++        for k in [1,5,11]:
++            cb,tw=out[k]
++            # ICR in body frame: v = w x (p - c) => c = p_origin + (-vy/w, vx/w)
++            icr = np.array([-tw[1]/tw[2], tw[0]/tw[2]]) if abs(tw[2])>1e-9 else None
++            print(f'x={x} k={k} pusher_b={cb} twist={tw} icr={icr}')
+diff --git a/dyn_push2.py b/dyn_push2.py
+new file mode 100644
+index 0000000..0b2773d
+--- /dev/null
++++ b/dyn_push2.py
+@@ -0,0 +1,17 @@
++from dyn_push import *
++print('--- side push +x on stem left face (x=-w/2) at various y')
++for y in [-0.2,-0.5,-0.8,-1.1]:
++    out,e=push(0,[-0.8,y],[1,0],0.01,8)
++    cb,tw=out[5]
++    icr=np.array([-tw[1]/tw[2], tw[0]/tw[2]]) if abs(tw[2])>1e-9 else None
++    print(f'y={y} pusher_b={cb} twist={tw} icr={icr}', 'c2=',None if icr is None else -icr[1]*cb[1])
++print('--- side push on bar end (x=+L/2) moving -x at y=-0.065')
++out,e=push(0,[1.0,-0.065],[-1,0],0.01,8)
++cb,tw=out[5]; print(cb,tw)
++print('--- oblique push at top center, angle a from normal')
++for a in [10,20,30,45,60]:
++    ar=np.radians(a)
++    out,e=push(0,[0.0,0.6],[np.sin(ar),-np.cos(ar)],0.01,10)
++    cb0=out[1][0]; cb1=out[-1][0]
++    tws=np.array([t for _,t in out[1:]])
++    print(f'a={a} pusher body x drift {cb1[0]-cb0[0]:.4f} over {len(out)-2} steps; mean twist {tws.mean(0)}')
+diff --git a/dyn_q45.py b/dyn_q45.py
+new file mode 100644
+index 0000000..c2bf6b4
+--- /dev/null
++++ b/dyn_q45.py
+@@ -0,0 +1,11 @@
++from dyn_push import *
++def run(seed, sb, d, step, total):
++    e=E(seed); e.goto_safe(sb); dw=R(e.obs[2])@np.array(d,float)
++    n=int(round(total/step))
++    for i in range(n): e.step(dw*step)
++    return e.obs.copy()
++for sb,d in [([0.4,0.4],[0,-1]),([-0.8,-0.9],[1,0]),([-0.5,0.5],[0.5,-0.866])]:
++    res=[run(0,sb,d,s,0.98) for s in [0.049,0.0245,0.01,0.005]]
++    for s,o in zip([0.049,0.0245,0.01,0.005],res): print(sb,d,'step',s,'pose',o[0:3],'pusher',o[16:18])
++print('determinism:')
++a=run(3,[0.3,0.4],[0.2,-1],0.03,1.2); b=run(3,[0.3,0.4],[0.2,-1],0.03,1.2); print(a[0:3],b[0:3],np.abs(a-b).max())
+diff --git a/dyn_validate.py b/dyn_validate.py
+new file mode 100644
+index 0000000..d176b2e
+--- /dev/null
++++ b/dyn_validate.py
+@@ -0,0 +1,23 @@
++from dyn_lib import *
++from dyn_model import *
++rng=np.random.default_rng(0)
++errs1=[];errsN=[]
++for trial in range(12):
++    seed=int(rng.integers(0,100)); e=E(seed)
++    ang=rng.uniform(0,2*np.pi); tgt_b=np.array([0,-0.4])+0.9*np.array([np.cos(ang),np.sin(ang)])
++    e.goto_safe(tgt_b)
++    o=e.obs; g=geom(o[12],o[13],o[14])
++    pose0=o[0:3].copy(); pb0=o[16:18].copy(); poseN=pose0.copy(); pbN=pb0.copy()
++    cw=to_world(o,[0,-0.4]); 
++    moved=0
++    for k in range(40):
++        d=cw-e.obs[16:18]; d=d/np.linalg.norm(d)*0.04 + rng.normal(0,0.01,2)
++        d=np.clip(d,-0.049,0.049)
++        ob=e.obs.copy()
++        p1,_=sim_step(g,ob[0:3],ob[16:18],d)
++        poseN,pbN=sim_step(g,poseN,pbN,d)
++        o2=e.step(d)
++        if np.linalg.norm(o2[0:3]-ob[0:3])>1e-6: moved+=1; errs1.append(np.r_[p1[0:2]-o2[0:2],p1[2]-o2[2]])
++    errN=np.r_[poseN[0:2]-e.obs[0:2],poseN[2]-e.obs[2]]
++    print(f'trial {trial} seed {seed} moved_steps {moved} open-loop final err pos {np.linalg.norm(errN[:2]):.4f} th {errN[2]:.4f}  total disp {np.linalg.norm(e.obs[0:2]-pose0[0:2]):.3f} dth {e.obs[2]-pose0[2]:.3f}')
++E1=np.array(errs1); print('1-step err (contact steps): pos rms',np.sqrt((E1[:,:2]**2).sum(1).mean()),'max',np.sqrt((E1[:,:2]**2).sum(1)).max(),'th rms',np.sqrt((E1[:,2]**2).mean()),'max',np.abs(E1[:,2]).max())
+diff --git a/explore.py b/explore.py
+new file mode 100644
+index 0000000..57c5102
+--- /dev/null
++++ b/explore.py
+@@ -0,0 +1,13 @@
++from env_client import make_env
++import numpy as np
++np.set_printoptions(precision=4, suppress=True, linewidth=200)
++env = make_env()
++for s in range(5):
++    obs,_ = env.reset(seed=s)
++    print(s, obs)
++print(env.max_steps)
++obs,_=env.reset(seed=0)
++for t in range(10):
++    obs,r,te,tr,_=env.step(np.array([0.049,0.0]))
++    print(t, obs[16:22], obs[0:6], r, te)
++env.close()
+diff --git a/explore2.py b/explore2.py
+new file mode 100644
+index 0000000..bd2146a
+--- /dev/null
++++ b/explore2.py
+@@ -0,0 +1,22 @@
++from env_client import make_env
++import numpy as np
++np.set_printoptions(precision=4, suppress=True, linewidth=200)
++env = make_env()
++obs,_=env.reset(seed=0)
++# block at (1.05,3.44). robot at (1.637,1.27). move robot to (1.05, 2.3) then push up
++def goto(obs, tgt, n=200):
++    for _ in range(n):
++        d = np.array(tgt)-obs[16:18]
++        if np.linalg.norm(d)<1e-4: break
++        a = np.clip(d, -0.049, 0.049)
++        obs,r,te,tr,_=env.step(a)
++    return obs
++obs = goto(obs,[1.05,2.3])
++print(obs[16:18], obs[0:6])
++for t in range(40):
++    obs,r,te,tr,_=env.step(np.array([0,0.04]))
++    if t%4==0: print(t, obs[16:18], obs[0:6])
++for t in range(20):
++    obs,r,te,tr,_=env.step(np.array([0,0.0]))
++    if t%2==0: print('stop',t, obs[16:18], obs[0:6])
++env.close()
+diff --git a/geom_blow.py b/geom_blow.py
+new file mode 100644
+index 0000000..e9e72cf
+--- /dev/null
++++ b/geom_blow.py
+@@ -0,0 +1,12 @@
++from geom_lib import *
++from geom_wall import corners
++P=Prober()
++seed=20
++o=P.reset(seed); th=P.b0[2]; M=rot(th); c=P.b0[:2]
++d=M@np.array([0,-1.0])
++P.nav(c+M@np.array([0,0.5]))
++for k in range(150):
++    prev=P.obs.copy(); P.step(d*0.03)
++    if np.abs(P.obs[0:3]-prev[0:3]).max()>0.2 or k%10==0:
++        cs=corners(P.obs); print(k,'robot',np.round(P.obs[16:18],3),'block',np.round(P.obs[0:3],3),'vel',np.round(P.obs[3:6],2),'cmin',np.round(cs.min(0),3),'cmax',np.round(cs.max(0),3))
++    if np.abs(P.obs[0:3]-prev[0:3]).max()>0.2: break
+diff --git a/geom_bounds.py b/geom_bounds.py
+new file mode 100644
+index 0000000..a9650c8
+--- /dev/null
++++ b/geom_bounds.py
+@@ -0,0 +1,14 @@
++from env_client import make_env
++import numpy as np
++env=make_env()
++for s in [0,1]:
++  for d in [(1,0),(-1,0),(0,1),(0,-1)]:
++    obs,_=env.reset(seed=s)
++    prev=obs[16:18].copy(); stuck=0
++    for t in range(300):
++        obs,*_=env.step(np.array(d)*0.0499)
++        if np.linalg.norm(obs[16:18]-prev)<1e-4: stuck+=1
++        else: stuck=0
++        prev=obs[16:18].copy()
++        if stuck>5: break
++    print(s,d,'t',t,'robot',obs[16:18],'block',obs[0:3])
+diff --git a/geom_bounds2.py b/geom_bounds2.py
+new file mode 100644
+index 0000000..116fc92
+--- /dev/null
++++ b/geom_bounds2.py
+@@ -0,0 +1,14 @@
++from env_client import make_env
++import numpy as np
++env=make_env()
++obs,_=env.reset(seed=0)
++for d in [(1,0),(-1,0),(0,1),(0,-1)]:
++    obs,_=env.reset(seed=0)
++    for t in range(200):
++        obs,*_=env.step(np.array(d)*0.0499)
++    p=obs[16:18].copy()
++    # now fine steps
++    seq=[]
++    for t in range(10):
++        obs,*_=env.step(np.array(d)*0.001); seq.append(obs[16:18].copy())
++    print(d,'after coarse',p,'after fine',seq[-1], 'fine deltas', np.round(np.diff([p]+seq,axis=0)[:,0 if d[0] else 1],5))
+diff --git a/geom_bounds3.py b/geom_bounds3.py
+new file mode 100644
+index 0000000..a64289d
+--- /dev/null
++++ b/geom_bounds3.py
+@@ -0,0 +1,21 @@
++from env_client import make_env
++import numpy as np
++env=make_env()
++obs,_=env.reset(seed=0)
++for t in range(64): obs,*_=env.step(np.array([0.0499,0]))
++print('x',obs[16])
++for a in [0.01,0.005,0.003,0.002,0.001,0.0005,0.0002,0.0001]:
++    for k in range(40):
++        x0=obs[16]; obs,*_=env.step(np.array([a,0])); 
++        if abs(obs[16]-x0)<1e-6: print('a',a,'rejected at x0',x0,'x0+a',x0+a); break
++    else: print('a',a,'no reject x',obs[16])
++# go to left via y bottom
++obs,_=env.reset(seed=0)
++for t in range(31): obs,*_=env.step(np.array([-0.0499,0]))
++print('x',obs[16])
++for a in [0.01,0.005,0.002,0.001,0.0005,0.0002,0.0001]:
++    for k in range(40):
++        x0=obs[16]; obs,*_=env.step(np.array([-a,0]))
++        if abs(obs[16]-x0)<1e-6: print('a',a,'rejected at x0',x0,'x0-a',x0-a); break
++        print('  moved',x0,'->',obs[16]) if k<3 else None
++    else: print('a',a,'no reject x',obs[16])
+diff --git a/geom_com.py b/geom_com.py
+new file mode 100644
+index 0000000..516e395
+--- /dev/null
++++ b/geom_com.py
+@@ -0,0 +1,14 @@
++from geom_lib import *
++P=Prober()
++for seed in [12,24]:
++    o=P.reset(seed); w,Lh,Lv=o[12:15]
++    Ab,As=Lh*w,w*Lv; yc=(Ab*(-w/2)+As*(-w-Lv/2))/(Ab+As)
++    print('seed',seed,'area centroid y=%.4f'%yc, 'bar-center y=%.4f'%(-w/2), 'stem-mid y=%.4f'%(-w-Lv/2))
++    for y in [-0.05,-0.15,-0.25,-0.3,-0.35,-0.4,-0.45,-0.55,-0.7]:
++        sx = -1.0 if y<-w else -0.9
++        P.reset(seed); th=P.b0[2]; M=rot(th); c=P.b0[:2]
++        P.nav(c+M@np.array([sx,y]))
++        d=M@np.array([1.0,0])
++        for k in range(int((abs(sx)+0.15)/0.005)): P.step(d*0.005)
++        db=P.obs[0:3]-P.b0
++        print('  push y=%.2f dtheta=%+.5f dpos_body=%s'%(y,db[2],np.round(M.T@db[:2],4)))
+diff --git a/geom_confirm.py b/geom_confirm.py
+new file mode 100644
+index 0000000..a386127
+--- /dev/null
++++ b/geom_confirm.py
+@@ -0,0 +1,18 @@
++from geom_lib import *
++import sys
++P=Prober()
++for seed in [20,31,24]:
++    o=P.reset(seed); w,Lh,Lv=o[12:15]; r=o[28]
++    print('seed',seed,'w %.4f Lh %.4f Lv %.4f'%(w,Lh,Lv))
++    probes={'top(y=0)':((0.2,1.0),(0,-1),1,0.0),
++            'bar_bottom(y=-w)':((0.35,-1.0),(0,1),1,-w),
++            'bar_end_right(x=Lh/2)':((1.2,-w/2),(-1,0),0,Lh/2),
++            'bar_end_left(x=-Lh/2)':((-1.2,-w/2),(1,0),0,-Lh/2),
++            'stem_right(x=w/2)':((1.0,-0.7),(-1,0),0,w/2),
++            'stem_left(x=-w/2)':((-1.0,-0.7),(1,0),0,-w/2),
++            'stem_tip(y=-w-Lv)':((0.0,-1.55),(0,1),1,-w-Lv)}
++    for name,(s,d,ax,pred) in probes.items():
++        res,msg=P.probe(seed,np.array(s),np.array(d,float))
++        if res is None: print(name,msg); continue
++        surf=res[1][ax]-r*np.array(d)[ax]
++        print('  %-24s surface=%.4f predicted=%.4f err=%.5f'%(name,surf,pred,surf-pred))
+diff --git a/geom_lib.py b/geom_lib.py
+new file mode 100644
+index 0000000..dfec0cf
+--- /dev/null
++++ b/geom_lib.py
+@@ -0,0 +1,48 @@
++from env_client import make_env
++import numpy as np
++R=1.6
++def rot(th): c,s=np.cos(th),np.sin(th); return np.array([[c,-s],[s,c]])
++class Prober:
++    def __init__(s): s.env=make_env()
++    def reset(s,seed):
++        s.seed=seed; s.obs,_=s.env.reset(seed=seed); s.b0=s.obs[0:3].copy(); return s.obs
++    def moved(s): return np.max(np.abs(s.obs[0:3]-s.b0))>1e-7
++    def step(s,a):
++        s.obs,*_=s.env.step(np.clip(np.asarray(a,float),-0.0499,0.0499))
++    def goto(s,p,maxstep=0.04):
++        for _ in range(2000):
++            d=p-s.obs[16:18]; n=np.linalg.norm(d)
++            if n<1e-9: return
++            a=d if n<=maxstep else d/n*maxstep
++            s.step(a)
++            if n<=maxstep: return
++    def nav(s,world_pt):
++        c=s.b0[:2]; r=s.obs[16:18]-c; ang=np.arctan2(r[1],r[0])
++        s.goto(c+R*np.array([np.cos(ang),np.sin(ang)]))
++        v=world_pt-c; tang=np.arctan2(v[1],v[0])
++        da=(tang-ang+np.pi)%(2*np.pi)-np.pi
++        n=int(abs(da)/0.02)+1
++        for k in range(1,n+1):
++            a=ang+da*k/n; s.goto(c+R*np.array([np.cos(a),np.sin(a)]))
++        s.goto(world_pt)
++    def probe(s,seed,start_b,dir_b,maxdist=2.0,fine=0.0002):
++        """start_b, dir_b in body frame. returns distance travelled at contact (bounds)."""
++        th=s.b0[2]; M=rot(th)
++        s.reset(seed); c=s.b0[:2]; start_w=c+M@start_b; d=M@(dir_b/np.linalg.norm(dir_b))
++        s.nav(start_w)
++        if s.moved(): return None,'moved during nav'
++        p0=s.obs[16:18].copy(); t=0
++        while t<maxdist:
++            prev=s.obs[16:18].copy(); s.step(d*0.005); t+=0.005
++            if s.moved(): break
++        else: return None,'no contact'
++        coarse=np.dot(prev-p0,d)
++        s.reset(seed); s.nav(start_w); p0=s.obs[16:18].copy()
++        s.goto(p0+d*(coarse-0.006),0.005)
++        while True:
++            prev=s.obs[16:18].copy(); s.step(d*fine)
++            if s.moved(): break
++        dprev=np.dot(prev-p0,d); dnow=np.dot(s.obs[16:18]-p0,d)
++        # contact point robot center in body frame
++        pb_prev=M.T@(prev-c); pb_now=M.T@(s.obs[16:18]-c)
++        return (pb_prev,pb_now),'ok'
+diff --git a/geom_limits.py b/geom_limits.py
+new file mode 100644
+index 0000000..d7899c8
+--- /dev/null
++++ b/geom_limits.py
+@@ -0,0 +1,12 @@
++from env_client import make_env
++import numpy as np
++env=make_env()
++obs,_=env.reset(seed=0)
++for a in [[0.0499,0],[0.04999999,0],[0.05,0],[0,0.05],[-0.05,0],[0.035,0.035],[0.049,0.049],[0.0499,0.0499],[-0.0499,-0.0499]]:
++    try:
++        o,*_=env.step(np.array(a,dtype=float)); print(a,'ok', o[16:18]-obs[16:18]); obs=o
++    except Exception as e:
++        print(a,'ERR',repr(e)[:300]); env.close(); env=make_env(); obs,_=env.reset(seed=0)
++try:
++    o,*_=env.step(np.array([0.05,0],dtype=np.float32)); print('f32 ok')
++except Exception as e: print('f32 ERR',repr(e)[:200])
+diff --git a/geom_radial.py b/geom_radial.py
+new file mode 100644
+index 0000000..1f40ba4
+--- /dev/null
++++ b/geom_radial.py
+@@ -0,0 +1,9 @@
++from geom_lib import *
++import sys
++P=Prober(); seed=int(sys.argv[1])
++o=P.reset(seed); print('seed',seed,'w,Lh,Lv',o[12:15],'r',o[28])
++for k in range(24):
++    a=2*np.pi*k/24; u=np.array([np.cos(a),np.sin(a)])
++    res,msg=P.probe(seed,1.5*u,-u)
++    if res is None: print(k,msg); continue
++    print('ang %5.1f contact robot body pos prev %s now %s'%(np.degrees(a),np.round(res[0],4),np.round(res[1],4)))
+diff --git a/geom_seeds.py b/geom_seeds.py
+new file mode 100644
+index 0000000..48ceb09
+--- /dev/null
++++ b/geom_seeds.py
+@@ -0,0 +1,6 @@
++from env_client import make_env
++import numpy as np
++env=make_env()
++for s in range(60):
++    o,_=env.reset(seed=s)
++    if 1.7<o[0]<3.3 and 1.7<o[1]<3.3: print(s, np.round(o[[0,1,2,12,13,14,16,17]],4))
+diff --git a/geom_wall.py b/geom_wall.py
+new file mode 100644
+index 0000000..ea0ed8d
+--- /dev/null
++++ b/geom_wall.py
+@@ -0,0 +1,17 @@
++from geom_lib import *
++def corners(o):
++    x,y,th=o[0:3]; w,Lh,Lv=o[12:15]; M=rot(th)
++    pts=np.array([[-Lh/2,0],[Lh/2,0],[Lh/2,-w],[-Lh/2,-w],[w/2,-w-Lv],[-w/2,-w-Lv]])
++    return (M@pts.T).T+[x,y]
++if __name__=="__main__":
++  P=Prober()
++  for seed,d in [(1,(1,0)),(12,(1,0)),(12,(-1,0)),(12,(0,1)),(12,(0,-1))]:
++      o=P.reset(seed); d=np.array(d,float); c=P.b0[:2]
++      # go behind block (opposite side), then push through center line
++      P.nav(c-d*1.55)
++      ext=[]
++      for k in range(200):
++          P.step(d*0.0499)
++          ext.append(np.max(corners(P.obs)@d))
++      print('seed',seed,'dir',d,'robot',np.round(P.obs[16:18],3),'block',np.round(P.obs[0:3],3),'block extreme along dir: max %.3f final %.3f'%(max(ext),ext[-1]))
++  
+\ No newline at end of file
+diff --git a/geom_wall2.py b/geom_wall2.py
+new file mode 100644
+index 0000000..1b6ca7c
+--- /dev/null
++++ b/geom_wall2.py
+@@ -0,0 +1,13 @@
++from geom_lib import *
++from geom_wall import corners
++P=Prober()
++for seed in [12,20,24,31]:
++    o=P.reset(seed); th=P.b0[2]; M=rot(th); c=P.b0[:2]
++    d=M@np.array([0,-1.0])  # stem direction
++    P.nav(c+M@np.array([0,0.5]))
++    lo,hi=[],[]
++    for k in range(150):
++        P.step(d*0.03)
++        cs=corners(P.obs); lo.append(cs.min(0)); hi.append(cs.max(0))
++    lo=np.min(lo,0); hi=np.max(hi,0)
++    print('seed',seed,'stemdir',np.round(d,2),'robot',np.round(P.obs[16:18],3),'block',np.round(P.obs[0:3],3),'corner min',np.round(lo,3),'max',np.round(hi,3))
+diff --git a/geom_wrap.py b/geom_wrap.py
+new file mode 100644
+index 0000000..7babea3
+--- /dev/null
++++ b/geom_wrap.py
+@@ -0,0 +1,10 @@
++from geom_lib import *
++P=Prober()
++for seed in [22,16]:
++    o=P.reset(seed); th=P.b0[2]; M=rot(th); c=P.b0[:2]
++    print('seed',seed,'theta0',th)
++    P.nav(c+M@np.array([0.45,-0.5]))
++    ths=[]
++    for k in range(200):
++        P.step(M@np.array([0,1.0])*0.005); ths.append(P.obs[2])
++    print('  theta traj', np.round(ths[40::8],4))
+diff --git a/test_approach.py b/test_approach.py
+new file mode 100644
+index 0000000..37f5560
+--- /dev/null
++++ b/test_approach.py
+@@ -0,0 +1,26 @@
++import sys, time, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++from concurrent.futures import ThreadPoolExecutor
++def run(seed):
++    env = make_env()
++    ap = GeneratedApproach(env.action_space, env.observation_space, {})
++    obs, info = env.reset(seed=seed)
++    ap.reset(obs, info)
++    t0 = time.time(); ok=False
++    for t in range(env.max_steps):
++        a = ap.get_action(obs)
++        obs, r, term, trunc, info = env.step(a)
++        if term: ok=True; break
++        if trunc: break
++    dt=time.time()-t0
++    e = (obs[0]-obs[29], obs[1]-obs[30], (obs[2]-obs[31]+np.pi)%(2*np.pi)-np.pi)
++    env.close()
++    return seed, ok, t+1, dt, e
++if __name__=='__main__':
++    a,b = int(sys.argv[1]), int(sys.argv[2])
++    with ThreadPoolExecutor(8) as ex:
++        res = list(ex.map(run, range(a,b)))
++    for s,ok,n,dt,e in res:
++        print(s, ok, n, f'{dt:.1f}s', np.round(e,3))
++    print('success', sum(r[1] for r in res), '/', len(res), 'mean steps', np.mean([r[2] for r in res]))

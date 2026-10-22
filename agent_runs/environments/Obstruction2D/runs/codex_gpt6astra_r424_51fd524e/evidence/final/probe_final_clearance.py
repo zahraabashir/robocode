@@ -1,0 +1,9 @@
+from env_client import make_env
+from approach import GeneratedApproach
+import numpy as np
+e=make_env();s,_=e.reset(seed=151);p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,{})
+for t in range(80):s,r,d,tr,i=e.step(p.get_action(s))
+for action in [[0,-.001,0,0,1]]*10+[[.003,0,0,0,1],[0,-.001,0,0,1]]*6:
+ s,r,d,tr,i=e.step(np.array(action,dtype=np.float32));print('step',action,'robot',[s.get(p.robot,k) for k in ['x','y']],'block',p.rect(s,p.block),'done',d,flush=True)
+ if d:break
+e.close()

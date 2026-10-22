@@ -1,0 +1,27 @@
+diff --git a/approach.py b/approach.py
+index 14a32d6..3266302 100644
+--- a/approach.py
++++ b/approach.py
+@@ -18,15 +18,18 @@ class GeneratedApproach:
+         tx, tw = state.get(target, "x"), state.get(target, "width")
+         crowded = any(abs(tx - state.get(o, "x")) <
+                       0.5 * (tw + state.get(o, "width")) + 0.14 for o in obstacles)
+-        tasks = list(obstacles)
+-        if crowded:
+-            tasks.append(target)
+         def top_y(o):
+             angle = state.get(o, "theta")
+             vertical_half = 0.5 * (abs(math.sin(angle)) * state.get(o, "width") +
+                                    abs(math.cos(angle)) * state.get(o, "height"))
+             return state.get(o, "y") + vertical_half
+-        tasks.sort(key=top_y, reverse=True)
++        tasks = sorted(obstacles, key=top_y, reverse=True)
++        if crowded:
++            target_top = top_y(target)
++            # Clear meaningfully taller neighbors first, then move the target
++            # before near-tied lower objects can obstruct its pickup corridor.
++            insert_at = sum(top_y(o) > target_top + 0.015 for o in tasks)
++            tasks.insert(insert_at, target)
+         self.todo = [o.name for o in tasks]
+         self.todo.append(target_name)  # retrieve it last for the actual placement
+         surface = state.get_objects(self.types["target_surface"])[0]

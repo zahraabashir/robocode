@@ -1,0 +1,33 @@
+import numpy as np
+from env_client import make_env
+
+CALIBRATE = -1 / 2
+IMAGE = -1 / 6
+env = make_env()
+obs, _ = env.reset(seed=1)
+space = env.observation_space
+rt = next(t for t in space.types if t.name == "rover")
+ot = next(t for t in space.types if t.name == "objective")
+r0 = sorted(obs.get_objects(rt), key=lambda o: o.name)[0]
+objs = sorted(obs.get_objects(ot), key=lambda o: o.name)
+
+
+def show(label):
+    print(label, [round(float(obs.get(r0, f)), 2) for f in ("x", "y", "calibrated")],
+          [[int(obs.get(o, f)) for f in ("have_image_rover0", "received_image")] for o in objs])
+
+
+for k in range(13):
+    a = np.zeros(8, np.float32)
+    if k < 2:
+        a[:2] = (.2, .2)
+    else:
+        a[1] = .2
+    obs, *_ = env.step(a)
+show("vantage")
+for op in (CALIBRATE, IMAGE, CALIBRATE, IMAGE):
+    a = np.zeros(8, np.float32)
+    a[3] = op
+    obs, *_ = env.step(a)
+    show("op")
+env.close()

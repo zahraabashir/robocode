@@ -1,0 +1,12 @@
+diff --git a/approach.py b/approach.py
+index 8b6d4f5..b47903e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -34,6 +34,7 @@ class GeneratedApproach:
+         x=self._v(state,name,"pose_x"); self.start_x=x
+         pick_bx=-.12
+         model_x=x
++        if x>.44: pick_bx=-.08
+         forward_retracted=(name=="target_block" and self.region[0]>x+.15)
+         if forward_retracted:
+             # Pick with the base retracted and the arm extended.  The stored base

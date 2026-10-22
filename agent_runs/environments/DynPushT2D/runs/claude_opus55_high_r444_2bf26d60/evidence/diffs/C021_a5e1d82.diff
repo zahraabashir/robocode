@@ -1,0 +1,31 @@
+diff --git a/approach.py b/approach.py
+index 659eedc..6c95e3e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -169,11 +169,11 @@ class GeneratedApproach:
+         self.stuck_rate = 1e-3
+         self.stage = 0
+         self.spacing = 0.06
+-        self.angs = (-0.5, -0.25, 0.0, 0.25, 0.5)
++        self.angs = (-0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75)
+         self.la_mode = 1
+         self.rbar = 0.03
+-        self.pre_clear = 0.035
+-        self.final_infl = R_ROBOT + 0.008
++        self.pre_clear = -0.1
++        self.final_infl = R_ROBOT + 0.004
+         self.sub_clear = 1.0
+         self.H2 = 30
+         self.H = 40
+diff --git a/tune.py b/tune.py
+index 6d61f6c..d358788 100644
+--- a/tune.py
++++ b/tune.py
+@@ -17,6 +17,7 @@ def run(seed):
+         obs, r, term, trunc, _ = env.step(np.clip(ap.get_action(obs), -0.049, 0.049))
+         if term or trunc: break
+     env.close()
++    if time.time()-t0 > 10: print("SLOW", seed, steps, time.time()-t0, flush=True)
+     if not term: print("FAIL", seed, obs[0:3]-obs[29:32], flush=True)
+     return term, steps, time.time()-t0
+ if __name__ == "__main__":

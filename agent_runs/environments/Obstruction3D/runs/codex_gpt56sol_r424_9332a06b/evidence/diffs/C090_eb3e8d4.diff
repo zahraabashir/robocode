@@ -1,0 +1,18 @@
+diff --git a/approach.py b/approach.py
+index 20abbfe..f0e6663 100644
+--- a/approach.py
++++ b/approach.py
+@@ -153,12 +153,7 @@ class GeneratedApproach:
+                 er=np.r_[g-pos,-feat[3:]]
+                 u=np.linalg.solve(self.J.T@self.J+1e-5*np.eye(5),self.J.T@np.clip(er,-.03,.03))
+                 a += self.B@np.clip(u,-.05,.05)
+-            # If an obstruction remains latched, a short re-close/open cycle
+-            # can break static finger contact. Ordinary releases finish before
+-            # this recovery ever activates.
+-            pulse=(self.object_name!="target_block" and self.release_t>=20
+-                   and self.release_t%30<3)
+-            a[10]=-1. if pulse else 1.; self.release_t+=1; return a
++            a[10]=1.; self.release_t+=1; return a
+         clearance=.19
+         goals=[np.array([pos[0],pos[1],clearance]),np.array([self.dest[0],self.dest[1],clearance]),
+                np.array([self.dest[0],self.dest[1],self.rest_z+.005])]

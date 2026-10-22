@@ -1,0 +1,48 @@
+diff --git a/approach.py b/approach.py
+index 774cf04..b1d624a 100644
+--- a/approach.py
++++ b/approach.py
+@@ -78,6 +78,8 @@ class GeneratedApproach:
+         goalcx=self.destx-bx+self.target_grasp
+         reserve_left=min(self.destx,goalcx-.105)
+         reserve_right=max(self.destx+bw,goalcx+.105)
++        pickup_left=min(bx,self.target_grasp-.105)
++        pickup_right=max(bx+bw,self.target_grasp+.105)
+         low=max(.005,.101+self.offsetx)
+         high=min(1.613-w,1.517+self.offsetx)
+         positions=[low,high,float(np.clip(x,low,high))]
+@@ -89,6 +91,7 @@ class GeneratedApproach:
+         for left in positions:
+             if left<low or left>high:continue
+             if left<reserve_right+.008 and left+w>reserve_left-.008:continue
++            if left<pickup_right+.008 and left+w>pickup_left-.008:continue
+             if any(left<ox+ow+.012 and left+w>ox-.012 for o,(ox,oy,ow,oh) in others):continue
+             if base_clear(left,.101):floor.append(left)
+         if floor:return min(floor,key=lambda left:abs(left-x)),.101
+@@ -100,6 +103,7 @@ class GeneratedApproach:
+         for left in positions:
+             if left<low or left>high:continue
+             if left<reserve_right+.02 and left+w>reserve_left-.02:continue
++            if left<pickup_right+.02 and left+w>pickup_left-.02:continue
+             if any(o in (self.surface,self.block) and left<ox+ow+.04 and left+w>ox-.04 for o,(ox,oy,ow,oh) in others):continue
+             bottom=.101
+             for o,(ox,oy,ow,oh) in others:
+diff --git a/sweep_300_700.log b/sweep_300_700.log
+index 3b0d199..d1cee4f 100644
+--- a/sweep_300_700.log
++++ b/sweep_300_700.log
+@@ -171,3 +171,14 @@
+ 473 OK 22
+ 470 OK 43
+ 471 OK 35
++472 OK 38
++474 OK 27
++478 OK 19
++476 OK 78
++475 OK 82
++477 OK 71
++482 OK 22
++479 OK 87
++481 OK 42
++483 OK 21
++485 OK 18

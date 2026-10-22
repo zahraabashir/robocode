@@ -1,0 +1,1028 @@
+[
+  {
+    "id": "C001",
+    "commit": "39b704bd4c673badf283a944dbdf9834714c2ad6",
+    "parents": [],
+    "date": "2026-09-11T11:44:13+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".gitignore",
+      "AGENTS.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_39b704b.diff",
+    "diff_sha256": "fb026bcc38fca4e6fe34a3b8c2fef5c6444838a3b4ffc94013341d85d35ad464",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "749e49bf2fdf785b57ab36eb024c5299cc4d70de",
+    "parents": [
+      "39b704bd4c673badf283a944dbdf9834714c2ad6"
+    ],
+    "date": "2026-09-11T11:44:57+02:00",
+    "title": "Add geometry probe for planner design",
+    "files": [
+      "probe_planner_design.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C002_749e49b.diff",
+    "diff_sha256": "dc2e1df695136a47a2d5e26451e128145adc3b2100d83f479ee1707179d07ce1",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C003",
+    "commit": "43ce01c901d24823e5a13d954a6027a430250be8",
+    "parents": [
+      "749e49bf2fdf785b57ab36eb024c5299cc4d70de"
+    ],
+    "date": "2026-09-11T11:45:04+02:00",
+    "title": "Fix probe to use environment observation space",
+    "files": [
+      "probe_planner_design.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C003_43ce01c.diff",
+    "diff_sha256": "caa5d190dabe42f7258920f74a6cda596f61e0291b7b28de4a53da10a42be4e7",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C004",
+    "commit": "bb12723a0162eb68971644c3d83d32db722f6e0a",
+    "parents": [
+      "43ce01c901d24823e5a13d954a6027a430250be8"
+    ],
+    "date": "2026-09-11T11:45:07+02:00",
+    "title": "Add black-box arena geometry probe",
+    "files": [
+      "probe_geometry.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C004_bb12723.diff",
+    "diff_sha256": "e4b233146c576a8f78e6d79bd9249db75a99228578b16091c8a412b0823cb4ab",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C005",
+    "commit": "fddd393297b4388c0bb002950eb148fc0a37f7f4",
+    "parents": [
+      "bb12723a0162eb68971644c3d83d32db722f6e0a"
+    ],
+    "date": "2026-09-11T11:45:20+02:00",
+    "title": "add focused black-box operator probe",
+    "files": [
+      "probe_ops.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C005_fddd393.diff",
+    "diff_sha256": "4e048b815626267e133742a43f78581951880f7e50434e5f0f7d194980cee2a1",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C006",
+    "commit": "36258b277abd0c8b283651fe7d1c296535d03a25",
+    "parents": [
+      "fddd393297b4388c0bb002950eb148fc0a37f7f4"
+    ],
+    "date": "2026-09-11T11:45:21+02:00",
+    "title": "Fix object type feature lookup in geometry probe",
+    "files": [
+      "probe_geometry.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C006_36258b2.diff",
+    "diff_sha256": "d388e2d3f2a91b8c30183007224bfafd54da45c8b2edea3d3881a798d2f33219",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C007",
+    "commit": "56169bb2934fb8f3639bcc0918d2bc7d83c22b6c",
+    "parents": [
+      "36258b277abd0c8b283651fe7d1c296535d03a25"
+    ],
+    "date": "2026-09-11T11:45:24+02:00",
+    "title": "Add rover collision and motion probe",
+    "files": [
+      "probe_motion_design.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C007_56169bb.diff",
+    "diff_sha256": "b6a2d9949fb2d6fd8e2f32010c04c5d0ee32c8cc65349ed4220c6ec922566c01",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C008",
+    "commit": "3c52b1b29e896e1de7335805722a15167da06d1c",
+    "parents": [
+      "56169bb2934fb8f3639bcc0918d2bc7d83c22b6c"
+    ],
+    "date": "2026-09-11T11:46:08+02:00",
+    "title": "extend operator probe with stateful sample and image scenario",
+    "files": [
+      "probe_ops.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C008_3c52b1b.diff",
+    "diff_sha256": "7f5acc525d70d4886dca1837ddd1e0a00fc1cfaeb03defdab01162f0ba6ad3eb",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C009",
+    "commit": "ce9d483fd7a86f004d313bd98e0e820c09145a31",
+    "parents": [
+      "3c52b1b29e896e1de7335805722a15167da06d1c"
+    ],
+    "date": "2026-09-11T11:46:09+02:00",
+    "title": "Add targeted wall and visibility semantics probes",
+    "files": [
+      "probe_semantics.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C009_ce9d483.diff",
+    "diff_sha256": "092d5e1bf6d1ec8436da9f9c34f1f0d1e7d37cba0281b34d10307e5435875a89",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C010",
+    "commit": "c8b9c70a77e9184d51b7e81e8ad1a98df6000996",
+    "parents": [
+      "ce9d483fd7a86f004d313bd98e0e820c09145a31"
+    ],
+    "date": "2026-09-11T11:46:22+02:00",
+    "title": "Probe lower wall crossing clearance",
+    "files": [
+      "probe_motion_design.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C010_c8b9c70.diff",
+    "diff_sha256": "caaa07e6ceccad26e6f714b0714051b4bf0875e652eb8a9a515558ba7f50d67b",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C011",
+    "commit": "dbe015e7076c61ad5b3b52060d4e5a4026f084f8",
+    "parents": [
+      "c8b9c70a77e9184d51b7e81e8ad1a98df6000996"
+    ],
+    "date": "2026-09-11T11:46:45+02:00",
+    "title": "probe home tolerance and simultaneous rover collision handling",
+    "files": [
+      "probe_ops.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C011_dbe015e.diff",
+    "diff_sha256": "715db57c2c934694163fe425a3b6acaa777f60f18a53cad4f74a0e0f2ed1ce38",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C012",
+    "commit": "0f846f82c995a3f3cfb8bea319322d69e7504afa",
+    "parents": [
+      "dbe015e7076c61ad5b3b52060d4e5a4026f084f8"
+    ],
+    "date": "2026-09-11T11:46:48+02:00",
+    "title": "Add initial geometry-based rover policy and test harness",
+    "files": [
+      "approach.py",
+      "inspect_env.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C012_0f846f8.diff",
+    "diff_sha256": "f65581348015127ace53d24a48b4d9eae0d9ac8dcd3951164cc96ac2a3d91f73",
+    "events": [
+      {
+        "event": "E0016",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "4ed2002a9183c8421b253f23009e30110290393c2db257277f763748f02e88e0",
+    "version": "evidence/versions/C012_0f846f8_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C013",
+    "commit": "a0302251f8192894c5434bc31e835ade9dc33526",
+    "parents": [
+      "0f846f82c995a3f3cfb8bea319322d69e7504afa"
+    ],
+    "date": "2026-09-11T11:47:11+02:00",
+    "title": "Increase collision clearance and radio opportunistically",
+    "files": [
+      "approach.py",
+      "probe_ops.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C013_a030225.diff",
+    "diff_sha256": "b52af13f4c39845453c21e9aa5af49f51510966777e4035dd1b6ae7d03537420",
+    "events": [
+      {
+        "event": "E0027",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6c52f575f767b077ac49ed55a362622897034aa8c8fa8c27972e6b2336e28429",
+    "version": "evidence/versions/C013_a030225_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C014",
+    "commit": "0ba4818f7975931aa294dffa1c41a3751e7f56a8",
+    "parents": [
+      "a0302251f8192894c5434bc31e835ade9dc33526"
+    ],
+    "date": "2026-09-11T11:47:26+02:00",
+    "title": "Probe sample and radio visibility from right arena",
+    "files": [
+      "probe_ops_design.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C014_0ba4818.diff",
+    "diff_sha256": "4e02358c59237f3ea24a9c1969da9f01ec15c07e228be6f884c45f77b6c439ae",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C015",
+    "commit": "c9a3e23fdd4fded13ee9f3827e92eda40f34bdd3",
+    "parents": [
+      "0ba4818f7975931aa294dffa1c41a3751e7f56a8"
+    ],
+    "date": "2026-09-11T11:47:35+02:00",
+    "title": "Probe lower-gap radio point",
+    "files": [
+      "probe_ops_design.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C015_c9a3e23.diff",
+    "diff_sha256": "1a7e717f49607907fc9e261157d5bd07ebe34c9067995a46c61bdb11eb813fd0",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C016",
+    "commit": "fd428f80bb7f87173472455850c2c01371479739",
+    "parents": [
+      "c9a3e23fdd4fded13ee9f3827e92eda40f34bdd3"
+    ],
+    "date": "2026-09-11T11:47:50+02:00",
+    "title": "Probe image visibility and calibration semantics",
+    "files": [
+      "probe_image_design.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C016_fd428f8.diff",
+    "diff_sha256": "9c71a46d569a4406a67bbc661ee5a69e6b9afcc6458b12e7f70ef9ae4f9924bf",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C017",
+    "commit": "738181b2caac73262a5d59e56fae8c5f2c0692a6",
+    "parents": [
+      "fd428f80bb7f87173472455850c2c01371479739"
+    ],
+    "date": "2026-09-11T11:50:10+02:00",
+    "title": "Respect central wall and split imaging across rovers",
+    "files": [
+      "approach.py",
+      "trace_run.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C017_738181b.diff",
+    "diff_sha256": "e74d1933dce01b35663abf9f2fc0798e7e162efe48e3622a3466b5b71cac5284",
+    "events": [
+      {
+        "event": "E0035",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1f20d961b8e0a3300325eb63d64f18ed258bf1f4fea558d05bebded065acf154",
+    "version": "evidence/versions/C017_738181b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C018",
+    "commit": "71d3423e0dd9d28422bed029015d7d9bae82fcc8",
+    "parents": [
+      "738181b2caac73262a5d59e56fae8c5f2c0692a6"
+    ],
+    "date": "2026-09-11T11:50:38+02:00",
+    "title": "Allocate sample types to reachable arena sides",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C018_71d3423.diff",
+    "diff_sha256": "7723c83713431e955c83b74850dc24a1f95b9f2183f8e5922922d9995b936ab2",
+    "events": [
+      {
+        "event": "E0039",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "59fb519c7f4b592decd2835e7a98236de0c974dc215ebdc1acbbb47548af74f4",
+    "version": "evidence/versions/C018_71d3423_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C019",
+    "commit": "2af34144897078d862cb54111e5d4838c0d8151d",
+    "parents": [
+      "71d3423e0dd9d28422bed029015d7d9bae82fcc8"
+    ],
+    "date": "2026-09-11T11:50:49+02:00",
+    "title": "Enable left rover to image left-side objectives",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C019_2af3414.diff",
+    "diff_sha256": "4a368f0481764543b143237454b25ec82dfb955493f89568cb6cd734c7427d2f",
+    "events": [
+      {
+        "event": "E0043",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "08d9684b5e553ebd05f219fa76355d94e3b156cce2821f46d0ac5028891080c9",
+    "version": "evidence/versions/C019_2af3414_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C020",
+    "commit": "03b6e5b1831d1c9cf61b9ccebeec4ce64d4c81fd",
+    "parents": [
+      "2af34144897078d862cb54111e5d4838c0d8151d"
+    ],
+    "date": "2026-09-11T11:51:37+02:00",
+    "title": "Add measured rover clearance around obstacles",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C020_03b6e5b.diff",
+    "diff_sha256": "cfbaa03afbc04e516df9280ef9fad3f79a0704e9db8dd367a204bab6c2548edb",
+    "events": [
+      {
+        "event": "E0049",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "0e7df16a86c80b46b74905c56ed411cfd62dc9ee3f2c2e84467fe97abd131555",
+    "version": "evidence/versions/C020_03b6e5b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C021",
+    "commit": "6a2200f6db647e8823ffdd7b42168ed1bdbe9b1f",
+    "parents": [
+      "03b6e5b1831d1c9cf61b9ccebeec4ce64d4c81fd"
+    ],
+    "date": "2026-09-11T11:52:03+02:00",
+    "title": "Follow planned segments without componentwise deviation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C021_6a2200f.diff",
+    "diff_sha256": "2afe167f187ea2037ff8244b24a85a677b437f9f1e7fca95619bdf3f5ec92114",
+    "events": [
+      {
+        "event": "E0053",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "5e08f074535171ad79c798dd7ff0de2955b3d7e7338f2e0fd8833ddc0d8675a4",
+    "version": "evidence/versions/C021_6a2200f_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C022",
+    "commit": "d0e92ecfcaaa15872d707d8855e222943f78ec7d",
+    "parents": [
+      "6a2200f6db647e8823ffdd7b42168ed1bdbe9b1f"
+    ],
+    "date": "2026-09-11T11:52:55+02:00",
+    "title": "Clamp sample stances inside rover arena boundary",
+    "files": [
+      "approach.py",
+      "trace_run.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C022_d0e92ec.diff",
+    "diff_sha256": "6b6fbe0f3dc56ae1acd58be96888bf683531196266e4304c10dc23a806a364c8",
+    "events": [
+      {
+        "event": "E0060",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "3025da860e7380c00b6be8513ce8b284494829bf8c39e9e5d8249d011bde8711",
+    "version": "evidence/versions/C022_d0e92ec_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C023",
+    "commit": "07d9f616c47661d22905a0cbdd52dfd3d8367b85",
+    "parents": [
+      "d0e92ecfcaaa15872d707d8855e222943f78ec7d"
+    ],
+    "date": "2026-09-11T11:53:35+02:00",
+    "title": "Use measured clearance to preserve narrow navigable gaps",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C023_07d9f61.diff",
+    "diff_sha256": "7954f0dd8cda46d87d4e33246faef8b9f50110eafaf1ae069444688585ecaf79",
+    "events": [
+      {
+        "event": "E0068",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "8cbd43db18942f3a6e0cf76621ade5202344ebcf608a7ae611f486a224b06dce",
+    "version": "evidence/versions/C023_07d9f61_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C024",
+    "commit": "b89302c3a49bddaf005583842196c02392d890ef",
+    "parents": [
+      "07d9f616c47661d22905a0cbdd52dfd3d8367b85"
+    ],
+    "date": "2026-09-11T11:54:29+02:00",
+    "title": "Refine planning grid for tight pillar passages",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C024_b89302c.diff",
+    "diff_sha256": "559f388195b1c00d93b1f02ea4de9c3636928a8d918ff1fe3afdca7da77021a7",
+    "events": [
+      {
+        "event": "E0078",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "c440a58ae2d035313fbf6b64de137695091b33f89e97535ad94c0e8c0cf6e77f",
+    "version": "evidence/versions/C024_b89302c_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C025",
+    "commit": "2f8f2a2c38038e41b22227355a18885ce4287c75",
+    "parents": [
+      "b89302c3a49bddaf005583842196c02392d890ef"
+    ],
+    "date": "2026-09-11T11:55:06+02:00",
+    "title": "Keep planned paths inside physical boundary with safe clearance",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C025_2f8f2a2.diff",
+    "diff_sha256": "06007af51cc9500a67a18e8eea49c2bce342ae5bde84a4abe805cd8f2a1e7d67",
+    "events": [
+      {
+        "event": "E0084",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "ed6f2bd755ce1fcad8579c16eed90d812eb09628f1f190db3dacd9b0390f6016",
+    "version": "evidence/versions/C025_2f8f2a2_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C026",
+    "commit": "bc97ce11ef9874ce72993b41681c554824f6542f",
+    "parents": [
+      "2f8f2a2c38038e41b22227355a18885ce4287c75"
+    ],
+    "date": "2026-09-11T11:56:08+02:00",
+    "title": "Retry narrow routes at measured clearance only when needed",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C026_bc97ce1.diff",
+    "diff_sha256": "e37bf696b533253173b3665fc5f4d46da41d3c49285513f4a3237acd8aa59fa9",
+    "events": [
+      {
+        "event": "E0091",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "77e594ae612926995898a183dc18d00dd3bcdef40c70543ab4ba6a8ec3a160a1",
+    "version": "evidence/versions/C026_bc97ce1_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C027",
+    "commit": "2493a4e36af5a79fb4b0dd51799f2d6aafeb0696",
+    "parents": [
+      "bc97ce11ef9874ce72993b41681c554824f6542f"
+    ],
+    "date": "2026-09-11T11:57:06+02:00",
+    "title": "Add robust camera standoff rings and safer primary routes",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C027_2493a4e.diff",
+    "diff_sha256": "80c631b29faeb06bce4b074f94c1e7504af88bf355c5ca94e7a03117a7913156",
+    "events": [
+      {
+        "event": "E0099",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "fe27834c0e3386ca7259a22609f961f6f43a13b33250bed7f2a659b612bdfcc1",
+    "version": "evidence/versions/C027_2493a4e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C028",
+    "commit": "a914a91f14f1e11973ce740a2ddcf6befb02fa77",
+    "parents": [
+      "2493a4e36af5a79fb4b0dd51799f2d6aafeb0696"
+    ],
+    "date": "2026-09-11T11:58:17+02:00",
+    "title": "Support both required sample types on the same rover side",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C028_a914a91.diff",
+    "diff_sha256": "49e5d5b75717529d8a55f805157b71bc4c9bdf1eb05ad4c8c6cdae208655efaa",
+    "events": [
+      {
+        "event": "E0105",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "f34d748de33ba70bc5acf9a920c036317eabf51cc31ff33855533627b1f70a72",
+    "version": "evidence/versions/C028_a914a91_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C029",
+    "commit": "b98dc7b4b36ca662b82c6b69f89f65619f90ebc3",
+    "parents": [
+      "a914a91f14f1e11973ce740a2ddcf6befb02fa77"
+    ],
+    "date": "2026-09-11T11:59:00+02:00",
+    "title": "Choose reachable sample stances near boundaries and lander",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C029_b98dc7b.diff",
+    "diff_sha256": "f5403d10f169033db175d5c429f576aabb207b3febbe6a44716cb542b654537e",
+    "events": [
+      {
+        "event": "E0109",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6fbc6e6990f64eb3ce622de8e8d6e176274970fa5e2bdbbd974edf32fcd71edc",
+    "version": "evidence/versions/C029_b98dc7b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C030",
+    "commit": "46c4b3a011a01614675f4d672f7dcc367eeab746",
+    "parents": [
+      "b98dc7b4b36ca662b82c6b69f89f65619f90ebc3"
+    ],
+    "date": "2026-09-11T11:59:30+02:00",
+    "title": "Route around lander and avoid samples trapped beside it",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C030_46c4b3a.diff",
+    "diff_sha256": "1f592c6b9ef3c0e3a0b9e52b382b6c69bfe8199d2969af32ebe0fa009347c663",
+    "events": [
+      {
+        "event": "E0115",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "49ddc5f003a68db532c150d9f0ec5f47c43f388ea72502a8cce7968987d49c5f",
+    "version": "evidence/versions/C030_46c4b3a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C031",
+    "commit": "89fd168ba7553392a2fae44ecdc20ddaa753e3f8",
+    "parents": [
+      "46c4b3a011a01614675f4d672f7dcc367eeab746"
+    ],
+    "date": "2026-09-11T11:59:43+02:00",
+    "title": "Exclude lander-overlapping samples from assignment",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C031_89fd168.diff",
+    "diff_sha256": "dc9a20a702c4d959f4e7ab91e129c476ba85f3c3b77cc02d4cf25528960aa864",
+    "events": [
+      {
+        "event": "E0119",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "9f121f1274adb61f4ee0e957d20f441b1536c8f951905eb96d8bd2e93d67dfc4",
+    "version": "evidence/versions/C031_89fd168_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C032",
+    "commit": "9ca15aa90f6a6aa64c0120a6f4a662cd23f6e3c6",
+    "parents": [
+      "89fd168ba7553392a2fae44ecdc20ddaa753e3f8"
+    ],
+    "date": "2026-09-11T12:00:59+02:00",
+    "title": "Model full lander footprint and inset corner stances",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C032_9ca15aa.diff",
+    "diff_sha256": "e1153161a0dabcbdf0405f5932d79630398788d91c07d7038d25428ce7313fb7",
+    "events": [
+      {
+        "event": "E0129",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6ff679e170da14579bfdc8fa67b05a6f45dda69cd95ae511f475734528e2ed8d",
+    "version": "evidence/versions/C032_9ca15aa_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C033",
+    "commit": "99046102fbbd4189667cd3446db32918856db38d",
+    "parents": [
+      "9ca15aa90f6a6aa64c0120a6f4a662cd23f6e3c6"
+    ],
+    "date": "2026-09-11T12:01:49+02:00",
+    "title": "Avoid unreachable samples in rounded arena corners",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C033_9904610.diff",
+    "diff_sha256": "06284f2acfd634d42098d97c51c9cddfb2a3c5bf9bc467b0c20803d092213e49",
+    "events": [
+      {
+        "event": "E0139",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "f4d81ed7edf297211bf35179368e0c01cd9cfa1727823b709dcd3cdef385054e",
+    "version": "evidence/versions/C033_9904610_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C034",
+    "commit": "a732c2ac277125c06315ab9575081404a90846fc",
+    "parents": [
+      "99046102fbbd4189667cd3446db32918856db38d"
+    ],
+    "date": "2026-09-11T12:02:40+02:00",
+    "title": "Penalize sample assignments obstructed by the lander",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C034_a732c2a.diff",
+    "diff_sha256": "23fbbe8c56532bc61f8e0bd53b2bfec339701005d676b38cb8d6137e5e31d67f",
+    "events": [
+      {
+        "event": "E0145",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "2742f77c6f1dc606a55320f0f66ff34191179a683bbd4d4572ced0457d3ebfcf",
+    "version": "evidence/versions/C034_a732c2a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C035",
+    "commit": "85d529c1265dda8a2d0388a642e3a0044710da64",
+    "parents": [
+      "a732c2ac277125c06315ab9575081404a90846fc"
+    ],
+    "date": "2026-09-11T12:03:27+02:00",
+    "title": "Add bounded adversarial seed search harness",
+    "files": [
+      "search_failures.py"
+    ],
+    "file_roles": [
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C035_85d529c.diff",
+    "diff_sha256": "6c8c0b6e436433ff016d9771a3cc35a8c8f8bd5972e42657c4ef28a59bf52dc5",
+    "events": [
+      {
+        "event": "E0157",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C036",
+    "commit": "83e4d78886a50cd1b4438ef6780667fbbd7c8d1b",
+    "parents": [
+      "85d529c1265dda8a2d0388a642e3a0044710da64"
+    ],
+    "date": "2026-09-11T12:04:50+02:00",
+    "title": "Use conservative sampling distance away from forced edge stances",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C036_83e4d78.diff",
+    "diff_sha256": "3d179072079ceee8f68c17abf18f9159116f1ee1e08a94538b6e4acc5b0ae8bb",
+    "events": [
+      {
+        "event": "E0172",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "24c9ef7dbb2eba13bcc1392efcce0579ba40737a16ec285cab28c054e016d371",
+    "version": "evidence/versions/C036_83e4d78_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C037",
+    "commit": "4a7e3f9a3afcc929b91f4ecadba26226c9f8bd67",
+    "parents": [
+      "83e4d78886a50cd1b4438ef6780667fbbd7c8d1b"
+    ],
+    "date": "2026-09-11T12:05:45+02:00",
+    "title": "Increase modeled vertical lander collision clearance",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C037_4a7e3f9.diff",
+    "diff_sha256": "8e31ce7a256393a1f322be0bd9b7063ef4074efdf8fda25e468378c90398576b",
+    "events": [
+      {
+        "event": "E0184",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "4606c301b5a5ccdfa547fbe54946f05fd4358af5d9bb1ec6921dd87fdd00223b",
+    "version": "evidence/versions/C037_4a7e3f9_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C038",
+    "commit": "af51a502752fe0ffa536654fee0f02fe0ab7c251",
+    "parents": [
+      "4a7e3f9a3afcc929b91f4ecadba26226c9f8bd67"
+    ],
+    "date": "2026-09-11T12:07:54+02:00",
+    "title": "Recover when overlapping samples are analyzed out of queue order",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C038_af51a50.diff",
+    "diff_sha256": "668bb142fbc638d87d95c46fe63e628769b7d689d6af67df3cad19c071880645",
+    "events": [
+      {
+        "event": "E0208",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "8922c29b9fa7607bc075665384dd0b00b705799b4c537ce41e00879c92e004c6",
+    "version": "evidence/versions/C038_af51a50_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C039",
+    "commit": "16487520898b534efd5c39bbfb970516a3e36ce0",
+    "parents": [
+      "af51a502752fe0ffa536654fee0f02fe0ab7c251"
+    ],
+    "date": "2026-09-11T12:08:36+02:00",
+    "title": "Choose sample stances that disambiguate overlapping samples",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C039_1648752.diff",
+    "diff_sha256": "e53e070bb9cb1d19ab304f90243db3e6165cad07b43efc53cdfefe5f0a850cee",
+    "events": [
+      {
+        "event": "E0218",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "4ea65ecb6d4ff8b8f0d7ed83664ecacc03f9946c33b3db685c2fef0ecca50871",
+    "version": "evidence/versions/C039_1648752_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C040",
+    "commit": "21f9614b103025f26fe6f5df1fffec27797a8867",
+    "parents": [
+      "16487520898b534efd5c39bbfb970516a3e36ce0"
+    ],
+    "date": "2026-09-11T12:10:03+02:00",
+    "title": "Add variable-object-count validation harness",
+    "files": [
+      "test_counts.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C040_21f9614.diff",
+    "diff_sha256": "8bc173899266fc3bb8229778c9c87e1acad65d30fb1118f10e5246138ea6c297",
+    "events": [
+      {
+        "event": "E0236",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C041",
+    "commit": "4e995ed7e8337a6d511e0baf46be7e87b888af8a",
+    "parents": [
+      "21f9614b103025f26fe6f5df1fffec27797a8867"
+    ],
+    "date": "2026-09-11T12:12:22+02:00",
+    "title": "Optimize diagonal routes and sample on arrival",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C041_4e995ed.diff",
+    "diff_sha256": "3c6298844825f1974cfcf194dbc061d3d333d226c00488715b2f056854c9567b",
+    "events": [
+      {
+        "event": "E0254",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "3606d983378b73b4f1dfe3ef4d2e74f63716e979909d78f9833ee0631cf7a97e",
+    "version": "evidence/versions/C041_4e995ed_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C042",
+    "commit": "0d4421dafd8406cfbcb682dd9280daac0b4233b8",
+    "parents": [
+      "4e995ed7e8337a6d511e0baf46be7e87b888af8a"
+    ],
+    "date": "2026-09-11T12:12:42+02:00",
+    "title": "Restore shorter geometric paths after rollout regression",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C042_0d4421d.diff",
+    "diff_sha256": "1c349aedc859b83449433115abd999dd5098fe29c8531dd1079d332f97d93d9b",
+    "events": [
+      {
+        "event": "E0258",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "cfc66c90dd9614305ed936b4159980f0787a0ddf4b5d18a472a1ce814e5bf3df",
+    "version": "evidence/versions/C042_0d4421d_approach.py",
+    "same_policy_as_earlier": []
+  }
+]

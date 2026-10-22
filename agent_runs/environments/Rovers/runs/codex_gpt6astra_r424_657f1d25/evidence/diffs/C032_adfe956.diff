@@ -1,0 +1,71 @@
+diff --git a/approach.py b/approach.py
+index adf6019..d34eb20 100644
+--- a/approach.py
++++ b/approach.py
+@@ -229,13 +229,13 @@ class GeneratedApproach:
+             task=self.tasks[r]
+             last=self.last_op[r]
+             if last is not None:
+-                old_task, old_p, old_op, old_count, old_evidence = last
++                old_task, old_p, old_op, old_count, old_evidence, at_goal = last
+                 if old_op==.5 and any(s.get(obj,feature)>.5 for obj,feature in old_evidence):
+                     if all(np.linalg.norm(p-v)>.1 for v in self.good_radio[r]):self.good_radio[r].append(p.copy())
+                 failed = ((old_task[0]=='image' and old_op == -.5 and s.get(rob,'calibrated')<.5) or
+                           (old_task[0]=='image' and old_op == -1/6 and self.result_count(s,r)<=old_count) or
+                           (old_op == .5 and old_task[0]=='send' and self.pending(s,r)))
+-                if failed and task==old_task and task[0] in ('image','send'):
++                if failed and at_goal and task==old_task and task[0] in ('image','send'):
+                     self.rejected_views.setdefault(task,[]).append(p.copy())
+                     self.masks[task] &= np.linalg.norm(self.points-p,axis=1)>(.085 if task in self.loose_views else .22)
+                     self.replan(s,r,p,pos[1-r])
+@@ -292,5 +292,6 @@ class GeneratedApproach:
+                     if not self.have(s,j):op=-1/6 if s.get(rob,'calibrated')>.5 else -.5
+             action[r*4:r*4+2]=d;action[r*4+3]=op
+             self.previous[r]=(p.copy(),d.copy())
+-            self.last_op[r]=(task,q.copy(),op,self.result_count(s,r),self.radio_evidence(s,r) if op==.5 else [])
++            at_goal=not path or np.linalg.norm(q-path[-1])<.025
++            self.last_op[r]=(task,q.copy(),op,self.result_count(s,r),self.radio_evidence(s,r) if op==.5 else [],at_goal)
+         return action
+diff --git a/probe_dynamic_radio.py b/probe_dynamic_radio.py
+new file mode 100644
+index 0000000..ac087e9
+--- /dev/null
++++ b/probe_dynamic_radio.py
+@@ -0,0 +1,21 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import numpy as np
++for seed in [1212,549]:
++ e=make_env();s,i=e.reset(seed=seed,options={'object_count':4});a=GeneratedApproach(e.action_space,e.observation_space,{});a.reset(s,i)
++ def p(r):return a.xy(s,a.rovers[r])
++ def pending():return [(str(o),f) for o,f in a.radio_evidence(s,0)]
++ for t in range(180):
++  ev=a.radio_evidence(s,0);act=a.get_action(s);s,*_=e.step(act)
++  if act[3]>.4 and act[3]<.6 and ev:
++   success=any(s.get(o,f)>.5 for o,f in ev)
++   print(seed,t,'send',p(0),p(1),success,'pending',pending(),flush=True)
++   if t>22 and not success and s.get(a.rovers[1],'at_home')>.5:break
++ else:e.close();continue
++ for dest in [(-1,-1.51),(-1,-1),(-.6,-1),(-1,-1.75)]:
++  for k in range(20):
++   d=np.clip(np.array(dest)-p(1),-.2,.2);act=np.zeros(8);act[3]=.5;act[4:6]=d
++   s,*_=e.step(act)
++   print(seed,'intervene',p(0),p(1),'pending',pending(),flush=True)
++   if np.max(np.abs(d))<.005:break
++ e.close()
+diff --git a/probe_radio_memory.py b/probe_radio_memory.py
+new file mode 100644
+index 0000000..bbad7bd
+--- /dev/null
++++ b/probe_radio_memory.py
+@@ -0,0 +1,10 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import sys
++E=make_env();s,i=E.reset(seed=int(sys.argv[1]),options={'object_count':4} if len(sys.argv)>2 else None);A=GeneratedApproach(E.action_space,E.observation_space,{});A.reset(s,i)
++for t in range(180):
++ ac=A.get_action(s)
++ if t<30 or t%10==0:print(t,[A.xy(s,r).round(3).tolist() for r in A.rovers],A.tasks,ac[[3,7]].round(2).tolist(),'good',[[p.round(3).tolist() for p in ps] for ps in A.good_radio],flush=True)
++ s,_,term,tr,_=E.step(ac)
++ if term:break
++E.close()

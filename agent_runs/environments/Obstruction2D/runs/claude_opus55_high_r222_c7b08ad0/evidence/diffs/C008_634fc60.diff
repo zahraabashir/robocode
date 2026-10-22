@@ -1,0 +1,113 @@
+diff --git a/approach.py b/approach.py
+index 874e567..616bc89 100644
+--- a/approach.py
++++ b/approach.py
+@@ -6,6 +6,7 @@ MAXD = 0.05
+ ARM_MAX = 0.2
+ EARLY = True
+ BOTTOM_OFF = 0.018
++VM = 0.025  # keep gripper this far from non-held objects while vacuum is on
+ 
+ 
+ class GeneratedApproach:
+@@ -50,9 +51,11 @@ class GeneratedApproach:
+                  gw=float(state.get(robot, 'gripper_width')))
+         return r, rects
+ 
+-    def _clear_y_at(self, x, rects, held=None, aj=None, exclude=()):
++    def _clear_y_at(self, x, rects, held=None, aj=None, exclude=(), vm=None):
+         """Min robot y at horizontal pos x so nothing collides (robot above objects)."""
+         r = self.r
++        if vm is None:
++            vm = VM if held is not None else 0.0
+         if aj is None:
+             aj = r['aj']
+         R = r['R']
+@@ -66,9 +69,9 @@ class GeneratedApproach:
+             if dx < R:
+                 need = max(need, y1 + np.sqrt(R * R - dx * dx))
+             # arm + gripper
+-            g0, g1 = x - r['gh'] / 2, x + r['gh'] / 2
++            g0, g1 = x - r['gh'] / 2 - vm, x + r['gh'] / 2 + vm
+             if g1 > x0 and g0 < x1:
+-                need = max(need, y1 + aj + r['gw'])
++                need = max(need, y1 + aj + r['gw'] + vm)
+             # held object
+             if held is not None:
+                 hx0 = x + held['dx0']
+@@ -111,7 +114,7 @@ class GeneratedApproach:
+         for cx in cands:
+             if cx < WORLD_X[0] + r['R'] + 1e-3 or cx > WORLD_X[1] - r['R'] - 1e-3:
+                 continue
+-            need = self._clear_y_at(cx, rects, None, ARM_MAX, exclude=(o['name'],))
++            need = self._clear_y_at(cx, rects, None, ARM_MAX, exclude=(o['name'],), vm=VM)
+             goal = top + ARM_MAX + r['gw'] + self.grasp_eps
+             bad = max(0.0, need - goal)
+             out.append((round(bad, 4), abs(cx - centre), float(cx)))
+@@ -185,8 +188,9 @@ class GeneratedApproach:
+         bx0, bx1, by1 = b
+         d = np.maximum(np.maximum(bx0 - xs, 0.0), xs - bx1)
+         out = np.where(d < R, by1 + np.sqrt(np.maximum(R * R - d * d, 0.0)), -1.0)
+-        g = (xs + r['gh'] / 2 > bx0) & (xs - r['gh'] / 2 < bx1)
+-        out = np.maximum(out, np.where(g, by1 + aj + r['gw'], -1.0))
++        vm = VM if held is not None else 0.0
++        g = (xs + r['gh'] / 2 + vm > bx0) & (xs - r['gh'] / 2 - vm < bx1)
++        out = np.maximum(out, np.where(g, by1 + aj + r['gw'] + vm, -1.0))
+         if held is not None:
+             h = (xs + held['dx1'] > bx0) & (xs + held['dx0'] < bx1)
+             out = np.maximum(out, np.where(h, by1 - held['dy0'], -1.0))
+diff --git a/big_test.txt b/big_test.txt
+new file mode 100644
+index 0000000..f870ad2
+--- /dev/null
++++ b/big_test.txt
+@@ -0,0 +1,5 @@
++(1072, 1, False, 1000, 13.5)
++success 79 / 80 mean steps 46.675
++success 80 / 80 mean steps 44.2875
++(1038, 3, False, 1000, 65.5)
++success 79 / 80 mean steps 58.7125
+diff --git a/dbg3.py b/dbg3.py
+new file mode 100644
+index 0000000..b2f950e
+--- /dev/null
++++ b/dbg3.py
+@@ -0,0 +1,14 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++seed=int(sys.argv[1]); oc=int(sys.argv[2]); T=int(sys.argv[3])
++env = make_env(); ap = GeneratedApproach(env.action_space, env.observation_space, {})
++obs, info = env.reset(seed=seed, options={'object_count':oc}); ap.reset(obs, info)
++for t in range(T):
++    a = ap.get_action(obs); obs, *_ = env.step(a)
++r,rects = ap._parse(obs); ap.r=r
++print(ap.phase, ap.task, ap.held)
++print('robot', {k: round(v,3) for k,v in r.items()})
++for k,v in sorted(rects.items()): print(k, {q: round(v[q],3) for q in ['x0','x1','y0','y1']})
++print('need here', ap._clear_y_at(r['x'], rects, ap.held))
++for n,o in rects.items(): print(n, ap._clear_y_at(r['x'], {n:o}, ap.held))
+diff --git a/exp3.py b/exp3.py
+new file mode 100644
+index 0000000..c4d4fd3
+--- /dev/null
++++ b/exp3.py
+@@ -0,0 +1,18 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++for gap in [0.0, 0.005, 0.01, 0.015, 0.02, 0.03, 0.05]:
++    obs, info = env.reset(seed=0)
++    R = obs.get_object_from_name('robot'); B = obs.get_object_from_name('target_block')
++    def st(a):
++        global obs
++        obs,*_ = env.step(np.array(a,dtype=np.float32))
++    st([0,0,0,0.1,0])
++    top = obs.get(B,'y')+obs.get(B,'height'); tx = obs.get(B,'x')+obs.get(B,'width')/2
++    gy = top + 0.21 + gap
++    for i in range(40):
++        st([np.clip(tx-obs.get(R,'x'),-.05,.05), np.clip(gy-obs.get(R,'y'),-.05,.05),0,0,0])
++    y0 = obs.get(R,'y')
++    st([0,0,0,0,1]); st([0,0.05,0,0,1])
++    print(gap, round(y0-0.21-top,4), 'block y', round(obs.get(B,'y'),3))
++env.close()

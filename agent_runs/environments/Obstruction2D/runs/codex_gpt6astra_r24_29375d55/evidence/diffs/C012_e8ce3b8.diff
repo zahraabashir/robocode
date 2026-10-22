@@ -1,0 +1,277 @@
+diff --git a/approach.py b/approach.py
+index bedf44b..f735e39 100644
+--- a/approach.py
++++ b/approach.py
+@@ -70,8 +70,11 @@ class GeneratedApproach:
+             o=self.block;self.dest=self.goal
+         else:
+             o=max(bad,key=lambda p:self.rect(s,p)[1]+self.rect(s,p)[3])
+-            # A taller neighbour may block the selected object's top grasp.
+-            for _ in range(len(obs)+1):
++            # Clear dependencies of an exclusive vacuum grasp, including shorter
++            # neighbours. Track visited tasks to avoid dependency cycles.
++            visited=set()
++            for _ in range(len(obs)+2):
++                visited.add(o)
+                 x,y,w,h=self.rect(s,o)
+                 others=[p for p in obs+[self.block] if p!=o]
+                 grasps=[]
+@@ -80,9 +83,14 @@ class GeneratedApproach:
+                     grasps.append((len(blocking),abs(off-w/2),off,blocking))
+                 best=min(grasps,key=lambda z:z[:2])
+                 if not best[0]:break
+-                taller=[p for p in best[3] if self.rect(s,p)[1]+self.rect(s,p)[3]>y+h+.001 and p!=self.block]
+-                if not taller:break
+-                o=max(taller,key=lambda p:self.rect(s,p)[1]+self.rect(s,p)[3])
++                dependencies=set(p for grasp in grasps for p in grasp[3] if p not in visited)
++                if not dependencies:break
++                def access_cost(p):
++                    qx,qy,qw,qh=self.rect(s,p)
++                    rest=[q for q in obs+[self.block] if q!=p]
++                    scores=[len(self.conflicts(s,p,qx,qy,z,rest,True)) for z in self.offsets(qx,qx,qw)]
++                    return (min(scores) if scores else 999,p==self.block,-qy-qh)
++                o=min(dependencies,key=access_cost)
+             x,y,w,h=self.rect(s,o)
+             others=[p for p in obs+[self.block] if p!=o]
+             occupied=[self.rect(s,p) for p in others]
+diff --git a/probe_final_0_499.jsonl b/probe_final_0_499.jsonl
+index 54945fd..a1f7574 100644
+--- a/probe_final_0_499.jsonl
++++ b/probe_final_0_499.jsonl
+@@ -153,3 +153,119 @@
+ {"seed": 152, "success": true, "steps": 47, "seconds": 0.57, "phase": "place", "task": "target_block", "robot": [0.8721857666969299, 0.46635934710502625], "taskxy": [0.8440008163452148, 0.10500002652406693], "dest": [0.8440008464753628, 0.10500000149011612]}
+ {"seed": 153, "success": true, "steps": 77, "seconds": 1.04, "phase": "place", "task": "target_block", "robot": [0.837716281414032, 0.4352205991744995], "taskxy": [0.7561463117599487, 0.11058241128921509], "dest": [0.7561462779045105, 0.10500000149011612]}
+ {"seed": 154, "success": true, "steps": 38, "seconds": 0.36, "phase": "place", "task": "target_block", "robot": [1.4377179145812988, 0.5013315677642822], "taskxy": [1.373274803161621, 0.10499999672174454], "dest": [1.373274709701538, 0.10500000149011612]}
++{"seed": 155, "success": true, "steps": 27, "seconds": 0.34, "phase": "place", "task": "target_block", "robot": [0.6788395643234253, 0.4997852146625519], "taskxy": [0.638012170791626, 0.10500000417232513], "dest": [0.638012226998806, 0.10500000149011612]}
++{"seed": 156, "success": true, "steps": 75, "seconds": 1.76, "phase": "place", "task": "target_block", "robot": [0.5066274404525757, 0.48027175664901733], "taskxy": [0.4116956293582916, 0.10499999672174454], "dest": [0.41169568490982056, 0.10500000149011612]}
++{"seed": 157, "success": true, "steps": 35, "seconds": 0.59, "phase": "place", "task": "target_block", "robot": [1.3497886657714844, 0.47784608602523804], "taskxy": [1.322613000869751, 0.10500001907348633], "dest": [1.3226130266189575, 0.10500000149011612]}
++{"seed": 158, "success": true, "steps": 79, "seconds": 1.42, "phase": "place", "task": "target_block", "robot": [0.37651991844177246, 0.5184414982795715], "taskxy": [0.3254949450492859, 0.10499996691942215], "dest": [0.3254949938058853, 0.10500000149011612]}
++{"seed": 159, "success": true, "steps": 57, "seconds": 1.24, "phase": "place", "task": "target_block", "robot": [0.9187734723091125, 0.48148277401924133], "taskxy": [0.8804414868354797, 0.11580751091241837], "dest": [0.8804415248036385, 0.10500000149011612]}
++{"seed": 160, "success": true, "steps": 22, "seconds": 0.5, "phase": "place", "task": "target_block", "robot": [0.8499256372451782, 0.3714103698730469], "taskxy": [0.7984733581542969, 0.10500001162290573], "dest": [0.7984733324050903, 0.10500000149011612]}
++{"seed": 161, "success": true, "steps": 55, "seconds": 1.19, "phase": "place", "task": "target_block", "robot": [1.1081222295761108, 0.39952361583709717], "taskxy": [1.068873405456543, 0.10500001907348633], "dest": [1.0688733573555946, 0.10500000149011612]}
++{"seed": 162, "success": true, "steps": 57, "seconds": 1.2, "phase": "place", "task": "target_block", "robot": [1.0537642240524292, 0.40186822414398193], "taskxy": [1.0106520652770996, 0.10499997437000275], "dest": [1.0106520469784737, 0.10500000149011612]}
++{"seed": 163, "success": true, "steps": 54, "seconds": 0.88, "phase": "place", "task": "target_block", "robot": [0.9177966713905334, 0.3824598789215088], "taskxy": [0.8651367425918579, 0.10500003397464752], "dest": [0.8651366572380066, 0.10500000149011612]}
++{"seed": 164, "success": true, "steps": 57, "seconds": 1.08, "phase": "place", "task": "target_block", "robot": [1.2256959676742554, 0.5093793272972107], "taskxy": [1.1723312139511108, 0.10500004887580872], "dest": [1.1723312403559685, 0.10500000149011612]}
++{"seed": 165, "success": true, "steps": 67, "seconds": 1.1, "phase": "place", "task": "target_block", "robot": [0.2682192027568817, 0.4459765553474426], "taskxy": [0.1840570867061615, 0.10500002652406693], "dest": [0.18405709075927734, 0.10500000149011612]}
++{"seed": 166, "success": true, "steps": 49, "seconds": 1.01, "phase": "place", "task": "target_block", "robot": [0.6377275586128235, 0.39235711097717285], "taskxy": [0.5801003575325012, 0.10500000417232513], "dest": [0.580100323677063, 0.10500000149011612]}
++{"seed": 167, "success": true, "steps": 73, "seconds": 1.66, "phase": "place", "task": "target_block", "robot": [0.34188753366470337, 0.4285704493522644], "taskxy": [0.2607855796813965, 0.10499997437000275], "dest": [0.2607856433391571, 0.10500000149011612]}
++{"seed": 168, "success": true, "steps": 44, "seconds": 0.68, "phase": "place", "task": "target_block", "robot": [0.319296270608902, 0.44384098052978516], "taskxy": [0.2873324155807495, 0.10499998182058334], "dest": [0.28733244198560715, 0.10500000149011612]}
++{"seed": 169, "success": true, "steps": 76, "seconds": 1.48, "phase": "place", "task": "target_block", "robot": [1.1820814609527588, 0.39930057525634766], "taskxy": [1.124733328819275, 0.10808269679546356], "dest": [1.1247333250939846, 0.10500000149011612]}
++{"seed": 170, "success": true, "steps": 57, "seconds": 1.24, "phase": "place", "task": "target_block", "robot": [1.1065210103988647, 0.3782927691936493], "taskxy": [1.0794156789779663, 0.10500001907348633], "dest": [1.0794156532287598, 0.10500000149011612]}
++{"seed": 171, "success": true, "steps": 70, "seconds": 1.67, "phase": "place", "task": "target_block", "robot": [0.8228991627693176, 0.41371044516563416], "taskxy": [0.7452370524406433, 0.10500001162290573], "dest": [0.7452371127605438, 0.10500000149011612]}
++{"seed": 172, "success": true, "steps": 53, "seconds": 1.11, "phase": "place", "task": "target_block", "robot": [0.41540467739105225, 0.45427289605140686], "taskxy": [0.3587935268878937, 0.10500001907348633], "dest": [0.35879347878694534, 0.10500000149011612]}
++{"seed": 173, "success": true, "steps": 82, "seconds": 1.68, "phase": "place", "task": "target_block", "robot": [1.0739846229553223, 0.427572637796402], "taskxy": [1.0047025680541992, 0.11802444607019424], "dest": [1.0047026730775832, 0.10500000149011612]}
++{"seed": 174, "success": true, "steps": 60, "seconds": 1.18, "phase": "place", "task": "target_block", "robot": [1.3998658657073975, 0.5096529126167297], "taskxy": [1.3021860122680664, 0.11027856171131134], "dest": [1.302186038017273, 0.10500000149011612]}
++{"seed": 175, "success": true, "steps": 54, "seconds": 0.98, "phase": "place", "task": "target_block", "robot": [0.5429722666740417, 0.40398716926574707], "taskxy": [0.4575830399990082, 0.10499999672174454], "dest": [0.45758303594589234, 0.10500000149011612]}
++{"seed": 176, "success": true, "steps": 34, "seconds": 0.7, "phase": "place", "task": "target_block", "robot": [0.5253431797027588, 0.3972555100917816], "taskxy": [0.43885281682014465, 0.10499997437000275], "dest": [0.43885291028022766, 0.10500000149011612]}
++{"seed": 177, "success": true, "steps": 66, "seconds": 1.31, "phase": "place", "task": "target_block", "robot": [0.4299778640270233, 0.5061010718345642], "taskxy": [0.3458276093006134, 0.10500006377696991], "dest": [0.34582762825489044, 0.10500000149011612]}
++{"seed": 178, "success": true, "steps": 83, "seconds": 1.57, "phase": "place", "task": "target_block", "robot": [0.4065881669521332, 0.48104023933410645], "taskxy": [0.3213166296482086, 0.10500004887580872], "dest": [0.32131667840480804, 0.10500000149011612]}
++{"seed": 179, "success": true, "steps": 80, "seconds": 1.64, "phase": "place", "task": "target_block", "robot": [0.7077009677886963, 0.5017470717430115], "taskxy": [0.6586494445800781, 0.10500005632638931], "dest": [0.6586494703292847, 0.10500000149011612]}
++{"seed": 180, "success": true, "steps": 37, "seconds": 0.62, "phase": "place", "task": "target_block", "robot": [1.3683747053146362, 0.5143249034881592], "taskxy": [1.3210786581039429, 0.10500001907348633], "dest": [1.3210786838531494, 0.10500000149011612]}
++{"seed": 181, "success": true, "steps": 64, "seconds": 1.25, "phase": "place", "task": "target_block", "robot": [0.7283605337142944, 0.4436970055103302], "taskxy": [0.6458709239959717, 0.10996868461370468], "dest": [0.6458708636760712, 0.10500000149011612]}
++{"seed": 182, "success": true, "steps": 123, "seconds": 2.59, "phase": "place", "task": "target_block", "robot": [1.2127327919006348, 0.4545983672142029], "taskxy": [1.1303986310958862, 0.11775460094213486], "dest": [1.1303985376358032, 0.10500000149011612]}
++{"seed": 183, "success": true, "steps": 68, "seconds": 1.27, "phase": "place", "task": "target_block", "robot": [0.7105968594551086, 0.43518194556236267], "taskxy": [0.6211819052696228, 0.11581460386514664], "dest": [0.6211819506883621, 0.10500000149011612]}
++{"seed": 184, "success": true, "steps": 56, "seconds": 1.09, "phase": "place", "task": "target_block", "robot": [0.5227537751197815, 0.4349152147769928], "taskxy": [0.46838974952697754, 0.11110152304172516], "dest": [0.4683896716237068, 0.10500000149011612]}
++{"seed": 185, "success": true, "steps": 26, "seconds": 0.48, "phase": "place", "task": "target_block", "robot": [1.1295785903930664, 0.4156990945339203], "taskxy": [1.1027228832244873, 0.10500001162290573], "dest": [1.1027229089736938, 0.10500000149011612]}
++{"seed": 186, "success": true, "steps": 23, "seconds": 0.45, "phase": "place", "task": "target_block", "robot": [0.8565794825553894, 0.44635188579559326], "taskxy": [0.8123353719711304, 0.10499999672174454], "dest": [0.812335472881794, 0.10500000149011612]}
++{"seed": 187, "success": true, "steps": 55, "seconds": 0.72, "phase": "place", "task": "target_block", "robot": [0.879634439945221, 0.3927272856235504], "taskxy": [0.8033652305603027, 0.10500000417232513], "dest": [0.8033652563095093, 0.10500000149011612]}
++{"seed": 188, "success": true, "steps": 25, "seconds": 0.44, "phase": "place", "task": "target_block", "robot": [1.1417644023895264, 0.5073009133338928], "taskxy": [1.083407998085022, 0.1140517070889473], "dest": [1.0834080238342285, 0.10500000149011612]}
++{"seed": 189, "success": true, "steps": 37, "seconds": 0.58, "phase": "place", "task": "target_block", "robot": [0.5203484892845154, 0.3785127103328705], "taskxy": [0.4810485541820526, 0.10500001162290573], "dest": [0.4810485135316849, 0.10500000149011612]}
++{"seed": 190, "success": true, "steps": 19, "seconds": 0.32, "phase": "place", "task": "target_block", "robot": [1.2292784452438354, 0.38788771629333496], "taskxy": [1.1581885814666748, 0.10500000417232513], "dest": [1.1581884880065918, 0.10500000149011612]}
++{"seed": 191, "success": true, "steps": 31, "seconds": 0.45, "phase": "place", "task": "target_block", "robot": [0.3704800605773926, 0.48505374789237976], "taskxy": [0.32364729046821594, 0.10499995201826096], "dest": [0.3236472647190094, 0.10500000149011612]}
++{"seed": 192, "success": true, "steps": 51, "seconds": 0.96, "phase": "place", "task": "target_block", "robot": [0.8002225756645203, 0.45102423429489136], "taskxy": [0.7718510627746582, 0.11088915169239044], "dest": [0.77185102891922, 0.10500000149011612]}
++{"seed": 193, "success": true, "steps": 61, "seconds": 1.14, "phase": "place", "task": "target_block", "robot": [0.9963451027870178, 0.44249528646469116], "taskxy": [0.9350860714912415, 0.10499998927116394], "dest": [0.9350860376358032, 0.10500000149011612]}
++{"seed": 194, "success": true, "steps": 80, "seconds": 1.54, "phase": "place", "task": "target_block", "robot": [0.7642729878425598, 0.44943496584892273], "taskxy": [0.6783518195152283, 0.11694321036338806], "dest": [0.6783518452644348, 0.10500000149011612]}
++{"seed": 195, "success": true, "steps": 25, "seconds": 0.44, "phase": "place", "task": "target_block", "robot": [0.964584469795227, 0.4673209488391876], "taskxy": [0.9271239638328552, 0.10499999672174454], "dest": [0.927123929977417, 0.10500000149011612]}
++{"seed": 196, "success": true, "steps": 39, "seconds": 0.51, "phase": "place", "task": "target_block", "robot": [0.31277817487716675, 0.4252198338508606], "taskxy": [0.28194278478622437, 0.10499998182058334], "dest": [0.2819427962899208, 0.10500000149011612]}
++{"seed": 197, "success": true, "steps": 105, "seconds": 1.88, "phase": "place", "task": "target_block", "robot": [0.23045824468135834, 0.3804325461387634], "taskxy": [0.1317470520734787, 0.11212193220853806], "dest": [0.13174698907136917, 0.10500000149011612]}
++{"seed": 198, "success": true, "steps": 64, "seconds": 1.18, "phase": "place", "task": "target_block", "robot": [0.5582054257392883, 0.3970530331134796], "taskxy": [0.4988064169883728, 0.10499998182058334], "dest": [0.49880640614032745, 0.10500000149011612]}
++{"seed": 199, "success": true, "steps": 55, "seconds": 1.0, "phase": "place", "task": "target_block", "robot": [0.648369312286377, 0.38046735525131226], "taskxy": [0.6041066646575928, 0.10499998927116394], "dest": [0.6041066308021545, 0.10500000149011612]}
++{"seed": 200, "success": true, "steps": 23, "seconds": 0.35, "phase": "place", "task": "target_block", "robot": [0.2759738564491272, 0.42613643407821655], "taskxy": [0.211454838514328, 0.10500000417232513], "dest": [0.21145481276512146, 0.10500000149011612]}
++{"seed": 201, "success": true, "steps": 28, "seconds": 0.44, "phase": "place", "task": "target_block", "robot": [1.3988492488861084, 0.45141932368278503], "taskxy": [1.3624951839447021, 0.10500000417232513], "dest": [1.3624950904846191, 0.10500000149011612]}
++{"seed": 202, "success": true, "steps": 32, "seconds": 0.5, "phase": "place", "task": "target_block", "robot": [0.5097997784614563, 0.4955108165740967], "taskxy": [0.44253644347190857, 0.10500001162290573], "dest": [0.4425364326238632, 0.10500000149011612]}
++{"seed": 203, "success": true, "steps": 37, "seconds": 0.67, "phase": "place", "task": "target_block", "robot": [1.186576008796692, 0.43590211868286133], "taskxy": [1.115207314491272, 0.10499999672174454], "dest": [1.1152073402404785, 0.10500000149011612]}
++{"seed": 204, "success": true, "steps": 62, "seconds": 1.27, "phase": "place", "task": "target_block", "robot": [1.0393760204315186, 0.4598790407180786], "taskxy": [0.987558901309967, 0.1079280897974968], "dest": [0.9875588830113411, 0.10500000149011612]}
++{"seed": 205, "success": true, "steps": 41, "seconds": 0.87, "phase": "place", "task": "target_block", "robot": [0.7076284885406494, 0.38412514328956604], "taskxy": [0.6479341983795166, 0.10499999672174454], "dest": [0.6479342241287231, 0.10500000149011612]}
++{"seed": 206, "success": true, "steps": 60, "seconds": 0.87, "phase": "place", "task": "target_block", "robot": [1.0803148746490479, 0.4990718364715576], "taskxy": [0.991710901260376, 0.10500001162290573], "dest": [0.9917109866142273, 0.10500000149011612]}
++{"seed": 207, "success": true, "steps": 22, "seconds": 0.26, "phase": "place", "task": "target_block", "robot": [1.1297786235809326, 0.4129013419151306], "taskxy": [1.0416415929794312, 0.10499998927116394], "dest": [1.0416414995193481, 0.10500000149011612]}
++{"seed": 208, "success": true, "steps": 29, "seconds": 0.62, "phase": "place", "task": "target_block", "robot": [0.5984526872634888, 0.5258283615112305], "taskxy": [0.5097808837890625, 0.1189642995595932], "dest": [0.5097808383703232, 0.10500000149011612]}
++{"seed": 209, "success": true, "steps": 47, "seconds": 1.15, "phase": "place", "task": "target_block", "robot": [0.3402767777442932, 0.4764922559261322], "taskxy": [0.2583696246147156, 0.10499997437000275], "dest": [0.25836959075927735, 0.10500000149011612]}
++{"seed": 210, "success": true, "steps": 22, "seconds": 0.43, "phase": "place", "task": "target_block", "robot": [1.3060802221298218, 0.4392000734806061], "taskxy": [1.250214695930481, 0.10500001907348633], "dest": [1.2502147216796875, 0.10500000149011612]}
++{"seed": 211, "success": true, "steps": 31, "seconds": 0.45, "phase": "place", "task": "target_block", "robot": [0.3674474060535431, 0.4546499252319336], "taskxy": [0.27272942662239075, 0.10499999672174454], "dest": [0.2727294306755066, 0.10500000149011612]}
++{"seed": 212, "success": true, "steps": 32, "seconds": 0.56, "phase": "place", "task": "target_block", "robot": [0.585322916507721, 0.46521443128585815], "taskxy": [0.4856983423233032, 0.10499997437000275], "dest": [0.48569840598106384, 0.10500000149011612]}
++{"seed": 213, "success": true, "steps": 20, "seconds": 0.27, "phase": "place", "task": "target_block", "robot": [0.6057043075561523, 0.38289469480514526], "taskxy": [0.5172275304794312, 0.10500000417232513], "dest": [0.5172275047302246, 0.10500000149011612]}
++{"seed": 214, "success": true, "steps": 46, "seconds": 0.91, "phase": "place", "task": "target_block", "robot": [0.8655529022216797, 0.3729828894138336], "taskxy": [0.7683003544807434, 0.10499998927116394], "dest": [0.7683004032373428, 0.10500000149011612]}
++{"seed": 215, "success": true, "steps": 77, "seconds": 1.83, "phase": "place", "task": "target_block", "robot": [1.320755124092102, 0.4673813581466675], "taskxy": [1.2284895181655884, 0.1218569427728653], "dest": [1.228489543914795, 0.10500000149011612]}
++{"seed": 216, "success": true, "steps": 34, "seconds": 0.64, "phase": "place", "task": "target_block", "robot": [1.2239514589309692, 0.4838959276676178], "taskxy": [1.1950523853302002, 0.10500002652406693], "dest": [1.1950523372292519, 0.10500000149011612]}
++{"seed": 217, "success": true, "steps": 54, "seconds": 1.34, "phase": "place", "task": "target_block", "robot": [1.175728440284729, 0.4819212853908539], "taskxy": [1.1115593910217285, 0.10573051124811172], "dest": [1.111559416770935, 0.10500000149011612]}
++{"seed": 218, "success": true, "steps": 44, "seconds": 0.78, "phase": "place", "task": "target_block", "robot": [1.176265001296997, 0.38821133971214294], "taskxy": [1.1356468200683594, 0.10500000417232513], "dest": [1.1356467266082764, 0.10500000149011612]}
++{"seed": 219, "success": true, "steps": 25, "seconds": 0.29, "phase": "place", "task": "target_block", "robot": [1.157348871231079, 0.39573025703430176], "taskxy": [1.1398152112960815, 0.10499999672174454], "dest": [1.1398151296675205, 0.10500000149011612]}
++{"seed": 220, "success": true, "steps": 52, "seconds": 1.37, "phase": "place", "task": "target_block", "robot": [1.0986727476119995, 0.4213770925998688], "taskxy": [1.0730984210968018, 0.11643066257238388], "dest": [1.0730983276367188, 0.10500000149011612]}
++{"seed": 221, "success": true, "steps": 61, "seconds": 1.17, "phase": "place", "task": "target_block", "robot": [0.3358476459980011, 0.4090851843357086], "taskxy": [0.28837478160858154, 0.11406353116035461], "dest": [0.28837466645240784, 0.10500000149011612]}
++{"seed": 222, "success": true, "steps": 50, "seconds": 0.79, "phase": "place", "task": "target_block", "robot": [0.9746835231781006, 0.4498068690299988], "taskxy": [0.9080284237861633, 0.10500002652406693], "dest": [0.908028338432312, 0.10500000149011612]}
++{"seed": 223, "success": true, "steps": 32, "seconds": 0.67, "phase": "place", "task": "target_block", "robot": [0.7633123993873596, 0.509973406791687], "taskxy": [0.7206600308418274, 0.10499997437000275], "dest": [0.7206600565910339, 0.10500000149011612]}
++{"seed": 224, "success": true, "steps": 58, "seconds": 1.31, "phase": "place", "task": "target_block", "robot": [0.6685876250267029, 0.5090759992599487], "taskxy": [0.62440425157547, 0.10500002652406693], "dest": [0.6244041852355003, 0.10500000149011612]}
++{"seed": 225, "success": true, "steps": 104, "seconds": 2.16, "phase": "place", "task": "target_block", "robot": [1.384185791015625, 0.49962905049324036], "taskxy": [1.302336573600769, 0.10499996691942215], "dest": [1.3023365993499756, 0.10500000149011612]}
++{"seed": 226, "success": true, "steps": 96, "seconds": 2.37, "phase": "place", "task": "target_block", "robot": [1.1779597997665405, 0.43679046630859375], "taskxy": [1.0982797145843506, 0.10499999672174454], "dest": [1.0982797403335571, 0.10500000149011612]}
++{"seed": 227, "success": true, "steps": 63, "seconds": 1.41, "phase": "place", "task": "target_block", "robot": [0.3517328202724457, 0.5155989527702332], "taskxy": [0.3225812017917633, 0.10500003397464752], "dest": [0.3225811462402344, 0.10500000149011612]}
++{"seed": 228, "success": true, "steps": 65, "seconds": 1.12, "phase": "place", "task": "target_block", "robot": [0.3378910720348358, 0.5143822431564331], "taskxy": [0.28288230299949646, 0.10500001162290573], "dest": [0.2828822921514511, 0.10500000149011612]}
++{"seed": 229, "success": true, "steps": 26, "seconds": 0.33, "phase": "place", "task": "target_block", "robot": [0.7486321926116943, 0.4222504794597626], "taskxy": [0.671496570110321, 0.10499998182058334], "dest": [0.6714965958595276, 0.10500000149011612]}
++{"seed": 230, "success": true, "steps": 45, "seconds": 0.75, "phase": "place", "task": "target_block", "robot": [0.5077856183052063, 0.4311956465244293], "taskxy": [0.45475825667381287, 0.10500001907348633], "dest": [0.45475822281837464, 0.10500000149011612]}
++{"seed": 231, "success": true, "steps": 32, "seconds": 0.48, "phase": "place", "task": "target_block", "robot": [1.4847581386566162, 0.39034947752952576], "taskxy": [1.412453055381775, 0.10500000417232513], "dest": [1.412452961921692, 0.10500000149011612]}
++{"seed": 232, "success": true, "steps": 28, "seconds": 0.42, "phase": "place", "task": "target_block", "robot": [0.8916046619415283, 0.4392629563808441], "taskxy": [0.8406209945678711, 0.11876391619443893], "dest": [0.8406209607124329, 0.10500000149011612]}
++{"seed": 233, "success": true, "steps": 25, "seconds": 0.38, "phase": "place", "task": "target_block", "robot": [0.46690359711647034, 0.426400363445282], "taskxy": [0.4409104585647583, 0.10499998927116394], "dest": [0.44091043654084205, 0.10500000149011612]}
++{"seed": 234, "success": true, "steps": 48, "seconds": 0.97, "phase": "place", "task": "target_block", "robot": [0.8331327438354492, 0.39630216360092163], "taskxy": [0.7439514398574829, 0.10499998927116394], "dest": [0.7439514656066895, 0.10500000149011612]}
++{"seed": 235, "success": true, "steps": 70, "seconds": 1.37, "phase": "place", "task": "target_block", "robot": [1.0686665773391724, 0.4238032102584839], "taskxy": [0.9809161424636841, 0.10500001907348633], "dest": [0.9809161086082459, 0.10500000149011612]}
++{"seed": 236, "success": true, "steps": 78, "seconds": 1.41, "phase": "place", "task": "target_block", "robot": [0.43392857909202576, 0.4580334722995758], "taskxy": [0.4006537199020386, 0.10500000417232513], "dest": [0.4006537910103798, 0.10500000149011612]}
++{"seed": 237, "success": true, "steps": 130, "seconds": 2.82, "phase": "place", "task": "target_block", "robot": [1.1581759452819824, 0.4202324151992798], "taskxy": [1.0837352275848389, 0.11442454159259796], "dest": [1.0837352533340454, 0.10500000149011612]}
++{"seed": 238, "success": true, "steps": 17, "seconds": 0.27, "phase": "place", "task": "target_block", "robot": [1.1040297746658325, 0.5032710433006287], "taskxy": [1.0285972356796265, 0.10499997437000275], "dest": [1.028597284436226, 0.10500000149011612]}
++{"seed": 239, "success": true, "steps": 66, "seconds": 1.48, "phase": "place", "task": "target_block", "robot": [0.16682486236095428, 0.38093796372413635], "taskxy": [0.15599282085895538, 0.10499998927116394], "dest": [0.15599279779195785, 0.10500000149011612]}
++{"seed": 240, "success": true, "steps": 88, "seconds": 2.15, "phase": "place", "task": "target_block", "robot": [0.612666666507721, 0.48277008533477783], "taskxy": [0.5492323637008667, 0.10499998182058334], "dest": [0.5492323379516602, 0.10500000149011612]}
++{"seed": 241, "success": true, "steps": 16, "seconds": 0.45, "phase": "place", "task": "target_block", "robot": [0.7412592172622681, 0.4410387873649597], "taskxy": [0.7108486294746399, 0.10500002652406693], "dest": [0.7108485956192017, 0.10500000149011612]}
++{"seed": 242, "success": true, "steps": 74, "seconds": 1.57, "phase": "place", "task": "target_block", "robot": [1.1532000303268433, 0.4735446274280548], "taskxy": [1.1005274057388306, 0.11291550099849701], "dest": [1.1005273122787476, 0.10500000149011612]}
++{"seed": 243, "success": true, "steps": 36, "seconds": 0.94, "phase": "place", "task": "target_block", "robot": [0.8666688799858093, 0.4522400498390198], "taskxy": [0.8218184113502502, 0.10499998927116394], "dest": [0.8218185447454452, 0.10500000149011612]}
++{"seed": 244, "success": true, "steps": 56, "seconds": 1.21, "phase": "place", "task": "target_block", "robot": [0.4911010265350342, 0.45117995142936707], "taskxy": [0.4545808434486389, 0.11887894570827484], "dest": [0.45458084005117416, 0.10500000149011612]}
++{"seed": 245, "success": true, "steps": 44, "seconds": 0.76, "phase": "place", "task": "target_block", "robot": [1.4415509700775146, 0.49445393681526184], "taskxy": [1.3971720933914185, 0.12182342261075974], "dest": [1.3971720598638058, 0.10500000149011612]}
++{"seed": 246, "success": true, "steps": 85, "seconds": 1.73, "phase": "place", "task": "target_block", "robot": [0.7642503976821899, 0.49088242650032043], "taskxy": [0.6990669965744019, 0.10500001162290573], "dest": [0.6990669627189636, 0.10500000149011612]}
++{"seed": 247, "success": true, "steps": 31, "seconds": 0.61, "phase": "place", "task": "target_block", "robot": [0.20380060374736786, 0.4834861755371094], "taskxy": [0.1403365582227707, 0.10500002652406693], "dest": [0.14033650267124176, 0.10500000149011612]}
++{"seed": 248, "success": true, "steps": 58, "seconds": 1.06, "phase": "place", "task": "target_block", "robot": [0.8608196973800659, 0.45696964859962463], "taskxy": [0.7712672352790833, 0.10499998182058334], "dest": [0.7712672244310379, 0.10500000149011612]}
++{"seed": 249, "success": true, "steps": 59, "seconds": 1.4, "phase": "place", "task": "target_block", "robot": [0.8829273581504822, 0.3954724371433258], "taskxy": [0.8378003835678101, 0.10500002652406693], "dest": [0.8378004093170166, 0.10500000149011612]}
++{"seed": 250, "success": true, "steps": 76, "seconds": 1.37, "phase": "place", "task": "target_block", "robot": [1.3038842678070068, 0.46708062291145325], "taskxy": [1.2672725915908813, 0.12196354568004608], "dest": [1.2672724981307983, 0.10500000149011612]}
++{"seed": 251, "success": true, "steps": 21, "seconds": 0.39, "phase": "place", "task": "target_block", "robot": [0.7847655415534973, 0.39147523045539856], "taskxy": [0.7452533841133118, 0.10500001162290573], "dest": [0.7452534098625183, 0.10500000149011612]}
++{"seed": 252, "success": true, "steps": 105, "seconds": 2.42, "phase": "place", "task": "target_block", "robot": [0.3148675560951233, 0.41874825954437256], "taskxy": [0.2326650470495224, 0.12078919261693954], "dest": [0.23266509580612182, 0.10500000149011612]}
++{"seed": 253, "success": true, "steps": 59, "seconds": 1.22, "phase": "place", "task": "target_block", "robot": [0.47121843695640564, 0.4166892170906067], "taskxy": [0.39688506722450256, 0.10499998927116394], "dest": [0.39688499677181244, 0.10500000149011612]}
++{"seed": 254, "success": true, "steps": 30, "seconds": 0.51, "phase": "place", "task": "target_block", "robot": [1.1631126403808594, 0.4831763207912445], "taskxy": [1.0712007284164429, 0.10500000417232513], "dest": [1.0712006349563599, 0.10500000149011612]}
++{"seed": 255, "success": true, "steps": 24, "seconds": 0.44, "phase": "place", "task": "target_block", "robot": [0.4749964475631714, 0.5114946365356445], "taskxy": [0.43975576758384705, 0.10500001162290573], "dest": [0.4397557939887047, 0.10500000149011612]}
++{"seed": 256, "success": true, "steps": 41, "seconds": 0.74, "phase": "place", "task": "target_block", "robot": [0.18776346743106842, 0.3770383596420288], "taskxy": [0.15264756977558136, 0.10500002652406693], "dest": [0.1526476110816002, 0.10500000149011612]}
++{"seed": 257, "success": true, "steps": 42, "seconds": 0.99, "phase": "place", "task": "target_block", "robot": [0.7609815001487732, 0.4031407833099365], "taskxy": [0.7189555168151855, 0.10500001162290573], "dest": [0.7189555432200432, 0.10500000149011612]}
++{"seed": 258, "success": true, "steps": 59, "seconds": 0.97, "phase": "place", "task": "target_block", "robot": [0.7062091827392578, 0.4496920108795166], "taskxy": [0.6362114548683167, 0.10500001162290573], "dest": [0.6362114806175232, 0.10500000149011612]}
++{"seed": 259, "success": true, "steps": 18, "seconds": 0.28, "phase": "place", "task": "target_block", "robot": [0.9312155246734619, 0.46929770708084106], "taskxy": [0.8974550366401672, 0.10500004142522812], "dest": [0.8974550630450249, 0.10500000149011612]}
++{"seed": 260, "success": true, "steps": 48, "seconds": 0.79, "phase": "place", "task": "target_block", "robot": [0.20646943151950836, 0.45633232593536377], "taskxy": [0.14486873149871826, 0.10499999672174454], "dest": [0.1448687504529953, 0.10500000149011612]}
++{"seed": 261, "success": true, "steps": 84, "seconds": 1.21, "phase": "place", "task": "target_block", "robot": [1.3919466733932495, 0.4903557598590851], "taskxy": [1.3416986465454102, 0.11838201433420181], "dest": [1.3416986722946167, 0.10500000149011612]}
++{"seed": 262, "success": true, "steps": 68, "seconds": 1.41, "phase": "place", "task": "target_block", "robot": [0.6816429495811462, 0.4072231948375702], "taskxy": [0.644614040851593, 0.11491809040307999], "dest": [0.6446140069961548, 0.10500000149011612]}
++{"seed": 263, "success": true, "steps": 58, "seconds": 1.04, "phase": "place", "task": "target_block", "robot": [0.9665015339851379, 0.42489609122276306], "taskxy": [0.8788727521896362, 0.10633112490177155], "dest": [0.878872718334198, 0.10500000149011612]}
++{"seed": 264, "success": true, "steps": 42, "seconds": 0.52, "phase": "place", "task": "target_block", "robot": [1.4424645900726318, 0.5062238574028015], "taskxy": [1.3729870319366455, 0.10499998927116394], "dest": [1.3729869384765625, 0.10500000149011612]}
++{"seed": 265, "success": true, "steps": 76, "seconds": 1.24, "phase": "place", "task": "target_block", "robot": [0.9962603449821472, 0.46669816970825195], "taskxy": [0.9276090264320374, 0.11074265092611313], "dest": [0.9276089925765991, 0.10500000149011612]}
++{"seed": 266, "success": true, "steps": 57, "seconds": 0.75, "phase": "place", "task": "target_block", "robot": [0.7869787812232971, 0.49575239419937134], "taskxy": [0.7370191216468811, 0.10500004887580872], "dest": [0.7370191473960876, 0.10500000149011612]}
++{"seed": 267, "success": true, "steps": 52, "seconds": 0.71, "phase": "place", "task": "target_block", "robot": [0.5722533464431763, 0.5094451308250427], "taskxy": [0.506056010723114, 0.10499999672174454], "dest": [0.5060559768676758, 0.10500000149011612]}
++{"seed": 268, "success": true, "steps": 119, "seconds": 2.02, "phase": "place", "task": "target_block", "robot": [0.3827471435070038, 0.5371249914169312], "taskxy": [0.30395928025245667, 0.12298395484685898], "dest": [0.3039593439102173, 0.10500000149011612]}
++{"seed": 269, "success": true, "steps": 69, "seconds": 1.35, "phase": "place", "task": "target_block", "robot": [0.8137312531471252, 0.373912513256073], "taskxy": [0.7295321822166443, 0.10842517018318176], "dest": [0.7295321713685989, 0.10500000149011612]}
++{"seed": 270, "success": true, "steps": 47, "seconds": 0.79, "phase": "place", "task": "target_block", "robot": [0.34268084168434143, 0.41687682271003723], "taskxy": [0.26159849762916565, 0.10641171038150787], "dest": [0.2615984867811203, 0.10500000149011612]}
+diff --git a/reachability.jsonl b/reachability.jsonl
+new file mode 100644
+index 0000000..e69de29
+diff --git a/test_counts_scene_v3.jsonl b/test_counts_scene_v3.jsonl
+index 19506c0..8c570c1 100644
+--- a/test_counts_scene_v3.jsonl
++++ b/test_counts_scene_v3.jsonl
+@@ -35,3 +35,23 @@
+ {"count": 4, "seed": 34, "steps": 101, "success": true, "seconds": 3.93}
+ {"count": 4, "seed": 35, "steps": 50, "success": true, "seconds": 3.79}
+ {"count": 4, "seed": 36, "steps": 164, "success": true, "seconds": 3.88}
++{"count": 4, "seed": 37, "steps": 125, "success": true, "seconds": 8.42}
++{"count": 4, "seed": 38, "steps": 78, "success": true, "seconds": 5.62}
++{"count": 4, "seed": 39, "steps": 115, "success": true, "seconds": 9.62}
++{"count": 4, "seed": 40, "steps": 1000, "success": false, "seconds": 28.52, "phase": "lift", "task": "obstruction0", "dest": [1.0216619691292983, 0.105], "robot": [1.1846210956573486, 0.5024091005325317], "init": {"obstruction0": [1.2066210508346558, 0.10000099986791611, 0.05134028568863869, 0.0626128688454628], "obstruction1": [1.1243525743484497, 0.10000099986791611, 0.05510848015546799, 0.08476104587316513], "obstruction2": [1.2656339406967163, 0.10000099986791611, 0.0683768093585968, 0.06045512482523918], "obstruction3": [1.373109221458435, 0.10000099986791611, 0.15054073929786682, 0.09669425338506699], "target_block": [0.5387240052223206, 0.10000099986791611, 0.16028523445129395, 0.06994911283254623], "target_surface": [1.1792722940444946, 0.0, 0.19835792481899261, 0.10000000149011612]}, "final": {"obstruction0": [1.2066210508346558, 0.10000099986791611, 0.05134028568863869, 0.0626128688454628], "obstruction1": [1.1243525743484497, 0.10000099986791611, 0.05510848015546799, 0.08476104587316513], "obstruction2": [1.2656339406967163, 0.10000099986791611, 0.0683768093585968, 0.06045512482523918], "obstruction3": [1.373109221458435, 0.10000099986791611, 0.15054073929786682, 0.09669425338506699], "target_block": [0.5387240052223206, 0.10000099986791611, 0.16028523445129395, 0.06994911283254623], "target_surface": [1.1792722940444946, 0.0, 0.19835792481899261, 0.10000000149011612]}}
++{"count": 4, "seed": 41, "steps": 100, "success": true, "seconds": 5.03}
++{"count": 4, "seed": 42, "steps": 63, "success": true, "seconds": 4.4}
++{"count": 4, "seed": 43, "steps": 82, "success": true, "seconds": 5.74}
++{"count": 4, "seed": 44, "steps": 85, "success": true, "seconds": 4.03}
++{"count": 4, "seed": 45, "steps": 67, "success": true, "seconds": 5.09}
++{"count": 4, "seed": 46, "steps": 112, "success": true, "seconds": 6.21}
++{"count": 4, "seed": 47, "steps": 84, "success": true, "seconds": 5.49}
++{"count": 4, "seed": 48, "steps": 118, "success": true, "seconds": 7.17}
++{"count": 4, "seed": 49, "steps": 71, "success": true, "seconds": 4.98}
++{"count": 4, "seed": 50, "steps": 78, "success": true, "seconds": 6.33}
++{"count": 4, "seed": 51, "steps": 81, "success": true, "seconds": 7.94}
++{"count": 4, "seed": 52, "steps": 72, "success": true, "seconds": 7.5}
++{"count": 4, "seed": 53, "steps": 87, "success": true, "seconds": 7.5}
++{"count": 4, "seed": 54, "steps": 63, "success": true, "seconds": 5.81}
++{"count": 4, "seed": 55, "steps": 106, "success": true, "seconds": 5.02}
++{"count": 4, "seed": 56, "steps": 88, "success": true, "seconds": 3.38}
+diff --git a/test_counts_scene_v3.log b/test_counts_scene_v3.log
+index 19506c0..8c570c1 100644
+--- a/test_counts_scene_v3.log
++++ b/test_counts_scene_v3.log
+@@ -35,3 +35,23 @@
+ {"count": 4, "seed": 34, "steps": 101, "success": true, "seconds": 3.93}
+ {"count": 4, "seed": 35, "steps": 50, "success": true, "seconds": 3.79}
+ {"count": 4, "seed": 36, "steps": 164, "success": true, "seconds": 3.88}
++{"count": 4, "seed": 37, "steps": 125, "success": true, "seconds": 8.42}
++{"count": 4, "seed": 38, "steps": 78, "success": true, "seconds": 5.62}
++{"count": 4, "seed": 39, "steps": 115, "success": true, "seconds": 9.62}
++{"count": 4, "seed": 40, "steps": 1000, "success": false, "seconds": 28.52, "phase": "lift", "task": "obstruction0", "dest": [1.0216619691292983, 0.105], "robot": [1.1846210956573486, 0.5024091005325317], "init": {"obstruction0": [1.2066210508346558, 0.10000099986791611, 0.05134028568863869, 0.0626128688454628], "obstruction1": [1.1243525743484497, 0.10000099986791611, 0.05510848015546799, 0.08476104587316513], "obstruction2": [1.2656339406967163, 0.10000099986791611, 0.0683768093585968, 0.06045512482523918], "obstruction3": [1.373109221458435, 0.10000099986791611, 0.15054073929786682, 0.09669425338506699], "target_block": [0.5387240052223206, 0.10000099986791611, 0.16028523445129395, 0.06994911283254623], "target_surface": [1.1792722940444946, 0.0, 0.19835792481899261, 0.10000000149011612]}, "final": {"obstruction0": [1.2066210508346558, 0.10000099986791611, 0.05134028568863869, 0.0626128688454628], "obstruction1": [1.1243525743484497, 0.10000099986791611, 0.05510848015546799, 0.08476104587316513], "obstruction2": [1.2656339406967163, 0.10000099986791611, 0.0683768093585968, 0.06045512482523918], "obstruction3": [1.373109221458435, 0.10000099986791611, 0.15054073929786682, 0.09669425338506699], "target_block": [0.5387240052223206, 0.10000099986791611, 0.16028523445129395, 0.06994911283254623], "target_surface": [1.1792722940444946, 0.0, 0.19835792481899261, 0.10000000149011612]}}
++{"count": 4, "seed": 41, "steps": 100, "success": true, "seconds": 5.03}
++{"count": 4, "seed": 42, "steps": 63, "success": true, "seconds": 4.4}
++{"count": 4, "seed": 43, "steps": 82, "success": true, "seconds": 5.74}
++{"count": 4, "seed": 44, "steps": 85, "success": true, "seconds": 4.03}
++{"count": 4, "seed": 45, "steps": 67, "success": true, "seconds": 5.09}
++{"count": 4, "seed": 46, "steps": 112, "success": true, "seconds": 6.21}
++{"count": 4, "seed": 47, "steps": 84, "success": true, "seconds": 5.49}
++{"count": 4, "seed": 48, "steps": 118, "success": true, "seconds": 7.17}
++{"count": 4, "seed": 49, "steps": 71, "success": true, "seconds": 4.98}
++{"count": 4, "seed": 50, "steps": 78, "success": true, "seconds": 6.33}
++{"count": 4, "seed": 51, "steps": 81, "success": true, "seconds": 7.94}
++{"count": 4, "seed": 52, "steps": 72, "success": true, "seconds": 7.5}
++{"count": 4, "seed": 53, "steps": 87, "success": true, "seconds": 7.5}
++{"count": 4, "seed": 54, "steps": 63, "success": true, "seconds": 5.81}
++{"count": 4, "seed": 55, "steps": 106, "success": true, "seconds": 5.02}
++{"count": 4, "seed": 56, "steps": 88, "success": true, "seconds": 3.38}
+diff --git a/validate_count3.jsonl b/validate_count3.jsonl
+index e8f7b10..d0dc937 100644
+--- a/validate_count3.jsonl
++++ b/validate_count3.jsonl
+@@ -48,3 +48,53 @@
+ {"seed": 147, "count": 3, "success": true, "steps": 61, "policy_seconds": 0.0131, "elapsed": 0.828}
+ {"seed": 148, "count": 3, "success": true, "steps": 102, "policy_seconds": 0.0154, "elapsed": 1.313}
+ {"seed": 149, "count": 3, "success": true, "steps": 56, "policy_seconds": 0.0111, "elapsed": 0.786}
++{"seed": 150, "count": 3, "success": true, "steps": 101, "policy_seconds": 0.0247, "elapsed": 1.753}
++{"seed": 151, "count": 3, "success": true, "steps": 65, "policy_seconds": 0.0126, "elapsed": 1.701}
++{"seed": 152, "count": 3, "success": true, "steps": 85, "policy_seconds": 0.0155, "elapsed": 1.867}
++{"seed": 153, "count": 3, "success": true, "steps": 110, "policy_seconds": 0.0282, "elapsed": 2.715}
++{"seed": 154, "count": 3, "success": true, "steps": 73, "policy_seconds": 0.014, "elapsed": 1.691}
++{"seed": 155, "count": 3, "success": true, "steps": 98, "policy_seconds": 0.0167, "elapsed": 2.265}
++{"seed": 156, "count": 3, "success": true, "steps": 71, "policy_seconds": 0.0124, "elapsed": 1.669}
++{"seed": 157, "count": 3, "success": true, "steps": 62, "policy_seconds": 0.0125, "elapsed": 1.307}
++{"seed": 158, "count": 3, "success": true, "steps": 64, "policy_seconds": 0.0136, "elapsed": 1.446}
++{"seed": 159, "count": 3, "success": true, "steps": 61, "policy_seconds": 0.0143, "elapsed": 1.384}
++{"seed": 160, "count": 3, "success": true, "steps": 80, "policy_seconds": 0.0125, "elapsed": 2.052}
++{"seed": 161, "count": 3, "success": true, "steps": 60, "policy_seconds": 0.0148, "elapsed": 1.349}
++{"seed": 162, "count": 3, "success": true, "steps": 22, "policy_seconds": 0.003, "elapsed": 0.47}
++{"seed": 163, "count": 3, "success": true, "steps": 61, "policy_seconds": 0.0196, "elapsed": 1.584}
++{"seed": 164, "count": 3, "success": true, "steps": 121, "policy_seconds": 0.0338, "elapsed": 3.087}
++{"seed": 165, "count": 3, "success": true, "steps": 97, "policy_seconds": 0.0217, "elapsed": 2.266}
++{"seed": 166, "count": 3, "success": true, "steps": 93, "policy_seconds": 0.0224, "elapsed": 2.03}
++{"seed": 167, "count": 3, "success": true, "steps": 65, "policy_seconds": 0.0128, "elapsed": 1.467}
++{"seed": 168, "count": 3, "success": true, "steps": 70, "policy_seconds": 0.0135, "elapsed": 1.541}
++{"seed": 169, "count": 3, "success": true, "steps": 44, "policy_seconds": 0.014, "elapsed": 1.02}
++{"seed": 170, "count": 3, "success": true, "steps": 74, "policy_seconds": 0.0121, "elapsed": 1.62}
++{"seed": 171, "count": 3, "success": true, "steps": 64, "policy_seconds": 0.0124, "elapsed": 1.493}
++{"seed": 172, "count": 3, "success": true, "steps": 74, "policy_seconds": 0.0134, "elapsed": 1.6}
++{"seed": 173, "count": 3, "success": true, "steps": 101, "policy_seconds": 0.0242, "elapsed": 2.402}
++{"seed": 174, "count": 3, "success": true, "steps": 57, "policy_seconds": 0.0125, "elapsed": 1.415}
++{"seed": 175, "count": 3, "success": true, "steps": 75, "policy_seconds": 0.0173, "elapsed": 1.819}
++{"seed": 176, "count": 3, "success": true, "steps": 68, "policy_seconds": 0.0094, "elapsed": 1.467}
++{"seed": 177, "count": 3, "success": true, "steps": 54, "policy_seconds": 0.0131, "elapsed": 1.232}
++{"seed": 178, "count": 3, "success": true, "steps": 93, "policy_seconds": 0.0155, "elapsed": 2.149}
++{"seed": 179, "count": 3, "success": true, "steps": 61, "policy_seconds": 0.0099, "elapsed": 1.38}
++{"seed": 180, "count": 3, "success": true, "steps": 76, "policy_seconds": 0.0263, "elapsed": 1.88}
++{"seed": 181, "count": 3, "success": true, "steps": 71, "policy_seconds": 0.0138, "elapsed": 1.809}
++{"seed": 182, "count": 3, "success": true, "steps": 93, "policy_seconds": 0.0142, "elapsed": 2.196}
++{"seed": 183, "count": 3, "success": true, "steps": 88, "policy_seconds": 0.0096, "elapsed": 2.394}
++{"seed": 184, "count": 3, "success": true, "steps": 110, "policy_seconds": 0.0277, "elapsed": 2.755}
++{"seed": 185, "count": 3, "success": true, "steps": 93, "policy_seconds": 0.0209, "elapsed": 2.409}
++{"seed": 186, "count": 3, "success": true, "steps": 63, "policy_seconds": 0.01, "elapsed": 1.773}
++{"seed": 187, "count": 3, "success": true, "steps": 90, "policy_seconds": 0.0184, "elapsed": 2.279}
++{"seed": 188, "count": 3, "success": true, "steps": 90, "policy_seconds": 0.0144, "elapsed": 1.952}
++{"seed": 189, "count": 3, "success": true, "steps": 101, "policy_seconds": 0.0229, "elapsed": 2.766}
++{"seed": 190, "count": 3, "success": true, "steps": 79, "policy_seconds": 0.0172, "elapsed": 2.111}
++{"seed": 191, "count": 3, "success": true, "steps": 106, "policy_seconds": 0.0326, "elapsed": 2.566}
++{"seed": 192, "count": 3, "success": true, "steps": 69, "policy_seconds": 0.0139, "elapsed": 1.61}
++{"seed": 193, "count": 3, "success": true, "steps": 124, "policy_seconds": 0.0147, "elapsed": 3.349}
++{"seed": 194, "count": 3, "success": true, "steps": 117, "policy_seconds": 0.0292, "elapsed": 2.851}
++{"seed": 195, "count": 3, "success": true, "steps": 57, "policy_seconds": 0.0133, "elapsed": 1.606}
++{"seed": 196, "count": 3, "success": true, "steps": 57, "policy_seconds": 0.0144, "elapsed": 1.559}
++{"seed": 197, "count": 3, "success": true, "steps": 139, "policy_seconds": 0.037, "elapsed": 3.739}
++{"seed": 198, "count": 3, "success": true, "steps": 75, "policy_seconds": 0.0149, "elapsed": 2.177}
++{"seed": 199, "count": 3, "success": true, "steps": 82, "policy_seconds": 0.0165, "elapsed": 1.865}

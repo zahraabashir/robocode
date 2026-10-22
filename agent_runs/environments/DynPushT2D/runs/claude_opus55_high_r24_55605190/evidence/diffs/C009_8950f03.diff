@@ -1,0 +1,310 @@
+diff --git a/approach.py b/approach.py
+index 91805d0..0d277ab 100644
+--- a/approach.py
++++ b/approach.py
+@@ -73,6 +73,8 @@ class GeneratedApproach:
+         self.last_pose = None
+         self.margin = (0.012, 0.03, 0.07)
+ 
++    ANG_W = 0.6
++
+     # ---------------- helpers ----------------
+     def err(self, ref, th, goal):
+         g = self.g
+@@ -94,7 +96,7 @@ class GeneratedApproach:
+                          np.maximum(np.abs(ref[..., 1] - gref[1]) - m[0], 0))
+         e_com = np.hypot(np.maximum(np.abs(comx - gcom[0]) - m[1], 0),
+                          np.maximum(np.abs(comy - gcom[1]) - m[1], 0))
+-        return e_ref + e_com + 0.6 * dth
++        return e_ref + e_com + self.ANG_W * dth
+ 
+     def seg_free(self, pose, a, b, clear):
+         if a is self.start_pt:
+@@ -178,6 +180,15 @@ class GeneratedApproach:
+         self.node_vis = {}
+ 
+     # ---------------- planning ----------------
++    MODE = 'rate'
++    RC = 4.0
++    V = 0.03
++
++    def score(self, E0, E, steps):
++        if self.MODE in ('rate', 'rate_old'):
++            return (E0 - E) / (steps + self.RC)
++        return -(steps + E / self.V)
++
+     def plan_push(self, s):
+         g = self.g
+         pose = s[0:3].copy()
+@@ -254,6 +265,8 @@ class GeneratedApproach:
+         whi = np.maximum(4.97, cw.max(0) + 0.01)
+         results_len = np.zeros(K)
+         results_E = np.full(K, np.inf)
++        results_S = np.full(K, -np.inf)
++        mcu = np.max(np.abs(uw), 1)
+         stepcnt = standoff / ds
+         for k in range(1, nsteps + 1):
+             c, sn = np.cos(th), np.sin(th)
+@@ -278,25 +291,24 @@ class GeneratedApproach:
+             if not valid.any():
+                 break
+             E = self.err(ref, th, goal)
+-            better = valid & (E < results_E - 1e-9)
++            sc = -E if self.MODE == 'rate_old' else self.score(E0, E, lb + k * ds * mcu / AMAX + 3)
++            better = valid & (E < E0 - 1e-4) & (sc > results_S)
++            results_S = np.where(better, sc, results_S)
+             results_E = np.where(better, E, results_E)
+             results_len = np.where(better, k * ds, results_len)
+ 
+-        imp = E0 - results_E
+-        # rate = improvement / steps, with lower bound travel first
+-        push_steps = results_len * np.max(np.abs(uw), 1) / AMAX + 3
+-        order = np.argsort(-(imp / (lb + push_steps + 4)))
++        push_steps = results_len * mcu / AMAX + 3
++        order = np.argsort(-results_S)
+         best_i, best_rate, best_path = None, -np.inf, None
+         for i in order[:60]:
+-            if not np.isfinite(results_E[i]) or imp[i] <= 1e-4:
+-                continue
+-            ub_rate = imp[i] / (lb[i] + push_steps[i] + 4)
+-            if ub_rate <= best_rate:
++            if not np.isfinite(results_S[i]):
++                break
++            if self.MODE != 'rate_old' and results_S[i] <= best_rate:
+                 break
+             path, cost = self.nav_path(pose, start, pre[i])
+             if path is None:
+                 continue
+-            rate = imp[i] / (cost + len(prefix) + push_steps[i] + 4)
++            rate = self.score(E0, results_E[i], cost + len(prefix) + push_steps[i])
+             if rate > best_rate:
+                 best_rate, best_i, best_path = rate, i, path
+         if best_i is None:
+diff --git a/res_600_800.txt b/res_600_800.txt
+new file mode 100644
+index 0000000..2b9614d
+--- /dev/null
++++ b/res_600_800.txt
+@@ -0,0 +1,201 @@
++600 True 219 2.9s [ 0.015 -0.012 -0.026]
++601 True 147 2.4s [0.025 0.003 0.107]
++602 True 134 1.5s [-0.008  0.012  0.103]
++603 True 171 3.0s [ 0.005 -0.017  0.02 ]
++604 True 151 2.9s [ 0.007 -0.021 -0.106]
++605 True 148 3.0s [-0.009  0.01   0.116]
++606 True 167 2.7s [ 0.014 -0.02  -0.071]
++607 True 229 4.0s [ 0.019 -0.022  0.115]
++608 True 291 4.9s [ 0.015 -0.005 -0.116]
++609 True 271 4.2s [-0.006 -0.008 -0.099]
++610 True 195 3.1s [0.015 0.007 0.11 ]
++611 True 138 3.0s [-0.021  0.012 -0.03 ]
++612 True 107 1.4s [-0.002  0.03   0.104]
++613 True 107 1.5s [ 0.014 -0.003 -0.053]
++614 True 194 3.5s [ 0.01  -0.014  0.092]
++615 True 77 1.0s [-0.023 -0.019  0.013]
++616 True 67 1.0s [ 0.015  0.027 -0.13 ]
++617 True 243 4.7s [ 0.018 -0.013 -0.069]
++618 True 212 4.0s [ 0.02  -0.004 -0.115]
++619 True 174 3.0s [ 0.009 -0.025  0.021]
++620 True 232 3.9s [ 0.013  0.005 -0.123]
++621 True 152 2.8s [0.002 0.024 0.032]
++622 True 195 2.4s [-0.012 -0.022 -0.1  ]
++623 True 209 3.1s [ 0.003 -0.019  0.088]
++624 True 134 1.5s [ 0.009  0.013 -0.126]
++625 True 183 2.4s [-0.022  0.024 -0.086]
++626 True 354 8.5s [ 0.02  -0.016  0.076]
++627 True 144 2.5s [0.003 0.027 0.053]
++628 True 182 3.2s [-0.011 -0.013  0.032]
++629 True 257 4.2s [-0.022 -0.007  0.017]
++630 True 243 4.3s [0.01  0.022 0.021]
++631 True 205 3.7s [-0.024 -0.    -0.031]
++632 True 235 5.7s [-0.016  0.022 -0.08 ]
++633 True 175 4.3s [ 0.022 -0.006  0.017]
++634 True 164 5.3s [-0.014  0.021 -0.058]
++635 True 166 5.3s [ 0.003 -0.02   0.015]
++636 True 128 3.1s [-0.008  0.02   0.089]
++637 True 188 5.6s [-0.023  0.011 -0.115]
++638 True 159 5.3s [-0.002  0.023 -0.02 ]
++639 True 88 3.2s [ 0.01  -0.019  0.007]
++640 True 237 7.1s [-0.009  0.027  0.106]
++641 True 119 3.2s [-0.016  0.018  0.026]
++642 True 209 5.5s [0.022 0.008 0.045]
++643 True 221 6.2s [0.021 0.009 0.041]
++644 True 183 5.4s [ 0.02  -0.012 -0.035]
++645 True 204 5.9s [-0.001 -0.019  0.069]
++646 True 254 5.2s [ 0.015  0.014 -0.075]
++647 True 182 3.5s [ 0.008 -0.022  0.085]
++648 True 156 2.4s [-0.01  -0.011 -0.105]
++649 True 251 5.1s [ 0.028 -0.007 -0.068]
++650 True 182 2.8s [-0.021  0.015  0.076]
++651 True 359 6.6s [0.018 0.011 0.023]
++652 True 226 4.9s [-0.008  0.01  -0.117]
++653 True 250 5.0s [0.008 0.014 0.091]
++654 True 160 2.1s [-0.012  0.022 -0.018]
++655 True 209 4.0s [0.016 0.008 0.005]
++656 True 199 3.8s [0.015 0.027 0.106]
++657 True 214 3.6s [ 0.019  0.016 -0.059]
++658 True 291 4.7s [-0.001  0.029  0.114]
++659 True 217 3.8s [-0.005 -0.01   0.102]
++660 True 219 4.6s [0.003 0.024 0.011]
++661 True 181 3.1s [-0.02   0.014 -0.01 ]
++662 True 273 5.8s [-0.002  0.017  0.055]
++663 True 314 7.3s [-0.004 -0.018 -0.004]
++664 True 209 4.8s [ 0.01   0.019 -0.08 ]
++665 True 97 2.0s [0.012 0.024 0.109]
++666 True 55 1.4s [-0.016 -0.006  0.06 ]
++667 True 266 8.0s [-0.025 -0.018 -0.02 ]
++668 True 259 6.0s [0.018 0.01  0.107]
++669 True 121 3.4s [ 0.022 -0.011 -0.012]
++670 True 214 5.4s [-0.015 -0.018 -0.028]
++671 True 272 5.8s [-0.021 -0.001  0.027]
++672 True 108 2.6s [-0.003 -0.031  0.114]
++673 True 171 4.5s [ 0.009 -0.016 -0.069]
++674 True 127 3.3s [0.022 0.004 0.118]
++675 True 110 2.1s [-0.023  0.016 -0.099]
++676 True 336 8.6s [ 0.003 -0.024 -0.047]
++677 True 232 7.0s [ 0.01  -0.023  0.028]
++678 True 198 6.5s [-0.012  0.02  -0.073]
++679 True 102 2.4s [-0.011 -0.017  0.113]
++680 True 212 4.9s [ 0.014 -0.02   0.009]
++681 True 275 6.2s [-0.016  0.031  0.115]
++682 True 181 4.6s [-0.011  0.014  0.099]
++683 True 222 6.7s [-0.018 -0.014 -0.027]
++684 True 124 3.2s [ 0.006  0.021 -0.107]
++685 True 223 7.3s [ 0.018  0.023 -0.044]
++686 True 170 5.9s [ 0.008 -0.018  0.06 ]
++687 True 204 5.6s [ 0.01  -0.005  0.109]
++688 True 190 6.2s [ 0.018  0.021 -0.032]
++689 True 149 4.8s [-0.02  -0.025  0.002]
++690 True 293 8.2s [ 0.013  0.02  -0.117]
++691 True 245 7.5s [0.018 0.012 0.037]
++692 True 269 7.3s [ 0.01  -0.017 -0.079]
++693 True 205 5.5s [0.01  0.017 0.047]
++694 True 215 5.5s [-0.012  0.021  0.089]
++695 True 175 6.1s [-0.022  0.017 -0.066]
++696 True 82 2.4s [0.024 0.021 0.001]
++697 True 398 10.9s [ 0.017 -0.005  0.023]
++698 True 120 3.9s [ 0.014 -0.019  0.04 ]
++699 True 165 5.3s [-0.019  0.018 -0.039]
++700 True 140 2.8s [-0.017  0.006 -0.129]
++701 True 180 2.9s [ 0.008  0.005 -0.113]
++702 True 157 3.8s [-0.012  0.011  0.007]
++703 True 266 8.0s [-0.024 -0.023  0.   ]
++704 True 79 2.4s [0.007 0.02  0.082]
++705 True 141 4.5s [0.023 0.018 0.101]
++706 True 112 3.2s [0.001 0.021 0.022]
++707 True 251 6.5s [-0.013  0.009 -0.103]
++708 True 113 2.5s [ 0.013 -0.02  -0.017]
++709 True 228 4.6s [ 0.011 -0.003 -0.109]
++710 True 96 2.4s [0.02  0.027 0.091]
++711 True 134 1.6s [-0.003 -0.008 -0.1  ]
++712 True 151 3.7s [0.021 0.011 0.043]
++713 True 121 4.1s [-0.006  0.023 -0.011]
++714 True 109 3.0s [ 0.01   0.007 -0.123]
++715 True 186 4.0s [ 0.021  0.002 -0.069]
++716 True 205 3.9s [-0.017  0.001  0.067]
++717 True 275 4.8s [ 0.008 -0.018  0.076]
++718 True 248 4.5s [0.014 0.013 0.093]
++719 True 201 3.5s [ 0.016 -0.019 -0.019]
++720 True 197 3.3s [-0.005  0.021  0.055]
++721 True 222 4.4s [ 0.019 -0.012 -0.104]
++722 True 141 2.2s [ 0.016 -0.007 -0.085]
++723 True 133 2.7s [-0.015  0.019  0.075]
++724 True 224 3.4s [-0.01  -0.013  0.067]
++725 True 177 3.1s [-0.024  0.002 -0.048]
++726 True 216 3.2s [-0.03   0.014 -0.102]
++727 True 101 1.2s [ 0.009 -0.004 -0.122]
++728 True 210 3.6s [-0.017 -0.025 -0.047]
++729 True 200 3.3s [-0.025  0.006  0.012]
++730 True 197 3.5s [-0.018 -0.007  0.016]
++731 True 253 4.6s [ 0.015  0.015 -0.077]
++732 True 180 4.1s [-0.017 -0.001 -0.082]
++733 True 206 3.5s [ 0.007 -0.025 -0.098]
++734 True 121 1.6s [ 0.022 -0.008  0.089]
++735 True 118 1.9s [0.029 0.027 0.09 ]
++736 True 209 2.9s [-0.007  0.031  0.121]
++737 True 224 3.8s [-0.002  0.033  0.111]
++738 True 224 3.7s [-0.007  0.012 -0.097]
++739 True 187 3.4s [ 0.023  0.028 -0.046]
++740 True 146 1.6s [-0.019 -0.02   0.059]
++741 True 234 3.7s [-0.004  0.021  0.061]
++742 True 154 2.7s [0.009 0.019 0.088]
++743 True 80 1.3s [ 0.018  0.033 -0.105]
++744 True 203 4.1s [ 0.01   0.004 -0.115]
++745 True 101 2.1s [-0.021 -0.     0.057]
++746 True 443 6.8s [ 0.014 -0.018 -0.058]
++747 True 228 4.2s [0.016 0.025 0.081]
++748 True 103 1.6s [-0.001  0.008 -0.108]
++749 True 105 2.1s [-0.006  0.02  -0.026]
++750 True 103 2.2s [-0.001  0.022 -0.049]
++751 True 205 3.1s [-0.024 -0.015 -0.014]
++752 True 263 4.5s [0.018 0.018 0.062]
++753 True 189 3.0s [-0.011  0.022 -0.028]
++754 True 191 3.0s [ 0.018 -0.004  0.05 ]
++755 True 195 3.5s [-0.001  0.018  0.003]
++756 True 114 2.2s [0.014 0.014 0.029]
++757 True 209 4.1s [-0.018 -0.    -0.08 ]
++758 True 28 0.9s [-0.01   0.018 -0.011]
++759 True 273 5.0s [-0.006 -0.02   0.044]
++760 True 203 5.0s [-0.021  0.011 -0.054]
++761 True 204 3.1s [-0.028  0.029  0.099]
++762 True 136 3.3s [-0.007 -0.015  0.059]
++763 True 230 5.2s [ 0.02  -0.016 -0.073]
++764 True 85 1.6s [ 0.017 -0.018 -0.056]
++765 True 176 3.5s [-0.01  -0.019 -0.115]
++766 True 135 2.8s [ 0.024 -0.019 -0.102]
++767 True 133 2.7s [ 0.028 -0.017  0.118]
++768 True 102 1.8s [-0.001 -0.01  -0.082]
++769 True 150 2.5s [ 0.007 -0.024 -0.101]
++770 True 100 2.1s [0.018 0.009 0.059]
++771 True 185 3.7s [-0.021 -0.014 -0.004]
++772 True 217 4.4s [-0.013 -0.016  0.071]
++773 True 123 2.2s [ 0.021 -0.004  0.001]
++774 True 290 5.4s [-0.021  0.009  0.104]
++775 True 102 2.3s [0.019 0.014 0.13 ]
++776 True 101 1.8s [-0.01  -0.022  0.014]
++777 True 104 1.9s [-0.018  0.007  0.047]
++778 True 101 2.3s [-0.021 -0.015  0.   ]
++779 True 208 4.7s [-0.005  0.02  -0.014]
++780 True 188 2.4s [-0.024 -0.003 -0.123]
++781 True 232 4.0s [0.02  0.005 0.007]
++782 True 226 3.1s [0.006 0.018 0.041]
++783 True 161 2.2s [ 0.009  0.02  -0.044]
++784 True 138 2.5s [-0.019 -0.006  0.081]
++785 True 153 2.3s [0.003 0.009 0.131]
++786 True 198 3.3s [-0.021  0.003 -0.001]
++787 True 242 4.5s [-0.018  0.002 -0.098]
++788 True 273 4.7s [-0.008  0.013 -0.137]
++789 True 184 3.2s [-0.019  0.018  0.043]
++790 True 180 2.6s [-0.004 -0.019  0.114]
++791 True 167 3.4s [0.016 0.008 0.111]
++792 True 248 3.1s [-0.016  0.022 -0.096]
++793 True 220 2.7s [-0.015  0.022  0.072]
++794 True 117 2.0s [-0.017 -0.012 -0.109]
++795 True 166 2.6s [-0.012  0.019 -0.06 ]
++796 True 140 1.8s [ 0.027 -0.026  0.008]
++797 True 216 2.2s [-0.023  0.005  0.002]
++798 True 121 1.6s [ 0.018 -0.004  0.013]
++799 True 178 1.7s [ 0.02  -0.008  0.106]
++success 200 / 200 mean steps 185.36
+diff --git a/sweep.py b/sweep.py
+new file mode 100644
+index 0000000..68388fb
+--- /dev/null
++++ b/sweep.py
+@@ -0,0 +1,15 @@
++import sys, json, numpy as np
++from env_client import make_env
++import approach
++from concurrent.futures import ThreadPoolExecutor
++cfg=json.loads(sys.argv[1]); a,b=int(sys.argv[2]),int(sys.argv[3])
++for k,v in cfg.items(): setattr(approach.GeneratedApproach,k,v)
++def run(seed):
++    env=make_env(); ap=approach.GeneratedApproach(None,None,{})
++    obs,info=env.reset(seed=seed); ap.reset(obs,info)
++    for t in range(1000):
++        obs,r,te,tr,_=env.step(ap.get_action(obs))
++        if te: break
++    env.close(); return t+1, te
++with ThreadPoolExecutor(6) as ex: res=list(ex.map(run, range(a,b)))
++print(sys.argv[1], 'mean', np.mean([r[0] for r in res]), 'succ', sum(r[1] for r in res), '/', len(res))

@@ -1,0 +1,356 @@
+diff --git a/approach.py b/approach.py
+index 6ad96db..1701ba4 100644
+--- a/approach.py
++++ b/approach.py
+@@ -116,6 +116,10 @@ class GeneratedApproach:
+         self.pickx=max(.1002,min(1.5178,x+offset))
+         self.offsetx=self.pickx-x
+         self.picktop=y+h
++        rx=float(s.get(self.robot,'x'))
++        self.empty_cruise=max([.34]+[qy+qh+.235 for p in obs+[self.block] for qx,qy,qw,qh in [self.rect(s,p)] if qx<max(rx,self.pickx)+.11 and qx+qw>min(rx,self.pickx)-.11])
++        self.empty_cruise=min(.86,self.empty_cruise)
++        self.carry_cruise=.86
+         self.phase='above'
+         self.stuck=0
+ 
+@@ -134,16 +138,20 @@ class GeneratedApproach:
+         vac=0.
+         tx,ty=rx,ry
+         if self.phase=='above':
+-            ty=.86
+-            if abs(ry-ty)<.002:
++            ty=self.empty_cruise
++            if ry>=ty-.002:
+                 tx=self.pickx
+                 if abs(rx-tx)<.002:self.phase='down'
+         if self.phase=='down':
+             tx=self.pickx;ty=self.picktop+.215;vac=0.
+             if (abs(rx-tx)<.002 and abs(ry-ty)<.002) or self.stuck>=2:
+                 self.phase='lift';self.before_y=y;vac=1.
++                self.offsety=ry-y;self.offsetx=rx-x
++                left=min(x,self.dest[0])-.11;right=max(x+w,self.dest[0]+w)+.11
++                tops=[qy+qh for p in self.obstacles(s)+[self.block] if p!=self.task for qx,qy,qw,qh in [self.rect(s,p)] if qx<right and qx+qw>left]
++                self.carry_cruise=min(.88,max([y+.06]+tops)+self.offsety+.026)
+         elif self.phase=='lift':
+-            vac=1.;ty=.86
++            vac=1.;ty=self.carry_cruise
+             if y>self.before_y+.025:
+                 self.offsetx=rx-x;self.offsety=ry-y
+             if abs(ry-ty)<.002:
+@@ -151,13 +159,13 @@ class GeneratedApproach:
+                     self.phase='down';self.picktop-=.005
+                 else:self.phase='carry'
+         elif self.phase=='carry':
+-            vac=1.;ty=.86;tx=self.dest[0]+self.offsetx
++            vac=1.;ty=self.carry_cruise;tx=self.dest[0]+self.offsetx
+             if abs(rx-tx)<.002:self.phase='place'
+         elif self.phase=='place':
+             vac=1.;tx=self.dest[0]+self.offsetx;ty=self.dest[1]+self.offsety
+             if abs(rx-tx)<.002 and abs(ry-ty)<.002:self.phase='release'
+         elif self.phase=='release':
+-            vac=0.;self.phase='retreat'
++            vac=0.;self.phase='choose'
+         elif self.phase=='retreat':
+             ty=.86
+             if abs(ry-ty)<.002:self.phase='choose'
+diff --git a/probe_failure319.log b/probe_failure319.log
+new file mode 100644
+index 0000000..5c36910
+--- /dev/null
++++ b/probe_failure319.log
+@@ -0,0 +1,187 @@
++INITIAL {'object_count': 2}
++obstruction0 [1.210984, 0.100001, 0.161419, 0.115854]
++obstruction1 [0.486631, 0.100001, 0.190952, 0.187956]
++robot [1.185983, 0.892465, -1.570796]
++target_block [0.308954, 0.100001, 0.176284, 0.189023]
++target_surface [1.248493, 0.0, 0.21702, 0.1]
++0 ('above', 'obstruction1', (0.5326113536937817, 0.105)) robot [1.185983, 0.86] task [0.486631, 0.100001]
++16 ('down', 'obstruction1', (0.5326113536937817, 0.105)) robot [0.464631, 0.81] task [0.486631, 0.100001]
++24 ('lift', 'obstruction1', (0.5326113536937817, 0.105)) robot [0.464631, 0.502957] task [0.486631, 0.100001]
++33 ('carry', 'obstruction1', (0.5326113536937817, 0.105)) robot [0.464631, 0.86] task [0.486631, 0.457044]
++35 ('place', 'obstruction1', (0.5326113536937817, 0.105)) robot [0.510611, 0.86] task [0.532611, 0.457044]
++44 ('release', 'obstruction1', (0.5326113536937817, 0.105)) robot [0.510611, 0.507956] task [0.532611, 0.105]
++45 ('retreat', 'obstruction1', (0.5326113536937817, 0.105)) robot [0.510611, 0.507956] task [0.532611, 0.105]
++54 ('choose', 'obstruction1', (0.5326113536937817, 0.105)) robot [0.510611, 0.86] task [0.532611, 0.105]
++55 ('down', 'obstruction1', (0.5819511252738334, 0.105)) robot [0.510611, 0.81] task [0.532611, 0.105]
++63 ('lift', 'obstruction1', (0.5819511252738334, 0.105)) robot [0.510611, 0.507956] task [0.532611, 0.105]
++72 ('carry', 'obstruction1', (0.5819511252738334, 0.105)) robot [0.510611, 0.86] task [0.532611, 0.457044]
++74 ('place', 'obstruction1', (0.5819511252738334, 0.105)) robot [0.559951, 0.86] task [0.581951, 0.457044]
++83 ('release', 'obstruction1', (0.5819511252738334, 0.105)) robot [0.559951, 0.507956] task [0.581951, 0.105]
++84 ('retreat', 'obstruction1', (0.5819511252738334, 0.105)) robot [0.559951, 0.507956] task [0.581951, 0.105]
++93 ('choose', 'obstruction1', (0.5819511252738334, 0.105)) robot [0.559951, 0.86] task [0.581951, 0.105]
++94 ('down', 'obstruction1', (0.6312908968538851, 0.105)) robot [0.559951, 0.81] task [0.581951, 0.105]
++102 ('lift', 'obstruction1', (0.6312908968538851, 0.105)) robot [0.559951, 0.507956] task [0.581951, 0.105]
++111 ('carry', 'obstruction1', (0.6312908968538851, 0.105)) robot [0.559951, 0.86] task [0.581951, 0.457044]
++113 ('place', 'obstruction1', (0.6312908968538851, 0.105)) robot [0.609291, 0.86] task [0.631291, 0.457044]
++122 ('release', 'obstruction1', (0.6312908968538851, 0.105)) robot [0.609291, 0.507956] task [0.631291, 0.105]
++123 ('retreat', 'obstruction1', (0.6312908968538851, 0.105)) robot [0.609291, 0.507956] task [0.631291, 0.105]
++132 ('choose', 'obstruction1', (0.6312908968538851, 0.105)) robot [0.609291, 0.86] task [0.631291, 0.105]
++133 ('down', 'obstruction1', (0.6806306684339368, 0.105)) robot [0.609291, 0.81] task [0.631291, 0.105]
++141 ('lift', 'obstruction1', (0.6806306684339368, 0.105)) robot [0.609291, 0.507956] task [0.631291, 0.105]
++150 ('carry', 'obstruction1', (0.6806306684339368, 0.105)) robot [0.609291, 0.86] task [0.631291, 0.457044]
++152 ('place', 'obstruction1', (0.6806306684339368, 0.105)) robot [0.658631, 0.86] task [0.680631, 0.457044]
++161 ('release', 'obstruction1', (0.6806306684339368, 0.105)) robot [0.658631, 0.507956] task [0.680631, 0.105]
++162 ('retreat', 'obstruction1', (0.6806306684339368, 0.105)) robot [0.658631, 0.507956] task [0.680631, 0.105]
++171 ('choose', 'obstruction1', (0.6806306684339368, 0.105)) robot [0.658631, 0.86] task [0.680631, 0.105]
++172 ('down', 'obstruction1', (0.7299704400139885, 0.105)) robot [0.658631, 0.81] task [0.680631, 0.105]
++180 ('lift', 'obstruction1', (0.7299704400139885, 0.105)) robot [0.658631, 0.507956] task [0.680631, 0.105]
++189 ('carry', 'obstruction1', (0.7299704400139885, 0.105)) robot [0.658631, 0.86] task [0.680631, 0.457044]
++191 ('place', 'obstruction1', (0.7299704400139885, 0.105)) robot [0.70797, 0.86] task [0.72997, 0.457044]
++200 ('release', 'obstruction1', (0.7299704400139885, 0.105)) robot [0.70797, 0.507956] task [0.72997, 0.105]
++201 ('retreat', 'obstruction1', (0.7299704400139885, 0.105)) robot [0.70797, 0.507956] task [0.72997, 0.105]
++210 ('choose', 'obstruction1', (0.7299704400139885, 0.105)) robot [0.70797, 0.86] task [0.72997, 0.105]
++211 ('down', 'obstruction1', (0.7793102115940402, 0.105)) robot [0.70797, 0.81] task [0.72997, 0.105]
++219 ('lift', 'obstruction1', (0.7793102115940402, 0.105)) robot [0.70797, 0.507956] task [0.72997, 0.105]
++228 ('carry', 'obstruction1', (0.7793102115940402, 0.105)) robot [0.70797, 0.86] task [0.72997, 0.457044]
++230 ('place', 'obstruction1', (0.7793102115940402, 0.105)) robot [0.75731, 0.86] task [0.77931, 0.457044]
++239 ('release', 'obstruction1', (0.7793102115940402, 0.105)) robot [0.75731, 0.507956] task [0.77931, 0.105]
++240 ('retreat', 'obstruction1', (0.7793102115940402, 0.105)) robot [0.75731, 0.507956] task [0.77931, 0.105]
++249 ('choose', 'obstruction1', (0.7793102115940402, 0.105)) robot [0.75731, 0.86] task [0.77931, 0.105]
++250 ('down', 'obstruction1', (0.828649983174092, 0.105)) robot [0.75731, 0.81] task [0.77931, 0.105]
++258 ('lift', 'obstruction1', (0.828649983174092, 0.105)) robot [0.75731, 0.507956] task [0.77931, 0.105]
++267 ('carry', 'obstruction1', (0.828649983174092, 0.105)) robot [0.75731, 0.86] task [0.77931, 0.457044]
++269 ('place', 'obstruction1', (0.828649983174092, 0.105)) robot [0.80665, 0.86] task [0.82865, 0.457044]
++278 ('release', 'obstruction1', (0.828649983174092, 0.105)) robot [0.80665, 0.507956] task [0.82865, 0.105]
++279 ('retreat', 'obstruction1', (0.828649983174092, 0.105)) robot [0.80665, 0.507956] task [0.82865, 0.105]
++288 ('choose', 'obstruction1', (0.828649983174092, 0.105)) robot [0.80665, 0.86] task [0.82865, 0.105]
++289 ('down', 'obstruction1', (0.8779897547541436, 0.105)) robot [0.80665, 0.81] task [0.82865, 0.105]
++297 ('lift', 'obstruction1', (0.8779897547541436, 0.105)) robot [0.80665, 0.507956] task [0.82865, 0.105]
++306 ('carry', 'obstruction1', (0.8779897547541436, 0.105)) robot [0.80665, 0.86] task [0.82865, 0.457044]
++308 ('place', 'obstruction1', (0.8779897547541436, 0.105)) robot [0.85599, 0.86] task [0.87799, 0.457044]
++317 ('release', 'obstruction1', (0.8779897547541436, 0.105)) robot [0.85599, 0.507956] task [0.87799, 0.105]
++318 ('retreat', 'obstruction1', (0.8779897547541436, 0.105)) robot [0.85599, 0.507956] task [0.87799, 0.105]
++327 ('choose', 'obstruction1', (0.8779897547541436, 0.105)) robot [0.85599, 0.86] task [0.87799, 0.105]
++328 ('down', 'obstruction1', (0.9273295263341954, 0.105)) robot [0.85599, 0.81] task [0.87799, 0.105]
++336 ('lift', 'obstruction1', (0.9273295263341954, 0.105)) robot [0.85599, 0.507956] task [0.87799, 0.105]
++345 ('carry', 'obstruction1', (0.9273295263341954, 0.105)) robot [0.85599, 0.86] task [0.87799, 0.457044]
++347 ('place', 'obstruction1', (0.9273295263341954, 0.105)) robot [0.90533, 0.86] task [0.92733, 0.457044]
++356 ('release', 'obstruction1', (0.9273295263341954, 0.105)) robot [0.90533, 0.507956] task [0.92733, 0.105]
++357 ('retreat', 'obstruction1', (0.9273295263341954, 0.105)) robot [0.90533, 0.507956] task [0.92733, 0.105]
++366 ('choose', 'obstruction1', (0.9273295263341954, 0.105)) robot [0.90533, 0.86] task [0.92733, 0.105]
++367 ('down', 'obstruction1', (0.9766692979142472, 0.105)) robot [0.90533, 0.81] task [0.92733, 0.105]
++375 ('lift', 'obstruction1', (0.9766692979142472, 0.105)) robot [0.90533, 0.507956] task [0.92733, 0.105]
++384 ('carry', 'obstruction1', (0.9766692979142472, 0.105)) robot [0.90533, 0.86] task [0.92733, 0.457044]
++386 ('place', 'obstruction1', (0.9766692979142472, 0.105)) robot [0.954669, 0.86] task [0.976669, 0.457044]
++395 ('release', 'obstruction1', (0.9766692979142472, 0.105)) robot [0.954669, 0.507956] task [0.976669, 0.105]
++396 ('retreat', 'obstruction1', (0.9766692979142472, 0.105)) robot [0.954669, 0.507956] task [0.976669, 0.105]
++405 ('choose', 'obstruction1', (0.9766692979142472, 0.105)) robot [0.954669, 0.86] task [0.976669, 0.105]
++406 ('down', 'obstruction1', (0.5655045347471495, 0.105)) robot [0.954669, 0.81] task [0.976669, 0.105]
++414 ('lift', 'obstruction1', (0.5655045347471495, 0.105)) robot [0.954669, 0.507956] task [0.976669, 0.105]
++423 ('carry', 'obstruction1', (0.5655045347471495, 0.105)) robot [0.954669, 0.86] task [0.976669, 0.457044]
++433 ('place', 'obstruction1', (0.5655045347471495, 0.105)) robot [0.543504, 0.86] task [0.565504, 0.457044]
++442 ('release', 'obstruction1', (0.5655045347471495, 0.105)) robot [0.543505, 0.507956] task [0.565504, 0.105]
++443 ('retreat', 'obstruction1', (0.5655045347471495, 0.105)) robot [0.543505, 0.507956] task [0.565504, 0.105]
++452 ('choose', 'obstruction1', (0.5655045347471495, 0.105)) robot [0.543505, 0.86] task [0.565504, 0.105]
++453 ('down', 'obstruction1', (0.6148443063272011, 0.105)) robot [0.543504, 0.81] task [0.565504, 0.105]
++461 ('lift', 'obstruction1', (0.6148443063272011, 0.105)) robot [0.543504, 0.507956] task [0.565504, 0.105]
++470 ('carry', 'obstruction1', (0.6148443063272011, 0.105)) robot [0.543504, 0.86] task [0.565504, 0.457044]
++472 ('place', 'obstruction1', (0.6148443063272011, 0.105)) robot [0.592844, 0.86] task [0.614844, 0.457044]
++481 ('release', 'obstruction1', (0.6148443063272011, 0.105)) robot [0.592844, 0.507956] task [0.614844, 0.105]
++482 ('retreat', 'obstruction1', (0.6148443063272011, 0.105)) robot [0.592844, 0.507956] task [0.614844, 0.105]
++491 ('choose', 'obstruction1', (0.6148443063272011, 0.105)) robot [0.592844, 0.86] task [0.614844, 0.105]
++492 ('down', 'obstruction1', (0.6641840779072529, 0.105)) robot [0.592844, 0.81] task [0.614844, 0.105]
++500 ('lift', 'obstruction1', (0.6641840779072529, 0.105)) robot [0.592844, 0.507956] task [0.614844, 0.105]
++509 ('carry', 'obstruction1', (0.6641840779072529, 0.105)) robot [0.592844, 0.86] task [0.614844, 0.457044]
++511 ('place', 'obstruction1', (0.6641840779072529, 0.105)) robot [0.642184, 0.86] task [0.664184, 0.457044]
++520 ('release', 'obstruction1', (0.6641840779072529, 0.105)) robot [0.642184, 0.507956] task [0.664184, 0.105]
++521 ('retreat', 'obstruction1', (0.6641840779072529, 0.105)) robot [0.642184, 0.507956] task [0.664184, 0.105]
++530 ('choose', 'obstruction1', (0.6641840779072529, 0.105)) robot [0.642184, 0.86] task [0.664184, 0.105]
++531 ('down', 'obstruction1', (0.7135238494873046, 0.105)) robot [0.642184, 0.81] task [0.664184, 0.105]
++539 ('lift', 'obstruction1', (0.7135238494873046, 0.105)) robot [0.642184, 0.507956] task [0.664184, 0.105]
++548 ('carry', 'obstruction1', (0.7135238494873046, 0.105)) robot [0.642184, 0.86] task [0.664184, 0.457044]
++550 ('place', 'obstruction1', (0.7135238494873046, 0.105)) robot [0.691524, 0.86] task [0.713524, 0.457044]
++559 ('release', 'obstruction1', (0.7135238494873046, 0.105)) robot [0.691524, 0.507956] task [0.713524, 0.105]
++560 ('retreat', 'obstruction1', (0.7135238494873046, 0.105)) robot [0.691524, 0.507956] task [0.713524, 0.105]
++569 ('choose', 'obstruction1', (0.7135238494873046, 0.105)) robot [0.691524, 0.86] task [0.713524, 0.105]
++570 ('down', 'obstruction1', (0.7628636210673563, 0.105)) robot [0.691524, 0.81] task [0.713524, 0.105]
++578 ('lift', 'obstruction1', (0.7628636210673563, 0.105)) robot [0.691524, 0.507956] task [0.713524, 0.105]
++587 ('carry', 'obstruction1', (0.7628636210673563, 0.105)) robot [0.691524, 0.86] task [0.713524, 0.457044]
++589 ('place', 'obstruction1', (0.7628636210673563, 0.105)) robot [0.740864, 0.86] task [0.762864, 0.457044]
++598 ('release', 'obstruction1', (0.7628636210673563, 0.105)) robot [0.740864, 0.507956] task [0.762864, 0.105]
++599 ('retreat', 'obstruction1', (0.7628636210673563, 0.105)) robot [0.740864, 0.507956] task [0.762864, 0.105]
++608 ('choose', 'obstruction1', (0.7628636210673563, 0.105)) robot [0.740864, 0.86] task [0.762864, 0.105]
++609 ('down', 'obstruction1', (0.812203392647408, 0.105)) robot [0.740864, 0.81] task [0.762864, 0.105]
++617 ('lift', 'obstruction1', (0.812203392647408, 0.105)) robot [0.740864, 0.507956] task [0.762864, 0.105]
++626 ('carry', 'obstruction1', (0.812203392647408, 0.105)) robot [0.740864, 0.86] task [0.762864, 0.457044]
++628 ('place', 'obstruction1', (0.812203392647408, 0.105)) robot [0.790203, 0.86] task [0.812203, 0.457044]
++637 ('release', 'obstruction1', (0.812203392647408, 0.105)) robot [0.790203, 0.507956] task [0.812203, 0.105]
++638 ('retreat', 'obstruction1', (0.812203392647408, 0.105)) robot [0.790203, 0.507956] task [0.812203, 0.105]
++647 ('choose', 'obstruction1', (0.812203392647408, 0.105)) robot [0.790203, 0.86] task [0.812203, 0.105]
++648 ('down', 'obstruction1', (0.8615431642274598, 0.105)) robot [0.790203, 0.81] task [0.812203, 0.105]
++656 ('lift', 'obstruction1', (0.8615431642274598, 0.105)) robot [0.790203, 0.507956] task [0.812203, 0.105]
++665 ('carry', 'obstruction1', (0.8615431642274598, 0.105)) robot [0.790203, 0.86] task [0.812203, 0.457044]
++667 ('place', 'obstruction1', (0.8615431642274598, 0.105)) robot [0.839543, 0.86] task [0.861543, 0.457044]
++676 ('release', 'obstruction1', (0.8615431642274598, 0.105)) robot [0.839543, 0.507956] task [0.861543, 0.105]
++677 ('retreat', 'obstruction1', (0.8615431642274598, 0.105)) robot [0.839543, 0.507956] task [0.861543, 0.105]
++686 ('choose', 'obstruction1', (0.8615431642274598, 0.105)) robot [0.839543, 0.86] task [0.861543, 0.105]
++687 ('down', 'obstruction1', (0.9108829358075116, 0.105)) robot [0.839543, 0.81] task [0.861543, 0.105]
++695 ('lift', 'obstruction1', (0.9108829358075116, 0.105)) robot [0.839543, 0.507956] task [0.861543, 0.105]
++704 ('carry', 'obstruction1', (0.9108829358075116, 0.105)) robot [0.839543, 0.86] task [0.861543, 0.457044]
++706 ('place', 'obstruction1', (0.9108829358075116, 0.105)) robot [0.888883, 0.86] task [0.910883, 0.457044]
++715 ('release', 'obstruction1', (0.9108829358075116, 0.105)) robot [0.888883, 0.507956] task [0.910883, 0.105]
++716 ('retreat', 'obstruction1', (0.9108829358075116, 0.105)) robot [0.888883, 0.507956] task [0.910883, 0.105]
++725 ('choose', 'obstruction1', (0.9108829358075116, 0.105)) robot [0.888883, 0.86] task [0.910883, 0.105]
++726 ('down', 'obstruction1', (0.9602227073875632, 0.105)) robot [0.888883, 0.81] task [0.910883, 0.105]
++734 ('lift', 'obstruction1', (0.9602227073875632, 0.105)) robot [0.888883, 0.507956] task [0.910883, 0.105]
++743 ('carry', 'obstruction1', (0.9602227073875632, 0.105)) robot [0.888883, 0.86] task [0.910883, 0.457044]
++745 ('place', 'obstruction1', (0.9602227073875632, 0.105)) robot [0.938223, 0.86] task [0.960223, 0.457044]
++754 ('release', 'obstruction1', (0.9602227073875632, 0.105)) robot [0.938223, 0.507956] task [0.960223, 0.105]
++755 ('retreat', 'obstruction1', (0.9602227073875632, 0.105)) robot [0.938223, 0.507956] task [0.960223, 0.105]
++764 ('choose', 'obstruction1', (0.9602227073875632, 0.105)) robot [0.938223, 0.86] task [0.960223, 0.105]
++765 ('down', 'obstruction1', (0.5490579442204655, 0.105)) robot [0.938223, 0.81] task [0.960223, 0.105]
++773 ('lift', 'obstruction1', (0.5490579442204655, 0.105)) robot [0.938223, 0.507956] task [0.960223, 0.105]
++782 ('carry', 'obstruction1', (0.5490579442204655, 0.105)) robot [0.938223, 0.86] task [0.960223, 0.457044]
++792 ('place', 'obstruction1', (0.5490579442204655, 0.105)) robot [0.527058, 0.86] task [0.549058, 0.457044]
++801 ('release', 'obstruction1', (0.5490579442204655, 0.105)) robot [0.527058, 0.507956] task [0.549058, 0.105]
++802 ('retreat', 'obstruction1', (0.5490579442204655, 0.105)) robot [0.527058, 0.507956] task [0.549058, 0.105]
++811 ('choose', 'obstruction1', (0.5490579442204655, 0.105)) robot [0.527058, 0.86] task [0.549058, 0.105]
++812 ('down', 'obstruction1', (0.5983977158005173, 0.105)) robot [0.527058, 0.81] task [0.549058, 0.105]
++820 ('lift', 'obstruction1', (0.5983977158005173, 0.105)) robot [0.527058, 0.507956] task [0.549058, 0.105]
++829 ('carry', 'obstruction1', (0.5983977158005173, 0.105)) robot [0.527058, 0.86] task [0.549058, 0.457044]
++831 ('place', 'obstruction1', (0.5983977158005173, 0.105)) robot [0.576398, 0.86] task [0.598398, 0.457044]
++840 ('release', 'obstruction1', (0.5983977158005173, 0.105)) robot [0.576398, 0.507956] task [0.598398, 0.105]
++841 ('retreat', 'obstruction1', (0.5983977158005173, 0.105)) robot [0.576398, 0.507956] task [0.598398, 0.105]
++850 ('choose', 'obstruction1', (0.5983977158005173, 0.105)) robot [0.576398, 0.86] task [0.598398, 0.105]
++851 ('down', 'obstruction1', (0.647737487380569, 0.105)) robot [0.576398, 0.81] task [0.598398, 0.105]
++859 ('lift', 'obstruction1', (0.647737487380569, 0.105)) robot [0.576398, 0.507956] task [0.598398, 0.105]
++868 ('carry', 'obstruction1', (0.647737487380569, 0.105)) robot [0.576398, 0.86] task [0.598398, 0.457044]
++870 ('place', 'obstruction1', (0.647737487380569, 0.105)) robot [0.625737, 0.86] task [0.647738, 0.457044]
++879 ('release', 'obstruction1', (0.647737487380569, 0.105)) robot [0.625737, 0.507956] task [0.647737, 0.105]
++880 ('retreat', 'obstruction1', (0.647737487380569, 0.105)) robot [0.625737, 0.507956] task [0.647737, 0.105]
++889 ('choose', 'obstruction1', (0.647737487380569, 0.105)) robot [0.625737, 0.86] task [0.647737, 0.105]
++890 ('down', 'obstruction1', (0.6970772589606207, 0.105)) robot [0.625737, 0.81] task [0.647737, 0.105]
++898 ('lift', 'obstruction1', (0.6970772589606207, 0.105)) robot [0.625737, 0.507956] task [0.647737, 0.105]
++907 ('carry', 'obstruction1', (0.6970772589606207, 0.105)) robot [0.625737, 0.86] task [0.647737, 0.457044]
++909 ('place', 'obstruction1', (0.6970772589606207, 0.105)) robot [0.675077, 0.86] task [0.697077, 0.457044]
++918 ('release', 'obstruction1', (0.6970772589606207, 0.105)) robot [0.675077, 0.507956] task [0.697077, 0.105]
++919 ('retreat', 'obstruction1', (0.6970772589606207, 0.105)) robot [0.675077, 0.507956] task [0.697077, 0.105]
++928 ('choose', 'obstruction1', (0.6970772589606207, 0.105)) robot [0.675077, 0.86] task [0.697077, 0.105]
++929 ('down', 'obstruction1', (0.7464170305406724, 0.105)) robot [0.675077, 0.81] task [0.697077, 0.105]
++937 ('lift', 'obstruction1', (0.7464170305406724, 0.105)) robot [0.675077, 0.507956] task [0.697077, 0.105]
++946 ('carry', 'obstruction1', (0.7464170305406724, 0.105)) robot [0.675077, 0.86] task [0.697077, 0.457044]
++948 ('place', 'obstruction1', (0.7464170305406724, 0.105)) robot [0.724417, 0.86] task [0.746417, 0.457044]
++957 ('release', 'obstruction1', (0.7464170305406724, 0.105)) robot [0.724417, 0.507956] task [0.746417, 0.105]
++958 ('retreat', 'obstruction1', (0.7464170305406724, 0.105)) robot [0.724417, 0.507956] task [0.746417, 0.105]
++967 ('choose', 'obstruction1', (0.7464170305406724, 0.105)) robot [0.724417, 0.86] task [0.746417, 0.105]
++968 ('down', 'obstruction1', (0.7957568021207242, 0.105)) robot [0.724417, 0.81] task [0.746417, 0.105]
++976 ('lift', 'obstruction1', (0.7957568021207242, 0.105)) robot [0.724417, 0.507956] task [0.746417, 0.105]
++985 ('carry', 'obstruction1', (0.7957568021207242, 0.105)) robot [0.724417, 0.86] task [0.746417, 0.457044]
++987 ('place', 'obstruction1', (0.7957568021207242, 0.105)) robot [0.773757, 0.86] task [0.795757, 0.457044]
++996 ('release', 'obstruction1', (0.7957568021207242, 0.105)) robot [0.773757, 0.507956] task [0.795757, 0.105]
++997 ('retreat', 'obstruction1', (0.7957568021207242, 0.105)) robot [0.773757, 0.507956] task [0.795757, 0.105]
++FINAL
++obstruction0 [1.210984, 0.100001, 0.161419, 0.115854]
++obstruction1 [0.795757, 0.105, 0.190952, 0.187956]
++robot [0.773757, 0.607956, -1.570796]
++target_block [0.61808, 0.105, 0.176284, 0.189023]
++target_surface [1.248493, 0.0, 0.21702, 0.1]
+diff --git a/probe_failure319.py b/probe_failure319.py
+new file mode 100644
+index 0000000..4bcc365
+--- /dev/null
++++ b/probe_failure319.py
+@@ -0,0 +1,16 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import json
++E=make_env();s,i=E.reset(seed=319);a=GeneratedApproach(E.action_space,E.observation_space,{});a.reset(s,i)
++def dump(s):
++ for n in sorted(s.get_object_names()):
++  o=s.get_object_from_name(n)
++  fs=['x','y','theta'] if n=='robot' else ['x','y','width','height']
++  print(n,[round(s.get(o,f),6) for f in fs])
++print('INITIAL',i);dump(s);prev=None
++for step in range(1000):
++ act=a.get_action(s);s,r,t,tr,_=E.step(act)
++ sig=(a.phase,a.task.name,a.dest)
++ if sig!=prev:print(step,sig,'robot',[round(s.get(a.robot,f),6) for f in ['x','y']],'task',[round(s.get(a.task,f),6) for f in ['x','y']]);prev=sig
++ if t:print('SUCCESS',step);break
++print('FINAL');dump(s);E.close()
+diff --git a/probe_validation_239_260_459.jsonl b/probe_validation_239_260_459.jsonl
+index 5df5736..4fdac47 100644
+--- a/probe_validation_239_260_459.jsonl
++++ b/probe_validation_239_260_459.jsonl
+@@ -118,3 +118,61 @@
+ {"seed": 376, "success": true, "steps": 113, "seconds": 0.79, "phase": "place", "task": "target_block", "robot": [0.962884247303009, 0.3838501572608948], "taskxy": [0.9230465292930603, 0.10499998927116394], "dest": [0.9230465550422668, 0.10500000149011612]}
+ {"seed": 377, "success": true, "steps": 125, "seconds": 0.74, "phase": "place", "task": "target_block", "robot": [0.7124477624893188, 0.4322310984134674], "taskxy": [0.6667981147766113, 0.10499997437000275], "dest": [0.6667979996204376, 0.10500000149011612]}
+ {"seed": 378, "success": true, "steps": 139, "seconds": 0.88, "phase": "place", "task": "target_block", "robot": [1.320676565170288, 0.4099999666213989], "taskxy": [1.2750359773635864, 0.10723832994699478], "dest": [1.275036003112793, 0.10500000149011612]}
++{"seed": 379, "success": true, "steps": 100, "seconds": 1.35, "phase": "place", "task": "target_block", "robot": [0.5351549386978149, 0.4626084268093109], "taskxy": [0.44198378920555115, 0.10499998927116394], "dest": [0.4419838480949402, 0.10500000149011612]}
++{"seed": 380, "success": true, "steps": 117, "seconds": 1.44, "phase": "place", "task": "target_block", "robot": [1.1052097082138062, 0.3802589476108551], "taskxy": [1.0409190654754639, 0.10500001907348633], "dest": [1.040919084429741, 0.10500000149011612]}
++{"seed": 381, "success": true, "steps": 128, "seconds": 1.73, "phase": "place", "task": "target_block", "robot": [0.21044324338436127, 0.4099999666213989], "taskxy": [0.1830083727836609, 0.12117896974086761], "dest": [0.18300830605626106, 0.10500000149011612]}
++{"seed": 382, "success": true, "steps": 64, "seconds": 0.83, "phase": "place", "task": "target_block", "robot": [0.3416171073913574, 0.5099999904632568], "taskxy": [0.3064669668674469, 0.10809426009654999], "dest": [0.30646691131591797, 0.10500000149011612]}
++{"seed": 383, "success": true, "steps": 60, "seconds": 0.75, "phase": "place", "task": "target_block", "robot": [0.9091927409172058, 0.4223421514034271], "taskxy": [0.8700603246688843, 0.10499999672174454], "dest": [0.8700603659749031, 0.10500000149011612]}
++{"seed": 384, "success": true, "steps": 61, "seconds": 0.79, "phase": "place", "task": "target_block", "robot": [0.40793582797050476, 0.46000000834465027], "taskxy": [0.381402850151062, 0.12396419048309326], "dest": [0.38140282067656517, 0.10500000149011612]}
++{"seed": 385, "success": true, "steps": 138, "seconds": 2.06, "phase": "place", "task": "target_block", "robot": [0.298006147146225, 0.48279163241386414], "taskxy": [0.24873580038547516, 0.10499998182058334], "dest": [0.24873575228452682, 0.10500000149011612]}
++{"seed": 386, "success": true, "steps": 98, "seconds": 1.57, "phase": "place", "task": "target_block", "robot": [0.8682867884635925, 0.42778250575065613], "taskxy": [0.7869170308113098, 0.10499998182058334], "dest": [0.7869169901609421, 0.10500000149011612]}
++{"seed": 387, "success": true, "steps": 107, "seconds": 1.38, "phase": "place", "task": "target_block", "robot": [0.7617767453193665, 0.4269392192363739], "taskxy": [0.6695501208305359, 0.10500000417232513], "dest": [0.6695501546859741, 0.10500000149011612]}
++{"seed": 388, "success": true, "steps": 102, "seconds": 1.22, "phase": "place", "task": "target_block", "robot": [0.6219067573547363, 0.37798935174942017], "taskxy": [0.5424970984458923, 0.10499996691942215], "dest": [0.5424971241950989, 0.10500000149011612]}
++{"seed": 389, "success": true, "steps": 51, "seconds": 0.64, "phase": "place", "task": "target_block", "robot": [0.9091194868087769, 0.48607856035232544], "taskxy": [0.8831784725189209, 0.10499998927116394], "dest": [0.8831784951984882, 0.10500000149011612]}
++{"seed": 390, "success": true, "steps": 118, "seconds": 1.4, "phase": "place", "task": "target_block", "robot": [0.29385292530059814, 0.4261748790740967], "taskxy": [0.2044985592365265, 0.10499998182058334], "dest": [0.20449851858615875, 0.10500000149011612]}
++{"seed": 391, "success": true, "steps": 63, "seconds": 0.34, "phase": "place", "task": "target_block", "robot": [0.8823308944702148, 0.46000000834465027], "taskxy": [0.8134672045707703, 0.11873778700828552], "dest": [0.8134671639204025, 0.10500000149011612]}
++{"seed": 392, "success": true, "steps": 43, "seconds": 0.35, "phase": "place", "task": "target_block", "robot": [0.3959086239337921, 0.4099999964237213], "taskxy": [0.3851921558380127, 0.1116122305393219], "dest": [0.3851922113895416, 0.10500000149011612]}
++{"seed": 393, "success": true, "steps": 42, "seconds": 0.35, "phase": "place", "task": "target_block", "robot": [0.8473110198974609, 0.4641478955745697], "taskxy": [0.7964699268341064, 0.10499999672174454], "dest": [0.7964699234366417, 0.10500000149011612]}
++{"seed": 394, "success": true, "steps": 40, "seconds": 0.26, "phase": "place", "task": "target_block", "robot": [1.2903193235397339, 0.3718622922897339], "taskxy": [1.2496579885482788, 0.10500004887580872], "dest": [1.2496580142974854, 0.10500000149011612]}
++{"seed": 395, "success": true, "steps": 71, "seconds": 0.48, "phase": "place", "task": "target_block", "robot": [1.0701254606246948, 0.3849175274372101], "taskxy": [1.0085678100585938, 0.10499999672174454], "dest": [1.0085678358078003, 0.10500000149011612]}
++{"seed": 396, "success": true, "steps": 131, "seconds": 0.95, "phase": "place", "task": "target_block", "robot": [1.4435029029846191, 0.4239347279071808], "taskxy": [1.3997095823287964, 0.10499995201826096], "dest": [1.3997094888687134, 0.10500000149011612]}
++{"seed": 397, "success": true, "steps": 99, "seconds": 0.84, "phase": "place", "task": "target_block", "robot": [0.8939307332038879, 0.5099999904632568], "taskxy": [0.8469716310501099, 0.107193224132061], "dest": [0.8469716567993164, 0.10500000149011612]}
++{"seed": 398, "success": true, "steps": 116, "seconds": 1.07, "phase": "place", "task": "target_block", "robot": [1.1266947984695435, 0.43454593420028687], "taskxy": [1.0583785772323608, 0.10500001162290573], "dest": [1.058378685593605, 0.10500000149011612]}
++{"seed": 399, "success": true, "steps": 160, "seconds": 1.31, "phase": "place", "task": "target_block", "robot": [1.074883222579956, 0.46000000834465027], "taskxy": [1.0180078744888306, 0.12211591005325317], "dest": [1.0180077810287476, 0.10500000149011612]}
++{"seed": 400, "success": true, "steps": 122, "seconds": 1.03, "phase": "place", "task": "target_block", "robot": [1.3494116067886353, 0.42408624291419983], "taskxy": [1.2923473119735718, 0.10500000417232513], "dest": [1.2923473377227783, 0.10500000149011612]}
++{"seed": 401, "success": true, "steps": 96, "seconds": 0.6, "phase": "place", "task": "target_block", "robot": [0.9968143105506897, 0.5099999904632568], "taskxy": [0.9094895124435425, 0.1196649968624115], "dest": [0.9094894866943359, 0.10500000149011612]}
++{"seed": 402, "success": true, "steps": 173, "seconds": 1.37, "phase": "place", "task": "target_block", "robot": [0.25376230478286743, 0.4841252267360687], "taskxy": [0.18817047774791718, 0.10499993711709976], "dest": [0.18817048180103302, 0.10500000149011612]}
++{"seed": 403, "success": true, "steps": 49, "seconds": 0.33, "phase": "place", "task": "target_block", "robot": [1.2087756395339966, 0.48637619614601135], "taskxy": [1.1544865369796753, 0.10500000417232513], "dest": [1.1544865627288818, 0.10500000149011612]}
++{"seed": 404, "success": true, "steps": 110, "seconds": 0.88, "phase": "place", "task": "target_block", "robot": [1.2266795635223389, 0.4599999785423279], "taskxy": [1.183605432510376, 0.11132096499204636], "dest": [1.183605339050293, 0.10500000149011612]}
++{"seed": 405, "success": true, "steps": 53, "seconds": 0.35, "phase": "place", "task": "target_block", "robot": [0.30883678793907166, 0.46000000834465027], "taskxy": [0.2701936960220337, 0.11215289682149887], "dest": [0.27019365060329437, 0.10500000149011612]}
++{"seed": 406, "success": true, "steps": 114, "seconds": 0.88, "phase": "place", "task": "target_block", "robot": [1.0068823099136353, 0.3726465702056885], "taskxy": [0.9335246682167053, 0.10500000417232513], "dest": [0.9335246343612671, 0.10500000149011612]}
++{"seed": 407, "success": true, "steps": 46, "seconds": 0.23, "phase": "place", "task": "target_block", "robot": [0.49152159690856934, 0.5099999904632568], "taskxy": [0.4177647829055786, 0.11976788192987442], "dest": [0.41776478695869446, 0.10500000149011612]}
++{"seed": 408, "success": true, "steps": 42, "seconds": 0.28, "phase": "place", "task": "target_block", "robot": [1.4128938913345337, 0.38593870401382446], "taskxy": [1.343496561050415, 0.10499999672174454], "dest": [1.3434965867996216, 0.10500000149011612]}
++{"seed": 409, "success": true, "steps": 51, "seconds": 0.28, "phase": "place", "task": "target_block", "robot": [0.9631754755973816, 0.5181084275245667], "taskxy": [0.9129404425621033, 0.10500003397464752], "dest": [0.9129405658245087, 0.10500000149011612]}
++{"seed": 410, "success": true, "steps": 110, "seconds": 0.76, "phase": "place", "task": "target_block", "robot": [1.2863388061523438, 0.43366649746894836], "taskxy": [1.199735403060913, 0.10499995946884155], "dest": [1.19973530960083, 0.10500000149011612]}
++{"seed": 411, "success": true, "steps": 46, "seconds": 0.24, "phase": "place", "task": "target_block", "robot": [1.237841010093689, 0.5195780396461487], "taskxy": [1.154388427734375, 0.10500001907348633], "dest": [1.1543883870840073, 0.10500000149011612]}
++{"seed": 412, "success": true, "steps": 104, "seconds": 0.55, "phase": "place", "task": "target_block", "robot": [0.40534552931785583, 0.5183286666870117], "taskxy": [0.34775203466415405, 0.10500004887580872], "dest": [0.3477520861029625, 0.10500000149011612]}
++{"seed": 413, "success": true, "steps": 44, "seconds": 0.12, "phase": "place", "task": "target_block", "robot": [0.6949586272239685, 0.4099999666213989], "taskxy": [0.6593862771987915, 0.11419090628623962], "dest": [0.6593862433433533, 0.10500000149011612]}
++{"seed": 414, "success": true, "steps": 114, "seconds": 0.33, "phase": "place", "task": "target_block", "robot": [0.78714519739151, 0.4100000262260437], "taskxy": [0.7129248976707458, 0.1066809669137001], "dest": [0.7129248719215393, 0.10500000149011612]}
++{"seed": 415, "success": true, "steps": 114, "seconds": 0.31, "phase": "place", "task": "target_block", "robot": [1.3313018083572388, 0.5099999904632568], "taskxy": [1.254622220993042, 0.10837230086326599], "dest": [1.254622127532959, 0.10500000149011612]}
++{"seed": 416, "success": true, "steps": 99, "seconds": 0.27, "phase": "place", "task": "target_block", "robot": [0.5655575394630432, 0.48688700795173645], "taskxy": [0.506436288356781, 0.10499997437000275], "dest": [0.5064363222122192, 0.10500000149011612]}
++{"seed": 417, "success": true, "steps": 48, "seconds": 0.12, "phase": "place", "task": "target_block", "robot": [0.4717937409877777, 0.4889780282974243], "taskxy": [0.37312066555023193, 0.10500001907348633], "dest": [0.3731206547021866, 0.10500000149011612]}
++{"seed": 418, "success": true, "steps": 34, "seconds": 0.11, "phase": "place", "task": "target_block", "robot": [0.30147528648376465, 0.5110160112380981], "taskxy": [0.22236646711826324, 0.10499999672174454], "dest": [0.2223664562702179, 0.10500000149011612]}
++{"seed": 419, "success": true, "steps": 42, "seconds": 0.13, "phase": "place", "task": "target_block", "robot": [0.5558983683586121, 0.47383809089660645], "taskxy": [0.5161226391792297, 0.10500001907348633], "dest": [0.5161226310133934, 0.10500000149011612]}
++{"seed": 420, "success": true, "steps": 92, "seconds": 0.25, "phase": "place", "task": "target_block", "robot": [1.0016852617263794, 0.46000000834465027], "taskxy": [0.9752458333969116, 0.12035991251468658], "dest": [0.9752458591461182, 0.10500000149011612]}
++{"seed": 421, "success": true, "steps": 61, "seconds": 0.15, "phase": "place", "task": "target_block", "robot": [0.7292649149894714, 0.5099999904632568], "taskxy": [0.6377012133598328, 0.10799118876457214], "dest": [0.6377012621164322, 0.10500000149011612]}
++{"seed": 422, "success": true, "steps": 53, "seconds": 0.15, "phase": "place", "task": "target_block", "robot": [1.217798113822937, 0.4862258732318878], "taskxy": [1.1851561069488525, 0.10500000417232513], "dest": [1.185156132698059, 0.10500000149011612]}
++{"seed": 423, "success": true, "steps": 53, "seconds": 0.14, "phase": "place", "task": "target_block", "robot": [0.2538324296474457, 0.5099999904632568], "taskxy": [0.20377209782600403, 0.1060633733868599], "dest": [0.20377211645245552, 0.10500000149011612]}
++{"seed": 424, "success": true, "steps": 46, "seconds": 0.12, "phase": "place", "task": "target_block", "robot": [0.8263397216796875, 0.4099999964237213], "taskxy": [0.7333964705467224, 0.12397715449333191], "dest": [0.733396534204483, 0.10500000149011612]}
++{"seed": 425, "success": true, "steps": 51, "seconds": 0.13, "phase": "place", "task": "target_block", "robot": [1.0872663259506226, 0.4733668565750122], "taskxy": [1.0078121423721313, 0.10499993711709976], "dest": [1.0078121017217636, 0.10500000149011612]}
++{"seed": 426, "success": true, "steps": 41, "seconds": 0.15, "phase": "place", "task": "target_block", "robot": [1.1259393692016602, 0.48864486813545227], "taskxy": [1.058435082435608, 0.10499997437000275], "dest": [1.058434988975525, 0.10500000149011612]}
++{"seed": 427, "success": true, "steps": 94, "seconds": 0.28, "phase": "place", "task": "target_block", "robot": [1.1728700399398804, 0.43867042660713196], "taskxy": [1.1356995105743408, 0.10499995946884155], "dest": [1.1356995363235474, 0.10500000149011612]}
++{"seed": 428, "success": true, "steps": 51, "seconds": 0.13, "phase": "place", "task": "target_block", "robot": [1.1063966751098633, 0.38594019412994385], "taskxy": [1.0149590969085693, 0.10499999672174454], "dest": [1.0149590034484863, 0.10500000149011612]}
++{"seed": 429, "success": true, "steps": 60, "seconds": 0.16, "phase": "place", "task": "target_block", "robot": [0.8236263394355774, 0.37104350328445435], "taskxy": [0.7275202870368958, 0.10499998182058334], "dest": [0.727520246386528, 0.10500000149011612]}
++{"seed": 430, "success": true, "steps": 44, "seconds": 0.14, "phase": "place", "task": "target_block", "robot": [0.514426052570343, 0.5099999904632568], "taskxy": [0.47870147228240967, 0.12264573574066162], "dest": [0.47870141673088074, 0.10500000149011612]}
++{"seed": 431, "success": true, "steps": 106, "seconds": 0.31, "phase": "place", "task": "target_block", "robot": [0.36169353127479553, 0.5099999904632568], "taskxy": [0.29767850041389465, 0.12272898107767105], "dest": [0.2976784698963165, 0.10500000149011612]}
++{"seed": 432, "success": true, "steps": 38, "seconds": 0.13, "phase": "place", "task": "target_block", "robot": [0.886044442653656, 0.4739563465118408], "taskxy": [0.846439778804779, 0.10500000417232513], "dest": [0.8464398227930069, 0.10500000149011612]}
++{"seed": 433, "success": true, "steps": 53, "seconds": 0.15, "phase": "place", "task": "target_block", "robot": [0.7844719290733337, 0.46000000834465027], "taskxy": [0.7369139194488525, 0.11384446173906326], "dest": [0.7369138638973236, 0.10500000149011612]}
++{"seed": 434, "success": true, "steps": 47, "seconds": 0.15, "phase": "place", "task": "target_block", "robot": [1.186089038848877, 0.43385952711105347], "taskxy": [1.14407217502594, 0.10499998927116394], "dest": [1.1440721384882926, 0.10500000149011612]}
++{"seed": 435, "success": true, "steps": 103, "seconds": 0.3, "phase": "place", "task": "target_block", "robot": [0.7736154198646545, 0.46176329255104065], "taskxy": [0.6938204765319824, 0.10499998182058334], "dest": [0.6938204507827759, 0.10500000149011612]}
++{"seed": 436, "success": true, "steps": 140, "seconds": 0.43, "phase": "place", "task": "target_block", "robot": [0.5325717329978943, 0.5100000500679016], "taskxy": [0.45083412528038025, 0.1119426041841507], "dest": [0.4508340995311737, 0.10500000149011612]}
+diff --git a/test_counts_scene_v2.jsonl b/test_counts_scene_v2.jsonl
+index f6ec3d5..d8fcd13 100644
+--- a/test_counts_scene_v2.jsonl
++++ b/test_counts_scene_v2.jsonl
+@@ -27,3 +27,5 @@
+ {"count": 4, "seed": 26, "steps": 165, "success": true, "seconds": 2.18}
+ {"count": 4, "seed": 27, "steps": 169, "success": true, "seconds": 2.28}
+ {"count": 4, "seed": 28, "steps": 174, "success": true, "seconds": 2.47}
++{"count": 4, "seed": 29, "steps": 105, "success": true, "seconds": 3.38}
++{"count": 4, "seed": 30, "steps": 168, "success": true, "seconds": 5.26}
+diff --git a/test_counts_scene_v2.log b/test_counts_scene_v2.log
+index f6ec3d5..d8fcd13 100644
+--- a/test_counts_scene_v2.log
++++ b/test_counts_scene_v2.log
+@@ -27,3 +27,5 @@
+ {"count": 4, "seed": 26, "steps": 165, "success": true, "seconds": 2.18}
+ {"count": 4, "seed": 27, "steps": 169, "success": true, "seconds": 2.28}
+ {"count": 4, "seed": 28, "steps": 174, "success": true, "seconds": 2.47}
++{"count": 4, "seed": 29, "steps": 105, "success": true, "seconds": 3.38}
++{"count": 4, "seed": 30, "steps": 168, "success": true, "seconds": 5.26}

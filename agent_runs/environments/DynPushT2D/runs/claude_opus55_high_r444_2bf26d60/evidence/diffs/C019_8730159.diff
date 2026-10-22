@@ -1,0 +1,110 @@
+diff --git a/approach.py b/approach.py
+index 1528ee2..e6506f5 100644
+--- a/approach.py
++++ b/approach.py
+@@ -167,6 +167,9 @@ class GeneratedApproach:
+         self.infl = R_ROBOT + 0.015
+         self.wall_margin = 0.01
+         self.stuck_rate = 1e-3
++        self.stage = 0
++        self.pre_clear = 0.035
++        self.final_infl = R_ROBOT + 0.008
+         self.sub_clear = 1.0
+         self.H2 = 30
+         self.H = 40
+@@ -266,7 +269,7 @@ class GeneratedApproach:
+         pre = sw - dw * 0.12
+         ds = dist_to_T_local(to_local(sw, pose), self.model.rects)
+         dp = dist_to_T_local(to_local(pre, pose), self.model.rects)
+-        ok &= (ds > R_ROBOT + 0.005) & (dp > R_ROBOT + 0.035)
++        ok &= (ds > R_ROBOT + 0.005) & (dp > R_ROBOT + self.pre_clear)
+         ok &= np.all((pre > WALL_LO + R_ROBOT + 0.02) & (pre < WALL_HI - R_ROBOT - 0.02), 1)
+         ok |= here
+         if self.blacklist:
+@@ -287,7 +290,10 @@ class GeneratedApproach:
+         HERE = np.concatenate([here] * len(speeds))
+         SP = np.repeat(np.array(speeds), ns)
+         N = len(SW)
+-        travel = np.where(HERE, 0.0, self.travel_est(robot, PRE, pose) + 0.12 / MAXD)
++        if self.stage:
++            travel = np.where(HERE, 0.0, self.travel_est(robot, PRE, pose) + 0.12 / MAXD)
++        else:
++            travel = np.where(HERE, 0.0, self.travel_est(robot, SW, pose))
+         cur = np.repeat(pose[None], N, 0)
+         rob = SW.copy()
+         bestscore = np.full(N, -np.inf)
+@@ -389,12 +395,13 @@ class GeneratedApproach:
+         ok = np.all((nodes > WALL_LO + R_ROBOT + 0.01) & (nodes < WALL_HI - R_ROBOT - 0.01), 1)
+         return nodes[ok]
+ 
+-    def _seg_free(self, P, Q, pose, ns=24):
++    def _seg_free(self, P, Q, pose, ns=24, infl=None):
+         """Vectorized: segments P[i]->Q[i] free of inflated T."""
++        infl = self.infl if infl is None else infl
+         ts = np.linspace(0, 1, ns)
+         pts = P[:, None, :] + ts[None, :, None] * (Q - P)[:, None, :]
+         dd = dist_to_T_local(to_local(pts.reshape(-1, 2), pose), self.model.rects).reshape(len(P), ns)
+-        return np.all(dd > self.infl - 1e-6, 1)
++        return np.all(dd > infl - 1e-6, 1)
+ 
+     def travel_est(self, robot, pts, pose):
+         """Travel steps from robot to each pt via visibility graph around block."""
+@@ -425,14 +432,15 @@ class GeneratedApproach:
+             dist = np.minimum(dist, dist[u] + D[u])
+         N = len(pts)
+         direct = np.hypot(*(pts - robot).T)
+-        dfree = self._seg_free(np.repeat(robot[None], N, 0), pts, pose)
++        tinf = self.final_infl if self.stage == 0 else self.infl
++        dfree = self._seg_free(np.repeat(robot[None], N, 0), pts, pose, infl=tinf)
+         if r0 <= self.infl:
+             dfree |= True  # handled by staging (robot adjacent) - approximate
+         best = np.where(dfree, direct, np.inf)
+         if K > 0:
+             PP = np.repeat(nodes, N, 0)
+             QQ = np.tile(pts, (K, 1))
+-            f = self._seg_free(PP, QQ, pose).reshape(K, N)
++            f = self._seg_free(PP, QQ, pose, infl=tinf).reshape(K, N)
+             dn = np.hypot(*(PP - QQ).T).reshape(K, N)
+             via = np.where(f, dist[1:, None] + dn, np.inf).min(0)
+             best = np.minimum(best, via)
+@@ -445,13 +453,15 @@ class GeneratedApproach:
+         infl = self.infl
+         rects = self.model.rects
+ 
+-        def free_seg(p, q):
++        tinf = self.final_infl
++
++        def free_seg(p, q, tol=infl):
+             pl = to_local(np.array([p, q]), pose)
+             ts = np.linspace(0, 1, max(2, int(np.linalg.norm(q - p) / 0.02) + 2))
+             pts = pl[0] + ts[:, None] * (pl[1] - pl[0])
+-            return np.all(dist_to_T_local(pts, rects) > infl - 1e-6)
++            return np.all(dist_to_T_local(pts, rects) > tol - 1e-6)
+ 
+-        if free_seg(robot, target):
++        if free_seg(robot, target, tinf):
+             return [target]
+         nodes = list(self._nodes(pose))
+         pts = [np.asarray(robot)] + nodes + [np.asarray(target)]
+@@ -469,7 +479,8 @@ class GeneratedApproach:
+             for v in range(n):
+                 if v == u:
+                     continue
+-                if not free_seg(pts[u], pts[v]) and not (u == 0 and self._escape_ok(pts[u], pts[v], pose)):
++                tol = tinf if v == n - 1 else infl
++                if not free_seg(pts[u], pts[v], tol) and not (u == 0 and self._escape_ok(pts[u], pts[v], pose)):
+                     continue
+                 nd = d + np.linalg.norm(pts[v] - pts[u])
+                 if nd < dist[v]:
+@@ -561,7 +572,10 @@ class GeneratedApproach:
+                 if here:
+                     self.path = []
+                 else:
+-                    self.path = self.nav_path(robot, st - dn * 0.12, pose) + [st]
++                    if self.stage:
++                        self.path = self.nav_path(robot, st - dn * 0.12, pose) + [st]
++                    else:
++                        self.path = self.nav_path(robot, st, pose)
+                 self.plan_pose = pose.copy()
+                 self.mode = "nav"
+             if self.mode == "nav":

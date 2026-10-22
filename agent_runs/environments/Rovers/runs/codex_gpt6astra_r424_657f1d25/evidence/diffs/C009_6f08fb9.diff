@@ -1,0 +1,26 @@
+diff --git a/approach.py b/approach.py
+index ac5c7f3..37b0767 100644
+--- a/approach.py
++++ b/approach.py
+@@ -155,7 +155,7 @@ class GeneratedApproach:
+                 old_task, old_p, old_op, old_count = last
+                 failed = ((old_op == -.5 and s.get(rob,'calibrated')<.5) or
+                           (old_op == -1/6 and self.result_count(s,r)<=old_count) or
+-                          (old_op == .5 and self.pending(s,r)))
++                          (old_op == .5 and old_task[0]=='send' and self.pending(s,r)))
+                 if failed and task==old_task and task[0] in ('image','send'):
+                     self.masks[task] &= np.linalg.norm(self.points-p,axis=1)>.22
+                     self.paths[r],_=self.route(p,self.masks[task],pos[1-r])
+@@ -190,7 +190,8 @@ class GeneratedApproach:
+             elif kind=='image' and self.visible(q[None,:],self.xy(s,self.objectives[k]),1.99)[0]:
+                 op=-1/6 if s.get(rob,'calibrated')>.5 else -.5
+                 if path and np.linalg.norm(q-path[-1])>.06 and last is not None and last[0]==task and last[2] in (-.5,-1/6):op=0.
+-            elif kind=='send' and self.visible(q[None,:],self.lander,3.99)[0]:op=.5
++            elif kind=='send' and self.visible(q[None,:],self.lander,3.99)[0]:
++                op=.5
+                 if path and np.linalg.norm(q-path[-1])>.06:op=0.
+             if op==0 and s.get(rob,'store_full')>.5:op=5/6
+             elif op==0 and self.pending(s,r) and self.visible(q[None,:],self.lander,3.99)[0]:op=.5
+diff --git a/test_results.txt b/test_results.txt
+new file mode 100644
+index 0000000..e69de29

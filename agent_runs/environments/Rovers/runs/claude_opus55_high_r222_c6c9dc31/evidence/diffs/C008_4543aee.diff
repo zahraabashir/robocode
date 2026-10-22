@@ -1,0 +1,67 @@
+diff --git a/approach.py b/approach.py
+index c7617ea..f367f0f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -100,6 +100,7 @@ class GeneratedApproach:
+         self.expect = None
+         self.nreplan = 0
+         self.plan_time = 0.0
++        self.log = []
+         self._plan(state)
+ 
+     # --------------------------------------------------------------- planning
+@@ -596,21 +597,26 @@ class GeneratedApproach:
+             x = self._get(state, o, "x"); y = self._get(state, o, "y")
+             if abs(x - ex) > 1e-3 or abs(y - ey) > 1e-3:
+                 self.bad_points.append((ex, ey))
++                self.log.append(("move", r, round(ex, 3), round(ey, 3)))
+                 return True
+             store, cal, imgs, recv = self._snapshot(state, r)
+             if op.startswith("sample") and store < 0.5:
++                self.log.append(("sample", r, op, round(x, 3), round(y, 3)))
+                 return True
+             if op.startswith("sample:"):
+                 soil = 1.0 if op[7:] == "soil" else 0.0
+                 if not any(self._get(state, sm, "analyzed_" + r) > 0.5 for sm in self.w.samples
+                            if abs(self._get(state, sm, "is_soil") - soil) < 0.5):
++                    self.log.append(("samplekind", r, op, round(x, 3), round(y, 3)))
+                     return True
+             if op == "calibrate" and cal < 0.5:
+                 self.bad_view[r].append((x, y))
++                self.log.append(("calib", r, round(x, 3), round(y, 3)))
+                 return True
+             if op.startswith("image:"):
+                 tgt = [ob for ob in self.w.objectives if ob.name == op[6:]][0]
+                 if self._get(state, tgt, "have_image_" + r) < 0.5:
++                    self.log.append(("image", r, op, round(x, 3), round(y, 3), imgs > snap[2]))
+                     if imgs <= snap[2]:
+                         self.bad_view[r].append((x, y))
+                     return True
+@@ -619,6 +625,7 @@ class GeneratedApproach:
+                 return True
+             if op == "send" and recv <= snap[3] and self._unsent(state, r):
+                 self.bad_send[r].append((x, y))
++                self.log.append(("send", r, round(x, 3), round(y, 3)))
+                 return True
+         return False
+ 
+diff --git a/batch.py b/batch.py
+index 603fb7f..886e443 100644
+--- a/batch.py
++++ b/batch.py
+@@ -11,12 +11,12 @@ def run(seed):
+     while not term and steps < 300:
+         a = ap.get_action(obs); obs, r, term, trunc, info = env.step(a); steps += 1
+     env.close()
+-    return seed, info.get('object_count'), steps, term, ap.nreplan, time.time()-t0
++    return ap.log, seed, info.get('object_count'), steps, term, ap.nreplan, time.time()-t0
+ if __name__=='__main__':
+     a,b=int(sys.argv[1]),int(sys.argv[2])
+     with ProcessPoolExecutor(8) as ex:
+         res=list(ex.map(run, range(a,b)))
+     import numpy as np
+     for r in res:
+-        if not r[3] or r[4]>0 or r[5]>10: print(r)
+-    print('solved',sum(r[3] for r in res),'/',len(res),'mean steps',np.mean([r[2] for r in res]), 'max time', max(r[5] for r in res))
++        if not r[4] or r[5]>0 or r[6]>10: print(r)
++    print('solved',sum(r[4] for r in res),'/',len(res),'mean steps',np.mean([r[3] for r in res]), 'max time', max(r[6] for r in res))

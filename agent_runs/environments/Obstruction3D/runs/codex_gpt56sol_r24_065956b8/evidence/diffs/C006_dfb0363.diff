@@ -1,0 +1,50 @@
+diff --git a/probe_dynamics.py b/probe_dynamics.py
+index 00100ef..0930c4e 100644
+--- a/probe_dynamics.py
++++ b/probe_dynamics.py
+@@ -27,6 +27,13 @@ def main():
+         obj = state.get_object_from_name(name)
+         print("object", name, "type", getattr(obj, "type", None), "repr", repr(obj))
+     print("robot baseline", dict(zip(ROBOT_FEATURES, robot_values(state))))
++    cuboid_features = (
++        "pose_x", "pose_y", "pose_z", "pose_qx", "pose_qy", "pose_qz", "pose_qw",
++        "grasp_active", "object_type", "half_extent_x", "half_extent_y", "half_extent_z",
++    )
++    for name in sorted(n for n in state.get_object_names() if n != "robot"):
++        obj = state.get_object_from_name(name)
++        print("cuboid", name, {f: state.get(obj, f) for f in cuboid_features})
+     env.close()
+ 
+     # Independent one-step effects from exactly the same initial state.
+@@ -47,6 +54,31 @@ def main():
+               "reward/done", reward, terminated, truncated)
+         env.close()
+ 
++    env = make_env()
++    for label, action_i, magnitude in (
++        ("base_x_negative", 0, -0.2),
++        ("base_y_negative", 1, -0.2),
++        ("base_rot_negative", 2, -0.2),
++        ("close", 10, -1.0),
++    ):
++        before, _ = env.reset(seed=0)
++        b = robot_values(before)
++        action = np.zeros(11, dtype=np.float32)
++        action[action_i] = magnitude
++        after, reward, terminated, truncated, _ = env.step(action)
++        a = robot_values(after)
++        changed = {
++            feature: round(float(delta), 7)
++            for feature, delta in zip(ROBOT_FEATURES, a - b)
++            if abs(delta) > 1e-7
++        }
++        print(label, changed, "robot", dict(zip(ROBOT_FEATURES, a)))
++        for name in sorted(n for n in after.get_object_names() if n != "robot"):
++            obj = after.get_object_from_name(name)
++            if after.get(obj, "grasp_active"):
++                print("grasped", name)
++    env.close()
++
+     # Cumulative response and any action clipping / rate effects.
+     for action_i in range(10):
+         env = make_env()

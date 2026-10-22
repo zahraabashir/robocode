@@ -1,0 +1,396 @@
+diff --git a/approach.py b/approach.py
+index 50cdb85..1d2c701 100644
+--- a/approach.py
++++ b/approach.py
+@@ -182,7 +182,7 @@ class GeneratedApproach:
+         near = [(n, b) for n, b in objs.items() if n != o.name and n != 'target_region'
+                 and np.linalg.norm(b.p[:2] - o.p[:2]) < 0.16]
+         z_lo = o.bottom + 0.044
+-        z_hi = o.top + 0.027
++        z_hi = o.top + 0.028
+         if z_hi < z_lo:
+             z_hi = z_lo = 0.5 * (z_lo + z_hi)
+         zs = [min(0.5 * (z_lo + z_hi), z_lo + 0.012)]
+@@ -201,14 +201,16 @@ class GeneratedApproach:
+             sds = np.linspace(-smax, smax, 7) if smax > 0 else [0.0]
+             sas = np.linspace(-amax, amax, 7) if amax > 0 else [0.0]
+             for zi, zg in enumerate(zs):
+-                tip = zg - 0.035
+-                rel = [(n, b) for n, b in near if b.top > tip]
++                tip = zg - 0.0315
++                rel = [(n, b) for n, b in near if b.top > zg - 0.042]
+                 for sd in sds:
+                     for sa in sas:
+                         x, y = o.p[:2] + sd * d + sa * a
+-                        boxes = self._finger_boxes(x, y, yaw) + [(np.array([x, y]), d, a, 0.043, 0.011)]
++                        fboxes = self._finger_boxes(x, y, yaw)
++                        sbox = (np.array([x, y]), d, a, 0.043, 0.011)
+                         blockers = []
+                         for n, b in rel:
++                            boxes = ([sbox] + fboxes) if b.top > tip else [sbox]
+                             for box in boxes:
+                                 if self._box_hits_obj(box, b):
+                                     blockers.append(n)
+@@ -237,6 +239,8 @@ class GeneratedApproach:
+         self.blocked = 0
+         self.last_q = None
+         self.fail_count = {}
++        self.bad_spots = []
++        self.last_spot = None
+         self.steps = 0
+         self.plans_made = 0
+         self.aborting = False
+@@ -358,7 +362,9 @@ class GeneratedApproach:
+         for x in np.arange(TABLE_X[0] + fp[0], TABLE_X[1] - fp[0], 0.02):
+             for y in np.arange(TABLE_Y[0] + fp[1], TABLE_Y[1] - fp[1], 0.02):
+                 p = np.array([x, y])
+-                cost = np.linalg.norm(p - cur)
++                cost = np.linalg.norm(p - cur) + 2.0 * max(0.0, 0.2 - x)
++                if any(np.linalg.norm(p - bs) < 0.035 for bs in self.bad_spots):
++                    continue
+                 if best is not None and cost >= best[0]:
+                     continue
+                 ok = True
+@@ -475,6 +481,7 @@ class GeneratedApproach:
+             clear = self._to_clear(objs)
+             reg = objs['target_region']
+             if held == 'target_block' and not clear:
++                self.last_spot = None
+                 self._plan_place(state, held, reg.p[:2], reg.top, reg.yaw)
+                 return
+             G = self._G(state)
+@@ -483,6 +490,7 @@ class GeneratedApproach:
+             spot = self._free_spot(o, objs, tool_yaw)
+             if spot is None:
+                 spot = o.p[:2]
++            self.last_spot = np.array(spot, float)
+             self._plan_place(state, held, spot, TABLE_TOP, o.yaw)
+             return
+         best = self._pick_target(objs)
+@@ -498,6 +506,8 @@ class GeneratedApproach:
+     def _abort(self, state):
+         """blocked: retreat straight up and replan."""
+         self.fail_count[self.current] = self.fail_count.get(self.current, 0) + 1
++        if self.last_spot is not None and float(state.get(self.robot, 'grasp_active')) > 0.5:
++            self.bad_spots.append(self.last_spot)
+         q = self._q(state)
+         T = self._tool(q)
+         p0 = T[:3, 3]
+diff --git a/d101.txt b/d101.txt
+index 3595e87..5186adf 100644
+--- a/d101.txt
++++ b/d101.txt
+@@ -9,17 +9,17 @@ obstruction7 [ 0.286 -0.17   0.107] [0.014 0.012 0.022]
+ obstruction8 [ 0.478 -0.016  0.099] [0.014 0.014 0.024]
+ target_block [ 0.419 -0.102  0.1  ] [0.039 0.025 0.025]
+ target_region [ 0.328 -0.152  0.08 ] [0.048 0.031 0.005]
+-step 1 task obstruction0 grasp 0.0 plan 11 fails {} tool [0.154 0.001 0.217] end [ 0.279 -0.124  0.16 ]
+-step 7 task obstruction0 grasp 1.0 plan 17 fails {} tool [ 0.279 -0.124  0.16 ] end [ 0.282 -0.022  0.152]
+-step 14 task obstruction2 grasp 0.0 plan 14 fails {} tool [ 0.282 -0.022  0.152] end [ 0.306 -0.119  0.141]
+-step 23 task obstruction2 grasp 1.0 plan 19 fails {} tool [ 0.306 -0.119  0.141] end [ 0.303 -0.282  0.133]
+-step 31 task obstruction1 grasp 0.0 plan 16 fails {} tool [ 0.303 -0.282  0.133] end [ 0.328 -0.161  0.141]
+-step 40 task obstruction1 grasp 1.0 plan 18 fails {} tool [ 0.328 -0.161  0.141] end [ 0.384 -0.286  0.133]
+-step 47 task obstruction3 grasp 0.0 plan 16 fails {} tool [ 0.384 -0.286  0.133] end [ 0.376 -0.176  0.141]
+-step 56 task obstruction3 grasp 1.0 plan 18 fails {} tool [ 0.376 -0.176  0.141] end [ 0.369 -0.344  0.133]
+-step 63 task obstruction7 grasp 0.0 plan 14 fails {} tool [ 0.369 -0.344  0.133] end [ 0.286 -0.17   0.141]
++step 1 task obstruction2 grasp 0.0 plan 11 fails {} tool [0.154 0.001 0.217] end [ 0.325 -0.1    0.166]
++step 6 task obstruction2 grasp 1.0 plan 17 fails {} tool [ 0.325 -0.1    0.166] end [ 0.282 -0.003  0.157]
++step 13 task obstruction0 grasp 0.0 plan 14 fails {} tool [ 0.282 -0.003  0.157] end [ 0.279 -0.124  0.141]
++step 22 task obstruction0 grasp 1.0 plan 17 fails {} tool [ 0.279 -0.124  0.141] end [ 0.182 -0.122  0.133]
++step 29 task obstruction1 grasp 0.0 plan 16 fails {} tool [ 0.182 -0.122  0.133] end [ 0.328 -0.161  0.141]
++step 40 task obstruction1 grasp 1.0 plan 18 fails {} tool [ 0.328 -0.161  0.141] end [ 0.324 -0.286  0.133]
++step 47 task obstruction3 grasp 0.0 plan 16 fails {} tool [ 0.324 -0.286  0.133] end [ 0.376 -0.176  0.141]
++step 56 task obstruction3 grasp 1.0 plan 17 fails {} tool [ 0.376 -0.176  0.141] end [ 0.429 -0.284  0.133]
++step 62 task obstruction7 grasp 0.0 plan 14 fails {} tool [ 0.429 -0.284  0.133] end [ 0.286 -0.17   0.141]
+ step 72 task obstruction7 grasp 1.0 plan 17 fails {} tool [ 0.286 -0.17   0.141] end [ 0.264 -0.288  0.133]
+ step 79 task target_block grasp 0.0 plan 17 fails {} tool [ 0.264 -0.288  0.133] end [ 0.419 -0.102  0.131]
+ step 86 task target_block grasp 1.0 plan 17 fails {} tool [ 0.419 -0.102  0.131] end [ 0.328 -0.152  0.143]
+ SOLVED 93
+-time 6.1811769008636475
++time 5.5087926387786865
+diff --git a/d113.txt b/d113.txt
+index f586687..06ff0fb 100644
+--- a/d113.txt
++++ b/d113.txt
+@@ -9,111 +9,15 @@ obstruction7 [ 0.359 -0.018  0.113] [0.017 0.018 0.028]
+ obstruction8 [ 0.22  -0.148  0.087] [0.015 0.018 0.012]
+ target_block [ 0.299 -0.251  0.1  ] [0.018 0.02  0.025]
+ target_region [ 0.339 -0.03   0.08 ] [0.022 0.025 0.005]
+-step 1 task obstruction0 grasp 0.0 plan 13 fails {} tool [0.154 0.001 0.217] end [ 0.321 -0.043  0.141]
+-step 7 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 1} tool [ 0.321 -0.043  0.141] end [ 0.356 -0.053  0.162]
+-step 18 task obstruction7 grasp 0.0 plan 10 fails {'obstruction0': 1, 'obstruction5': 1} tool [ 0.356 -0.053  0.162] end [ 0.359 -0.004  0.141]
+-step 22 task obstruction0 grasp 0.0 plan 15 fails {'obstruction0': 1, 'obstruction5': 1, 'obstruction7': 1} tool [ 0.359 -0.004  0.141] end [ 0.321 -0.049  0.141]
+-step 32 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 2, 'obstruction5': 1, 'obstruction7': 1} tool [ 0.321 -0.049  0.141] end [ 0.356 -0.058  0.162]
+-step 42 task obstruction7 grasp 0.0 plan 10 fails {'obstruction0': 2, 'obstruction5': 2, 'obstruction7': 1} tool [ 0.356 -0.058  0.162] end [ 0.365 -0.004  0.141]
+-step 46 task obstruction0 grasp 0.0 plan 15 fails {'obstruction0': 2, 'obstruction5': 2, 'obstruction7': 2} tool [ 0.365 -0.004  0.141] end [ 0.321 -0.037  0.141]
+-step 55 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 3, 'obstruction5': 2, 'obstruction7': 2} tool [ 0.321 -0.037  0.141] end [ 0.363 -0.053  0.162]
+-step 65 task obstruction7 grasp 0.0 plan 10 fails {'obstruction0': 3, 'obstruction5': 3, 'obstruction7': 2} tool [ 0.363 -0.053  0.162] end [ 0.352 -0.004  0.141]
+-step 69 task obstruction0 grasp 0.0 plan 15 fails {'obstruction0': 3, 'obstruction5': 3, 'obstruction7': 3} tool [ 0.352 -0.004  0.141] end [ 0.314 -0.043  0.141]
+-step 78 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 4, 'obstruction5': 3, 'obstruction7': 3} tool [ 0.314 -0.043  0.141] end [ 0.35  -0.053  0.162]
+-step 88 task obstruction7 grasp 0.0 plan 10 fails {'obstruction0': 4, 'obstruction5': 4, 'obstruction7': 3} tool [ 0.35  -0.053  0.162] end [0.359 0.003 0.141]
+-step 92 task obstruction2 grasp 0.0 plan 15 fails {'obstruction0': 4, 'obstruction5': 4, 'obstruction7': 4} tool [0.359 0.003 0.141] end [ 0.314 -0.013  0.133]
+-ABORT step 100 tool [ 0.314 -0.013  0.191] q [-1.027  0.646 -1.526 -2.146 -0.721 -1.146 -3.765] target [-0.905  0.723 -1.7   -2.236 -0.884 -1.012 -3.645] tgt tool [ 0.314 -0.013  0.133]
+-step 101 task obstruction0 grasp 0.0 plan 11 fails {'obstruction0': 4, 'obstruction5': 4, 'obstruction7': 4, 'obstruction2': 1} tool [ 0.314 -0.013  0.25 ] end [ 0.321 -0.03   0.141]
+-step 105 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 5, 'obstruction5': 4, 'obstruction7': 4, 'obstruction2': 1} tool [ 0.321 -0.03   0.141] end [ 0.356 -0.062  0.162]
+-step 115 task obstruction7 grasp 0.0 plan 10 fails {'obstruction0': 5, 'obstruction5': 5, 'obstruction7': 4, 'obstruction2': 1} tool [ 0.356 -0.062  0.162] end [ 0.34  -0.011  0.141]
+-step 119 task obstruction2 grasp 0.0 plan 15 fails {'obstruction0': 5, 'obstruction5': 5, 'obstruction7': 5, 'obstruction2': 1} tool [ 0.34  -0.011  0.141] end [ 0.321 -0.026  0.133]
+-step 129 task obstruction0 grasp 0.0 plan 11 fails {'obstruction0': 5, 'obstruction5': 5, 'obstruction7': 5, 'obstruction2': 2} tool [ 0.321 -0.026  0.133] end [ 0.321 -0.056  0.141]
+-step 133 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 6, 'obstruction5': 5, 'obstruction7': 5, 'obstruction2': 2} tool [ 0.321 -0.056  0.141] end [ 0.363 -0.058  0.162]
+-step 143 task obstruction7 grasp 0.0 plan 10 fails {'obstruction0': 6, 'obstruction5': 6, 'obstruction7': 5, 'obstruction2': 2} tool [ 0.363 -0.058  0.162] end [ 0.346 -0.004  0.141]
+-step 147 task obstruction2 grasp 0.0 plan 15 fails {'obstruction0': 6, 'obstruction5': 6, 'obstruction7': 6, 'obstruction2': 2} tool [ 0.346 -0.004  0.141] end [ 0.314 -0.02   0.133]
+-step 157 task obstruction0 grasp 0.0 plan 11 fails {'obstruction0': 6, 'obstruction5': 6, 'obstruction7': 6, 'obstruction2': 3} tool [ 0.314 -0.02   0.133] end [ 0.314 -0.049  0.141]
+-step 161 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 7, 'obstruction5': 6, 'obstruction7': 6, 'obstruction2': 3} tool [ 0.314 -0.049  0.141] end [ 0.35  -0.058  0.162]
+-step 171 task obstruction7 grasp 0.0 plan 10 fails {'obstruction0': 7, 'obstruction5': 7, 'obstruction7': 6, 'obstruction2': 3} tool [ 0.35  -0.058  0.162] end [ 0.371 -0.004  0.141]
+-step 175 task obstruction2 grasp 0.0 plan 15 fails {'obstruction0': 7, 'obstruction5': 7, 'obstruction7': 7, 'obstruction2': 3} tool [ 0.371 -0.004  0.141] end [ 0.314 -0.007  0.133]
+-ABORT step 184 tool [ 0.314 -0.007  0.191] q [-0.863  1.258 -1.018 -2.144 -0.992 -1.827 -6.407] target [-0.849  1.363 -1.122 -2.235 -1.122 -1.779 -6.373] tgt tool [ 0.314 -0.007  0.133]
+-step 185 task obstruction0 grasp 0.0 plan 11 fails {'obstruction0': 7, 'obstruction5': 7, 'obstruction7': 7, 'obstruction2': 4} tool [ 0.314 -0.007  0.25 ] end [ 0.314 -0.037  0.141]
+-step 189 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 8, 'obstruction5': 7, 'obstruction7': 7, 'obstruction2': 4} tool [ 0.314 -0.037  0.141] end [ 0.344 -0.053  0.162]
+-step 199 task obstruction7 grasp 0.0 plan 10 fails {'obstruction0': 8, 'obstruction5': 8, 'obstruction7': 7, 'obstruction2': 4} tool [ 0.344 -0.053  0.162] end [0.365 0.003 0.141]
+-step 203 task obstruction2 grasp 0.0 plan 15 fails {'obstruction0': 8, 'obstruction5': 8, 'obstruction7': 8, 'obstruction2': 4} tool [0.365 0.003 0.141] end [ 0.308 -0.013  0.133]
+-ABORT step 212 tool [ 0.308 -0.013  0.191] q [-0.866  1.222 -1.035 -2.162 -0.972 -1.78  -6.396] target [-0.846  1.324 -1.144 -2.255 -1.106 -1.728 -6.354] tgt tool [ 0.308 -0.013  0.133]
+-step 213 task obstruction0 grasp 0.0 plan 11 fails {'obstruction0': 8, 'obstruction5': 8, 'obstruction7': 8, 'obstruction2': 5} tool [ 0.308 -0.013  0.25 ] end [ 0.307 -0.043  0.141]
+-step 217 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 9, 'obstruction5': 8, 'obstruction7': 8, 'obstruction2': 5} tool [ 0.307 -0.043  0.141] end [ 0.369 -0.053  0.162]
+-step 227 task obstruction7 grasp 0.0 plan 10 fails {'obstruction0': 9, 'obstruction5': 9, 'obstruction7': 8, 'obstruction2': 5} tool [ 0.369 -0.053  0.162] end [0.352 0.003 0.141]
+-step 231 task obstruction2 grasp 0.0 plan 12 fails {'obstruction0': 9, 'obstruction5': 9, 'obstruction7': 9, 'obstruction2': 5} tool [0.352 0.003 0.141] end [ 0.315 -0.013  0.133]
+-ABORT step 234 tool [ 0.315 -0.013  0.191] q [-0.987  0.908 -1.306 -2.144 -0.88  -1.409 -5.093] target [-0.923  0.987 -1.444 -2.235 -1.028 -1.311 -5.006] tgt tool [ 0.315 -0.013  0.133]
+-step 235 task obstruction0 grasp 0.0 plan 15 fails {'obstruction0': 9, 'obstruction5': 9, 'obstruction7': 9, 'obstruction2': 6} tool [ 0.315 -0.013  0.25 ] end [ 0.321 -0.062  0.141]
+-step 244 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 10, 'obstruction5': 9, 'obstruction7': 9, 'obstruction2': 6} tool [ 0.321 -0.062  0.141] end [ 0.363 -0.062  0.162]
+-step 254 task obstruction7 grasp 0.0 plan 11 fails {'obstruction0': 10, 'obstruction5': 10, 'obstruction7': 9, 'obstruction2': 6} tool [ 0.363 -0.062  0.162] end [ 0.359 -0.018  0.169]
+-step 264 task obstruction2 grasp 0.0 plan 10 fails {'obstruction0': 10, 'obstruction5': 10, 'obstruction7': 10, 'obstruction2': 6} tool [ 0.359 -0.018  0.169] end [ 0.321 -0.032  0.133]
+-step 268 task obstruction0 grasp 0.0 plan 11 fails {'obstruction0': 10, 'obstruction5': 10, 'obstruction7': 10, 'obstruction2': 7} tool [ 0.321 -0.032  0.133] end [ 0.321 -0.024  0.141]
+-step 272 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 11, 'obstruction5': 10, 'obstruction7': 10, 'obstruction2': 7} tool [ 0.321 -0.024  0.141] end [ 0.35  -0.062  0.162]
+-step 282 task obstruction7 grasp 0.0 plan 8 fails {'obstruction0': 11, 'obstruction5': 11, 'obstruction7': 10, 'obstruction2': 7} tool [ 0.35  -0.062  0.162] end [ 0.359 -0.018  0.169]
+-step 286 task obstruction2 grasp 0.0 plan 13 fails {'obstruction0': 11, 'obstruction5': 11, 'obstruction7': 11, 'obstruction2': 7} tool [ 0.359 -0.018  0.169] end [ 0.314 -0.026  0.133]
+-step 296 task obstruction0 grasp 0.0 plan 11 fails {'obstruction0': 11, 'obstruction5': 11, 'obstruction7': 11, 'obstruction2': 8} tool [ 0.314 -0.026  0.133] end [ 0.314 -0.03   0.141]
+-step 300 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 12, 'obstruction5': 11, 'obstruction7': 11, 'obstruction2': 8} tool [ 0.314 -0.03   0.141] end [ 0.369 -0.058  0.162]
+-step 310 task obstruction7 grasp 0.0 plan 10 fails {'obstruction0': 12, 'obstruction5': 12, 'obstruction7': 11, 'obstruction2': 8} tool [ 0.369 -0.058  0.162] end [ 0.378 -0.004  0.141]
+-step 314 task obstruction2 grasp 0.0 plan 15 fails {'obstruction0': 12, 'obstruction5': 12, 'obstruction7': 12, 'obstruction2': 8} tool [ 0.378 -0.004  0.141] end [ 0.314 -0.001  0.133]
+-ABORT step 323 tool [ 0.314 -0.001  0.191] q [-0.876  1.271 -1.006 -2.144 -0.994 -1.844 -6.417] target [-0.863  1.377 -1.109 -2.235 -1.124 -1.798 -6.385] tgt tool [ 0.314 -0.001  0.133]
+-step 324 task obstruction0 grasp 0.0 plan 12 fails {'obstruction0': 12, 'obstruction5': 12, 'obstruction7': 12, 'obstruction2': 9} tool [ 0.314 -0.001  0.25 ] end [ 0.314 -0.056  0.141]
+-step 328 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 13, 'obstruction5': 12, 'obstruction7': 12, 'obstruction2': 9} tool [ 0.314 -0.056  0.141] end [ 0.344 -0.058  0.162]
+-step 338 task obstruction7 grasp 0.0 plan 10 fails {'obstruction0': 13, 'obstruction5': 13, 'obstruction7': 12, 'obstruction2': 9} tool [ 0.344 -0.058  0.162] end [ 0.34  -0.004  0.141]
+-step 342 task obstruction2 grasp 0.0 plan 15 fails {'obstruction0': 13, 'obstruction5': 13, 'obstruction7': 13, 'obstruction2': 9} tool [ 0.34  -0.004  0.141] end [ 0.308 -0.02   0.133]
+-step 352 task obstruction0 grasp 0.0 plan 11 fails {'obstruction0': 13, 'obstruction5': 13, 'obstruction7': 13, 'obstruction2': 10} tool [ 0.308 -0.02   0.133] end [ 0.307 -0.049  0.141]
+-step 356 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 14, 'obstruction5': 13, 'obstruction7': 13, 'obstruction2': 10} tool [ 0.307 -0.049  0.141] end [ 0.375 -0.053  0.162]
+-step 366 task obstruction7 grasp 0.0 plan 10 fails {'obstruction0': 14, 'obstruction5': 14, 'obstruction7': 13, 'obstruction2': 10} tool [ 0.375 -0.053  0.162] end [0.371 0.003 0.141]
+-step 370 task obstruction2 grasp 0.0 plan 15 fails {'obstruction0': 14, 'obstruction5': 14, 'obstruction7': 14, 'obstruction2': 10} tool [0.371 0.003 0.141] end [ 0.308 -0.007  0.133]
+-ABORT step 379 tool [ 0.308 -0.007  0.191] q [-0.888  1.219 -1.037 -2.163 -0.971 -1.776 -6.418] target [-0.868  1.321 -1.147 -2.255 -1.105 -1.724 -6.376] tgt tool [ 0.308 -0.007  0.133]
+-step 380 task obstruction0 grasp 0.0 plan 11 fails {'obstruction0': 14, 'obstruction5': 14, 'obstruction7': 14, 'obstruction2': 11} tool [ 0.308 -0.007  0.25 ] end [ 0.307 -0.037  0.141]
+-step 384 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 15, 'obstruction5': 14, 'obstruction7': 14, 'obstruction2': 11} tool [ 0.307 -0.037  0.141] end [ 0.337 -0.053  0.162]
+-step 394 task obstruction7 grasp 0.0 plan 10 fails {'obstruction0': 15, 'obstruction5': 15, 'obstruction7': 14, 'obstruction2': 11} tool [ 0.337 -0.053  0.162] end [0.346 0.003 0.141]
+-step 398 task obstruction2 grasp 0.0 plan 15 fails {'obstruction0': 15, 'obstruction5': 15, 'obstruction7': 15, 'obstruction2': 11} tool [0.346 0.003 0.141] end [ 0.301 -0.013  0.133]
+-ABORT step 407 tool [ 0.301 -0.013  0.191] q [-0.888  1.187 -1.05  -2.181 -0.953 -1.735 -6.405] target [-0.863  1.286 -1.164 -2.275 -1.09  -1.679 -6.356] tgt tool [ 0.301 -0.013  0.133]
+-step 408 task obstruction0 grasp 0.0 plan 11 fails {'obstruction0': 15, 'obstruction5': 15, 'obstruction7': 15, 'obstruction2': 12} tool [ 0.301 -0.013  0.25 ] end [ 0.301 -0.043  0.141]
+-step 412 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 16, 'obstruction5': 15, 'obstruction7': 15, 'obstruction2': 12} tool [ 0.301 -0.043  0.141] end [ 0.369 -0.062  0.162]
+-step 422 task obstruction7 grasp 0.0 plan 11 fails {'obstruction0': 16, 'obstruction5': 16, 'obstruction7': 15, 'obstruction2': 12} tool [ 0.369 -0.062  0.162] end [ 0.359 -0.024  0.169]
+-step 432 task obstruction2 grasp 0.0 plan 13 fails {'obstruction0': 16, 'obstruction5': 16, 'obstruction7': 16, 'obstruction2': 12} tool [ 0.359 -0.024  0.169] end [ 0.315 -0.008  0.133]
+-ABORT step 440 tool [ 0.315 -0.008  0.191] q [-0.783  0.282 -2.139 -2.14  -0.312 -0.871 -2.736] target [-0.64   0.417 -2.265 -2.228 -0.503 -0.702 -2.552] tgt tool [ 0.315 -0.008  0.133]
+-step 441 task obstruction0 grasp 0.0 plan 15 fails {'obstruction0': 16, 'obstruction5': 16, 'obstruction7': 16, 'obstruction2': 13} tool [ 0.315 -0.008  0.25 ] end [ 0.314 -0.062  0.141]
+-step 450 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 17, 'obstruction5': 16, 'obstruction7': 16, 'obstruction2': 13} tool [ 0.314 -0.062  0.141] end [ 0.344 -0.062  0.162]
+-step 460 task obstruction7 grasp 0.0 plan 11 fails {'obstruction0': 17, 'obstruction5': 17, 'obstruction7': 16, 'obstruction2': 13} tool [ 0.344 -0.062  0.162] end [ 0.359 -0.011  0.169]
+-step 469 task obstruction2 grasp 0.0 plan 13 fails {'obstruction0': 17, 'obstruction5': 17, 'obstruction7': 17, 'obstruction2': 13} tool [ 0.359 -0.011  0.169] end [ 0.309 -0.013  0.133]
+-ABORT step 477 tool [ 0.309 -0.013  0.191] q [-1.028  0.773 -1.395 -2.162 -0.804 -1.268 -5.197] target [-0.934  0.846 -1.556 -2.253 -0.962 -1.149 -5.092] tgt tool [ 0.309 -0.013  0.133]
+-step 478 task obstruction0 grasp 0.0 plan 15 fails {'obstruction0': 17, 'obstruction5': 17, 'obstruction7': 17, 'obstruction2': 14} tool [ 0.309 -0.013  0.25 ] end [ 0.314 -0.024  0.141]
+-step 487 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 18, 'obstruction5': 17, 'obstruction7': 17, 'obstruction2': 14} tool [ 0.314 -0.024  0.141] end [ 0.375 -0.058  0.162]
+-step 497 task obstruction7 grasp 0.0 plan 8 fails {'obstruction0': 18, 'obstruction5': 18, 'obstruction7': 17, 'obstruction2': 14} tool [ 0.375 -0.058  0.162] end [ 0.365 -0.018  0.169]
+-step 501 task obstruction2 grasp 0.0 plan 13 fails {'obstruction0': 18, 'obstruction5': 18, 'obstruction7': 18, 'obstruction2': 14} tool [ 0.365 -0.018  0.169] end [ 0.314 -0.032  0.133]
+-step 511 task obstruction0 grasp 0.0 plan 11 fails {'obstruction0': 18, 'obstruction5': 18, 'obstruction7': 18, 'obstruction2': 15} tool [ 0.314 -0.032  0.133] end [ 0.307 -0.03   0.141]
+-step 515 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 19, 'obstruction5': 18, 'obstruction7': 18, 'obstruction2': 15} tool [ 0.307 -0.03   0.141] end [ 0.337 -0.058  0.162]
+-step 525 task obstruction7 grasp 0.0 plan 8 fails {'obstruction0': 19, 'obstruction5': 19, 'obstruction7': 18, 'obstruction2': 15} tool [ 0.337 -0.058  0.162] end [ 0.352 -0.018  0.169]
+-step 529 task obstruction2 grasp 0.0 plan 13 fails {'obstruction0': 19, 'obstruction5': 19, 'obstruction7': 19, 'obstruction2': 15} tool [ 0.352 -0.018  0.169] end [0.314 0.006 0.133]
+-ABORT step 538 tool [0.314 0.006 0.191] q [-1.068  0.508 -1.673 -2.147 -0.601 -1.027 -3.986] target [-0.913  0.598 -1.861 -2.235 -0.775 -0.881 -3.844] tgt tool [0.314 0.006 0.133]
+-step 539 task obstruction0 grasp 0.0 plan 12 fails {'obstruction0': 19, 'obstruction5': 19, 'obstruction7': 19, 'obstruction2': 16} tool [0.314 0.006 0.25 ] end [ 0.307 -0.056  0.141]
+-step 543 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 20, 'obstruction5': 19, 'obstruction7': 19, 'obstruction2': 16} tool [ 0.307 -0.056  0.141] end [ 0.375 -0.062  0.162]
+-step 553 task obstruction7 grasp 0.0 plan 11 fails {'obstruction0': 20, 'obstruction5': 20, 'obstruction7': 19, 'obstruction2': 16} tool [ 0.375 -0.062  0.162] end [ 0.352 -0.018  0.169]
+-step 563 task obstruction2 grasp 0.0 plan 13 fails {'obstruction0': 20, 'obstruction5': 20, 'obstruction7': 20, 'obstruction2': 16} tool [ 0.352 -0.018  0.169] end [ 0.315 -0.003  0.133]
+-ABORT step 571 tool [ 0.315 -0.003  0.191] q [-0.794  0.28  -2.146 -2.14  -0.308 -0.87  -2.756] target [-0.652  0.415 -2.271 -2.228 -0.499 -0.7   -2.573] tgt tool [ 0.315 -0.003  0.133]
+-step 572 task obstruction0 grasp 0.0 plan 15 fails {'obstruction0': 20, 'obstruction5': 20, 'obstruction7': 20, 'obstruction2': 17} tool [ 0.315 -0.003  0.25 ] end [ 0.301 -0.049  0.141]
+-step 582 task obstruction5 grasp 0.0 plan 13 fails {'obstruction0': 21, 'obstruction5': 20, 'obstruction7': 20, 'obstruction2': 17} tool [ 0.301 -0.049  0.141] end [ 0.337 -0.062  0.162]
+-step 591 task obstruction7 grasp 0.0 plan 11 fails {'obstruction0': 21, 'obstruction5': 21, 'obstruction7': 20, 'obstruction2': 17} tool [ 0.337 -0.062  0.162] end [ 0.366 -0.018  0.169]
+-step 600 task obstruction2 grasp 0.0 plan 10 fails {'obstruction0': 21, 'obstruction5': 21, 'obstruction7': 21, 'obstruction2': 17} tool [ 0.366 -0.018  0.169] end [ 0.308 -0.026  0.133]
+-step 604 task obstruction0 grasp 0.0 plan 11 fails {'obstruction0': 21, 'obstruction5': 21, 'obstruction7': 21, 'obstruction2': 18} tool [ 0.308 -0.026  0.133] end [ 0.301 -0.037  0.141]
+-step 608 task obstruction7 grasp 0.0 plan 13 fails {'obstruction0': 22, 'obstruction5': 21, 'obstruction7': 21, 'obstruction2': 18} tool [ 0.301 -0.037  0.141] end [ 0.359 -0.025  0.169]
+-step 618 task obstruction2 grasp 0.0 plan 13 fails {'obstruction0': 22, 'obstruction5': 21, 'obstruction7': 22, 'obstruction2': 18} tool [ 0.359 -0.025  0.169] end [ 0.308 -0.001  0.133]
+-ABORT step 626 tool [ 0.308 -0.001  0.191] q [-1.017  0.388 -1.809 -2.165 -0.474 -0.937 -4.12 ] target [-0.834  0.501 -2.    -2.254 -0.668 -0.783 -3.947] tgt tool [ 0.308 -0.001  0.133]
+-step 628 task obstruction0 grasp 0.0 plan 11 fails {'obstruction0': 22, 'obstruction5': 21, 'obstruction7': 22, 'obstruction2': 19} tool [ 0.308 -0.001  0.25 ] end [ 0.321 -0.043  0.158]
+-step 633 task obstruction0 grasp 1.0 plan 25 fails {'obstruction0': 22, 'obstruction5': 21, 'obstruction7': 22, 'obstruction2': 19} tool [ 0.321 -0.043  0.158] end [ 0.207 -0.045  0.149]
+-step 649 task obstruction2 grasp 0.0 plan 12 fails {'obstruction0': 22, 'obstruction5': 21, 'obstruction7': 22, 'obstruction2': 19} tool [ 0.207 -0.045  0.149] end [ 0.301 -0.026  0.133]
+-step 660 task obstruction2 grasp 1.0 plan 28 fails {'obstruction0': 22, 'obstruction5': 21, 'obstruction7': 22, 'obstruction2': 19} tool [ 0.301 -0.026  0.133] end [0.307 0.079 0.124]
+-step 670 task obstruction5 grasp 0.0 plan 14 fails {'obstruction0': 22, 'obstruction5': 21, 'obstruction7': 22, 'obstruction2': 19} tool [0.307 0.079 0.124] end [ 0.356 -0.053  0.162]
+-step 679 task obstruction5 grasp 1.0 plan 30 fails {'obstruction0': 22, 'obstruction5': 21, 'obstruction7': 22, 'obstruction2': 19} tool [ 0.356 -0.053  0.162] end [0.427 0.086 0.154]
+-step 688 task obstruction7 grasp 0.0 plan 14 fails {'obstruction0': 22, 'obstruction5': 21, 'obstruction7': 22, 'obstruction2': 19} tool [0.427 0.086 0.154] end [ 0.345 -0.018  0.141]
+-step 697 task obstruction7 grasp 1.0 plan 16 fails {'obstruction0': 22, 'obstruction5': 21, 'obstruction7': 22, 'obstruction2': 19} tool [ 0.345 -0.018  0.141] end [0.254 0.098 0.133]
+-step 703 task target_block grasp 0.0 plan 19 fails {'obstruction0': 22, 'obstruction5': 21, 'obstruction7': 22, 'obstruction2': 19} tool [0.254 0.098 0.133] end [ 0.299 -0.251  0.131]
+-step 712 task target_block grasp 1.0 plan 19 fails {'obstruction0': 22, 'obstruction5': 21, 'obstruction7': 22, 'obstruction2': 19} tool [ 0.299 -0.251  0.131] end [ 0.339 -0.03   0.143]
+-SOLVED 718
+-time 53.90831160545349
++step 1 task obstruction0 grasp 0.0 plan 11 fails {} tool [0.154 0.001 0.217] end [ 0.321 -0.043  0.158]
++step 7 task obstruction0 grasp 1.0 plan 19 fails {} tool [ 0.321 -0.043  0.158] end [ 0.207 -0.045  0.149]
++step 15 task obstruction2 grasp 0.0 plan 12 fails {} tool [ 0.207 -0.045  0.149] end [ 0.314 -0.013  0.133]
++step 22 task obstruction2 grasp 1.0 plan 17 fails {} tool [ 0.314 -0.013  0.133] end [0.321 0.092 0.124]
++step 30 task obstruction5 grasp 0.0 plan 16 fails {} tool [0.321 0.092 0.124] end [ 0.356 -0.053  0.141]
++step 39 task obstruction5 grasp 1.0 plan 18 fails {} tool [ 0.356 -0.053  0.141] end [0.427 0.086 0.133]
++step 47 task obstruction7 grasp 0.0 plan 15 fails {} tool [0.427 0.086 0.133] end [ 0.359 -0.018  0.141]
++step 56 task obstruction7 grasp 1.0 plan 16 fails {} tool [ 0.359 -0.018  0.141] end [0.267 0.098 0.133]
++step 63 task target_block grasp 0.0 plan 19 fails {} tool [0.267 0.098 0.133] end [ 0.299 -0.251  0.131]
++step 73 task target_block grasp 1.0 plan 19 fails {} tool [ 0.299 -0.251  0.131] end [ 0.339 -0.03   0.142]
++SOLVED 80
++time 4.28628945350647
+diff --git a/r10v2.txt b/r10v2.txt
+index 87b0071..e69de29 100644
+--- a/r10v2.txt
++++ b/r10v2.txt
+@@ -1,21 +0,0 @@
+-0 (True, 125, 10, 104.89492058753967)
+-1 (True, 119, 10, 77.4553337097168)
+-2 (True, 93, 10, 57.68733549118042)
+-3 (True, 78, 10, 45.96848201751709)
+-4 (True, 133, 10, 91.54850959777832)
+-5 (True, 114, 10, 61.649073362350464)
+-6 (True, 108, 10, 69.97951006889343)
+-7 (True, 161, 10, 111.96945834159851)
+-8 (True, 123, 10, 103.88562154769897)
+-9 (True, 87, 10, 74.52696228027344)
+-10 (True, 102, 10, 82.24074697494507)
+-11 (True, 96, 10, 74.87361359596252)
+-12 (True, 102, 10, 83.29399371147156)
+-13 (True, 136, 10, 93.86978816986084)
+-14 (True, 110, 10, 71.97742629051208)
+-15 (True, 132, 10, 69.7938084602356)
+-16 (True, 97, 10, 54.36871552467346)
+-17 (True, 76, 10, 31.4574453830719)
+-18 (True, 103, 10, 38.24239134788513)
+-19 (True, 84, 10, 30.301987886428833)
+-success 20 / 20 mean steps 108.95 max time 111.96945834159851
+diff --git a/r7v2.txt b/r7v2.txt
+index 68abf2a..8357ef0 100644
+--- a/r7v2.txt
++++ b/r7v2.txt
+@@ -1,30 +1,30 @@
+-0 (True, 87, 7, 51.90975046157837)
+-1 (True, 103, 7, 64.63951778411865)
+-2 (True, 71, 7, 43.29448342323303)
+-3 (True, 78, 7, 55.36353397369385)
+-4 (True, 136, 7, 79.30280208587646)
+-5 (True, 107, 7, 65.30765151977539)
+-6 (True, 105, 7, 58.917471170425415)
+-7 (True, 143, 7, 95.11450624465942)
+-8 (True, 85, 7, 58.49885559082031)
+-9 (True, 87, 7, 66.62173414230347)
+-10 (True, 69, 7, 48.08510160446167)
+-11 (True, 77, 7, 54.44292092323303)
+-12 (True, 107, 7, 80.1859929561615)
+-13 (True, 134, 7, 101.62912821769714)
+-14 (True, 61, 7, 44.37665367126465)
+-15 (True, 111, 7, 93.56963753700256)
+-16 (True, 62, 7, 44.71505546569824)
+-17 (True, 76, 7, 50.44370412826538)
+-18 (True, 84, 7, 64.29676413536072)
+-19 (True, 77, 7, 48.525261640548706)
+-20 (True, 90, 7, 67.16040682792664)
+-21 (True, 104, 7, 78.47161626815796)
+-22 (True, 184, 7, 86.10974502563477)
+-23 (True, 103, 7, 67.44490051269531)
+-24 (True, 76, 7, 53.59507131576538)
+-25 (True, 49, 7, 35.07913136482239)
+-26 (True, 69, 7, 44.36275577545166)
+-27 (True, 71, 7, 38.36406922340393)
+-28 (True, 108, 7, 32.490216970443726)
+-success 30 / 30 mean steps 92.86666666666666 max time 101.62912821769714
++0 (True, 87, 7, 60.72479176521301)
++1 (True, 103, 7, 83.07648015022278)
++2 (True, 71, 7, 47.04066872596741)
++3 (True, 78, 7, 62.394036293029785)
++4 (True, 132, 7, 90.8275887966156)
++5 (True, 107, 7, 78.71391916275024)
++6 (True, 106, 7, 67.2218987941742)
++7 (True, 131, 7, 98.29449915885925)
++8 (True, 85, 7, 64.31360483169556)
++9 (True, 87, 7, 65.40352606773376)
++10 (True, 69, 7, 47.742194175720215)
++11 (True, 77, 7, 57.84087514877319)
++12 (True, 107, 7, 83.83754515647888)
++13 (True, 132, 7, 102.52496147155762)
++14 (True, 61, 7, 48.202779054641724)
++15 (True, 111, 7, 96.96697163581848)
++16 (True, 62, 7, 49.24976086616516)
++17 (True, 76, 7, 57.130834341049194)
++18 (True, 84, 7, 65.64731335639954)
++19 (True, 82, 7, 67.95730423927307)
++20 (True, 90, 7, 68.10633182525635)
++21 (True, 104, 7, 76.37464356422424)
++22 (True, 76, 7, 53.72096347808838)
++23 (True, 103, 7, 65.23439359664917)
++24 (True, 78, 7, 47.02994132041931)
++25 (True, 49, 7, 36.07643413543701)
++26 (True, 69, 7, 40.60338997840881)
++27 (True, 71, 7, 37.73515844345093)
++28 (True, 100, 7, 28.717182159423828)
++success 30 / 30 mean steps 88.36666666666666 max time 102.52496147155762
+diff --git a/r9.txt b/r9.txt
+index 93bfdd5..fb094f8 100644
+--- a/r9.txt
++++ b/r9.txt
+@@ -1,31 +1,31 @@
+-100 (True, 96, 9, 52.53955030441284)
+-101 (True, 93, 9, 54.51079869270325)
+-102 (True, 112, 9, 65.34322571754456)
+-103 (True, 93, 9, 44.810567140579224)
+-104 (True, 153, 9, 93.75739359855652)
+-105 (True, 128, 9, 81.2679808139801)
+-106 (True, 93, 9, 62.40128564834595)
+-107 (True, 112, 9, 69.19037199020386)
+-108 (True, 131, 9, 91.25654864311218)
+-109 (True, 100, 9, 64.36337423324585)
+-110 (True, 121, 9, 79.18544244766235)
+-111 (True, 63, 9, 34.50396370887756)
+-112 (True, 144, 9, 99.37276291847229)
+-113 (True, 718, 9, 225.3370132446289)
+-114 (True, 82, 9, 43.92652463912964)
+-115 (True, 97, 9, 65.58510565757751)
+-116 (True, 86, 9, 52.46846628189087)
+-117 (True, 107, 9, 80.39322829246521)
+-118 (True, 137, 9, 93.61911106109619)
+-119 (True, 148, 9, 108.74081182479858)
+-120 (True, 106, 9, 68.54011392593384)
+-121 (True, 94, 9, 71.20775604248047)
+-122 (True, 121, 9, 81.89497876167297)
+-123 (True, 80, 9, 45.335349321365356)
+-124 (True, 104, 9, 61.29020118713379)
+-125 (True, 95, 9, 53.72698712348938)
+-126 (True, 78, 9, 39.93084263801575)
+-127 (True, 76, 9, 37.43912959098816)
+-128 (True, 84, 9, 34.11875557899475)
+-129 (True, 71, 9, 20.42490267753601)
+-success 30 / 30 mean steps 124.1 max time 225.3370132446289
++100 (True, 96, 9, 67.79566717147827)
++101 (True, 93, 9, 61.625250577926636)
++102 (True, 98, 9, 73.67022275924683)
++103 (True, 90, 9, 46.72491192817688)
++104 (True, 143, 9, 96.65303158760071)
++105 (True, 122, 9, 77.48038005828857)
++106 (True, 93, 9, 47.51486015319824)
++107 (True, 112, 9, 72.36881613731384)
++108 (True, 131, 9, 110.22542905807495)
++109 (True, 100, 9, 70.26443481445312)
++110 (True, 121, 9, 92.87895226478577)
++111 (True, 72, 9, 44.093530893325806)
++112 (True, 113, 9, 81.1205563545227)
++113 (True, 80, 9, 54.67210102081299)
++114 (True, 82, 9, 55.89376902580261)
++115 (True, 97, 9, 79.13153052330017)
++116 (True, 64, 9, 51.10925650596619)
++117 (True, 104, 9, 81.26630234718323)
++118 (True, 125, 9, 102.77139973640442)
++119 (True, 148, 9, 114.42909741401672)
++120 (True, 105, 9, 74.66918158531189)
++121 (True, 80, 9, 51.272884368896484)
++122 (True, 113, 9, 87.74087524414062)
++123 (True, 80, 9, 51.04293632507324)
++124 (True, 104, 9, 71.35939741134644)
++125 (True, 100, 9, 57.89858102798462)
++126 (True, 78, 9, 48.48291540145874)
++127 (True, 73, 9, 38.89868927001953)
++128 (True, 80, 9, 32.20427870750427)
++129 (True, 71, 9, 26.382763624191284)
++success 30 / 30 mean steps 98.93333333333334 max time 114.42909741401672

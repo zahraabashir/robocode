@@ -1,0 +1,23 @@
+diff --git a/approach.py b/approach.py
+index 6611f2e..7e46a61 100644
+--- a/approach.py
++++ b/approach.py
+@@ -12,7 +12,7 @@ class GeneratedApproach:
+         rects = state.get_objects(self.types["rectangle"])
+         # Park every movable rectangle, tallest first.  Including the target in
+         # this clearing pass matters when it physically shields a shorter object.
+-        self.todo = [o.name for o in rects]
++        self.todo = [o.name for o in rects if state.get(o, "static") < 0.5]
+         self.todo.sort(key=lambda n: -state.get(state.get_object_from_name(n), "height"))
+         target_name = state.get_objects(self.types["target_block"])[0].name
+         self.todo.append(target_name)  # retrieve it last for the actual placement
+@@ -93,7 +93,8 @@ class GeneratedApproach:
+                 return self._action()
+             self.phase = "carry"
+         if self.phase == "carry":
+-            tx = state.get(surface, "x") if is_target else self.park_base + 0.24 * self.index
++            # Parking vertically in place avoids unknown horizontal world bounds.
++            tx = state.get(surface, "x") if is_target else ox
+             if abs(tx - rx) > 0.004:
+                 return self._action(dx=self._clip(tx - rx, 0.05), vac=1.0)
+             self.phase = "lower" if is_target else "release"

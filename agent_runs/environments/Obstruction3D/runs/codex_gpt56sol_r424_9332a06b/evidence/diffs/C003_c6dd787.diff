@@ -1,0 +1,156 @@
+diff --git a/approach.py b/approach.py
+index a6a5e08..94a75b2 100644
+--- a/approach.py
++++ b/approach.py
+@@ -11,8 +11,17 @@ class GeneratedApproach:
+ 
+     def reset(self, state, info):
+         self.t = 0
++        self.target_y = self._v(state, "target_block", "pose_y")
++
++    @staticmethod
++    def _v(state, name, feature):
++        return state.get(state.get_object_from_name(name), feature)
+ 
+     def get_action(self, state):
+         self.t += 1
+-        # Safe valid placeholder while the manipulation controller is calibrated.
+-        return np.zeros(self.action_space.shape, dtype=self.action_space.dtype)
++        a = np.zeros(self.action_space.shape, dtype=self.action_space.dtype)
++        robot_y = self._v(state, "robot", "pos_base_y")
++        a[1] = np.clip(self.target_y - robot_y, -0.2, 0.2)
++        if self.t >= 3:
++            a[10] = -1.0
++        return a
+diff --git a/probe_geometry_states.out b/probe_geometry_states.out
+index e69de29..e6aef9e 100644
+--- a/probe_geometry_states.out
++++ b/probe_geometry_states.out
+@@ -0,0 +1,67 @@
++SEED 0 COUNT_ARG None MAX 1000 ASHAPE (11,) LOW [-0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -1.0] HIGH [0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 1.0] INFO {'object_count': 2}
++robot Kinematic3DRobot {'pos_base_x': -0.11999999731779099, 'pos_base_y': 0.0, 'pos_base_rot': 0.0, 'joint_1': 0.0, 'joint_2': -0.3499999940395355, 'joint_3': -3.1415927410125732, 'joint_4': -2.5, 'joint_5': 0.0, 'joint_6': -0.8700000047683716, 'joint_7': 1.5707963705062866, 'finger_state': 0.0, 'grasp_active': 0.0, 'grasp_tf_x': 0.0, 'grasp_tf_y': 0.0, 'grasp_tf_z': 0.0, 'grasp_tf_qx': 0.0, 'grasp_tf_qy': 0.0, 'grasp_tf_qz': 0.0, 'grasp_tf_qw': 0.0}
++target_region Kinematic3DCuboid {'pose_x': 0.14442715048789978, 'pose_y': 0.23301441967487335, 'pose_z': 0.07999999821186066, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.03910885006189346, 'half_extent_y': 0.028093600645661354, 'half_extent_z': 0.004999999888241291}
++obstruction1 Kinematic3DCuboid {'pose_x': 0.10313927382230759, 'pose_y': 0.20900817215442657, 'pose_z': 0.10099423676729202, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.018631789833307266, 'half_extent_y': 0.015414612367749214, 'half_extent_z': 0.0159942377358675}
++target_block Kinematic3DCuboid {'pose_x': 0.33598166704177856, 'pose_y': 0.17328143119812012, 'pose_z': 0.10000000149011612, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.03128708153963089, 'half_extent_y': 0.022474881261587143, 'half_extent_z': 0.02500000037252903}
++obstruction0 Kinematic3DCuboid {'pose_x': 0.1034325584769249, 'pose_y': 0.24800321459770203, 'pose_z': 0.09505476802587509, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.019350724294781685, 'half_extent_y': 0.01815853640437126, 'half_extent_z': 0.010054769925773144}
++SEED 1 COUNT_ARG None MAX 1000 ASHAPE (11,) LOW [-0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -1.0] HIGH [0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 1.0] INFO {'object_count': 1}
++target_block Kinematic3DCuboid {'pose_x': 0.13774842023849487, 'pose_y': 0.18313223123550415, 'pose_z': 0.10000000149011612, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.02828371897339821, 'half_extent_y': 0.038811128586530685, 'half_extent_z': 0.02500000037252903}
++robot Kinematic3DRobot {'pos_base_x': -0.11999999731779099, 'pos_base_y': 0.0, 'pos_base_rot': 0.0, 'joint_1': 0.0, 'joint_2': -0.3499999940395355, 'joint_3': -3.1415927410125732, 'joint_4': -2.5, 'joint_5': 0.0, 'joint_6': -0.8700000047683716, 'joint_7': 1.5707963705062866, 'finger_state': 0.0, 'grasp_active': 0.0, 'grasp_tf_x': 0.0, 'grasp_tf_y': 0.0, 'grasp_tf_z': 0.0, 'grasp_tf_qx': 0.0, 'grasp_tf_qy': 0.0, 'grasp_tf_qz': 0.0, 'grasp_tf_qw': 0.0}
++target_region Kinematic3DCuboid {'pose_x': 0.44773608446121216, 'pose_y': -0.132277250289917, 'pose_z': 0.07999999821186066, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.035354647785425186, 'half_extent_y': 0.04851391166448593, 'half_extent_z': 0.004999999888241291}
++obstruction0 Kinematic3DCuboid {'pose_x': 0.419426292181015, 'pose_y': -0.14254437386989594, 'pose_z': 0.10106389969587326, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.013297317549586296, 'half_extent_y': 0.017884286120533943, 'half_extent_z': 0.01606389693915844}
++SEED 2 COUNT_ARG None MAX 1000 ASHAPE (11,) LOW [-0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -1.0] HIGH [0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 1.0] INFO {'object_count': 2}
++robot Kinematic3DRobot {'pos_base_x': -0.11999999731779099, 'pos_base_y': 0.0, 'pos_base_rot': 0.0, 'joint_1': 0.0, 'joint_2': -0.3499999940395355, 'joint_3': -3.1415927410125732, 'joint_4': -2.5, 'joint_5': 0.0, 'joint_6': -0.8700000047683716, 'joint_7': 1.5707963705062866, 'finger_state': 0.0, 'grasp_active': 0.0, 'grasp_tf_x': 0.0, 'grasp_tf_y': 0.0, 'grasp_tf_z': 0.0, 'grasp_tf_qx': 0.0, 'grasp_tf_qy': 0.0, 'grasp_tf_qz': 0.0, 'grasp_tf_qw': 0.0}
++target_region Kinematic3DCuboid {'pose_x': 0.15949532389640808, 'pose_y': 0.0742836520075798, 'pose_z': 0.07999999821186066, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.027848364785313606, 'half_extent_y': 0.02895473502576351, 'half_extent_z': 0.004999999888241291}
++obstruction1 Kinematic3DCuboid {'pose_x': 0.14757776260375977, 'pose_y': 0.10241974890232086, 'pose_z': 0.10283249616622925, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.019674358889460564, 'half_extent_y': 0.016830647364258766, 'half_extent_z': 0.017832497134804726}
++target_block Kinematic3DCuboid {'pose_x': 0.18906673789024353, 'pose_y': -0.33527371287345886, 'pose_z': 0.10000000149011612, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.022278690710663795, 'half_extent_y': 0.02316378802061081, 'half_extent_z': 0.02500000037252903}
++obstruction0 Kinematic3DCuboid {'pose_x': 0.17032761871814728, 'pose_y': 0.06920900195837021, 'pose_z': 0.09800124168395996, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.016574330627918243, 'half_extent_y': 0.015622656792402267, 'half_extent_z': 0.013001245446503162}
++SEED 3 COUNT_ARG None MAX 1000 ASHAPE (11,) LOW [-0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -1.0] HIGH [0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 1.0] INFO {'object_count': 2}
++robot Kinematic3DRobot {'pos_base_x': -0.11999999731779099, 'pos_base_y': 0.0, 'pos_base_rot': 0.0, 'joint_1': 0.0, 'joint_2': -0.3499999940395355, 'joint_3': -3.1415927410125732, 'joint_4': -2.5, 'joint_5': 0.0, 'joint_6': -0.8700000047683716, 'joint_7': 1.5707963705062866, 'finger_state': 0.0, 'grasp_active': 0.0, 'grasp_tf_x': 0.0, 'grasp_tf_y': 0.0, 'grasp_tf_z': 0.0, 'grasp_tf_qx': 0.0, 'grasp_tf_qy': 0.0, 'grasp_tf_qz': 0.0, 'grasp_tf_qw': 0.0}
++target_region Kinematic3DCuboid {'pose_x': 0.3291561007499695, 'pose_y': -0.3026953637599945, 'pose_z': 0.07999999821186066, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.022569475695490837, 'half_extent_y': 0.027104314416646957, 'half_extent_z': 0.004999999888241291}
++obstruction1 Kinematic3DCuboid {'pose_x': 0.3195573091506958, 'pose_y': -0.27949976921081543, 'pose_z': 0.11446920782327652, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.012927207164466381, 'half_extent_y': 0.01001490093767643, 'half_extent_z': 0.0294692050665617}
++target_block Kinematic3DCuboid {'pose_x': 0.15941956639289856, 'pose_y': -0.0823003500699997, 'pose_z': 0.10000000149011612, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.01805558055639267, 'half_extent_y': 0.021683452650904655, 'half_extent_z': 0.02500000037252903}
++obstruction0 Kinematic3DCuboid {'pose_x': 0.21985502541065216, 'pose_y': 0.11412347853183746, 'pose_z': 0.09975675493478775, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.014306279830634594, 'half_extent_y': 0.015867985785007477, 'half_extent_z': 0.02475675567984581}
++SEED 4 COUNT_ARG None MAX 1000 ASHAPE (11,) LOW [-0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -1.0] HIGH [0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 1.0] INFO {'object_count': 2}
++robot Kinematic3DRobot {'pos_base_x': -0.11999999731779099, 'pos_base_y': 0.0, 'pos_base_rot': 0.0, 'joint_1': 0.0, 'joint_2': -0.3499999940395355, 'joint_3': -3.1415927410125732, 'joint_4': -2.5, 'joint_5': 0.0, 'joint_6': -0.8700000047683716, 'joint_7': 1.5707963705062866, 'finger_state': 0.0, 'grasp_active': 0.0, 'grasp_tf_x': 0.0, 'grasp_tf_y': 0.0, 'grasp_tf_z': 0.0, 'grasp_tf_qx': 0.0, 'grasp_tf_qy': 0.0, 'grasp_tf_qz': 0.0, 'grasp_tf_qw': 0.0}
++target_region Kinematic3DCuboid {'pose_x': 0.17281867563724518, 'pose_y': 0.07829679548740387, 'pose_z': 0.07999999821186066, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.048291683197021484, 'half_extent_y': 0.035339824855327606, 'half_extent_z': 0.004999999888241291}
++obstruction1 Kinematic3DCuboid {'pose_x': 0.17259173095226288, 'pose_y': 0.07778430730104446, 'pose_z': 0.0985538512468338, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.019689328968524933, 'half_extent_y': 0.019290264695882797, 'half_extent_z': 0.013553851284086704}
++target_block Kinematic3DCuboid {'pose_x': 0.3974335789680481, 'pose_y': -0.241974338889122, 'pose_z': 0.10000000149011612, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.03863334655761719, 'half_extent_y': 0.028271861374378204, 'half_extent_z': 0.02500000037252903}
++obstruction0 Kinematic3DCuboid {'pose_x': 0.20295670628547668, 'pose_y': 0.1171213760972023, 'pose_z': 0.10454306751489639, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.015439414419233799, 'half_extent_y': 0.019022149965167046, 'half_extent_z': 0.01954307034611702}
++SEED 5 COUNT_ARG None MAX 1000 ASHAPE (11,) LOW [-0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -1.0] HIGH [0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 1.0] INFO {'object_count': 2}
++robot Kinematic3DRobot {'pos_base_x': -0.11999999731779099, 'pos_base_y': 0.0, 'pos_base_rot': 0.0, 'joint_1': 0.0, 'joint_2': -0.3499999940395355, 'joint_3': -3.1415927410125732, 'joint_4': -2.5, 'joint_5': 0.0, 'joint_6': -0.8700000047683716, 'joint_7': 1.5707963705062866, 'finger_state': 0.0, 'grasp_active': 0.0, 'grasp_tf_x': 0.0, 'grasp_tf_y': 0.0, 'grasp_tf_z': 0.0, 'grasp_tf_qx': 0.0, 'grasp_tf_qy': 0.0, 'grasp_tf_qz': 0.0, 'grasp_tf_qw': 0.0}
++target_region Kinematic3DCuboid {'pose_x': 0.23323433101177216, 'pose_y': -0.3173888027667999, 'pose_z': 0.07999999821186066, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.04415008798241615, 'half_extent_y': 0.04423822462558746, 'half_extent_z': 0.004999999888241291}
++obstruction1 Kinematic3DCuboid {'pose_x': 0.19244296848773956, 'pose_y': -0.3001417815685272, 'pose_z': 0.10042903572320938, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.010608026757836342, 'half_extent_y': 0.015555961057543755, 'half_extent_z': 0.015429032035171986}
++target_block Kinematic3DCuboid {'pose_x': 0.4644085764884949, 'pose_y': 0.11111042648553848, 'pose_z': 0.10000000149011612, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.03532006964087486, 'half_extent_y': 0.03539057821035385, 'half_extent_z': 0.02500000037252903}
++obstruction0 Kinematic3DCuboid {'pose_x': 0.2229616791009903, 'pose_y': -0.3180749714374542, 'pose_z': 0.1129535511136055, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.014349475502967834, 'half_extent_y': 0.019741861149668694, 'half_extent_z': 0.027953552082180977}
++SEED 6 COUNT_ARG None MAX 1000 ASHAPE (11,) LOW [-0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -1.0] HIGH [0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 1.0] INFO {'object_count': 1}
++target_block Kinematic3DCuboid {'pose_x': 0.35964807868003845, 'pose_y': -0.12778636813163757, 'pose_z': 0.10000000149011612, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.028915943577885628, 'half_extent_y': 0.024238500744104385, 'half_extent_z': 0.02500000037252903}
++robot Kinematic3DRobot {'pos_base_x': -0.11999999731779099, 'pos_base_y': 0.0, 'pos_base_rot': 0.0, 'joint_1': 0.0, 'joint_2': -0.3499999940395355, 'joint_3': -3.1415927410125732, 'joint_4': -2.5, 'joint_5': 0.0, 'joint_6': -0.8700000047683716, 'joint_7': 1.5707963705062866, 'finger_state': 0.0, 'grasp_active': 0.0, 'grasp_tf_x': 0.0, 'grasp_tf_y': 0.0, 'grasp_tf_z': 0.0, 'grasp_tf_qx': 0.0, 'grasp_tf_qy': 0.0, 'grasp_tf_qz': 0.0, 'grasp_tf_qw': 0.0}
++target_region Kinematic3DCuboid {'pose_x': 0.25887131690979004, 'pose_y': 0.3604186475276947, 'pose_z': 0.07999999821186066, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.0361449308693409, 'half_extent_y': 0.030298126861453056, 'half_extent_z': 0.004999999888241291}
++obstruction0 Kinematic3DCuboid {'pose_x': 0.29616957902908325, 'pose_y': 0.3819534182548523, 'pose_z': 0.11200382560491562, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.011229723691940308, 'half_extent_y': 0.010517292656004429, 'half_extent_z': 0.027003826573491096}
++SEED 7 COUNT_ARG None MAX 1000 ASHAPE (11,) LOW [-0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -1.0] HIGH [0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 1.0] INFO {'object_count': 2}
++robot Kinematic3DRobot {'pos_base_x': -0.11999999731779099, 'pos_base_y': 0.0, 'pos_base_rot': 0.0, 'joint_1': 0.0, 'joint_2': -0.3499999940395355, 'joint_3': -3.1415927410125732, 'joint_4': -2.5, 'joint_5': 0.0, 'joint_6': -0.8700000047683716, 'joint_7': 1.5707963705062866, 'finger_state': 0.0, 'grasp_active': 0.0, 'grasp_tf_x': 0.0, 'grasp_tf_y': 0.0, 'grasp_tf_z': 0.0, 'grasp_tf_qx': 0.0, 'grasp_tf_qy': 0.0, 'grasp_tf_qz': 0.0, 'grasp_tf_qw': 0.0}
++target_region Kinematic3DCuboid {'pose_x': 0.21138089895248413, 'pose_y': -0.14111600816249847, 'pose_z': 0.07999999821186066, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.03875286504626274, 'half_extent_y': 0.046916414052248, 'half_extent_z': 0.004999999888241291}
++obstruction1 Kinematic3DCuboid {'pose_x': 0.19748550653457642, 'pose_y': -0.2596478760242462, 'pose_z': 0.097443588078022, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.019955003634095192, 'half_extent_y': 0.017926618456840515, 'half_extent_z': 0.022443585097789764}
++target_block Kinematic3DCuboid {'pose_x': 0.13278193771839142, 'pose_y': 0.23286931216716766, 'pose_z': 0.10000000149011612, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.031002290546894073, 'half_extent_y': 0.03753313049674034, 'half_extent_z': 0.02500000037252903}
++obstruction0 Kinematic3DCuboid {'pose_x': 0.20672087371349335, 'pose_y': -0.14065960049629211, 'pose_z': 0.1005685105919838, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.014679349958896637, 'half_extent_y': 0.013030324131250381, 'half_extent_z': 0.015568512491881847}
++SEED 8 COUNT_ARG None MAX 1000 ASHAPE (11,) LOW [-0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -1.0] HIGH [0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 1.0] INFO {'object_count': 2}
++robot Kinematic3DRobot {'pos_base_x': -0.11999999731779099, 'pos_base_y': 0.0, 'pos_base_rot': 0.0, 'joint_1': 0.0, 'joint_2': -0.3499999940395355, 'joint_3': -3.1415927410125732, 'joint_4': -2.5, 'joint_5': 0.0, 'joint_6': -0.8700000047683716, 'joint_7': 1.5707963705062866, 'finger_state': 0.0, 'grasp_active': 0.0, 'grasp_tf_x': 0.0, 'grasp_tf_y': 0.0, 'grasp_tf_z': 0.0, 'grasp_tf_qx': 0.0, 'grasp_tf_qy': 0.0, 'grasp_tf_qz': 0.0, 'grasp_tf_qw': 0.0}
++target_region Kinematic3DCuboid {'pose_x': 0.39821675419807434, 'pose_y': 0.25920993089675903, 'pose_z': 0.07999999821186066, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.029809167608618736, 'half_extent_y': 0.049618303775787354, 'half_extent_z': 0.004999999888241291}
++obstruction1 Kinematic3DCuboid {'pose_x': 0.42532429099082947, 'pose_y': 0.22171513736248016, 'pose_z': 0.1070854440331459, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.012559205293655396, 'half_extent_y': 0.01590902917087078, 'half_extent_z': 0.022085445001721382}
++target_block Kinematic3DCuboid {'pose_x': 0.278115451335907, 'pose_y': -0.09169850498437881, 'pose_z': 0.10000000149011612, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.02384733408689499, 'half_extent_y': 0.039694644510746, 'half_extent_z': 0.02500000037252903}
++obstruction0 Kinematic3DCuboid {'pose_x': 0.37770166993141174, 'pose_y': 0.2923009693622589, 'pose_z': 0.10014290362596512, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.01478965487331152, 'half_extent_y': 0.01241352129727602, 'half_extent_z': 0.015142904594540596}
++SEED 9 COUNT_ARG None MAX 1000 ASHAPE (11,) LOW [-0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -1.0] HIGH [0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 1.0] INFO {'object_count': 1}
++target_block Kinematic3DCuboid {'pose_x': 0.4175705015659332, 'pose_y': 0.315448522567749, 'pose_z': 0.10000000149011612, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.036885980516672134, 'half_extent_y': 0.022883612662553787, 'half_extent_z': 0.02500000037252903}
++robot Kinematic3DRobot {'pos_base_x': -0.11999999731779099, 'pos_base_y': 0.0, 'pos_base_rot': 0.0, 'joint_1': 0.0, 'joint_2': -0.3499999940395355, 'joint_3': -3.1415927410125732, 'joint_4': -2.5, 'joint_5': 0.0, 'joint_6': -0.8700000047683716, 'joint_7': 1.5707963705062866, 'finger_state': 0.0, 'grasp_active': 0.0, 'grasp_tf_x': 0.0, 'grasp_tf_y': 0.0, 'grasp_tf_z': 0.0, 'grasp_tf_qx': 0.0, 'grasp_tf_qy': 0.0, 'grasp_tf_qz': 0.0, 'grasp_tf_qw': 0.0}
++target_region Kinematic3DCuboid {'pose_x': 0.3854208290576935, 'pose_y': 0.16049827635288239, 'pose_z': 0.07999999821186066, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.04610747471451759, 'half_extent_y': 0.02860451675951481, 'half_extent_z': 0.004999999888241291}
++obstruction0 Kinematic3DCuboid {'pose_x': 0.4182850122451782, 'pose_y': 0.19173592329025269, 'pose_z': 0.09630308300256729, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.014372480101883411, 'half_extent_y': 0.01484944298863411, 'half_extent_z': 0.011303083971142769}
++SEED 10 COUNT_ARG None MAX 1000 ASHAPE (11,) LOW [-0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -1.0] HIGH [0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 1.0] INFO {'object_count': 2}
++robot Kinematic3DRobot {'pos_base_x': -0.11999999731779099, 'pos_base_y': 0.0, 'pos_base_rot': 0.0, 'joint_1': 0.0, 'joint_2': -0.3499999940395355, 'joint_3': -3.1415927410125732, 'joint_4': -2.5, 'joint_5': 0.0, 'joint_6': -0.8700000047683716, 'joint_7': 1.5707963705062866, 'finger_state': 0.0, 'grasp_active': 0.0, 'grasp_tf_x': 0.0, 'grasp_tf_y': 0.0, 'grasp_tf_z': 0.0, 'grasp_tf_qx': 0.0, 'grasp_tf_qy': 0.0, 'grasp_tf_qz': 0.0, 'grasp_tf_qw': 0.0}
++target_region Kinematic3DCuboid {'pose_x': 0.1938587725162506, 'pose_y': 0.009571950882673264, 'pose_z': 0.07999999821186066, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.048680052161216736, 'half_extent_y': 0.026230454444885254, 'half_extent_z': 0.004999999888241291}
++obstruction1 Kinematic3DCuboid {'pose_x': 0.19671772420406342, 'pose_y': 0.2702596187591553, 'pose_z': 0.08778702467679977, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.011449947021901608, 'half_extent_y': 0.017455801367759705, 'half_extent_z': 0.012787028215825558}
++target_block Kinematic3DCuboid {'pose_x': 0.3608908951282501, 'pose_y': 0.2590554654598236, 'pose_z': 0.10000000149011612, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.03894403949379921, 'half_extent_y': 0.020984362810850143, 'half_extent_z': 0.02500000037252903}
++obstruction0 Kinematic3DCuboid {'pose_x': 0.22099873423576355, 'pose_y': 0.02971748821437359, 'pose_z': 0.10176430642604828, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.019569259136915207, 'half_extent_y': 0.018253328278660774, 'half_extent_z': 0.016764305531978607}
++SEED 11 COUNT_ARG None MAX 1000 ASHAPE (11,) LOW [-0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -0.20000000298023224, -1.0] HIGH [0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 1.0] INFO {'object_count': 0}
++target_block Kinematic3DCuboid {'pose_x': 0.3441009819507599, 'pose_y': -0.09747365862131119, 'pose_z': 0.10000000149011612, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.019085684791207314, 'half_extent_y': 0.027982668951153755, 'half_extent_z': 0.02500000037252903}
++robot Kinematic3DRobot {'pos_base_x': -0.11999999731779099, 'pos_base_y': 0.0, 'pos_base_rot': 0.0, 'joint_1': 0.0, 'joint_2': -0.3499999940395355, 'joint_3': -3.1415927410125732, 'joint_4': -2.5, 'joint_5': 0.0, 'joint_6': -0.8700000047683716, 'joint_7': 1.5707963705062866, 'finger_state': 0.0, 'grasp_active': 0.0, 'grasp_tf_x': 0.0, 'grasp_tf_y': 0.0, 'grasp_tf_z': 0.0, 'grasp_tf_qx': 0.0, 'grasp_tf_qy': 0.0, 'grasp_tf_qz': 0.0, 'grasp_tf_qw': 0.0}
++target_region Kinematic3DCuboid {'pose_x': 0.13396383821964264, 'pose_y': -0.2570292055606842, 'pose_z': 0.07999999821186066, 'pose_qx': 0.0, 'pose_qy': 0.0, 'pose_qz': 0.0, 'pose_qw': 1.0, 'grasp_active': 0.0, 'object_type': -1.0, 'half_extent_x': 0.023857105523347855, 'half_extent_y': 0.034978337585926056, 'half_extent_z': 0.004999999888241291}
+diff --git a/probe_geometry_summary.py b/probe_geometry_summary.py
+new file mode 100644
+index 0000000..e9b08c4
+--- /dev/null
++++ b/probe_geometry_summary.py
+@@ -0,0 +1,54 @@
++from collections import Counter
++from env_client import make_env
++
++
++def xyzhe(state, name):
++    o = state.get_object_from_name(name)
++    fs = ["pose_x", "pose_y", "pose_z", "half_extent_x", "half_extent_y", "half_extent_z"]
++    return [float(state.get(o, f)) for f in fs]
++
++
++def rng_update(ranges, key, vals):
++    if key not in ranges:
++        ranges[key] = [[x, x] for x in vals]
++    for r, x in zip(ranges[key], vals):
++        r[0] = min(r[0], x)
++        r[1] = max(r[1], x)
++
++
++env = make_env()
++counts = Counter()
++ranges = {}
++on_region = 0
++off_region = 0
++overlaps = []
++for seed in range(100):
++    state, info = env.reset(seed=seed)
++    names = state.get_object_names()
++    obs = sorted(n for n in names if n.startswith("obstruction"))
++    counts[len(obs)] += 1
++    reg = xyzhe(state, "target_region")
++    block = xyzhe(state, "target_block")
++    rng_update(ranges, "region", reg)
++    rng_update(ranges, "block", block)
++    for name in obs:
++        v = xyzhe(state, name)
++        rng_update(ranges, "obstruction", v)
++        dx, dy = abs(v[0]-reg[0]), abs(v[1]-reg[1])
++        hit = dx < v[3]+reg[3] and dy < v[4]+reg[4]
++        if hit: on_region += 1
++        else: off_region += 1
++        overlaps.append((dx, dy, dx-(v[3]+reg[3]), dy-(v[4]+reg[4])))
++print("counts", counts)
++print("ranges [x,y,z,hx,hy,hz]", ranges)
++print("obstruction overlaps/off", on_region, off_region)
++print("separation delta extrema", [[min(v[i] for v in overlaps), max(v[i] for v in overlaps)] for i in range(4)])
++
++for count in [0, 1, 2, 3, 5, 10]:
++    try:
++        state, info = env.reset(seed=123, options={"object_count": count})
++        actual = sum(n.startswith("obstruction") for n in state.get_object_names())
++        print("forced", count, "actual", actual, "info", info)
++    except Exception as e:
++        print("forced", count, "ERR", repr(e))
++env.close()

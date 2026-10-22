@@ -1,0 +1,89 @@
+diff --git a/approach.py b/approach.py
+index 73a7fe4..51b55f3 100644
+--- a/approach.py
++++ b/approach.py
+@@ -22,10 +22,17 @@ class GeneratedApproach:
+         self.cache={}
+     def config(self,z):
+         z=round(float(z),6)
+-        if z not in self.cache:self.cache[z]=ik(self.x,z)
+-        return self.cache[z]
++        key=(z,self.yaw)
++        if key not in self.cache:
++            guess=np.array([0,.4,-np.pi,-1.8,0,-1.,self.yaw])
++            self.cache[key]=ik(self.x,z,guess)
++        return self.cache[key]
+     def reset(self,state,info):
+         self.phase='raise'
++        self.yaw=np.pi/2
++        self.yawindex=0
++        self.blocked_attempts=0
++        self.last_command=False
+         self.steps=0
+         cubes=list(state.get_objects(self.cube_type))
+         region=next(o for o in cubes if o.name=='target_region')
+@@ -52,17 +59,25 @@ class GeneratedApproach:
+         held=next((o for o in cubes if state.get(o,'grasp_active')>.5),None)
+         region=byname['target_region']
+         motion=np.r_[b,q]
+-        self.stalled=self.stalled+1 if self.last_motion is not None and np.max(abs(motion-self.last_motion))<1e-7 else 0
++        self.stalled=self.stalled+1 if self.last_command and self.last_motion is not None and np.max(abs(motion-self.last_motion))<1e-7 else 0
+         self.last_motion=motion.copy()
+         if self.phase=='descend' and self.stalled>=2:
+             self.height=ee[2]
+-            self.phase='close'
++            self.blocked_attempts+=1
++            self.phase='retry_raise' if self.blocked_attempts%2==0 else 'close'
+             self.stalled=0
+         for _ in range(8):
+             a=np.zeros(11)
+             obj=byname[self.goal]
+             p=self.pos(state,obj)
+-            if self.phase=='raise':
++            if self.phase=='retry_raise':
++                a[3:10]=self.config(.35)-q
++                a[10]=1
++                if np.max(abs(a[3:10]))<1e-4:
++                    self.yawindex=(self.yawindex+1)%4
++                    self.yaw=[np.pi/2,0,np.pi/4,3*np.pi/4][self.yawindex]
++                    self.phase='raise';continue
++            elif self.phase=='raise':
+                 a[3:10]=self.config(.35)-q
+                 a[10]=1
+                 if np.max(abs(a[3:10]))<1e-4:self.phase='align';continue
+@@ -130,8 +145,9 @@ class GeneratedApproach:
+                 if held is None and self.goal!='target_block':
+                     self.discarded+=1
+                     self.goal=self.tasks.pop(0) if self.tasks else 'target_block'
+-                    self.phase='raise';self.retries=0;continue
++                    self.phase='raise';self.retries=0;self.blocked_attempts=0;continue
+             m=np.max(abs(a[:10]))
+             if m>.15:a[:10]*=.15/m
++            self.last_command=np.max(abs(a[:10]))>1e-5
+             return np.clip(a,self.action_space.low,self.action_space.high).astype(np.float32)
+         return np.zeros(11,dtype=np.float32)
+diff --git a/probe_latest_dense.log b/probe_latest_dense.log
+new file mode 100644
+index 0000000..fe4a90a
+--- /dev/null
++++ b/probe_latest_dense.log
+@@ -0,0 +1,8 @@
++0 ('obstruction1', 'raise') height 0.35 held 0.0 ee [0.31565754 0.00134757 0.24424087]
++9 ('obstruction1', 'align') height 0.35 held 0.0 ee [0.60000001 0.00134759 0.35      ]
++12 ('obstruction1', 'descend') height 0.33 held 0.0 ee [0.59999999 0.00134759 0.32999999]
++20 ('obstruction1', 'reopen') height 0.15499999999999997 held 1.0 ee [0.60000001 0.0013476  0.155     ]
++21 ('obstruction1', 'lift') height 0.17999999524184937 held 1.0 ee [0.59999998 0.0013476  0.18000001]
++29 ('obstruction1', 'transfer') height 0.35 held 1.0 ee [0.60000001 0.00134749 0.35      ]
++30 ('obstruction1', 'transfer') height 0.35 held 1.0 ee [0.60000001 0.00134749 0.35      ]
++32 ('obstruction1', 'lower') height 0.32999999923895146 held 1.0 ee [0.60000003 0.00134759 0.33000002]
+diff --git a/sweep_current.log b/sweep_current.log
+index a160eaf..96b0a07 100644
+--- a/sweep_current.log
++++ b/sweep_current.log
+@@ -19,3 +19,6 @@
+ {"seed": 18, "count": null, "success": true, "steps": 82, "phase": "release", "goal": "target_block", "seconds": 1.72, "grasp": 0.0}
+ {"seed": 19, "count": null, "success": true, "steps": 83, "phase": "release", "goal": "target_block", "seconds": 1.48, "grasp": 0.0}
+ {"seed": 20, "count": null, "success": true, "steps": 126, "phase": "release", "goal": "target_block", "seconds": 2.42, "grasp": 0.0}
++{"seed": 21, "count": null, "success": true, "steps": 42, "phase": "release", "goal": "target_block", "seconds": 0.82, "grasp": 0.0}
++{"seed": 22, "count": null, "success": true, "steps": 83, "phase": "release", "goal": "target_block", "seconds": 1.95, "grasp": 0.0}
++{"seed": 23, "count": null, "success": true, "steps": 42, "phase": "release", "goal": "target_block", "seconds": 5.09, "grasp": 0.0}

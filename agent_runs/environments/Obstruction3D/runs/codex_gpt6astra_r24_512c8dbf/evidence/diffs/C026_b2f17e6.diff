@@ -1,0 +1,113 @@
+diff --git a/approach.py b/approach.py
+index c49860e..d239065 100644
+--- a/approach.py
++++ b/approach.py
+@@ -1,38 +1,84 @@
+ import numpy as np
+-from kin import ik
++from kin import ik, fk
+ 
+ class GeneratedApproach:
+     def __init__(self, action_space, observation_space, primitives):
+         self.action_space=action_space
+         self.observation_space=observation_space
++        self.cache={}
++    def pos(self,state,obj):
++        return np.array([state.get(obj,'pose_'+f) for f in 'xyz'])
++    def size(self,state,obj):
++        return np.array([state.get(obj,'half_extent_'+f) for f in 'xyz'])
+     def reset(self,state,info):
+         self.robot=state.get_objects(self.observation_space.get_type('Kinematic3DRobot'))[0]
+         self.block=state.get_object_from_name('target_block')
+         self.region=state.get_object_from_name('target_region')
+-        self.phase='above';self.t=0;self.stall=0
+-    def pos(self,state,obj):
+-        return np.array([state.get(obj,'pose_'+f) for f in 'xyz'])
++        self.objects=state.get_objects(self.observation_space.get_type('Kinematic3DCuboid'))
++        rp=self.pos(state,self.region);rs=self.size(state,self.region)
++        obs=[o for o in self.objects if o not in [self.block,self.region] and np.all(np.abs(self.pos(state,o)[:2]-rp[:2]) < self.size(state,o)[:2]+rs[:2]+.012)]
++        obs.sort(key=lambda o:-self.pos(state,o)[2])
++        self.todo=obs+[self.block];self.index=0;self.phase='above';self.t=0;self.stall=0;self.last=None
++        self.obj=self.todo[0];self.destination=self.choose_destination(state)
++    def choose_destination(self,state):
++        if self.obj==self.block:
++            p=self.pos(state,self.region).copy();p[2]+=self.size(state,self.region)[2]+self.size(state,self.obj)[2]+.001
++            return p
++        h=self.size(state,self.obj)
++        candidates=[]
++        for x in [.135,.2,.265,.33,.395,.465]:
++            for y in [-.36,.36,-.29,.29,-.22,.22,-.15,.15,0]:
++                p=np.array([x,y,.075+h[2]+.001]);free=True
++                for other in self.objects:
++                    if other==self.obj:continue
++                    op=self.pos(state,other);oh=self.size(state,other)
++                    if np.all(np.abs(p[:2]-op[:2]) < h[:2]+oh[:2]+.009):free=False;break
++                if free:candidates.append(p)
++        if candidates:
++            start=self.pos(state,self.obj)
++            return min(candidates,key=lambda p:np.linalg.norm(p[:2]-start[:2]))
++        return np.array([.135,-.36,.076+h[2]])
+     def get_action(self,state):
+-        self.t+=1;r=self.robot;b=self.block
+-        bp=self.pos(state,b);rp=self.pos(state,self.region)
++        self.t+=1;r=self.robot
+         qnow=np.array([state.get(r,'joint_'+str(i)) for i in range(1,8)])
++        base=np.array([state.get(r,'pos_base_x'),state.get(r,'pos_base_y')])
++        model,_=fk(qnow);model+=np.r_[base+[.12,0],0]
+         held=state.get(r,'grasp_active')>0
+-        if held and self.phase in ['above','grasp']: self.phase='lift'
+-        if self.phase=='above':dest=bp+[0,0,.18];grip=0
+-        elif self.phase=='grasp':dest=bp+[0,0,.052];grip=-1
+-        elif self.phase=='lift':dest=np.array([bp[0],bp[1],.30]);grip=0
+-        elif self.phase=='carry':dest=np.array([rp[0],rp[1],.30]);grip=0
+-        elif self.phase=='lower':dest=np.array([rp[0],rp[1],rp[2]+state.get(self.region,'half_extent_z')+state.get(b,'half_extent_z')+.002]);grip=0
+-        else:dest=bp;grip=1
+-        if held:
+-            from kin import fk
+-            model,_=fk(qnow)
+-            model+=np.array([state.get(r,'pos_base_x')+.12,state.get(r,'pos_base_y'),0])
+-            dest=dest+model-bp
+-        q=ik(dest[0]-state.get(r,'pos_base_x')-.12,dest[2])
+-        by=dest[1]-.001
+-        err=max(np.max(np.abs(q-qnow)),abs(by-state.get(r,'pos_base_y')))
+-        if err<.002:
+-            self.phase={'above':'grasp','grasp':'grasp','lift':'carry','carry':'lower','lower':'release','release':'release'}[self.phase]
+-        a=np.zeros(11,dtype=np.float32);a[1]=by-state.get(r,'pos_base_y');a[3:10]=q-qnow;a[10]=grip
++        bp=self.pos(state,self.obj)
++        signature=np.r_[base,qnow,held]
++        if self.last is not None and np.max(abs(signature-self.last))<1e-6:self.stall+=1
++        else:self.stall=0
++        self.last=signature
++        if held and self.phase in ['above','align','grasp']:
++            grabbed=[o for o in self.objects if state.get(o,'grasp_active')>0]
++            if grabbed and grabbed[0]!=self.obj:
++                self.obj=grabbed[0];self.destination=self.choose_destination(state);bp=self.pos(state,self.obj)
++            self.phase='lift';self.lift_xy=bp[:2].copy()
++        if self.phase=='release' and not held:
++            self.index+=1
++            if self.index>=len(self.todo):self.index=len(self.todo)-1
++            self.obj=self.todo[self.index];self.destination=self.choose_destination(state);self.phase='above';bp=self.pos(state,self.obj)
++        grip=0
++        if self.phase=='above':dest=np.r_[model[:2],.34]
++        elif self.phase=='align':dest=np.r_[bp[:2],.34]
++        elif self.phase=='grasp':dest=bp+[0,0,.055];grip=-1
++        elif self.phase=='lift':dest=np.r_[self.lift_xy,.30]
++        elif self.phase=='carry':dest=np.r_[self.destination[:2],.30]
++        elif self.phase=='lower':dest=self.destination.copy()
++        else:dest=bp.copy();grip=1
++        if held:dest=dest+model-bp
++        if self.phase=='above':dest[2]=.34
++        # Preserve a vertical wrist throughout travel and use the mobile base for XY.
++        dz=np.clip(dest[2]-model[2],-.025,.025)
++        z=model[2]+dz
++        key=round(float(z),7)
++        if key not in self.cache:self.cache[key]=ik(.50,z)
++        q=self.cache[key]
++        targetbase=dest[:2]-[.62,.001]
++        delta=np.r_[targetbase-base,q-qnow]
++        scale=max(1.,np.max(np.abs(delta))/.18)
++        a=np.zeros(11,dtype=np.float32);a[:2]=delta[:2]/scale;a[3:10]=delta[2:]/scale;a[10]=grip
++        error=np.max(np.abs(dest-model))
++        if error<.0015 and np.max(abs(q-qnow))<.006:
++            self.phase={'above':'align','align':'grasp','grasp':'grasp','lift':'carry','carry':'lower','lower':'release','release':'release'}[self.phase]
+         return np.clip(a,self.action_space.low,self.action_space.high)

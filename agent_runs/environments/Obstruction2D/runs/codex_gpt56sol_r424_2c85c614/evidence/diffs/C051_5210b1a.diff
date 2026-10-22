@@ -1,0 +1,17 @@
+diff --git a/approach.py b/approach.py
+index b38adba..cdcf5c9 100644
+--- a/approach.py
++++ b/approach.py
+@@ -96,8 +96,10 @@ class GeneratedApproach:
+                                 for qx, qw, _ in used]
+                     return min(margins)
+                 blocker_slots = [(qx, name) for qx, _, name in used if name != target_name]
+-                if blocker_slots:
+-                    px, _ = max(blocker_slots, key=lambda item: abs(item[0] - sx))
++                stack_slots = [item for item in blocker_slots
++                               if not min(tx, sx) - 0.10 < item[0] < max(tx, sx) + 0.10]
++                if len(obstacles) <= 2 and stack_slots:
++                    px, _ = max(stack_slots, key=lambda item: abs(item[0] - sx))
+                     level = sum(abs(qx - px) < 0.01 for qx, _, name in used
+                                 if name != target_name)
+                     park_y = 0.30 + 0.20 * level

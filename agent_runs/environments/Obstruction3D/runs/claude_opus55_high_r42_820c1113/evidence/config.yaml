@@ -1,0 +1,47 @@
+primitive_level: none
+primitives: []
+approach:
+  backend:
+    backend: claude
+    model: claude-opus-5-5
+    effort: high
+  _target_: robocode.approaches.agentic_approach.AgenticApproach
+  max_budget_usd: 20.0
+  max_turns: 0
+  output_dir: ${hydra:runtime.output_dir}
+  load_dir: null
+  container_backend: apptainer
+  geometry_prompt: false
+  modular_code_prompt: false
+  token_budget_prompt: false
+  max_output_tokens: 32768
+  autocompact_pct: 80
+  blackbox: true
+  blackbox_strict: true
+  telemetry: false
+environment:
+  _target_: robocode.environments.variable_object_count_env.VariableObjectCountEnv
+  constant_object_env_path: kinder.envs.kinematic3d.obstruction3d:Obstruction3DEnv
+  count_kwarg: num_obstructions
+  count_object_prefix: obstruction
+  design_counts:
+  - 0
+  - 1
+  - 2
+  eval_counts:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+replicate_seed: 42
+experiment_id: obstruction3d_generalized__agentic__none__blackbox__strict__claude_opus55__timeout_60s__13b0d502
+eval_seed: 792075
+max_steps: 1000
+num_eval_tasks: 100
+eval_timeout: 60
+render_videos: false
+record_approach_history: false
+mcp_tools:
+- render_state
+- render_policy

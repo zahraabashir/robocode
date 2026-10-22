@@ -1,0 +1,21 @@
+diff --git a/approach.py b/approach.py
+index d0a9634..a6979ec 100644
+--- a/approach.py
++++ b/approach.py
+@@ -250,7 +250,7 @@ class GeneratedApproach:
+             _, S0, S1 = best
+             self.plans[r0] = self._extract(res0, S0)
+             self.plans[r1] = self._extract(res1, S1)
+-        self.per = per
++        self.per = dict(per)
+         self.t = 0
+ 
+     def _theta_dp(self, state):
+diff --git a/r0_off.txt b/r0_off.txt
+index e69de29..f701d96 100644
+--- a/r0_off.txt
++++ b/r0_off.txt
+@@ -0,0 +1,3 @@
++{"args": {"seed": 582, "rover": "rover0", "path": [[0.3, -2.18], [0.3, 0.5]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.30000001192092896, -2.180000066757202]], [[0.30000001192092896, -2.180000066757202], [0.30000001192092896, -2.0799999237060547], true]]}
++{"args": {"seed": 369, "rover": "rover0", "path": [[0.3, -2.18], [0.3, 0.5]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.29999998211860657, -2.180000066757202]], [[0.29999998211860657, -2.180000066757202], [0.30000001192092896, -2.0799999237060547], true]]}
++{"args": {"seed": 973, "rover": "rover0", "path": [[0.3, -2.18], [0.3, 0.5]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.30000001192092896, -2.1681997776031494]], [[0.30000001192092896, -2.1681997776031494], [0.29999998211860657, -2.068199634552002], true]]}

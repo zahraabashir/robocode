@@ -1,0 +1,24 @@
+diff --git a/approach.py b/approach.py
+index 738ce82..be60912 100644
+--- a/approach.py
++++ b/approach.py
+@@ -96,6 +96,10 @@ class GeneratedApproach:
+             best = 0.1 + 1e-3 if surf["x"] > W / 2 else W - 0.1 - 1e-3
+         return best
+ 
++    def _grasp_x(self, tgt, robot):
++        lo, hi = robot["rad"] + 1e-3, W - robot["rad"] - 1e-3
++        return float(np.clip(tgt["x"] + tgt["w"] / 2, lo, hi))
++
+     # ---------------- main ----------------
+     def get_action(self, state):
+         robot, objs, surf, block = self._parse(state)
+@@ -130,7 +134,7 @@ class GeneratedApproach:
+                 continue
+             if ph == "goto":
+                 tgt = objs[self.obj_name]
+-                cx = tgt["x"] + tgt["w"] / 2
++                cx = self._grasp_x(tgt, robot)
+                 if not near(robot["x"], cx):
+                     return goto(cx, robot["y"], 0.0)
+                 self.phase = "descend"

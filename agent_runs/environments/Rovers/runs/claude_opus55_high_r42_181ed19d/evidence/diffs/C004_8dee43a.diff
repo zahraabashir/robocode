@@ -1,0 +1,164 @@
+diff --git a/approach.py b/approach.py
+index 5d6878a..693bec4 100644
+--- a/approach.py
++++ b/approach.py
+@@ -247,6 +247,7 @@ class GeneratedApproach:
+         self.stuck = {rn: 0 for rn in self.rnames}
+         self.targets = {rn: None for rn in self.rnames}
+         self.last_pos = {}
++        self._bw_cache = {}
+         self.step_count = 0
+ 
+     def _img_mask(self, rn, k, imaged):
+@@ -528,14 +529,96 @@ class GeneratedApproach:
+                 return "image"
+             if needed and any(k in my_imgs for (_, k) in needed) and self.stuck[rn] >= 2:
+                 return "image"
+-        if store_full:
++        if store_full and need_types:
+             return "drop"
+         if not calibrated and my_imgs and vis:
+             return "calibrate"
+         if self._unsent(state, rn) and self._lander_visible(rn, nx, ny, other_xy):
+             return "send"
++        if store_full:
++            return "drop"
+         return "noop"
+ 
++    def _remaining(self, state, rn):
++        rem = []
++        for t in self.plan[rn]:
++            if t[0] == "O" and state.get(self.objectives[t[1]], "received_image") > 0.5:
++                continue
++            if t[0] in ("S", "T") and self._type_received(state, t[0] == "T"):
++                continue
++            if not self._task_done(state, rn, t):
++                rem.append(t)
++        if rem or self._unsent(state, rn):
++            rem.append("send")
++        rem.append("home")
++        return tuple(rem)
++
++    def _mask(self, rn, task, imaged):
++        if task[0] == "O":
++            m2 = self._img_mask(rn, task[1], imaged)
++            if m2.any():
++                return m2
++        return self.regions[rn][task]
++
++    def _backward(self, rn, rem, imaged):
++        """G[k] = cost-to-go field after completing rem[k] standing at a cell."""
++        key = (rn, rem, imaged)
++        if key in self._bw_cache:
++            return self._bw_cache[key]
++        S = self.sides[rn]
++        ims = []
++        cur = set(imaged)
++        for t in rem:
++            ims.append(frozenset(cur))
++            if t != "send" and t != "home" and t[0] == "O":
++                cur.add(t[1])
++        G = [None] * len(rem)
++        G[-1] = np.zeros(S.N)
++        for k in range(len(rem) - 2, -1, -1):
++            nxt = rem[k + 1]
++            m = self._mask(rn, nxt, ims[k + 1]) if nxt not in ("send", "home") \
++                else self.regions[rn][nxt]
++            init = np.where(m, G[k + 1], np.inf)
++            G[k] = S.field_from(init)
++        if len(self._bw_cache) > 200:
++            self._bw_cache.clear()
++        self._bw_cache[key] = (G, ims)
++        return G, ims
++
++    def _target(self, state, rn, rem, cur, other_xy):
++        S = self.sides[rn]
++        imaged = frozenset(k for k, o in enumerate(self.objectives)
++                           if state.get(o, "have_image_%s" % rn) > 0.5)
++        G, ims = self._backward(rn, rem, imaged)
++        task = rem[0]
++        if task == "home":
++            m = self.regions[rn]["home"]
++        elif task == "send":
++            m = self.regions[rn]["send"].copy()
++            # exclude cells whose lander LOS is blocked by the other rover now
++            cx = S.CX[S.fi, S.fj]
++            cy = S.CY[S.fi, S.fj]
++            lx, ly = self.lander
++            blk = _seg_circle_hit(cx, cy, lx, ly, other_xy[0], other_xy[1], ROVER_BLOCK_R + 0.03)
++            m2 = m & ~blk
++            if m2.any():
++                m = m2
++        else:
++            m = self._mask(rn, task, ims[0]).copy()
++        bl = [n for n in self.blacklist[rn] if n[0] == task]
++        if bl:
++            m = m.copy()
++            for (_, n) in bl:
++                m[n] = False
++            if not m.any():
++                m = self.regions[rn][task] if task in self.regions[rn] else m
++        d = S.dist_from_node(cur)
++        score = np.where(m, d + G[0], np.inf)
++        n = int(np.argmin(score))
++        if not np.isfinite(score[n]):
++            return None
++        return n
++
+     def get_action(self, state):
+         g = state.get
+         self.step_count += 1
+@@ -547,36 +630,29 @@ class GeneratedApproach:
+         for rn in self.rnames:
+             x, y, th = poses[rn]
+             S = self.sides[rn]
+-            task = self._current_task(state, rn)
++            rem = self._remaining(state, rn)
++            task = rem[0]
+             tasks[rn] = task
+             cur = S.node_of(x, y)
+-            # stuck detection
+-            if self.targets[rn] is not None and self.targets[rn][0] == task:
+-                tgt = self.targets[rn][1]
+-                if cur == tgt:
+-                    self.stuck[rn] += 1
+-                    if self.stuck[rn] > 3 and task != "home":
+-                        self.blacklist[rn].add(tgt)
+-                        self.targets[rn] = None
+-                        self.stuck[rn] = 0
+-                else:
+-                    lp = self.last_pos.get(rn)
+-                    if lp is not None and abs(lp[0] - x) < 1e-4 and abs(lp[1] - y) < 1e-4:
+-                        self.stuck[rn] += 1
+-                        if self.stuck[rn] > 3:
+-                            self.blacklist[rn].add(tgt)
+-                            self.targets[rn] = None
+-                            self.stuck[rn] = 0
++            ox, oy, _ = poses[self.other[rn]]
++            # stuck detection: at target (or not moving) with task unchanged
++            lp = self.last_pos.get(rn)
++            prev = self.targets[rn]
++            if prev is not None and prev[0] == task and task != "home" and (
++                    cur == prev[1] or (lp is not None and abs(lp[0] - x) < 1e-4
++                                       and abs(lp[1] - y) < 1e-4)):
++                self.stuck[rn] += 1
++                if self.stuck[rn] > 2:
++                    self.blacklist[rn].add((task, prev[1]))
++                    self.stuck[rn] = 0
+             else:
+-                self.targets[rn] = None
+                 self.stuck[rn] = 0
+-            if self.targets[rn] is None:
+-                tgt = self._pick_target(rn, task, cur, state)
+-                self.targets[rn] = (task, tgt) if tgt is not None else None
+-            if self.targets[rn] is None:
++            tgt = self._target(state, rn, rem, cur, (ox, oy))
++            self.targets[rn] = (task, tgt) if tgt is not None else None
++            if tgt is None:
+                 nexts[rn] = (x, y)
+             else:
+-                nexts[rn] = self._next_pos(rn, x, y, self.targets[rn][1])
++                nexts[rn] = self._next_pos(rn, x, y, tgt)
+             self.last_pos[rn] = (x, y)
+         for ri, rn in enumerate(self.rnames):
+             x, y, th = poses[rn]

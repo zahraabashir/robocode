@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index ad4f3c6..3c76b6b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -105,7 +105,7 @@ class GeneratedApproach:
+             self.phase = "carry"
+         if self.phase == "carry":
+             if is_target:
+-                tx = state.get(surface, "x")
++                tx = state.get(surface, "x") + 0.008
+             elif obj.type.name == "target_block":
+                 tx = ox
+             else:

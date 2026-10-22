@@ -1,0 +1,29 @@
+diff --git a/probe_base.py b/probe_base.py
+new file mode 100644
+index 0000000..5c1fb50
+--- /dev/null
++++ b/probe_base.py
+@@ -0,0 +1,23 @@
++from env_client import make_env
++import numpy as np
++
++def vals(s):
++ o=s.get_object_from_name('robot'); return [float(s.get(o,f)) for f in ('pos_base_x','pos_base_y','pos_base_rot','grasp_active','finger_state')]
++e=make_env()
++for ax in [0,1]:
++ for sign in [-1,1]:
++  s,_=e.reset(seed=0)
++  for t in range(15):
++   a=np.zeros(11);a[ax]=sign*.05;s,r,done,tr,i=e.step(a)
++   print('BASE',ax,sign,t,vals(s),flush=True)
++s,_=e.reset(seed=0)
++# Move in x,y while closing. Reset for each row to prevent any grasp sticking.
++for x in np.arange(-.52,.481,.05):
++ s,_=e.reset(seed=0)
++ for y in np.arange(-.1,.551,.015):
++  b=vals(s);a=np.zeros(11);a[0:2]=np.clip([x-b[0],y-b[1]],-.2,.2);a[10]=-1
++  s,r,done,tr,i=e.step(a)
++  if vals(s)[3]:
++   print('GRASP',x,y,vals(s),[(n,float(s.get(s.get_object_from_name(n),'grasp_active'))) for n in s.get_object_names()],flush=True);break
++ print('ROW',round(x,3),vals(s),flush=True)
++e.close()

@@ -1,0 +1,21 @@
+diff --git a/approach.py b/approach.py
+index 854b20a..9b0d875 100644
+--- a/approach.py
++++ b/approach.py
+@@ -9,7 +9,7 @@ TMAX = 120
+ BAND = {"sample": -5 / 6, "calibrate": -0.5, "image": -1 / 6, "noop": 1 / 6,
+         "send": 0.5, "drop": 5 / 6}
+ SEND_PEN = 0
+-HOME_TOL = 0.15
++HOME_TOL = 0.0
+ NOOP, CAL, IMG, SAMP, DROP, SEND = "noop", "calibrate", "image", "sample", "drop", "send"
+ 
+ 
+diff --git a/res_approach_h.json b/res_approach_h.json
+new file mode 100644
+index 0000000..202b119
+--- /dev/null
++++ b/res_approach_h.json
+@@ -0,0 +1 @@
++{"0": 25, "1": 20, "2": 20, "3": 21, "4": 21, "5": 25, "6": 20, "7": 21, "8": 21, "9": 22, "10": 22, "11": 19, "12": 23, "13": 23, "14": 29, "15": 23, "16": 22, "17": 21, "18": 21, "19": 25, "20": 27, "21": 20, "22": 23, "23": 18, "24": 19, "25": 20, "26": 22, "27": 21, "28": 22, "29": 21, "30": 22, "31": 25, "32": 20, "33": 23, "34": 19, "35": 18, "36": 29, "37": 18, "38": 23, "39": 22, "40": 21, "41": 19, "42": 22, "43": 25, "44": 20, "45": 21, "46": 20, "47": 19}
+\ No newline at end of file

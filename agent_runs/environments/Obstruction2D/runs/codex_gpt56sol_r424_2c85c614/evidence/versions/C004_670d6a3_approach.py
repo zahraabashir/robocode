@@ -1,0 +1,117 @@
+"""Feedback controller for variable-count Obstruction2D."""
+import math
+import numpy as np
+
+
+class GeneratedApproach:
+    def __init__(self, action_space, observation_space, primitives):
+        self.action_space = action_space
+        self.types = {t.name: t for t in observation_space.types}
+
+    def reset(self, state, info):
+        rects = state.get_objects(self.types["rectangle"])
+        self.todo = [o.name for o in rects if o.type.name == "rectangle"]
+        self.todo.sort(key=lambda n: state.get(state.get_object_from_name(n), "height"))
+        self.todo.append(state.get_objects(self.types["target_block"])[0].name)
+        xs = [state.get(state.get_object_from_name(n), "x") for n in state.get_object_names()]
+        self.park_base = max(xs) + 0.45
+        self.index, self.phase, self.retry = 0, "orient", 0
+        self.stalled, self.last_robot_y = 0, None
+        self.pick_y, self.attached, self.release_wait = 0.0, False, 0
+
+    @staticmethod
+    def _clip(v, limit):
+        return max(-limit, min(limit, v))
+
+    def _action(self, dx=0.0, dy=0.0, dtheta=0.0, darm=0.0, vac=0.0):
+        a = np.array([dx, dy, dtheta, darm, vac], dtype=np.float32)
+        return np.clip(a, self.action_space.low, self.action_space.high).astype(np.float32)
+
+    def get_action(self, state):
+        robot = state.get_objects(self.types["crv_robot"])[0]
+        surface = state.get_objects(self.types["target_surface"])[0]
+        rx, ry = state.get(robot, "x"), state.get(robot, "y")
+        theta = state.get(robot, "theta")
+        if self.index >= len(self.todo):
+            return self._action()
+        obj = state.get_object_from_name(self.todo[self.index])
+        is_target = obj.type.name == "target_block"
+        ox, oy = state.get(obj, "x"), state.get(obj, "y")
+        width = state.get(obj, "width")
+
+        if self.phase == "orient":
+            err = (-math.pi / 2 - theta + math.pi) % (2 * math.pi) - math.pi
+            if abs(err) < 0.025:
+                self.phase = "rise"
+            else:
+                return self._action(dtheta=self._clip(err, 0.196))
+        if self.phase == "rise":
+            if ry >= 0.88:
+                self.phase = "align"
+            else:
+                return self._action(dy=min(0.05, 0.9 - ry))
+        if self.phase == "align":
+            offsets = (0.0, -0.22, 0.22, -0.38, 0.38)
+            tx = ox + offsets[min(self.retry, 4)] * width
+            if abs(tx - rx) < 0.004:
+                self.phase, self.stalled = "descend", 0
+                self.last_robot_y, self.pick_y = ry, oy
+            else:
+                return self._action(dx=self._clip(tx - rx, 0.05), vac=1.0)
+        if self.phase == "descend":
+            if self.last_robot_y is not None and abs(ry - self.last_robot_y) < 0.001:
+                self.stalled += 1
+            else:
+                self.stalled = 0
+            self.last_robot_y = ry
+            if self.stalled >= 2 or ry < 0.18:
+                self.phase = "lift"
+            else:
+                return self._action(dy=-0.05, vac=1.0)
+        if self.phase == "lift":
+            if oy > self.pick_y + 0.015:
+                self.attached = True
+            if ry < 0.79:
+                return self._action(dy=0.05, vac=1.0)
+            if not self.attached:
+                self.retry += 1
+                if self.retry < 5:
+                    self.phase = "align"
+                    return self._action()
+                if not is_target:
+                    self.index += 1
+                    self.retry = 0
+                    self.phase = "rise"
+                    return self._action()
+                self.retry, self.phase = 0, "align"
+                return self._action()
+            self.phase = "carry"
+        if self.phase == "carry":
+            tx = state.get(surface, "x") if is_target else self.park_base + 0.24 * self.index
+            if abs(tx - rx) > 0.004:
+                return self._action(dx=self._clip(tx - rx, 0.05), vac=1.0)
+            self.phase = "lower" if is_target else "release"
+            self.stalled, self.last_robot_y = 0, ry
+        if self.phase == "lower":
+            if abs(ry - self.last_robot_y) < 0.001:
+                self.stalled += 1
+            else:
+                self.stalled = 0
+            self.last_robot_y = ry
+            if self.stalled >= 3:
+                self.phase = "release"
+            else:
+                return self._action(dy=-0.05, vac=1.0)
+        if self.phase == "release":
+            self.release_wait += 1
+            if self.release_wait < 2:
+                return self._action()
+            self.phase = "retreat"
+        if self.phase == "retreat":
+            if ry < 0.89:
+                return self._action(dy=0.05)
+            self.index += 1
+            self.retry, self.attached, self.release_wait = 0, False, 0
+            self.phase = "align" if self.index < len(self.todo) else "done"
+            return self._action()
+        return self._action()

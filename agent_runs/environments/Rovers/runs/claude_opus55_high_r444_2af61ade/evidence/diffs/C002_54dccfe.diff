@@ -1,0 +1,79 @@
+diff --git a/NOTES.md b/NOTES.md
+new file mode 100644
+index 0000000..e1e7d87
+--- /dev/null
++++ b/NOTES.md
+@@ -0,0 +1,9 @@
++# Env notes (Rovers)
++- Use: from env_client import make_env; env=make_env(); obs,info=env.reset(seed=s); obs,r,term,trunc,info=env.step(np.array(8 floats,float32))
++- Iterate objects: `for o in obs:` gives objects (o.name, o.type.name); obs.get(o,'x'); obs.get_object_from_name('rover0').
++- Action per rover: [dx(+-0.2), dy(+-0.2), dtheta(+-0.4), selector]. Selector band centres: sample=-0.8333, calibrate=-0.5, image=-0.1667, noop=0.1667, send=0.5, drop=0.8333. (0 = noop)
++- Rover starts: rover0 (1.0,-1.75,theta=pi), rover1 (-1.0,-1.75,theta=0). Lander fixed (-1.9,-2.0).
++- Mounds: obstacles with half_x=0.25 at (+-2,2),(+-0.5,2), z small. Objectives sit on mounds (z=0.2). Pillars: half 0.05x0.05, height 0.4.
++- A hidden wall (NOT in obs) runs along x=0 for the full arena length -> rover0 confined to x>0, rover1 to x<0. Rover0 min x at y=-1.75 is 0.23 (so wall half-thickness + rover radius = 0.23).
++- Motions that collide are rejected entirely (rover stays put); the operator in that step still applies.
++- Arena is 5m square (approx -2.5..2.5).
+diff --git a/dump.py b/dump.py
+new file mode 100644
+index 0000000..ee6a3f6
+--- /dev/null
++++ b/dump.py
+@@ -0,0 +1,8 @@
++from env_client import make_env
++env = make_env()
++for seed in [0,1]:
++    obs, info = env.reset(seed=seed)
++    print("seed",seed, info)
++    for o in obs:
++        print(o.name, o.type.name, [round(float(v),3) for v in obs.data[o]])
++env.close()
+diff --git a/probe1.py b/probe1.py
+new file mode 100644
+index 0000000..e375e21
+--- /dev/null
++++ b/probe1.py
+@@ -0,0 +1,18 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=0)
++r0 = obs.get_object_from_name('rover0'); r1=obs.get_object_from_name('rover1')
++def p(o): return tuple(round(obs.get(o,f),3) for f in ['x','y','theta','store_full','calibrated','at_home'])
++# move rover0 -x, rover1 nothing
++for i in range(8):
++    obs,r,te,tr,inf = env.step(np.array([-0.2,0,0,0, 0,0,0,0],dtype=np.float32))
++    print(i,p(r0),p(r1),r,te,tr)
++# try bigger than limits
++obs,r,te,tr,inf = env.step(np.array([0,0.5,0,0, 0,0,0,0],dtype=np.float32)); print('big',p(r0))
++obs,r,te,tr,inf = env.step(np.array([0,0,0.4,0, 0,0,0,0],dtype=np.float32)); print('rot',p(r0))
++# move rover1 +y up the left side
++for i in range(25):
++    obs,r,te,tr,inf = env.step(np.array([0,0,0,0, 0,0.2,0,0],dtype=np.float32))
++print('r1 after up',p(r1))
++env.close()
+diff --git a/probe2.py b/probe2.py
+new file mode 100644
+index 0000000..8f2b65c
+--- /dev/null
++++ b/probe2.py
+@@ -0,0 +1,20 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=0)
++r0 = obs.get_object_from_name('rover0')
++def p(o): return tuple(round(obs.get(o,f),4) for f in ['x','y','theta'])
++# rover0 to the wall with fine steps
++for i in range(200):
++    obs,*_ = env.step(np.array([-0.01,0,0,0, 0,0,0,0],dtype=np.float32))
++print('r0 min x at y=-1.75', p(r0))
++# move up along wall, testing whether wall ends
++xs=[]
++for i in range(40):
++    obs,*_ = env.step(np.array([0,0.1,0,0, 0,0,0,0],dtype=np.float32))
++    # try to move left
++    b=obs.get(r0,'x')
++    obs,*_ = env.step(np.array([-0.05,0,0,0, 0,0,0,0],dtype=np.float32))
++    xs.append((round(obs.get(r0,'y'),2), round(obs.get(r0,'x'),3)))
++print(xs)
++env.close()

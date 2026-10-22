@@ -1,0 +1,103 @@
+diff --git a/approach.py b/approach.py
+index 64f5f9e..dc5c0ff 100644
+--- a/approach.py
++++ b/approach.py
+@@ -22,6 +22,7 @@ OBJ_RANGE = 1.975
+ LANDER_RANGE = 3.965
+ ROVER_BLOCK_R = 0.26
+ SAMPLE_R = 0.235
++LOS_MARGIN = 0.012
+ HOME_R = 0.235
+ HOME_THETA = {"rover0": math.pi, "rover1": 0.0}
+ 
+@@ -41,6 +42,23 @@ def seg_point_dist(ax, ay, bx, by, px, py):
+     return np.sqrt(qx * qx + qy * qy)
+ 
+ 
++def seg_hits_box(ax, ay, bx, by, cx, cy, hx, hy):
++    """Vectorised: does segment (ax,ay)->(bx,by) intersect box centred (cx,cy)?"""
++    dx = bx - ax
++    dy = by - ay
++    t0 = np.zeros(np.shape(ax))
++    t1 = np.ones(np.shape(ax))
++    for d, a, c, h in ((dx, ax, cx, hx), (dy, ay, cy, hy)):
++        d = np.where(np.abs(d) < 1e-12, 1e-12, d)
++        u = (c - h - a) / d
++        v = (c + h - a) / d
++        lo = np.minimum(u, v)
++        hi = np.maximum(u, v)
++        t0 = np.maximum(t0, lo)
++        t1 = np.minimum(t1, hi)
++    return t0 <= t1
++
++
+ class World:
+     def __init__(self, state, obs_space):
+         self.space = obs_space
+@@ -74,6 +92,8 @@ class GeneratedApproach:
+             self.home_theta[n] = self._get(state, o, "theta")
+         self.plans = None
+         self.bad_points = []
++        self.bad_view = {n: [] for n in self.w.rovers}
++        self.bad_send = {n: [] for n in self.w.rovers}
+         self.expect = None
+         self.nreplan = 0
+         self._plan(state)
+@@ -224,9 +244,17 @@ class GeneratedApproach:
+         regions = []
+         names = []
+         vany = np.zeros(X.shape, bool)
++        pillars = [(g(o, "x"), g(o, "y"), g(o, "half_x") + LOS_MARGIN, g(o, "half_y") + LOS_MARGIN)
++                   for o in w.obstacles if g(o, "half_x") < 0.12 and g(o, "half_y") < 0.12]
++        badv = np.zeros(X.shape, bool)
++        for (bx, by) in self.bad_view[r]:
++            badv |= np.hypot(X - bx, Y - by) < 0.04
+         for ob in w.objectives:
+-            d = np.hypot(CX - g(ob, "x"), CY - g(ob, "y"))
+-            vis = (d <= OBJ_RANGE) & free
++            ox, oy = g(ob, "x"), g(ob, "y")
++            d = np.hypot(CX - ox, CY - oy)
++            vis = (d <= OBJ_RANGE) & free & ~badv
++            for (px, py, phx, phy) in pillars:
++                vis &= ~seg_hits_box(CX, CY, ox, oy, px, py, phx, phy)
+             vany |= vis
+             if ob in need_img and vis.any():
+                 regions.append(("img", vis)); names.append(("img", ob.name))
+@@ -242,6 +270,10 @@ class GeneratedApproach:
+         # send region
+         lx, ly = g(w.lander, "x"), g(w.lander, "y")
+         send = (np.hypot(CX - lx, CY - ly) <= LANDER_RANGE) & free
++        for (px, py, phx, phy) in pillars:
++            send &= ~seg_hits_box(CX, CY, lx, ly, px, py, phx, phy)
++        for (bx, by) in self.bad_send[r]:
++            send &= np.hypot(X - bx, Y - by) > 0.04
+         for other in rnames:
+             if other == r:
+                 continue
+@@ -495,10 +527,13 @@ class GeneratedApproach:
+             if op == "sample" and store < 0.5:
+                 return True
+             if op == "calibrate" and cal < 0.5:
++                self.bad_view[r].append((x, y))
+                 return True
+             if op == "image" and imgs <= snap[2]:
++                self.bad_view[r].append((x, y))
+                 return True
+             if op == "send" and recv <= snap[3] and self._unsent(state, r):
++                self.bad_send[r].append((x, y))
+                 return True
+         return False
+ 
+diff --git a/dbg3.py b/dbg3.py
+new file mode 100644
+index 0000000..1ad291d
+--- /dev/null
++++ b/dbg3.py
+@@ -0,0 +1,7 @@
++import sys, math
++from env_client import make_env
++env=make_env(); obs,_=env.reset(seed=int(sys.argv[1]))
++T=lambda n: env.observation_space.get_type(n)
++cx,cy=float(sys.argv[2]),float(sys.argv[3])
++for o in obs.get_objects(T('objective')):
++    x,y=obs.get(o,'x'),obs.get(o,'y'); print(o.name, round(x,3),round(y,3), 'dist',round(math.hypot(x-cx,y-cy),3))

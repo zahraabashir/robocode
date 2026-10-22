@@ -1,0 +1,42 @@
+diff --git a/approach.py b/approach.py
+index 2b33e81..7939d33 100644
+--- a/approach.py
++++ b/approach.py
+@@ -189,14 +189,14 @@ class GeneratedApproach:
+     def cost(self, pose):
+         pose = np.atleast_2d(pose)
+         dp = pose[:, :2] - self.goal[:2]
+-        da = np.abs(wrap_arr(pose[:, 2] - self.goal[2]))
++        da = np.abs(pose[:, 2] - self.goal[2])
+         if self.cost_mode == 1:
+             return np.sqrt(dp[:, 0] ** 2 + dp[:, 1] ** 2 + (self.wa * da) ** 2)
+         return np.hypot(dp[:, 0], dp[:, 1]) + self.wa * da
+ 
+     def solved(self, pose):
+         return (abs(pose[0] - self.goal[0]) < 0.03 and abs(pose[1] - self.goal[1]) < 0.03
+-                and abs(wrap(pose[2] - self.goal[2])) < math.radians(8))
++                and abs(pose[2] - self.goal[2]) < math.radians(8))
+ 
+     # ------------------------------------------------------------------
+     def local_candidates(self, spacing, angs):
+@@ -315,7 +315,7 @@ class GeneratedApproach:
+ 
+     def in_goal(self, poses, frac=1.0):
+         dp = np.abs(poses[:, :2] - self.goal[:2])
+-        da = np.abs(wrap_arr(poses[:, 2] - self.goal[2]))
++        da = np.abs(poses[:, 2] - self.goal[2])
+         return (dp[:, 0] < 0.03 * frac) & (dp[:, 1] < 0.03 * frac) & (da < math.radians(8) * frac)
+ 
+     def _nodes(self, pose):
+diff --git a/tune.py b/tune.py
+index 3cdb96a..6d61f6c 100644
+--- a/tune.py
++++ b/tune.py
+@@ -17,6 +17,7 @@ def run(seed):
+         obs, r, term, trunc, _ = env.step(np.clip(ap.get_action(obs), -0.049, 0.049))
+         if term or trunc: break
+     env.close()
++    if not term: print("FAIL", seed, obs[0:3]-obs[29:32], flush=True)
+     return term, steps, time.time()-t0
+ if __name__ == "__main__":
+     a, b = int(sys.argv[1]), int(sys.argv[2])

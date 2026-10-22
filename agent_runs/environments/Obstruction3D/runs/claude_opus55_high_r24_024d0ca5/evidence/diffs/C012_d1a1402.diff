@@ -1,0 +1,80 @@
+diff --git a/approach.py b/approach.py
+index 9dae5e3..436c962 100644
+--- a/approach.py
++++ b/approach.py
+@@ -115,6 +115,7 @@ class GeneratedApproach:
+         self.last_q = None
+         self.last_a = None
+         self.blocked = False
++        self.look = STEP
+         self.stuck = 0
+         self.descent_len = 0
+         self.release_tries = 0
+@@ -279,7 +280,7 @@ class GeneratedApproach:
+             return None
+         k = -1
+         for i, qp in enumerate(self.qpath):
+-            if np.max(np.abs(_wrap(qp - q))) <= STEP:
++            if np.max(np.abs(_wrap(qp - q))) <= self.look:
+                 k = i
+                 if (i + self.popped) in self.corners:
+                     break
+@@ -295,7 +296,7 @@ class GeneratedApproach:
+             a[10] = self.travel_grip
+         else:
+             d = _wrap(self.qpath[0] - q)
+-            a[3:10] = d * (STEP / np.max(np.abs(d)))
++            a[3:10] = d * (self.look / np.max(np.abs(d)))
+         return a
+ 
+     def _noop(self, grip=0.0):
+@@ -307,6 +308,10 @@ class GeneratedApproach:
+         moved = self.last_q is None or not np.allclose(q, self.last_q, atol=1e-7)
+         attempted = self.last_a is not None and np.any(np.abs(self.last_a[3:10]) > 1e-9)
+         self.blocked = attempted and not moved
++        if self.blocked:
++            self.look = max(0.02, self.look * 0.35)
++        elif attempted:
++            self.look = min(STEP, self.look * 1.5)
+         self.last_q = q.copy()
+         try:
+             a = self._policy(state)
+diff --git a/dbg_pp.py b/dbg_pp.py
+index 9ed102a..f5f28b4 100644
+--- a/dbg_pp.py
++++ b/dbg_pp.py
+@@ -13,3 +13,5 @@ def sp(state,wps,yaw,final_grip=0.0,res=0.01):
+ ap._set_path=sp
+ ap._plan_place(obs)
+ for n in ap.names: print(n,np.round(ap._pose(obs,n)[0],3),np.round(ap._pose(obs,n)[2],3))
++from kin import tool_fk
++for qp in ap.qpath[:4]: T=tool_fk(qp,ap._base(obs)); print(np.round(T[:3,3],3), round(float(np.arctan2(T[1,0],T[0,0])),3), np.round(qp-ap._q(obs),3))
+diff --git a/probe86.py b/probe86.py
+new file mode 100644
+index 0000000..2915915
+--- /dev/null
++++ b/probe86.py
+@@ -0,0 +1,23 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++from kin import tool_fk, tool_ik, down_R
++seed=int(sys.argv[1]); T=int(sys.argv[2])
++def replay():
++    env=make_env(); obs,info=env.reset(seed=seed)
++    ap=GeneratedApproach(env.action_space,env.observation_space,{}); ap.reset(obs,info)
++    for t in range(T):
++        a=ap.get_action(obs); obs,*_=env.step(a)
++    return env,obs,ap
++env,obs,ap=replay()
++q=ap._q(obs); base=ap._base(obs); Tt=tool_fk(q,base); yaw=np.arctan2(Tt[1,0],Tt[0,0])
++print('tool',np.round(Tt[:3,3],3),'yaw',yaw,'finger',obs.get(ap.robot,'finger_state'))
++tests={'up1cm':(0,0,0.01),'up3mm':(0,0,0.003),'-x':(-0.005,0,0.002),'+x':(0.005,0,0.002),'-y':(0,-0.005,0.002),'+y':(0,0.005,0.002)}
++for k,d in tests.items():
++    env.close(); env,obs,ap=replay()
++    qn,ok=tool_ik(q,Tt[:3,3]+np.array(d),down_R(yaw),base)
++    a=np.zeros(11,dtype=np.float32); a[3:10]=np.clip(qn-q,-0.2,0.2)
++    obs2,*_=env.step(a)
++    print(k,'moved',not np.allclose(ap._q(obs2),q))
++a=np.zeros(11,dtype=np.float32); a[1]=0.01
++env.close(); env,obs,ap=replay(); obs2,*_=env.step(a); print('base dy moved', not np.allclose(ap._base(obs2),base))

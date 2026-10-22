@@ -1,0 +1,117 @@
+diff --git a/test_many.txt b/test_many.txt
+index c2323f1..c257a17 100644
+--- a/test_many.txt
++++ b/test_many.txt
+@@ -27,3 +27,32 @@ RESULT 1025 {'object_count': 4} True 32 1.322
+ RESULT 1026 {'object_count': 4} True 29 1.187
+ RESULT 1027 {'object_count': 4} True 26 0.743
+ RESULT 1028 {'object_count': 4} True 42 1.501
++RESULT 1029 {'object_count': 4} True 33 1.779
++RESULT 1030 {'object_count': 4} True 32 1.654
++RESULT 1031 {'object_count': 4} True 30 1.289
++RESULT 1032 {'object_count': 4} True 31 1.158
++RESULT 1033 {'object_count': 4} True 25 0.817
++RESULT 1034 {'object_count': 4} True 32 1.37
++RESULT 1035 {'object_count': 4} True 30 1.002
++RESULT 1036 {'object_count': 4} True 31 1.031
++RESULT 1037 {'object_count': 4} True 26 1.023
++RESULT 1038 {'object_count': 4} True 26 1.144
++RESULT 1039 {'object_count': 4} True 35 1.546
++RESULT 1040 {'object_count': 4} True 28 1.006
++RESULT 1041 {'object_count': 4} True 28 1.111
++RESULT 1042 {'object_count': 4} True 33 1.342
++RESULT 1043 {'object_count': 4} True 29 1.178
++RESULT 1044 {'object_count': 4} True 26 1.189
++RESULT 1045 {'object_count': 4} True 29 1.297
++RESULT 1046 {'object_count': 4} True 26 0.904
++RESULT 1047 {'object_count': 4} True 33 1.568
++RESULT 1048 {'object_count': 4} True 27 1.129
++RESULT 1049 {'object_count': 4} True 32 1.174
++RESULT 1050 {'object_count': 4} True 29 0.886
++RESULT 1051 {'object_count': 4} True 36 1.491
++RESULT 1052 {'object_count': 4} True 39 1.194
++RESULT 1053 {'object_count': 4} True 29 1.031
++RESULT 1054 {'object_count': 4} True 28 1.298
++RESULT 1055 {'object_count': 4} True 27 1.168
++RESULT 1056 {'object_count': 4} True 37 1.421
++RESULT 1057 {'object_count': 4} True 29 1.069
+diff --git a/test_refined.txt b/test_refined.txt
+index 597cbcf..ca9db6a 100644
+--- a/test_refined.txt
++++ b/test_refined.txt
+@@ -43,3 +43,39 @@ RESULT 41 {'object_count': 2} True 21 1.041
+ RESULT 42 {'object_count': 1} True 28 0.88
+ RESULT 43 {'object_count': 2} True 34 1.224
+ RESULT 44 {'object_count': 3} True 24 0.595
++RESULT 45 {'object_count': 3} True 29 1.218
++RESULT 46 {'object_count': 2} True 24 1.584
++RESULT 47 {'object_count': 1} True 26 1.292
++RESULT 48 {'object_count': 1} True 21 0.576
++RESULT 49 {'object_count': 1} True 42 1.431
++RESULT 50 {'object_count': 3} True 28 1.212
++RESULT 51 {'object_count': 2} True 23 1.149
++RESULT 52 {'object_count': 3} True 27 1.267
++RESULT 53 {'object_count': 3} True 26 0.64
++RESULT 54 {'object_count': 1} True 21 0.575
++RESULT 55 {'object_count': 3} True 29 1.279
++RESULT 56 {'object_count': 2} True 28 1.159
++RESULT 57 {'object_count': 1} True 18 0.49
++RESULT 58 {'object_count': 2} True 33 0.862
++RESULT 59 {'object_count': 3} True 24 1.097
++RESULT 60 {'object_count': 1} True 28 0.951
++RESULT 61 {'object_count': 2} True 25 0.673
++RESULT 62 {'object_count': 2} True 27 0.594
++RESULT 63 {'object_count': 2} True 30 0.91
++RESULT 64 {'object_count': 2} True 27 0.997
++RESULT 65 {'object_count': 1} True 20 0.852
++RESULT 66 {'object_count': 3} True 27 1.079
++RESULT 67 {'object_count': 3} True 25 0.486
++RESULT 68 {'object_count': 2} True 25 1.04
++RESULT 69 {'object_count': 1} True 24 1.172
++RESULT 70 {'object_count': 2} True 25 0.989
++RESULT 71 {'object_count': 3} True 26 1.007
++RESULT 72 {'object_count': 3} True 30 0.701
++RESULT 73 {'object_count': 3} True 24 0.907
++RESULT 74 {'object_count': 1} True 24 1.082
++RESULT 75 {'object_count': 2} True 24 1.036
++RESULT 76 {'object_count': 2} True 27 1.18
++RESULT 77 {'object_count': 1} True 23 0.508
++RESULT 78 {'object_count': 3} True 27 1.111
++RESULT 79 {'object_count': 1} True 32 1.215
++RESULT 80 {'object_count': 3} True 28 1.194
+diff --git a/test_stats.py b/test_stats.py
+new file mode 100644
+index 0000000..2601c23
+--- /dev/null
++++ b/test_stats.py
+@@ -0,0 +1,30 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import numpy as np
++import time,json,argparse
++P=argparse.ArgumentParser();P.add_argument('--start',type=int,default=0);P.add_argument('--n',type=int,default=100);P.add_argument('--count',type=int);P.add_argument('--out',default='stats.json');a=P.parse_args();out=[]
++for seed in range(a.start,a.start+a.n):
++ e=make_env();s,info=e.reset(seed=seed,options={'object_count':a.count} if a.count else None);ap=GeneratedApproach(e.action_space,e.observation_space,{});st=time.time();ap.reset(s,info);tm=time.time()-st
++ bad=[0,0,0];ops=[0,0,0,0,0];success=False
++ for t in range(200):
++  st=time.time();act=ap.get_action(s);tm+=time.time()-st
++  s2,_,done,trunc,_=e.step(act)
++  for r in range(2):
++   op=act[4*r+3];rob=ap.rovers[r]
++   if np.linalg.norm(act[4*r:4*r+2])>.01 and np.linalg.norm(ap.xy(s,rob)-ap.xy(s2,rob))<1e-6:bad[0]+=1
++   if abs(op+.5)<1e-4:
++    ops[0]+=1
++    if s2.get(rob,'calibrated')<.5:bad[1]+=1
++   if abs(op+.166666)<1e-4:ops[1]+=1
++   if abs(op-.5)<1e-4:
++    ops[2]+=1
++    if ap.pending(s2,r):bad[2]+=1
++   if abs(op+.83333)<1e-4:ops[3]+=1
++   if abs(op-.83333)<1e-4:ops[4]+=1
++  s=s2
++  if done or trunc:success=done;break
++ rec={'seed':seed,'n':info.get('object_count'),'success':success,'steps':t+1,'time':round(tm,3),'bad':bad,'ops':ops};out.append(rec)
++ if not success or seed%10==0:print(rec,flush=True)
++ e.close()
++open(a.out,'w').write(json.dumps(out))
++print('SUMMARY',sum(r['success'] for r in out),len(out),'mean',np.mean([r['steps'] for r in out]),'max_time',max(r['time'] for r in out),flush=True)

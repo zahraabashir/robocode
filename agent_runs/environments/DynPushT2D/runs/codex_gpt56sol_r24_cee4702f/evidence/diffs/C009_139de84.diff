@@ -1,0 +1,19 @@
+diff --git a/candidate_strategy.py b/candidate_strategy.py
+index cc1fffa..ba2bb5c 100644
+--- a/candidate_strategy.py
++++ b/candidate_strategy.py
+@@ -28,7 +28,13 @@ class CandidateStrategy:
+         return v / n if n > 1e-9 else np.zeros(2)
+ 
+     def _move(self, robot, target, gain=1.0):
+-        return np.clip((target - robot) * gain, self.low, self.high)
++        # The server also enforces a Euclidean displacement cap despite the Box
++        # metadata being per-axis, so diagonal commands must be normalized.
++        action = np.clip((target - robot) * gain, self.low, self.high)
++        norm = float(np.linalg.norm(action))
++        if norm > 0.049:
++            action *= 0.049 / norm
++        return action
+ 
+     def _select(self, s):
+         c = s[0:2]

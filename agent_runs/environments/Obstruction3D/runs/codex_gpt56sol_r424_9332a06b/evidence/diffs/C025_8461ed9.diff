@@ -1,0 +1,18 @@
+diff --git a/approach.py b/approach.py
+index dfb5e1f..1b94f4f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -89,11 +89,11 @@ class GeneratedApproach:
+                 d=.04*self.cal_sign; a += self.B[:,self.cal_i]*d; a[10]=-1.
+                 self.last_pos=feat; self.last_delta=d; return a
+         if self.mode=="release":
+-            if self.release_t<12:
++            if self.release_t<60:
+                 g=np.array([self.dest[0],self.dest[1],self.rest_z-.005])
+                 er=np.r_[g-pos,-feat[3:]]
+                 u=np.linalg.solve(self.J.T@self.J+1e-5*np.eye(5),self.J.T@np.clip(er,-.03,.03))
+-                a += self.B@np.clip(u,-.035,.035)
++                a += self.B@np.clip(u,-.05,.05)
+             a[10]=1.; self.release_t+=1; return a
+         goals=[np.array([pos[0],pos[1],.24]),np.array([self.dest[0],self.dest[1],.24]),
+                np.array([self.dest[0],self.dest[1],self.rest_z+.005])]

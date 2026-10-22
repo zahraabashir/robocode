@@ -1,0 +1,26 @@
+diff --git a/approach.py b/approach.py
+index 5dcb7ad..29fdb14 100644
+--- a/approach.py
++++ b/approach.py
+@@ -23,6 +23,7 @@ LANDER_RANGE = 3.985
+ SAMPLE_R = 0.242
+ HOME_R = 0.22
+ IMG_TH = -math.pi / 2
++ROT_IMG = 1.2
+ PILLAR_INFL_OBJ = 0.015
+ PILLAR_INFL_LAND = 0.04
+ ROVER_OCC_R = 0.26
+@@ -301,7 +302,12 @@ class GeneratedApproach:
+         if math.hypot(other["x"] - ohome[0], other["y"] - ohome[1]) > 0.05:
+             occl.append((other["x"], other["y"]))
+         merged = {}
+-        ths = [IMG_TH if IMG_TH is not None else self.homes[name][2]]
++        hth = self.homes[name][2]
++        if IMG_TH is None:
++            ths = [hth]
++        else:
++            d = float(_wrap(IMG_TH - hth))
++            ths = [float(_wrap(hth + math.copysign(min(abs(d), ROT_IMG), d)))]
+         for ith in ths:
+             P, table = self._rover_tables_h(ri, sc, need_objs, need_stone, need_soil,
+                                             pending, occl, ith)

@@ -1,0 +1,23 @@
+diff --git a/approach.py b/approach.py
+index c5162bb..2a47316 100644
+--- a/approach.py
++++ b/approach.py
+@@ -216,7 +216,7 @@ class GeneratedApproach:
+                 continue
+             ok = True
+             for o in others:
+-                if o["y"] + o["h"] > btop - 0.005 and o["x"] < x + half + 0.004 \
++                if o["y"] + o["h"] > btop - 0.02 and o["x"] < x + half + 0.004 \
+                         and o["x"] + o["w"] > x - half - 0.004:
+                     ok = False
+                     if self.grasp_conflict is None:
+@@ -488,6 +488,9 @@ class GeneratedApproach:
+         darm = r["arm_max"] - r["arm"]
+         if wp["kind"] == "grasp":
+             return self._act(0, 0, darm, 1, dth)
++        if wp["kind"] == "move" and r["vac"] > 0.5:
++            # make sure nothing is held before moving freely
++            return self._act(0, 0, 0, 0, 0)
+         if self.stall >= 2:
+             # stuck: nudge up and replan
+             self.stall = 0

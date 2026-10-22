@@ -1,0 +1,15 @@
+diff --git a/approach.py b/approach.py
+index 5cf6406..60a06a9 100644
+--- a/approach.py
++++ b/approach.py
+@@ -32,6 +32,10 @@ class GeneratedApproach:
+         triples=[base,(base[0]-.08,base[1],base[2]),(base[0]+.08,base[1],base[2]),
+                  (base[0],base[1]-.10,base[2]-.10),(base[0],base[1]+.10,base[2]+.10),
+                  (base[0],base[1],base[2]-.18),(base[0],base[1],base[2]+.18)]
++        if x<.23:
++            for q2 in (.10,.20,.30,.40):
++                for q4 in (-2.50,-2.35,-2.20):
++                    for q6 in (-.90,-.75,-.60): triples.append((q2,q4,q6))
+         self.pick_poses=[]
+         for q2,q4,q6 in triples:
+             self.pick_poses.append((np.array([0.,q2,-np.pi,q4,0.,q6,np.pi/2]),.00135,None))

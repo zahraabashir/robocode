@@ -1,0 +1,57 @@
+diff --git a/approach.py b/approach.py
+index a3204a3..4195637 100644
+--- a/approach.py
++++ b/approach.py
+@@ -186,6 +186,7 @@ class GeneratedApproach:
+         self.last_pos = None
+         self.target_name = None
+         self.block_dest = None
++        self.staged = False
+         self.attempts = {}
+         self.carry = None
+         self.stuck_carry = 0
+@@ -342,8 +343,16 @@ class GeneratedApproach:
+                 if bl2:
+                     self.block_grel = grel
+                     blockers = bl2
++        stage = False
+         if blockers:
+             tgt = min(blockers, key=lambda b: abs(b["x"] + b["w"] / 2 - rx))
++            if not self.staged:
++                oc = tgt["x"] + tgt["w"] / 2
++                bc = self.block["x"] + self.block_grel
++                gain = abs(rx - oc) + abs(oc - bc) - abs(rx - bc) - abs(bc - self.block_dest)
++                if gain > STAGE_GAIN:
++                    stage = True
++                    tgt = self.block
+         else:
+             tgt = self.block
+         gx = None
+@@ -379,13 +388,26 @@ class GeneratedApproach:
+         gpos = (gx, gy)
+         off = gy - tgt["y"]
+         gx_rel = gx - tgt["x"]
+-        if is_block:
++        if is_block and stage and tgt["name"] == self.block["name"]:
++            self.staged = True
++            nb = min(blockers, key=lambda b: abs(b["x"] + b["w"] / 2 - self.block_dest))
++            next_pos = (nb["x"] + nb["w"] / 2, nb["y"] + nb["h"] + self._grip_off() + GAP)
++            spot = self._free_spot(tgt, others, [], gx_rel, gpos, next_pos)
++            if spot is None:
++                spot = (tgt["x"], min(0.6, tgt["y"] + 0.3))
++            is_block = False
++            dest_x, dest_y = spot
++        elif is_block:
+             dest_x = self.block_dest
+             dest_y = FLOOR + BLOCK_Z - PLACE_GAP
+         else:
+             b = self.block
+             bgx = b["x"] + b["w"] / 2
+             next_pos = (bgx, b["y"] + b["h"] + self._grip_off() + GAP)
++            rem = [o for o in blockers if o["name"] != tgt["name"]]
++            if rem:
++                nb = min(rem, key=lambda o: abs(o["x"] + o["w"] / 2 - gx))
++                next_pos = (nb["x"] + nb["w"] / 2, nb["y"] + nb["h"] + self._grip_off() + GAP)
+             spot = self._free_spot(tgt, others, [], gx_rel, gpos, next_pos)
+             if spot is None:
+                 spot = (tgt["x"], min(0.6, tgt["y"] + 0.3))

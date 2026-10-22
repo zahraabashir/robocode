@@ -1,0 +1,21 @@
+diff --git a/test_batch.py b/test_batch.py
+index 2ac5088..83fb6f6 100644
+--- a/test_batch.py
++++ b/test_batch.py
+@@ -10,12 +10,13 @@ def run(seed):
+  try:
+   s,i=e.reset(seed=seed,options={'object_count':count} if count is not None else None)
+   p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,i)
+-  st=time.time();trace=[]
++  st=time.time();trace=[];policy_seconds=0.0
+   for t in range(e.max_steps):
+-   a=p.get_action(s);s,r,d,tr,i=e.step(a)
++   tick=time.perf_counter();a=p.get_action(s);policy_seconds+=time.perf_counter()-tick
++   s,r,d,tr,i=e.step(a)
+    if t%40==0:trace.append([t,p.phase,p.obj.name if p.obj else '',round(s.get(p.robot,'x'),4),round(s.get(p.robot,'y'),4)])
+    if d or tr:break
+-  out=dict(seed=seed,count=count,done=d,steps=t+1,seconds=round(time.time()-st,3))
++  out=dict(seed=seed,count=count,done=d,steps=t+1,seconds=round(time.time()-st,3),policy_seconds=round(policy_seconds,4))
+   if not d:out['trace']=trace[-4:];out['state']={o.name:{f:s.get(o,f) for f in ('x','y','width','height')} for o in s.get_objects(p.ot)}
+   print(seed, "OK" if d else "FAIL", t+1, flush=True)
+   return out

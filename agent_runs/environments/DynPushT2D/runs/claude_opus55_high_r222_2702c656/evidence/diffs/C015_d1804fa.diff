@@ -1,0 +1,48 @@
+diff --git a/approach.py b/approach.py
+index e43c919..f8fad82 100644
+--- a/approach.py
++++ b/approach.py
+@@ -89,6 +89,8 @@ class GeneratedApproach:
+         self.ang_tol = math.radians(3.5)
+         self.lam = 0.3
+         self.kres = 1.2
++        self.wall_m = 0.3
++        self.rot_chunk = math.radians(45)
+         self.kpush = 20.0
+         self.obl = 0.0
+         self.tk = 0.6
+@@ -199,14 +201,14 @@ class GeneratedApproach:
+                 cost = (path + abs(dth) * arm + self.kres * resid) / 0.05 + (self.kpush if resid > 0.03 else 0.0)
+                 # wall check along the predicted rotation
+                 m = 1e9
+-                for f in (0.5, 1.0):
++                for f in (0.25, 0.5, 0.75, 1.0):
+                     a2 = dth * f
+                     c2, s2 = math.cos(a2), math.sin(a2)
+                     R2 = np.array([[c2, -s2], [s2, c2]])
+                     p2 = cw + R2 @ (B.p - cw)
+                     m = min(m, self.wall_margin_pose(B, p2, B.th + a2))
+-                if m < 0.2:
+-                    cost += 1000 + (0.2 - m) * 1000
++                if m < self.wall_m:
++                    cost += 1000 + (self.wall_m - m) * 1000
+                 s = -cost
+                 if s > bs:
+                     bs, best = s, pr
+@@ -359,6 +361,7 @@ class GeneratedApproach:
+                 return np.zeros(2)
+             self.push = pr
+             self.push_dth0 = dth
++            self.push_th0 = float(obs[2])
+             self.push_err0 = np.array([obs[29] - obs[0], obs[30] - obs[1]])
+             self.mode = 'approach'
+             self.push_steps = 0
+@@ -413,6 +416,8 @@ class GeneratedApproach:
+                 rem = abs(dth)
+                 if dth * self.push_dth0 <= 0 or rem < self.rot_end:
+                     done = True
++                if abs(wrap(B.th - self.push_th0)) > self.rot_chunk:
++                    done = True
+                 speed = MAXS if rem > self.rot_ramp else max(0.005, MAXS * rem / self.rot_ramp)
+             if self.push_steps == 1:
+                 self.push_start = (B.p.copy(), B.th)

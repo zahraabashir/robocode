@@ -1,0 +1,74 @@
+diff --git a/final_count4.jsonl b/final_count4.jsonl
+index 381692a..babaa40 100644
+--- a/final_count4.jsonl
++++ b/final_count4.jsonl
+@@ -97,3 +97,4 @@
+ {"seed": 96, "count": 4, "success": true, "steps": 59, "policy_seconds": 0.011, "elapsed": 0.183}
+ {"seed": 97, "count": 4, "success": true, "steps": 147, "policy_seconds": 0.0273, "elapsed": 0.44}
+ {"seed": 98, "count": 4, "success": true, "steps": 105, "policy_seconds": 0.0226, "elapsed": 0.328}
++{"seed": 99, "count": 4, "success": true, "steps": 100, "policy_seconds": 0.017, "elapsed": 0.721}
+diff --git a/final_edge_regression.jsonl b/final_edge_regression.jsonl
+new file mode 100644
+index 0000000..65541fa
+--- /dev/null
++++ b/final_edge_regression.jsonl
+@@ -0,0 +1,20 @@
++{"seed": 380, "count": 3, "success": true, "steps": 88, "policy_seconds": 0.0204, "elapsed": 0.731}
++{"seed": 381, "count": 3, "success": true, "steps": 100, "policy_seconds": 0.0165, "elapsed": 0.6}
++{"seed": 382, "count": 3, "success": true, "steps": 71, "policy_seconds": 0.0103, "elapsed": 0.206}
++{"seed": 383, "count": 3, "success": true, "steps": 59, "policy_seconds": 0.011, "elapsed": 0.183}
++{"seed": 384, "count": 3, "success": true, "steps": 112, "policy_seconds": 0.0209, "elapsed": 0.341}
++{"seed": 385, "count": 3, "success": true, "steps": 66, "policy_seconds": 0.008, "elapsed": 0.205}
++{"seed": 386, "count": 3, "success": true, "steps": 84, "policy_seconds": 0.0117, "elapsed": 0.236}
++{"seed": 387, "count": 3, "success": true, "steps": 80, "policy_seconds": 0.0218, "elapsed": 0.242}
++{"seed": 388, "count": 3, "success": true, "steps": 35, "policy_seconds": 0.0023, "elapsed": 0.091}
++{"seed": 389, "count": 3, "success": true, "steps": 76, "policy_seconds": 0.0119, "elapsed": 0.243}
++{"seed": 390, "count": 3, "success": true, "steps": 50, "policy_seconds": 0.0094, "elapsed": 0.157}
++{"seed": 391, "count": 3, "success": true, "steps": 70, "policy_seconds": 0.0205, "elapsed": 0.217}
++{"seed": 392, "count": 3, "success": true, "steps": 26, "policy_seconds": 0.0022, "elapsed": 0.082}
++{"seed": 393, "count": 3, "success": true, "steps": 69, "policy_seconds": 0.012, "elapsed": 0.214}
++{"seed": 394, "count": 3, "success": true, "steps": 47, "policy_seconds": 0.0025, "elapsed": 0.13}
++{"seed": 395, "count": 3, "success": true, "steps": 135, "policy_seconds": 0.0289, "elapsed": 0.398}
++{"seed": 396, "count": 3, "success": true, "steps": 61, "policy_seconds": 0.0101, "elapsed": 0.182}
++{"seed": 397, "count": 3, "success": true, "steps": 54, "policy_seconds": 0.0106, "elapsed": 0.16}
++{"seed": 398, "count": 3, "success": true, "steps": 64, "policy_seconds": 0.0088, "elapsed": 0.194}
++{"seed": 399, "count": 3, "success": true, "steps": 97, "policy_seconds": 0.0149, "elapsed": 0.298}
+diff --git a/probe_count3_edges.json b/probe_count3_edges.json
+new file mode 100644
+index 0000000..f886bd6
+--- /dev/null
++++ b/probe_count3_edges.json
+@@ -0,0 +1 @@
++{"far": [], "edges": []}
+diff --git a/probe_count3_edges.py b/probe_count3_edges.py
+new file mode 100644
+index 0000000..0ec772a
+--- /dev/null
++++ b/probe_count3_edges.py
+@@ -0,0 +1,12 @@
++from env_client import make_env
++import json
++edge=[];far=[]
++for seed in range(400,600):
++ e=make_env();s,i=e.reset(seed=seed,options={'object_count':3})
++ for o in s.get_objects(e.observation_space.get_type('rectangle')):
++  if s.get(o,'static'):continue
++  x,y,w,h=[s.get(o,f) for f in ['x','y','width','height']]
++  if x>1.5398:edge.append((seed,o.name,x,y,w,h))
++  if x>1.5518:far.append((seed,o.name,x,y,w,h))
++ e.close()
++print(json.dumps({'far':far,'edges':edge}),flush=True)
+diff --git a/scan_edge_cases.py b/scan_edge_cases.py
+new file mode 100644
+index 0000000..e542fc9
+--- /dev/null
++++ b/scan_edge_cases.py
+@@ -0,0 +1,8 @@
++from env_client import make_env
++import json
++for seed in range(600,1100):
++ e=make_env();s,i=e.reset(seed=seed,options={'object_count':3})
++ edge=[(o.name,s.get(o,'x'),s.get(o,'width')) for o in s.get_objects(e.observation_space.get_type('rectangle')) if o.type.name!='target_surface' and (s.get(o,'x')>1.5518 or s.get(o,'x')+s.get(o,'width')<.0662)]
++ if edge:print(json.dumps({'seed':seed,'edge':edge}),flush=True)
++ e.close()
++print('completed',flush=True)

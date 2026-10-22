@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 8ef43da..25daa61 100644
+--- a/approach.py
++++ b/approach.py
+@@ -84,7 +84,7 @@ class GeneratedApproach:
+ 
+     def _choose_task(self, state):
+         blockers = sorted((n for n in state.get_object_names() if self._blocking(state, n)),
+-                          key=lambda n: (n in self.deferred, -self._xyz(state, n)[2]))
++                          key=lambda n: (n in self.deferred, n))
+         if blockers:
+             self.object = blockers[0]
+             # Use rows opposite the goal. Staggering x prevents a pile even

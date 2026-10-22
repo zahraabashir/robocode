@@ -1,0 +1,59 @@
+diff --git a/approach.py b/approach.py
+index 49a65bc..883d2a9 100644
+--- a/approach.py
++++ b/approach.py
+@@ -44,6 +44,7 @@ class GeneratedApproach:
+     # ------------------------------------------------------------------
+     K_RERANK = 20
+     ORDER = 'near'
++    TOP_MAX = 0.46
+ 
+     def reset(self, state, info):
+         self.state = state
+@@ -515,7 +516,7 @@ class GeneratedApproach:
+         bb = _rect_bbox(s, block)
+         brx = bb[0] + g
+         bry = bb[3] + TIP + 0.003
+-        levels = [(v, 0.0) for v in np.arange(FLOOR + 0.005, 0.36 - h, 0.02)]
++        levels = [(v, 0.0) for v in np.arange(FLOOR + 0.005, self.TOP_MAX - h, 0.02)]
+         # remaining blockers' pickup columns must stay free
+         cols = []
+         for ob2 in self._blocking():
+diff --git a/approach_t36.py b/approach_t36.py
+new file mode 100644
+index 0000000..f6228b7
+--- /dev/null
++++ b/approach_t36.py
+@@ -0,0 +1,3 @@
++from approach import GeneratedApproach as _G
++class GeneratedApproach(_G):
++    TOP_MAX = 0.36
+diff --git a/quick.py b/quick.py
+index 0ce7f88..674d4d1 100644
+--- a/quick.py
++++ b/quick.py
+@@ -3,7 +3,7 @@ import test_approach as t
+ from concurrent.futures import ThreadPoolExecutor
+ seeds=[int(a) for a in sys.argv[1].split(',')] if ',' in sys.argv[1] else list(range(int(sys.argv[1]), int(sys.argv[2])))
+ cnt=int(sys.argv[3]) if len(sys.argv)>3 and sys.argv[3]!='-' else None
+-with ThreadPoolExecutor(4) as ex:
++with ThreadPoolExecutor(int(__import__("os").environ.get("NT","2"))) as ex:
+     res=list(ex.map(lambda s: (s,)+tuple(t.run(s,count=cnt)), seeds))
+ print(" ".join(f"{r[0]}:{r[2]}" for r in res))
+ for r in res:
+diff --git a/t36.txt b/t36.txt
+new file mode 100644
+index 0000000..7dbc98e
+--- /dev/null
++++ b/t36.txt
+@@ -0,0 +1,2 @@
++0:52 1:44 2:50 3:40 4:49 5:67 6:37 7:83 8:54 9:70 10:45 11:40 12:69 13:45 14:22 15:21 16:18 17:46 18:40 19:38 20:49 21:47 22:64 23:37 24:46 25:37 26:35 27:14 28:40 29:24 30:21 31:44 32:53 33:51 34:27 35:26 36:30 37:27 38:17 39:46 40:49 41:27 42:27 43:23 44:42 45:59 46:34 47:34 48:18 49:16 50:53 51:29 52:47 53:49 54:26 55:22 56:48 57:11 58:38 59:49 60:21 61:46 62:49 63:25 64:24 65:16 66:41 67:32 68:29 69:32 70:30 71:21 72:82 73:38 74:20 75:57 76:26 77:16 78:50 79:30 80:51 81:21 82:34 83:64 84:51 85:41 86:24 87:34 88:45 89:40 90:55 91:28 92:35 93:48 94:19 95:43 96:27 97:31 98:45 99:37
++succ 100 / 100 mean steps 38.24 max time 4.384720087051392
+diff --git a/t46.txt b/t46.txt
+new file mode 100644
+index 0000000..0fce2ce
+--- /dev/null
++++ b/t46.txt
+@@ -0,0 +1,2 @@
++0:52 1:44 2:50 3:40 4:49 5:67 6:37 7:83 8:54 9:70 10:43 11:40 12:69 13:45 14:22 15:21 16:18 17:46 18:40 19:38 20:49 21:47 22:64 23:37 24:46 25:37 26:35 27:14 28:40 29:24 30:21 31:44 32:53 33:51 34:27 35:26 36:30 37:27 38:17 39:46 40:49 41:27 42:27 43:23 44:42 45:59 46:34 47:34 48:18 49:16 50:53 51:29 52:47 53:49 54:26 55:22 56:48 57:11 58:38 59:49 60:21 61:46 62:49 63:25 64:24 65:16 66:41 67:32 68:29 69:32 70:30 71:21 72:82 73:38 74:20 75:57 76:26 77:16 78:50 79:30 80:51 81:21 82:34 83:58 84:51 85:41 86:20 87:34 88:45 89:40 90:55 91:28 92:35 93:48 94:19 95:43 96:27 97:31 98:45 99:37
++succ 100 / 100 mean steps 38.12 max time 6.809597730636597

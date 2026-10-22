@@ -1,0 +1,39 @@
+diff --git a/approach.py b/approach.py
+index 8b2d645..30e5d36 100644
+--- a/approach.py
++++ b/approach.py
+@@ -162,11 +162,11 @@ class GeneratedApproach:
+         gz = p[2] + 0.035  # TCP height for grasp (object centre 2-5 cm below TCP works)
+         zf, zh = self._safe_heights(s, obj, others)
+         return [
+-            ('move', np.array([p[0], p[1], max(zf, gz + 0.05)]), yaw, False),
++            ('move', np.array([p[0], p[1], max(zf, gz + 0.05)]), yaw, False, None, 'joint'),
+             ('move', np.array([p[0], p[1], gz]), yaw, True),
+             ('close', obj.name, p.copy(), yaw, [0.045, 0.03, 0.05, 0.025]),
+             ('move', np.array([p[0], p[1], zh]), yaw, False),
+-            ('place_move', place_center + np.array([0, 0, zh - place_center[2]]), yaw, False),
++            ('place_move', place_center + np.array([0, 0, zh - place_center[2]]), yaw, False, None, 'joint'),
+             ('place_move', place_center, yaw, True),
+             ('open', place_center, yaw),
+             ('move_rel_up', zf, yaw),
+@@ -181,7 +181,7 @@ class GeneratedApproach:
+         place_center = np.array([place_xy[0], place_xy[1], support_top + h[2] + 0.002])
+         return [
+             ('move_rel_up', SAFE_Z, yaw),
+-            ('place_move', place_center + np.array([0, 0, SAFE_Z - place_center[2]]), yaw, False),
++            ('place_move', place_center + np.array([0, 0, SAFE_Z - place_center[2]]), yaw, False, None, 'joint'),
+             ('place_move', place_center, yaw, True),
+             ('open', place_center, yaw),
+             ('move_rel_up', SAFE_Z, yaw),
+@@ -358,6 +358,11 @@ class GeneratedApproach:
+                 qc, ok = ik(base, qc, p0 + f * (pos - p0), down_R(y0 + f * dy), tool=TOOL,
+                             iters=100 if i < n else 300)
+                 path.append(qc.copy())
++            if len(cmd) > 5 and cmd[5] == 'joint' and path:
++                # high transit: straight line in joint space (fewest steps)
++                dq = path[-1] - q
++                m = int(np.ceil(np.max(np.abs(dq)) / (MAXD * 0.999))) or 1
++                path = [q + dq * (i / m) for i in range(1, m + 1)]
+             self.qtarget = path
+             self.pidx = 0
+             self.last_q = None

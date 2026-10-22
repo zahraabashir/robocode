@@ -1,0 +1,36 @@
+diff --git a/probe_rotation_agent.py b/probe_rotation_agent.py
+new file mode 100644
+index 0000000..989dd88
+--- /dev/null
++++ b/probe_rotation_agent.py
+@@ -0,0 +1,30 @@
++"""Independent black-box rotation probes for DynPushT2D (not policy code)."""
++import math
++import numpy as np
++
++from env_client import make_env
++
++
++def wrap(x):
++    return (x + math.pi) % (2 * math.pi) - math.pi
++
++
++def summarize(seed):
++    env = make_env()
++    s, _ = env.reset(seed=seed)
++    print("RESET", seed,
++          "block", np.round(s[[0, 1, 2]], 4),
++          "robot", np.round(s[[16, 17]], 4),
++          "goal", np.round(s[[29, 30, 31]], 4),
++          "dims", np.round(s[[12, 13, 14, 28]], 4),
++          "err", round(wrap(float(s[31] - s[2])), 4))
++    env.close()
++
++
++def main():
++    for seed in range(12):
++        summarize(seed)
++
++
++if __name__ == "__main__":
++    main()

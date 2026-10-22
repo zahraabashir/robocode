@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 6fd51cb..525214d 100644
+--- a/approach.py
++++ b/approach.py
+@@ -274,7 +274,7 @@ class GeneratedApproach:
+                     else:
+                         goals=[target]; tolerance=.15
+                     self.paths[i]=self._astar(pos,goals,rects,tolerance)
+-                    self.targets[i]=key; self.stalls[i]=0
++                    self.targets[i]=key
+                     if not self.paths[i] and task!="nav_sample" and self._free(target,rects):
+                         self.paths[i]=[target]
+                 while self.paths[i] and math.dist(pos,self.paths[i][0])<.05: self.paths[i].pop(0)

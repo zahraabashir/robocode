@@ -1,0 +1,52 @@
+diff --git a/approach.py b/approach.py
+index 7160f34..f0621b2 100644
+--- a/approach.py
++++ b/approach.py
+@@ -47,7 +47,11 @@ class GeneratedApproach:
+         def residual(q):
+             t = _fk(q)
+             grasp = base + t[:3, 3] + .16 * t[:3, 2]
+-            return np.r_[10 * (grasp - xyz), 1.5 * t[:2, 2], .02 * (q - start)]
++            if self.carry_rotation is None:
++                orientation = t[:2, 2]
++            else:
++                orientation = Rotation.from_matrix(self.carry_rotation.T @ t[:3, :3]).as_rotvec()
++            return np.r_[10 * (grasp - xyz), 1.8 * orientation, .02 * (q - start)]
+         return least_squares(residual, start, max_nfev=180).x
+ 
+     def _xyz(self, state, name):
+@@ -93,7 +97,9 @@ class GeneratedApproach:
+         self.object = "target_block"
+         reg = self._xyz(state, "target_region")
+         z = reg[2] + self._get(state, "target_region", "half_extent_z")
+-        z += self._get(state, "target_block", "half_extent_z") + .006
++        # A tiny penetration request lets collision resolution establish support;
++        # airborne objects intentionally cannot be released by this environment.
++        z += self._get(state, "target_block", "half_extent_z") - .002
+         self.destination = np.array((reg[0], reg[1], z))
+ 
+     def _set_goal_for_object_delta(self, state, desired_object_xyz):
+@@ -114,6 +120,7 @@ class GeneratedApproach:
+         self.phase = "choose"
+         self.phase_steps = 0
+         self.park_count = 0
++        self.carry_rotation = None
+         self.base_x = self._get(state, "robot", "pos_base_x")
+         self.base_y = self._get(state, "robot", "pos_base_y")
+ 
+@@ -137,6 +144,7 @@ class GeneratedApproach:
+         if self.phase == "close":
+             if held is not None:
+                 self.object = held  # handle a neighboring obstruction gracefully
++                self.carry_rotation = _fk(q)[:3, :3].copy()
+                 self.phase, self.phase_steps = "lift", 0
+             elif self.phase_steps > 5:
+                 # Re-read its pose in case the open gripper nudged it.
+@@ -179,6 +187,7 @@ class GeneratedApproach:
+                     # Keep open and let physics settle/termination register.
+                     return self._act_to(q, q, 1.0)
+                 self.phase, self.phase_steps = "choose", 0
++                self.carry_rotation = None
+             return self._act_to(q, q, 1.0)
+ 
+         return self._act_to(q, q, 1.0)

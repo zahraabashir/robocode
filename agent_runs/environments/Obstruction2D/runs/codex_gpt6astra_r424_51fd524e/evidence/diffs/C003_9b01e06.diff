@@ -1,0 +1,17 @@
+diff --git a/probe_motion.py b/probe_motion.py
+new file mode 100644
+index 0000000..10e8e8e
+--- /dev/null
++++ b/probe_motion.py
+@@ -0,0 +1,11 @@
++from env_client import make_env
++import numpy as np
++
++def desc(e,s):
++ for ty in e.observation_space.types:
++  for o in s.get_objects(ty):
++   print(o.name, {f:round(float(s.get(o,f)),4) for f in e.observation_space.type_features[ty]})
++e=make_env();s,i=e.reset(seed=0); print('MAX',e.max_steps,'INFO',i);desc(e,s)
++for a in [[0,0,0,.1,0]]*5+[[0,0,.196,0,0]]*4+[[.05,0,0,0,0]]*3+[[0,-.05,0,0,0]]*3:
++ s,r,t,tr,i=e.step(np.array(a,dtype=np.float32));print('ACTION',a,r,t,tr);desc(e,s)
++e.close()

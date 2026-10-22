@@ -1,0 +1,30 @@
+diff --git a/approach.py b/approach.py
+index 05fa21a..3d41261 100644
+--- a/approach.py
++++ b/approach.py
+@@ -331,7 +331,7 @@ class GeneratedApproach:
+         fins = []
+         for i in range(2):
+             B = self.bfs[i]
+-            fins.append(B.run(B.hc, 0, wanted=[full], tmax=TMAX, time_budget=12.0))
++            fins.append(B.run(B.hc, 0, wanted=[full], tmax=TMAX, time_budget=10.0))
+         # best finish time for a superset-closed requirement: T_i(req) = min over S ⊇ req
+         def best_for(fin, req):
+             bt = None
+@@ -367,7 +367,7 @@ class GeneratedApproach:
+             B.other_traj = self._traj(1 - i)
+             B._send_t_cache = {}
+             req = self.my_req[i]
+-            fin = B.run(B.hc, 0, wanted=[req], tmax=TMAX, time_budget=8.0)
++            fin = B.run(B.hc, 0, wanted=[req], tmax=TMAX, time_budget=5.0)
+             bt = None
+             for S2, (t, L) in fin.items():
+                 if (S2 & req) == req and (bt is None or t < bt[0]):
+diff --git a/res_approach_j.json b/res_approach_j.json
+new file mode 100644
+index 0000000..a18da89
+--- /dev/null
++++ b/res_approach_j.json
+@@ -0,0 +1 @@
++{"0": 25, "1": 20, "2": 19, "3": 21, "4": 21, "5": 25, "6": 20, "7": 21, "8": 21, "9": 22, "10": 22, "11": 19, "12": 23, "13": 23, "14": 29, "15": 23, "16": 22, "17": 21, "18": 21, "19": 25, "20": 27, "21": 20, "22": 23, "23": 18, "24": 19, "25": 20, "26": 21, "27": 21, "28": 22, "29": 21, "30": 22, "31": 25, "32": 20, "33": 23, "34": 19, "35": 18, "36": 21, "37": 18, "38": 23, "39": 22, "40": 21, "41": 19, "42": 22, "43": 25, "44": 20, "45": 21, "46": 20, "47": 19}
+\ No newline at end of file

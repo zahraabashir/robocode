@@ -1,0 +1,17 @@
+diff --git a/approach.py b/approach.py
+index b47cc0e..2e997d2 100644
+--- a/approach.py
++++ b/approach.py
+@@ -125,8 +125,11 @@ class GeneratedApproach:
+             if span > 0.041:
+                 continue
+             clr = self._finger_clearance(s, obj, yaw, others)
++            aligned = abs(np.sin(2 * rel)) < 1e-6
+             score = min(clr, 0.02) - 0.002 * abs(_wrap(yaw - cy)) - 0.01 * span \
+-                - (0.0 if abs(np.sin(2 * rel)) < 1e-6 else 0.005)
++                - (0.0 if aligned else 0.03)
++            if not aligned and clr < 0.004:
++                continue
+             cands.append((score, _wrap(yaw)))
+         if not cands:
+             yaw = oyaw if h[0] <= h[1] else oyaw + np.pi / 2

@@ -1,0 +1,2322 @@
+[
+  {
+    "id": "C001",
+    "commit": "b8db573e6da12982e76953169b0a4634a230d0d6",
+    "parents": [],
+    "date": "2026-09-08T22:08:02+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".gitignore",
+      "AGENTS.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_b8db573.diff",
+    "diff_sha256": "b78e1a230d4c209c880f53afbc15f3ccb0fd99bb138c333f5d52d3a2a077ad77",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "b59ebec9e85d78c52f923b67a60ca56446903236",
+    "parents": [
+      "b8db573e6da12982e76953169b0a4634a230d0d6"
+    ],
+    "date": "2026-09-08T22:09:18+02:00",
+    "title": "Add initial reactive grasp-and-place baseline",
+    "files": [
+      "approach.py",
+      "probe_env.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C002_b59ebec.diff",
+    "diff_sha256": "07281e15224f0b6ae6bc687b97ff5aa0db6eedb55a2d1da85e4d928d88303b47",
+    "events": [
+      {
+        "event": "E0011",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "69c4379437e6a2f14410ad8e80afa423d845bc6cb81260c3bb2e5ff880dde781",
+    "version": "evidence/versions/C002_b59ebec_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "b9dd5522cc174a68908dfdd892bf66edb8ef52ae",
+    "parents": [
+      "b59ebec9e85d78c52f923b67a60ca56446903236"
+    ],
+    "date": "2026-09-08T22:10:02+02:00",
+    "title": "Add live multi-seed policy test harness",
+    "files": [
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C003_b9dd552.diff",
+    "diff_sha256": "3777bd8b592d8e1121b3d493606c7044f907b0e6877ba2037c657f4664f649dd",
+    "events": [
+      {
+        "event": "E0020",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C004",
+    "commit": "670d6a3f67570639f5110b2d2c6590347bc3fe13",
+    "parents": [
+      "b9dd5522cc174a68908dfdd892bf66edb8ef52ae"
+    ],
+    "date": "2026-09-08T22:22:47+02:00",
+    "title": "Implement feedback FSM for clearing and target placement",
+    "files": [
+      "approach.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C004_670d6a3.diff",
+    "diff_sha256": "7184607146fd18e701cd5402761b85cdf5b2cccb9ff5138c168bed92e027bb4d",
+    "events": [
+      {
+        "event": "E0079",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R01",
+      "title": "Implement feedback FSM for clearing and target placement",
+      "description": "Baseline stalls; explore manipulation → replace it with a controller that tracks movement phases and retries.",
+      "caveats": [
+        "Early controller redesign after an interrupted baseline test and extensive probes. The test harness also changes: the new harness enforces env.max_steps. It contains two recorded policy edit events (L75 and L77) before one commit; the intermediate pre-commit source is not reconstructed."
+      ],
+      "related_lines": [
+        12,
+        20,
+        22,
+        24,
+        26,
+        34,
+        35,
+        55,
+        66,
+        71,
+        73,
+        75,
+        77,
+        79
+      ],
+      "post_edit_test_lines": [
+        79,
+        88
+      ]
+    },
+    "policy_sha256": "0866bc4a109408c8c5c47bdf0c07fb5c5920bfbeaf22c6298d3da3030842dc58",
+    "version": "evidence/versions/C004_670d6a3_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "55d3dab50b9384cb12ec258ecb24aa218841153b",
+    "parents": [
+      "670d6a3f67570639f5110b2d2c6590347bc3fe13"
+    ],
+    "date": "2026-09-08T22:25:07+02:00",
+    "title": "Use reset pose as reachable safe travel height",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C005_55d3dab.diff",
+    "diff_sha256": "da88f5ab87fbb3c162772aa72cea612e55ce07bd6b9a1ac664c660236c3a73f5",
+    "events": [
+      {
+        "event": "E0094",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R02",
+      "title": "Use reset pose as reachable safe travel height",
+      "description": "Robot stays in the rise phase → use its initial height as the reachable travel height.",
+      "caveats": [],
+      "related_lines": [
+        79,
+        84,
+        88,
+        90,
+        92,
+        94
+      ],
+      "post_edit_test_lines": [
+        94,
+        99
+      ]
+    },
+    "policy_sha256": "4a1354194a9ea3b05e5c5949dafe0670a0254764d10edf0996b21c414a9bc5b6",
+    "version": "evidence/versions/C005_55d3dab_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C006",
+    "commit": "98c6f0752efb322c7bcf1f6f351d8d1d9f09ef37",
+    "parents": [
+      "55d3dab50b9384cb12ec258ecb24aa218841153b"
+    ],
+    "date": "2026-09-08T22:26:54+02:00",
+    "title": "Park all movable objects tallest-first before final placement",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C006_98c6f07.diff",
+    "diff_sha256": "02cd7054ad895aaba8e92dd196ac254e12b64cb759a36f52d88c9b20922a5c65",
+    "events": [
+      {
+        "event": "E0106",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R03",
+      "title": "Park all movable objects tallest-first before final placement",
+      "description": "Multi-object cases still fail → reorder rectangles tallest first and include an initial target-clearing pass.",
+      "caveats": [],
+      "related_lines": [
+        94,
+        99,
+        102,
+        104,
+        106
+      ],
+      "post_edit_test_lines": [
+        106
+      ]
+    },
+    "policy_sha256": "c3e84dcdd78a774b52a4270f826e0cf81471676a28d8981812f66c1167c2bd41",
+    "version": "evidence/versions/C006_98c6f07_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "6d93a7d48faa104e1329e4bfaefa94efecba66e8",
+    "parents": [
+      "98c6f0752efb322c7bcf1f6f351d8d1d9f09ef37"
+    ],
+    "date": "2026-09-08T22:27:43+02:00",
+    "title": "Exclude static surface and park cleared objects vertically",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C007_6d93a7d.diff",
+    "diff_sha256": "6abdbebb367e4c7bb9395f6186b913603dac163d2f54a22d2134ffee2b149ece",
+    "events": [
+      {
+        "event": "E0112",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R04",
+      "title": "Exclude static surface and park cleared objects vertically",
+      "description": "Printed task list includes the static surface and motion stalls → filter static objects and park vertically in place.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        106,
+        108,
+        110,
+        112
+      ],
+      "post_edit_test_lines": [
+        112
+      ]
+    },
+    "policy_sha256": "e6d03433d2577ada62a4c90c6d0fae742a4cbe3f071e11b20431c3305b10e127",
+    "version": "evidence/versions/C007_6d93a7d_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C008",
+    "commit": "e727013d4d32a19467cdd4c7261b1df1a117e9c0",
+    "parents": [
+      "6d93a7d48faa104e1329e4bfaefa94efecba66e8"
+    ],
+    "date": "2026-09-08T22:28:29+02:00",
+    "title": "Keep vacuum off during horizontal transit",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C008_e727013.diff",
+    "diff_sha256": "e79fc129c4fa5c8bcb7d0c4dcb6d139f66a07924fd8321da225db743fee9bc20",
+    "events": [
+      {
+        "event": "E0118",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R05",
+      "title": "Keep vacuum off during horizontal transit",
+      "description": "Target moves while the robot travels toward another object → turn vacuum off during horizontal alignment.",
+      "caveats": [],
+      "related_lines": [
+        112,
+        114,
+        116,
+        118
+      ],
+      "post_edit_test_lines": [
+        118
+      ]
+    },
+    "policy_sha256": "a25778bf91a562b81602763d22a56aacadeb54a4fb08413ac5fcdae44271c8a0",
+    "version": "evidence/versions/C008_e727013_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C009",
+    "commit": "5a9cda57e55c37dceaa8c7ddd7ec4813ed4b1916",
+    "parents": [
+      "e727013d4d32a19467cdd4c7261b1df1a117e9c0"
+    ],
+    "date": "2026-09-08T22:29:11+02:00",
+    "title": "Park cleared objects low enough for later regrasp",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C009_5a9cda5.diff",
+    "diff_sha256": "f3130311471ebb123fc2370cfcc012083acebb8e37e68a14d1c5cf32df71e851",
+    "events": [
+      {
+        "event": "E0124",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R06",
+      "title": "Park cleared objects low enough for later regrasp",
+      "description": "Objects remain high and the target cannot be regrasped → stop preliminary lifts at a lower parking height.",
+      "caveats": [],
+      "related_lines": [
+        118,
+        120,
+        122,
+        124
+      ],
+      "post_edit_test_lines": [
+        124
+      ]
+    },
+    "policy_sha256": "bb215b5b2e0bebab0e479e4ebad30525404e0bab86eefc37b6ba57280e5b6015",
+    "version": "evidence/versions/C009_5a9cda5_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C010",
+    "commit": "f214f7da0b2fc28156025e7d0c4e852164646ce7",
+    "parents": [
+      "5a9cda57e55c37dceaa8c7ddd7ec4813ed4b1916"
+    ],
+    "date": "2026-09-08T22:30:02+02:00",
+    "title": "Park obstructions laterally away from target surface",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C010_f214f7d.diff",
+    "diff_sha256": "34629cfb97a45bee3d8a31451140ea9be168c6377f236173109ba473d36e4093",
+    "events": [
+      {
+        "event": "E0130",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R07",
+      "title": "Park obstructions laterally away from target surface",
+      "description": "Controller finishes but placement fails → move obstructions laterally away from the surface.",
+      "caveats": [],
+      "related_lines": [
+        124,
+        126,
+        128,
+        130
+      ],
+      "post_edit_test_lines": [
+        130,
+        132
+      ]
+    },
+    "policy_sha256": "bdb73884f2da6adf983d996e701057365c2d140e761de87a60b9784e6cc7f4af",
+    "version": "evidence/versions/C010_f214f7d_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C011",
+    "commit": "dd0457e1ab7a6650cc3d3d9588c689fae71ca45b",
+    "parents": [
+      "f214f7da0b2fc28156025e7d0c4e852164646ce7"
+    ],
+    "date": "2026-09-08T22:32:29+02:00",
+    "title": "Only pre-park target when it blocks obstacle access",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C011_dd0457e.diff",
+    "diff_sha256": "b5a86cb80db8efd789b4aa40b9da797a531de960182ddc3bf31a064a08abe0a0",
+    "events": [
+      {
+        "event": "E0144",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R08",
+      "title": "Only pre-park target when it blocks obstacle access",
+      "description": "Broader tests mostly fail → temporarily move the target only when the geometry is crowded.",
+      "caveats": [],
+      "related_lines": [
+        132,
+        136,
+        138,
+        140,
+        142,
+        144
+      ],
+      "post_edit_test_lines": [
+        144
+      ]
+    },
+    "policy_sha256": "3ee508722b0e298e1eb614689be39cc9626cf06408b17debced8f21c9b478af0",
+    "version": "evidence/versions/C011_dd0457e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C012",
+    "commit": "3f73fd4d1be28fdc416adf4ded51401d96f74aae",
+    "parents": [
+      "dd0457e1ab7a6650cc3d3d9588c689fae71ca45b"
+    ],
+    "date": "2026-09-08T22:33:21+02:00",
+    "title": "Fix moving-goal bug in obstruction carry phase",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C012_3f73fd4.diff",
+    "diff_sha256": "07b1c82eac3bacd8a57beb76ad3222da7867e14c1b84e77c1718e2784fa34618",
+    "events": [
+      {
+        "event": "E0150",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R09",
+      "title": "Fix moving-goal bug in obstruction carry phase",
+      "description": "Failure persists with a moving obstruction destination → calculate that destination from the initial object position.",
+      "caveats": [],
+      "related_lines": [
+        144,
+        146,
+        148,
+        150
+      ],
+      "post_edit_test_lines": [
+        150,
+        163
+      ]
+    },
+    "policy_sha256": "38aca4796f4ae928cd9fe72e31c6f5306a8a19a08353e9cd2b5d88beae882ecd",
+    "version": "evidence/versions/C012_3f73fd4_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C013",
+    "commit": "735b56a0e4dd843040001a7b0a134945b773f4c3",
+    "parents": [
+      "3f73fd4d1be28fdc416adf4ded51401d96f74aae"
+    ],
+    "date": "2026-09-08T22:37:34+02:00",
+    "title": "Use lower carry height to match successful placement trajectory",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C013_735b56a.diff",
+    "diff_sha256": "ddb45ab946d3cc1fc31208d9be97b0403ba00136fc8db2b2a49978fd1e24e89a",
+    "events": [
+      {
+        "event": "E0177",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R10",
+      "title": "Use lower carry height to match successful placement trajectory",
+      "description": "Program placement fails despite a successful hand-scripted placement probe → lower the carry-height threshold.",
+      "caveats": [],
+      "related_lines": [
+        150,
+        152,
+        154,
+        155,
+        157,
+        163,
+        165,
+        167,
+        169,
+        171,
+        173,
+        175,
+        177
+      ],
+      "post_edit_test_lines": [
+        177
+      ]
+    },
+    "policy_sha256": "2d2909df67940b15e05da7ff25c473f66ab6e6a6e0293f211e246552925913ff",
+    "version": "evidence/versions/C013_735b56a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C014",
+    "commit": "b15ba765819745483cd25351bc231630e3c5f39b",
+    "parents": [
+      "735b56a0e4dd843040001a7b0a134945b773f4c3"
+    ],
+    "date": "2026-09-08T22:38:02+02:00",
+    "title": "Bias final placement slightly inside successful support region",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C014_b15ba76.diff",
+    "diff_sha256": "84e98f363053b798961af63be00b80c91de2060bc30179588bcd82f725fe3fe0",
+    "events": [
+      {
+        "event": "E0181",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R11",
+      "title": "Bias final placement slightly inside successful support region",
+      "description": "Lower carry height does not solve seed 1 → add a small horizontal offset to final placement.",
+      "caveats": [],
+      "related_lines": [
+        177,
+        179,
+        181
+      ],
+      "post_edit_test_lines": [
+        181,
+        183
+      ]
+    },
+    "policy_sha256": "02876f4de281db0f11f1c9879bb3df950212f1feb67050bab3b3df9ba05e814a",
+    "version": "evidence/versions/C014_b15ba76_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C015",
+    "commit": "af4477f6256966431e7a90dc3f715263ad6b6895",
+    "parents": [
+      "b15ba765819745483cd25351bc231630e3c5f39b"
+    ],
+    "date": "2026-09-08T22:39:24+02:00",
+    "title": "Use fine vertical steps so vacuum reaches contact",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C015_af4477f.diff",
+    "diff_sha256": "abe3ea92a7ccc00f418dd7e569d0549047c0f3c6dd18564ac02ec78fd3958e1b",
+    "events": [
+      {
+        "event": "E0193",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R12",
+      "title": "Use fine vertical steps so vacuum reaches contact",
+      "description": "Several grasp cases fail; a fine-step probe lifts them → reduce downward steps from 0.05 to 0.01.",
+      "caveats": [],
+      "related_lines": [
+        183,
+        185,
+        187,
+        189,
+        191,
+        193
+      ],
+      "post_edit_test_lines": [
+        193
+      ]
+    },
+    "policy_sha256": "f1555768eec9891cf23caba1faca72618e573248523061f440982c02fb108330",
+    "version": "evidence/versions/C015_af4477f_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C016",
+    "commit": "9c6bdf4aadd4fb0898c37109aaacae340556bc9d",
+    "parents": [
+      "af4477f6256966431e7a90dc3f715263ad6b6895"
+    ],
+    "date": "2026-09-08T22:40:21+02:00",
+    "title": "Avoid overshooting ceiling during retreat",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C016_9c6bdf4.diff",
+    "diff_sha256": "674fc761955f112085247dd198c7494aa386ff66a0d3da792b3dcff3187fdefd",
+    "events": [
+      {
+        "event": "E0201",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R13",
+      "title": "Avoid overshooting ceiling during retreat",
+      "description": "Robot stalls in retreat below its requested height → cap the upward step at the remaining height.",
+      "caveats": [],
+      "related_lines": [
+        193,
+        195,
+        197,
+        199,
+        201
+      ],
+      "post_edit_test_lines": [
+        201
+      ]
+    },
+    "policy_sha256": "bd1d04d47e4fdfc192e6c1111cbc590315f5af25ce4f256ff973211de91302e4",
+    "version": "evidence/versions/C016_9c6bdf4_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C017",
+    "commit": "4f80855d9224b4217f437fe0af644a140c1f0ee2",
+    "parents": [
+      "9c6bdf4aadd4fb0898c37109aaacae340556bc9d"
+    ],
+    "date": "2026-09-08T22:41:31+02:00",
+    "title": "Park blockers away from target and handle travel bounds",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C017_4f80855.diff",
+    "diff_sha256": "c1724383a762df4e9aea67fd8f05e6e5f6cd8aa37064780e68742c5c5b366983",
+    "events": [
+      {
+        "event": "E0207",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R14",
+      "title": "Park blockers away from target and handle travel bounds",
+      "description": "Target access and boundary cases remain → change parking direction and detect stalled horizontal carrying.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        201,
+        203,
+        205,
+        207
+      ],
+      "post_edit_test_lines": [
+        207
+      ]
+    },
+    "policy_sha256": "0eebf94397963b9b6162e33e0fda6570be921f090bed3d3432184fb09aebffc3",
+    "version": "evidence/versions/C017_4f80855_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C018",
+    "commit": "2d184c4bbc2637d77149742952c1c642ee1ec79f",
+    "parents": [
+      "4f80855d9224b4217f437fe0af644a140c1f0ee2"
+    ],
+    "date": "2026-09-08T22:42:36+02:00",
+    "title": "Vertically separate parked blockers and recover at walls",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C018_2d184c4.diff",
+    "diff_sha256": "43c87f1b6a1a1183440f7ba69aa57462b8fcace24f83318661ebd6d6973d22e8",
+    "events": [
+      {
+        "event": "E0213",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R15",
+      "title": "Vertically separate parked blockers and recover at walls",
+      "description": "Failures remain after new parking rule → vary parking heights and add stalled-alignment recovery.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        207,
+        209,
+        211,
+        213
+      ],
+      "post_edit_test_lines": [
+        213
+      ]
+    },
+    "policy_sha256": "6ea978610d3a71541a53b7ce7aa9a2afa948b974ef6b0144a186410e42eb5be0",
+    "version": "evidence/versions/C018_2d184c4_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C019",
+    "commit": "0c006f7a4edc8218bdfe1b95ba5a08070d037461",
+    "parents": [
+      "2d184c4bbc2637d77149742952c1c642ee1ec79f"
+    ],
+    "date": "2026-09-08T22:44:30+02:00",
+    "title": "Park blockers far outside surface at low clearance height",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C019_0c006f7.diff",
+    "diff_sha256": "2c7489c285e6cca612c1cf05e8ecf1e9cf966919c0331e0219fd0148e3a6826a",
+    "events": [
+      {
+        "event": "E0221",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R16",
+      "title": "Park blockers far outside surface at low clearance height",
+      "description": "Objects still obstruct target movement → return to lower parking and move blockers farther away from the surface.",
+      "caveats": [],
+      "related_lines": [
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "post_edit_test_lines": [
+        221,
+        223
+      ]
+    },
+    "policy_sha256": "2ee15dfc0dc45a49dd1b5078198850f597febcdb07633b75619535aefa577a59",
+    "version": "evidence/versions/C019_0c006f7_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C020",
+    "commit": "adf84aecab53f3d90cca1baf8247a94fa7adcbb5",
+    "parents": [
+      "0c006f7a4edc8218bdfe1b95ba5a08070d037461"
+    ],
+    "date": "2026-09-08T22:46:18+02:00",
+    "title": "Add edge grasps and compensate carried-object offset",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C020_adf84ae.diff",
+    "diff_sha256": "d2e20fdb3cd96087af7eeafe610d195bc4f080568ea02d9f1c76abe3a9411c27",
+    "events": [
+      {
+        "event": "E0229",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R17",
+      "title": "Add edge grasps and compensate carried-object offset",
+      "description": "Several target pickups remain blocked → expand grasp offsets and compensate for the object-to-gripper offset.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        221,
+        223,
+        225,
+        227,
+        229
+      ],
+      "post_edit_test_lines": [
+        229
+      ]
+    },
+    "policy_sha256": "8a90fd8cecc4d28283663e86156c0b860b2eff7c7e902c508a38c82a544c0e97",
+    "version": "evidence/versions/C020_adf84ae_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C021",
+    "commit": "b7ccec6239e077058e6424854f81fe21a464a3ec",
+    "parents": [
+      "adf84aecab53f3d90cca1baf8247a94fa7adcbb5"
+    ],
+    "date": "2026-09-08T22:48:03+02:00",
+    "title": "Allocate geometry-scored parking slots for blockers",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C021_b7ccec6.diff",
+    "diff_sha256": "4026b2242ec1e3c5415a075fc99a10df239817e224aaebb5d3231db6b34e1a84",
+    "events": [
+      {
+        "event": "E0236",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R18",
+      "title": "Allocate geometry-scored parking slots for blockers",
+      "description": "Multi-obstacle parking failures persist → rank candidate parking positions by geometric clearance.",
+      "caveats": [],
+      "related_lines": [
+        229,
+        231,
+        232,
+        234,
+        236
+      ],
+      "post_edit_test_lines": [
+        236
+      ]
+    },
+    "policy_sha256": "d513ebc43efafa0601c0efb6e3ea218fcdaf5aead40f1f4a0fd79d81ae44d1fc",
+    "version": "evidence/versions/C021_b7ccec6_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C022",
+    "commit": "0f0c2eeeb0cb14ed5a0b116fa12a266aee349f56",
+    "parents": [
+      "b7ccec6239e077058e6424854f81fe21a464a3ec"
+    ],
+    "date": "2026-09-08T22:49:07+02:00",
+    "title": "Reserve a remote slot for temporarily parked target",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C022_0f0c2ee.diff",
+    "diff_sha256": "f6bcbaf4c69b6e9c25a3d11c23f88129622ae37676b0f50ce91f1fc33f2c9135",
+    "events": [
+      {
+        "event": "E0242",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R19",
+      "title": "Reserve a remote slot for temporarily parked target",
+      "description": "Three regression cases still fail → reserve a remote parking position for the temporarily moved target.",
+      "caveats": [],
+      "related_lines": [
+        236,
+        238,
+        240,
+        242
+      ],
+      "post_edit_test_lines": [
+        242
+      ]
+    },
+    "policy_sha256": "a04b0ce06aee76bb9ec4c79bd1952a969a7804b6763470f54f0d4ca3bb5afcbd",
+    "version": "evidence/versions/C022_0f0c2ee_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C023",
+    "commit": "71c469c4e314a5b175e8c23b683914de11a519e1",
+    "parents": [
+      "0f0c2eeeb0cb14ed5a0b116fa12a266aee349f56"
+    ],
+    "date": "2026-09-08T22:49:55+02:00",
+    "title": "Lift final target above all parked blockers",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C023_71c469c.diff",
+    "diff_sha256": "b4b431d56f9012c874c8646d707ab6e9129d2882ce7e74126cc6f71b0f88294d",
+    "events": [
+      {
+        "event": "E0248",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R20",
+      "title": "Lift final target above all parked blockers",
+      "description": "Seed 3 stalls while carrying the final target → increase final target carry height.",
+      "caveats": [],
+      "related_lines": [
+        242,
+        244,
+        246,
+        248
+      ],
+      "post_edit_test_lines": [
+        248
+      ]
+    },
+    "policy_sha256": "ee7baac4e4b6a88c3e3687e0f3701df7f7d69aae0539a16599c903d3ac7ebf57",
+    "version": "evidence/versions/C023_71c469c_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C024",
+    "commit": "2185ba3df73338fd65ddcaabaa8b2a357185bd32",
+    "parents": [
+      "71c469c4e314a5b175e8c23b683914de11a519e1"
+    ],
+    "date": "2026-09-08T22:50:43+02:00",
+    "title": "Keep parking slots away from side-wall dead zones",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C024_2185ba3.diff",
+    "diff_sha256": "763e63facff08291856fef0a2a0102a0a662fb8c630c13b60000b3f5ef0f9f6a",
+    "events": [
+      {
+        "event": "E0254",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R21",
+      "title": "Keep parking slots away from side-wall dead zones",
+      "description": "Seed 5 fails after earlier fixes → move candidate parking positions away from side walls.",
+      "caveats": [],
+      "related_lines": [
+        248,
+        250,
+        252,
+        254
+      ],
+      "post_edit_test_lines": [
+        254
+      ]
+    },
+    "policy_sha256": "cfc04ff79c962cd138401e638b74dc1a1b1651da60bb910bb4c06f87dc388d40",
+    "version": "evidence/versions/C024_2185ba3_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C025",
+    "commit": "8e66f4e20a889c54882353ae942873737a9c3ce5",
+    "parents": [
+      "2185ba3df73338fd65ddcaabaa8b2a357185bd32"
+    ],
+    "date": "2026-09-08T22:51:32+02:00",
+    "title": "Cap verification lift at reachable ceiling",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C025_8e66f4e.diff",
+    "diff_sha256": "7db66fc0e771cf08debb581ca323ae6454dc62541c01ef78937fc13db9af034d",
+    "events": [
+      {
+        "event": "E0260",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R22",
+      "title": "Cap verification lift at reachable ceiling",
+      "description": "Seed 5 still stalls in lift → cap upward movement at the reachable ceiling.",
+      "caveats": [],
+      "related_lines": [
+        254,
+        256,
+        258,
+        260
+      ],
+      "post_edit_test_lines": [
+        260,
+        263
+      ]
+    },
+    "policy_sha256": "355cc789720fc5626e996eaa0481bdc41fe055482ffbd764a9e99ea67658cfd9",
+    "version": "evidence/versions/C025_8e66f4e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C026",
+    "commit": "3098aabc1d599cbc0c86bdff512bbb9059d0ffd9",
+    "parents": [
+      "8e66f4e20a889c54882353ae942873737a9c3ce5"
+    ],
+    "date": "2026-09-08T22:53:12+02:00",
+    "title": "Raise temporary target and maximize final carry clearance",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C026_3098aab.diff",
+    "diff_sha256": "9676360e4ee2aced2bb6065ab0573d94614193a4d230607a9d0279687309c8d4",
+    "events": [
+      {
+        "event": "E0271",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R23",
+      "title": "Raise temporary target and maximize final carry clearance",
+      "description": "A broader sweep finds seeds 18 and 22 failing → raise temporary target parking and final carry height.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        261,
+        263,
+        265,
+        267,
+        269,
+        271
+      ],
+      "post_edit_test_lines": [
+        271
+      ]
+    },
+    "policy_sha256": "10e269c93e35d3c7bcff52763aae0fac50de9a0052407179d5536b42cf4e22ce",
+    "version": "evidence/versions/C026_3098aab_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C027",
+    "commit": "5075837dadc53f2b9aa222d14fab65556d3e1d3b",
+    "parents": [
+      "3098aabc1d599cbc0c86bdff512bbb9059d0ffd9"
+    ],
+    "date": "2026-09-08T22:54:00+02:00",
+    "title": "Park crowded target outward and lower cleared blockers",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C027_5075837.diff",
+    "diff_sha256": "454df4cb3c1be219651b672557cfefc492a1e5bbb95a227ec718789259aa8591",
+    "events": [
+      {
+        "event": "E0277",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R24",
+      "title": "Park crowded target outward and lower cleared blockers",
+      "description": "Both targeted cases still fail → choose an outward target slot and lower blocker parking.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        271,
+        273,
+        275,
+        277
+      ],
+      "post_edit_test_lines": [
+        277
+      ]
+    },
+    "policy_sha256": "50f572b75af3c4431629b34873e6694d0df488ccd6f619f9b242043c18ba8aed",
+    "version": "evidence/versions/C027_5075837_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C028",
+    "commit": "0605fd3f07cdfae354f87870e72be0d05cfb4d0f",
+    "parents": [
+      "5075837dadc53f2b9aa222d14fab65556d3e1d3b"
+    ],
+    "date": "2026-09-08T22:54:44+02:00",
+    "title": "Route blockers outward without crossing the surface cluster",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C028_0605fd3.diff",
+    "diff_sha256": "5c5ca793404104ae5c69c5b0a9ee37c52cfd45a4ce0fcfdd38474efb9168ea33",
+    "events": [
+      {
+        "event": "E0283",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R25",
+      "title": "Route blockers outward without crossing the surface cluster",
+      "description": "Seed 18 remains unresolved → restrict blocker parking to the same side of the surface.",
+      "caveats": [],
+      "related_lines": [
+        277,
+        279,
+        281,
+        283
+      ],
+      "post_edit_test_lines": [
+        283
+      ]
+    },
+    "policy_sha256": "2051b534953d9e286373a321c8bea6f7a35d6f5735f75a4510cde7ae0fda0750",
+    "version": "evidence/versions/C028_0605fd3_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C029",
+    "commit": "f064af00582ce75b9fd14ff90c2d56e519faf1f5",
+    "parents": [
+      "0605fd3f07cdfae354f87870e72be0d05cfb4d0f"
+    ],
+    "date": "2026-09-08T22:55:32+02:00",
+    "title": "Carry blockers high then lower them into parking slots",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C029_f064af0.diff",
+    "diff_sha256": "088e07464ba5a3723eef49c8b86e1f58d0ed50dd79debf431ac0bdf130bcc386",
+    "events": [
+      {
+        "event": "E0289",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R26",
+      "title": "Carry blockers high then lower them into parking slots",
+      "description": "Seed 18 remains unresolved → carry blockers higher and add a separate lowering phase.",
+      "caveats": [],
+      "related_lines": [
+        283,
+        285,
+        287,
+        289
+      ],
+      "post_edit_test_lines": [
+        289
+      ]
+    },
+    "policy_sha256": "c3ae76700a4a0aa63425e6305925020b3f7111fddca0bafe7acaa0ff875e0dd5",
+    "version": "evidence/versions/C029_f064af0_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C030",
+    "commit": "a4cb1dbb0987bec72cb037f5bffc942ae4fc26f3",
+    "parents": [
+      "f064af00582ce75b9fd14ff90c2d56e519faf1f5"
+    ],
+    "date": "2026-09-08T22:56:16+02:00",
+    "title": "Accept maximum reachable blocker carry height",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C030_a4cb1db.diff",
+    "diff_sha256": "5d1f96e211645f6ae52d2a0e0774c026d3a3508337167d352ed640afb7668729",
+    "events": [
+      {
+        "event": "E0293",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R27",
+      "title": "Accept maximum reachable blocker carry height",
+      "description": "Seed 18 and six baseline cases fail → allow a blocker lift to finish at the reachable ceiling.",
+      "caveats": [],
+      "related_lines": [
+        289,
+        291,
+        293
+      ],
+      "post_edit_test_lines": [
+        293
+      ]
+    },
+    "policy_sha256": "2dd2a7176aed1705e260582f78ef3434b8dabb6cdc7f1ea6362b16c6ba19f04a",
+    "version": "evidence/versions/C030_a4cb1db_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C031",
+    "commit": "13fcd5838c87608d9c30898ed7dd2f6bfa8a00b7",
+    "parents": [
+      "a4cb1dbb0987bec72cb037f5bffc942ae4fc26f3"
+    ],
+    "date": "2026-09-08T22:57:02+02:00",
+    "title": "Restore reliable low blocker parking behavior",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C031_13fcd58.diff",
+    "diff_sha256": "11db208ac75920339e308865988d7eba075525797129c8741d04dfcc6a905ca3",
+    "events": [
+      {
+        "event": "E0297",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R28",
+      "title": "Restore reliable low blocker parking behavior",
+      "description": "The broad failures persist → undo the high-carry/lowering changes and restore low parking.",
+      "caveats": [
+        "Restores part of an earlier rule. A partial reversal is not necessarily a full Git revert or an exact return to an earlier complete program."
+      ],
+      "related_lines": [
+        293,
+        295,
+        297
+      ],
+      "post_edit_test_lines": [
+        297
+      ]
+    },
+    "policy_sha256": "2051b534953d9e286373a321c8bea6f7a35d6f5735f75a4510cde7ae0fda0750",
+    "version": "evidence/versions/C031_13fcd58_approach.py",
+    "same_policy_as_earlier": [
+      "C028"
+    ]
+  },
+  {
+    "id": "C032",
+    "commit": "04141a4c7d2ec421315e0c41837ad01b8093653e",
+    "parents": [
+      "13fcd5838c87608d9c30898ed7dd2f6bfa8a00b7"
+    ],
+    "date": "2026-09-08T22:57:35+02:00",
+    "title": "Choose globally clear parking slots over directional routing",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C032_04141a4.diff",
+    "diff_sha256": "9a90392a4fffd0ef8c9f9e770b3ff376703359c6fc4f21e5ee444a2d51a0bdb9",
+    "events": [
+      {
+        "event": "E0301",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R29",
+      "title": "Choose globally clear parking slots over directional routing",
+      "description": "Three baseline failures remain → remove the same-side parking restriction.",
+      "caveats": [
+        "Restores part of an earlier rule. A partial reversal is not necessarily a full Git revert or an exact return to an earlier complete program."
+      ],
+      "related_lines": [
+        297,
+        299,
+        301
+      ],
+      "post_edit_test_lines": [
+        301
+      ]
+    },
+    "policy_sha256": "50f572b75af3c4431629b34873e6694d0df488ccd6f619f9b242043c18ba8aed",
+    "version": "evidence/versions/C032_04141a4_approach.py",
+    "same_policy_as_earlier": [
+      "C027"
+    ]
+  },
+  {
+    "id": "C033",
+    "commit": "3f93ca0c4cd0d1c46cd0f0da2fc46554cfc0b38d",
+    "parents": [
+      "04141a4c7d2ec421315e0c41837ad01b8093653e"
+    ],
+    "date": "2026-09-08T22:58:24+02:00",
+    "title": "Use globally safest temporary target slot",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C033_3f93ca0.diff",
+    "diff_sha256": "9c3edcd8bb909710639b7cbcc77642cea93595238bb89b108d131589e9578eb5",
+    "events": [
+      {
+        "event": "E0307",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R30",
+      "title": "Use globally safest temporary target slot",
+      "description": "Seed 10 remains unresolved → remove the outward-only target parking rule.",
+      "caveats": [
+        "Restores part of an earlier rule. A partial reversal is not necessarily a full Git revert or an exact return to an earlier complete program."
+      ],
+      "related_lines": [
+        301,
+        303,
+        305,
+        307
+      ],
+      "post_edit_test_lines": [
+        307,
+        311
+      ]
+    },
+    "policy_sha256": "d201e21a74b137e5f3d7653014eba1c4fddf20a57b62620ccd506af5a894988a",
+    "version": "evidence/versions/C033_3f93ca0_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C034",
+    "commit": "990576d616dd3fe0c0742b7ac88631919d3b82a1",
+    "parents": [
+      "3f93ca0c4cd0d1c46cd0f0da2fc46554cfc0b38d"
+    ],
+    "date": "2026-09-08T23:00:33+02:00",
+    "title": "Use denser nonoverlapping parking allocation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C034_990576d.diff",
+    "diff_sha256": "ec9a5cfa8a34b57e841af394dbd8bb2957521a13ec845e764509aedfefa5b970",
+    "events": [
+      {
+        "event": "E0317",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R31",
+      "title": "Use denser nonoverlapping parking allocation",
+      "description": "Several clustered cases fail → reduce the spacing margin between parked objects.",
+      "caveats": [],
+      "related_lines": [
+        307,
+        311,
+        313,
+        315,
+        317
+      ],
+      "post_edit_test_lines": [
+        317
+      ]
+    },
+    "policy_sha256": "a51109374d7241053266e7a606ba478132210cf3c1251a75e5f9f77bfbe378ee",
+    "version": "evidence/versions/C034_990576d_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C035",
+    "commit": "a11bd5f9b411df31efdc63d9afbec4404369f0ff",
+    "parents": [
+      "990576d616dd3fe0c0742b7ac88631919d3b82a1"
+    ],
+    "date": "2026-09-08T23:01:02+02:00",
+    "title": "Restore validated parking clearance margin",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C035_a11bd5f.diff",
+    "diff_sha256": "87aa64b90c646f9f99d2ad5eacd114378115eeb35b9642af6b3f31be43a77eb4",
+    "events": [
+      {
+        "event": "E0321",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {
+      "alias": "R32",
+      "title": "Restore validated parking clearance margin",
+      "description": "Smaller spacing leaves all four targeted cases failing → restore the earlier spacing margin → compile and hand off without a fresh rollout report in that turn.",
+      "caveats": [
+        "No fresh rollout result is recorded after this revision before that turn ends at L328. L321 runs compilation. A later resumed turn probes the unchanged policy at L335 (included with R33); this is not a claim that the policy was never executed again. Later agent summaries are not a replacement for a missing same-turn retest.",
+        "Restores part of an earlier rule. A partial reversal is not necessarily a full Git revert or an exact return to an earlier complete program."
+      ],
+      "related_lines": [
+        317,
+        319,
+        321
+      ],
+      "post_edit_test_lines": []
+    },
+    "policy_sha256": "d201e21a74b137e5f3d7653014eba1c4fddf20a57b62620ccd506af5a894988a",
+    "version": "evidence/versions/C035_a11bd5f_approach.py",
+    "same_policy_as_earlier": [
+      "C033"
+    ]
+  },
+  {
+    "id": "C036",
+    "commit": "539f180b5e0bda7f31f3c416d407e89b1703d98c",
+    "parents": [
+      "a11bd5f9b411df31efdc63d9afbec4404369f0ff"
+    ],
+    "date": "2026-09-08T23:01:50+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C036_539f180.diff",
+    "diff_sha256": "d688fa82d5b103dd82c76b7c92757a19cb39e0ff44582247999ebebbd57fb377",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C037",
+    "commit": "c1c4586e18d6eb769aa82ec18799d7a6a5bd5dab",
+    "parents": [
+      "539f180b5e0bda7f31f3c416d407e89b1703d98c"
+    ],
+    "date": "2026-09-08T23:03:26+02:00",
+    "title": "Verify grasp against lowest observed object height",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C037_c1c4586.diff",
+    "diff_sha256": "453aadfc1a040a6ce358ef49718237ca2ab90270940d7426b76581259623115d",
+    "events": [
+      {
+        "event": "E0342",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {
+      "alias": "R33",
+      "title": "Verify grasp against lowest observed object height",
+      "description": "Resume work on seed 18; inspect pickup heights → verify a lift against the lowest observed object height.",
+      "caveats": [
+        "This crosses a turn boundary. Actual Git parent 539f180 only changes archived AGENTS.md; the preceding policy-changing commit is a11bd5f. These historical instructions remain data."
+      ],
+      "related_lines": [
+        317,
+        324,
+        327,
+        331,
+        335,
+        338,
+        340,
+        342
+      ],
+      "post_edit_test_lines": [
+        342
+      ]
+    },
+    "policy_sha256": "80b7cfdfc4412cac754bccd8155da693d92f5b4afb8e9b4a981354c5b657a5cb",
+    "version": "evidence/versions/C037_c1c4586_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C038",
+    "commit": "e97a5378cb34a8df18769cdf4c4b15f5bf5e674d",
+    "parents": [
+      "c1c4586e18d6eb769aa82ec18799d7a6a5bd5dab"
+    ],
+    "date": "2026-09-08T23:04:36+02:00",
+    "title": "Clear crowded objects from highest top edge downward",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C038_e97a537.diff",
+    "diff_sha256": "38400acac37c39a25cde18f48aacf7b615d0434c5f1e17110a3d48ab40209138",
+    "events": [
+      {
+        "event": "E0348",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R34",
+      "title": "Clear crowded objects from highest top edge downward",
+      "description": "Seed 18 still fails and the controller reaches done → sort the initial task list by computed top height.",
+      "caveats": [],
+      "related_lines": [
+        342,
+        344,
+        346,
+        348
+      ],
+      "post_edit_test_lines": [
+        348,
+        351
+      ]
+    },
+    "policy_sha256": "e8034e1cb2a6bf6fa8a6c95f9b510f853a69ec0036a52ddf47b0cb78c6cdc8fd",
+    "version": "evidence/versions/C038_e97a537_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C039",
+    "commit": "c9b3655e06a45822107bdbf0b1953ba730e77ef1",
+    "parents": [
+      "e97a5378cb34a8df18769cdf4c4b15f5bf5e674d"
+    ],
+    "date": "2026-09-08T23:06:22+02:00",
+    "title": "Keep parked blockers clear of final target sweep",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C039_c9b3655.diff",
+    "diff_sha256": "61fcc0e83e87b047a7da879cdf6e39f65bcb6a3f84ca7235e3a20010acdcb6ae",
+    "events": [
+      {
+        "event": "E0358",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R35",
+      "title": "Keep parked blockers clear of final target sweep",
+      "description": "Seeds 39 and 45 fail → add destination clearance and enlarge separation between parked objects.",
+      "caveats": [],
+      "related_lines": [
+        349,
+        351,
+        353,
+        354,
+        356,
+        358
+      ],
+      "post_edit_test_lines": [
+        358
+      ]
+    },
+    "policy_sha256": "8857d09ef6aa093fb17bea60028a35f227645b5d7cc64fb197f8b01c1b18f060",
+    "version": "evidence/versions/C039_c9b3655_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C040",
+    "commit": "4d36a38a1864f8754cb3d3ed0c0bf114e1588e37",
+    "parents": [
+      "c9b3655e06a45822107bdbf0b1953ba730e77ef1"
+    ],
+    "date": "2026-09-08T23:07:35+02:00",
+    "title": "Move crowded target after only materially taller blockers",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C040_4d36a38.diff",
+    "diff_sha256": "a5a91cbc52ad7d70300047f6c0a329a06726a80360f700e691b7e16bc3272841",
+    "events": [
+      {
+        "event": "E0366",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R36",
+      "title": "Move crowded target after only materially taller blockers",
+      "description": "Seed 3 becomes a regression → insert the target earlier when blocker heights are close.",
+      "caveats": [],
+      "related_lines": [
+        358,
+        360,
+        362,
+        364,
+        366
+      ],
+      "post_edit_test_lines": [
+        366,
+        370
+      ]
+    },
+    "policy_sha256": "a1ab001be5ecd7535e8eda13a23ead289d4333a62fd237b1f4a7ac7a535e3a9a",
+    "version": "evidence/versions/C040_4d36a38_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C041",
+    "commit": "be6feb60cb8cb0981cde9814194135d920128e75",
+    "parents": [
+      "4d36a38a1864f8754cb3d3ed0c0bf114e1588e37"
+    ],
+    "date": "2026-09-08T23:09:56+02:00",
+    "title": "Protect future pickups when assigning parking slots",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C041_be6feb6.diff",
+    "diff_sha256": "7d3d1b9979ebe42e5d30e249e515a2c8ec54dc4547c7e602d66db838762ff003",
+    "events": [
+      {
+        "event": "E0378",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R37",
+      "title": "Protect future pickups when assigning parking slots",
+      "description": "Seeds 15 and 26 fail → widen the height tolerance AND reject parking slots near future pickups.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        367,
+        370,
+        373,
+        374,
+        376,
+        378
+      ],
+      "post_edit_test_lines": [
+        378,
+        380
+      ]
+    },
+    "policy_sha256": "ed59c8f727519ae363c41ba26d8c01a006a0bd208c9773f0f9afe4266187424a",
+    "version": "evidence/versions/C041_be6feb6_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C042",
+    "commit": "616a82f41c95f8f631d9813da952c4d62c8e5a85",
+    "parents": [
+      "be6feb60cb8cb0981cde9814194135d920128e75"
+    ],
+    "date": "2026-09-08T23:11:34+02:00",
+    "title": "Prioritize physically overlapping taller blockers",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C042_616a82f.diff",
+    "diff_sha256": "362a69913f6cfbaff8950e79b1993fab4ed7cb9a971e5c7f8c03adc0674adadb",
+    "events": [
+      {
+        "event": "E0387",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R38",
+      "title": "Prioritize physically overlapping taller blockers",
+      "description": "Seed 18 breaks again → include geometric overlap in the target-ordering criterion.",
+      "caveats": [],
+      "related_lines": [
+        380,
+        382,
+        383,
+        385,
+        387
+      ],
+      "post_edit_test_lines": [
+        387,
+        389
+      ]
+    },
+    "policy_sha256": "6438b0ce72ba532e5573c611f0161d2ccd6b9cc03012a243add009d2d1356522",
+    "version": "evidence/versions/C042_616a82f_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C043",
+    "commit": "dafcc2f32a2e25cb17d3c23d03a74a4c163e5fd3",
+    "parents": [
+      "616a82f41c95f8f631d9813da952c4d62c8e5a85"
+    ],
+    "date": "2026-09-08T23:13:25+02:00",
+    "title": "Allocate outer parking slots before inner ones",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C043_dafcc2f.diff",
+    "diff_sha256": "f40fc0f7a59e82748c4301e4c4ad3c89d2aac5471bde89624c132c2226ac1749",
+    "events": [
+      {
+        "event": "E0396",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R39",
+      "title": "Allocate outer parking slots before inner ones",
+      "description": "Seed 59 fails → allocate farther-from-surface parking positions before inner positions.",
+      "caveats": [],
+      "related_lines": [
+        389,
+        391,
+        392,
+        394,
+        396
+      ],
+      "post_edit_test_lines": [
+        396,
+        401,
+        411
+      ]
+    },
+    "policy_sha256": "c588e5e6df70018bc505740684f4fe205964ffa0b66e6f37e5a16ef210c5e1cb",
+    "version": "evidence/versions/C043_dafcc2f_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C044",
+    "commit": "678059d4ec84d6608cd7d10084be4b9f6efe8e0e",
+    "parents": [
+      "dafcc2f32a2e25cb17d3c23d03a74a4c163e5fd3"
+    ],
+    "date": "2026-09-08T23:15:14+02:00",
+    "title": "Add pinned object-count regression support",
+    "files": [
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C044_678059d.diff",
+    "diff_sha256": "82a14c292301d5f49ac35132a31d4878c1f7e1af89ef7a9c19433df8f253cdb4",
+    "events": [
+      {
+        "event": "E0411",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C045",
+    "commit": "0e14ec7609b468597927230059f43346654fbc6d",
+    "parents": [
+      "678059d4ec84d6608cd7d10084be4b9f6efe8e0e"
+    ],
+    "date": "2026-09-08T23:16:33+02:00",
+    "title": "Choose least-conflicting fallback parking slots",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C045_0e14ec7.diff",
+    "diff_sha256": "5bf5f4a0beb84590c1dfdfa0b5690b6185523e48251198624fb5d21574100255",
+    "events": [
+      {
+        "event": "E0417",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R40",
+      "title": "Choose least-conflicting fallback parking slots",
+      "description": "Pinned count-3 tests fail on seeds 1 and 3 → densify the parking grid and score fallback constraint violations.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        407,
+        411,
+        413,
+        415,
+        417
+      ],
+      "post_edit_test_lines": [
+        417
+      ]
+    },
+    "policy_sha256": "2e29dcc66c0de22c86c55a59cadac26a9a365124ab3ca2af5aa088328ed3d842",
+    "version": "evidence/versions/C045_0e14ec7_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C046",
+    "commit": "f87f63f3649fbf63ac884fb1b9fe168478b2930c",
+    "parents": [
+      "0e14ec7609b468597927230059f43346654fbc6d"
+    ],
+    "date": "2026-09-08T23:17:21+02:00",
+    "title": "Increase clearance around future pickup columns",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C046_f87f63f.diff",
+    "diff_sha256": "7e9b69c9bfeb472c58134579d3e9f5425a36e2b22afde780cee0d39db22a378f",
+    "events": [
+      {
+        "event": "E0423",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R41",
+      "title": "Increase clearance around future pickup columns",
+      "description": "Count-3 seed 4 now fails → increase clearance around future pickup locations.",
+      "caveats": [],
+      "related_lines": [
+        417,
+        419,
+        421,
+        423
+      ],
+      "post_edit_test_lines": [
+        423,
+        426
+      ]
+    },
+    "policy_sha256": "4f1945fdeb02afd884b1d59dff9e78d0880b561d1a76b9b13eb0dbf2fa473c1e",
+    "version": "evidence/versions/C046_f87f63f_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C047",
+    "commit": "6fc104f41b4160e0015842e8f62e768b6b985c9e",
+    "parents": [
+      "f87f63f3649fbf63ac884fb1b9fe168478b2930c"
+    ],
+    "date": "2026-09-08T23:19:39+02:00",
+    "title": "Only relocate objects blocking the final placement footprint",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C047_6fc104f.diff",
+    "diff_sha256": "2fb043317135fd891c685fd27ab0d694485c5940709733c3c13a14451cc21807",
+    "events": [
+      {
+        "event": "E0437",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R42",
+      "title": "Only relocate objects blocking the final placement footprint",
+      "description": "Count-4 testing fails on four of five seeds → only relocate objects near the final placement footprint.",
+      "caveats": [
+        "L426 also reports a count-5 environment reset error. That is not evidence of robot-policy failure at count 5."
+      ],
+      "related_lines": [
+        424,
+        426,
+        428,
+        430,
+        432,
+        433,
+        435,
+        437
+      ],
+      "post_edit_test_lines": [
+        437
+      ]
+    },
+    "policy_sha256": "da5419d2e1cf3ab1ee4fc9a774348f6815f6c5a39dbad21a087702004d67b293",
+    "version": "evidence/versions/C047_6fc104f_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C048",
+    "commit": "c91cb8e9be2aec3700f91693fbc5d99f41f6e2a3",
+    "parents": [
+      "6fc104f41b4160e0015842e8f62e768b6b985c9e"
+    ],
+    "date": "2026-09-08T23:20:26+02:00",
+    "title": "Include blockers near the placement sweep envelope",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C048_c91cb8e.diff",
+    "diff_sha256": "9c92e222578a79e08da3c485fbd5a5d8f11408f1993b82ad87c4e0a1d1b4ef84",
+    "events": [
+      {
+        "event": "E0441",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R43",
+      "title": "Include blockers near the placement sweep envelope",
+      "description": "Filtering leaves baseline seed 6 and count-4 cases failing → widen the footprint used to select blockers.",
+      "caveats": [],
+      "related_lines": [
+        437,
+        439,
+        441
+      ],
+      "post_edit_test_lines": [
+        441
+      ]
+    },
+    "policy_sha256": "60b057e16a84619d11400139b5fe780b68d8591a9916c579519f152a130eb3fd",
+    "version": "evidence/versions/C048_c91cb8e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C049",
+    "commit": "bb1c5eb0368c5961989b6f2880180b9c46a128b5",
+    "parents": [
+      "c91cb8e9be2aec3700f91693fbc5d99f41f6e2a3"
+    ],
+    "date": "2026-09-08T23:21:04+02:00",
+    "title": "Increase clearance from the final lowering corridor",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C049_bb1c5eb.diff",
+    "diff_sha256": "99474d6359d62cd85fbd28a5d1b3a82b30348f655c5e1b17af3588e934afce3e",
+    "events": [
+      {
+        "event": "E0447",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R44",
+      "title": "Increase clearance from the final lowering corridor",
+      "description": "Count-4 seed 1 still fails → enlarge the clearance around the final lowering location.",
+      "caveats": [],
+      "related_lines": [
+        441,
+        443,
+        445,
+        447
+      ],
+      "post_edit_test_lines": [
+        447,
+        451
+      ]
+    },
+    "policy_sha256": "a59eb5a564ea73305691ccb8c763b7a12077a8118572e041ea1b7046163faf8f",
+    "version": "evidence/versions/C049_bb1c5eb_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C050",
+    "commit": "20d09c8656cf55177f2c3f77b7de178305af944c",
+    "parents": [
+      "bb1c5eb0368c5961989b6f2880180b9c46a128b5"
+    ],
+    "date": "2026-09-08T23:23:36+02:00",
+    "title": "Stack blockers when no safe horizontal slot exists",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C050_20d09c8.diff",
+    "diff_sha256": "f328bf4677bef8c337ee34d7cf7e9c199df85ae6f90991596dff80b4488c0f4e",
+    "events": [
+      {
+        "event": "E0458",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R45",
+      "title": "Stack blockers when no safe horizontal slot exists",
+      "description": "Seed 93 fails with crowded horizontal parking → add a vertical stacking fallback.",
+      "caveats": [],
+      "related_lines": [
+        451,
+        453,
+        454,
+        456,
+        458
+      ],
+      "post_edit_test_lines": [
+        458
+      ]
+    },
+    "policy_sha256": "8dd8c99bff0e62faa14dfc1f44683a5d3b26f11b4e7d580a15f154422cbd252b",
+    "version": "evidence/versions/C050_20d09c8_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C051",
+    "commit": "5210b1a6485b9c8c862638b37ae5f2b56dff06fe",
+    "parents": [
+      "20d09c8656cf55177f2c3f77b7de178305af944c"
+    ],
+    "date": "2026-09-08T23:25:02+02:00",
+    "title": "Stack only outside target transit corridor",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C051_5210b1a.diff",
+    "diff_sha256": "0b48b2757e7d6764d2ed0f6cfe1590211857e552f43ba9ace9f79e50249abbd2",
+    "events": [
+      {
+        "event": "E0464",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R46",
+      "title": "Stack only outside target transit corridor",
+      "description": "Stacking fixes seed 93 but breaks count-4 cases → restrict stacking to outer columns and small blocker sets.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        458,
+        460,
+        462,
+        464
+      ],
+      "post_edit_test_lines": [
+        464,
+        469
+      ]
+    },
+    "policy_sha256": "621f0093b5837c6f29d9ae7fe65f56d8ae88c3a9b2b0feab2b5fffc8b2b04fc4",
+    "version": "evidence/versions/C051_5210b1a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C052",
+    "commit": "4868fc2a012627cd4879d4579300529e3b15d8dd",
+    "parents": [
+      "5210b1a6485b9c8c862638b37ae5f2b56dff06fe"
+    ],
+    "date": "2026-09-08T23:27:21+02:00",
+    "title": "Shorten recovery lift after failed grasps",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C052_4868fc2.diff",
+    "diff_sha256": "518e33d8816181cf60443e9f483ecded4e79b1a97ad54afab6bc3dedc43b044e",
+    "events": [
+      {
+        "event": "E0475",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R47",
+      "title": "Shorten recovery lift after failed grasps",
+      "description": "New count-4 failures appear → shorten the verification/recovery lift when no attachment is detected.",
+      "caveats": [],
+      "related_lines": [
+        465,
+        469,
+        471,
+        473,
+        475
+      ],
+      "post_edit_test_lines": [
+        475
+      ]
+    },
+    "policy_sha256": "3c9f00bb26bca731956173aaaeccb1ae45910b298c97f107250149a4498e2ce4",
+    "version": "evidence/versions/C052_4868fc2_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C053",
+    "commit": "7cfa55b4e6f9afeae4855f47dde1f5c2462a57a5",
+    "parents": [
+      "4868fc2a012627cd4879d4579300529e3b15d8dd"
+    ],
+    "date": "2026-09-08T23:28:12+02:00",
+    "title": "Add tolerance to failed-grasp recovery height",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C053_7cfa55b.diff",
+    "diff_sha256": "7f46e8c415df1b6e43bd68cdf226cf1e289a5c676d54364cc5707916d86002b3",
+    "events": [
+      {
+        "event": "E0481",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R48",
+      "title": "Add tolerance to failed-grasp recovery height",
+      "description": "Count-4 seed 5 still fails → add a tolerance to the lift-height stopping condition.",
+      "caveats": [],
+      "related_lines": [
+        475,
+        477,
+        479,
+        481
+      ],
+      "post_edit_test_lines": [
+        481
+      ]
+    },
+    "policy_sha256": "942a183a9dcaae607d3a105ed1b52e9f875c81474efca7a53fd881abd8defe0c",
+    "version": "evidence/versions/C053_7cfa55b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C054",
+    "commit": "af3dcdd680dad5766ccec9c50f3e6ae84ec4255b",
+    "parents": [
+      "7cfa55b4e6f9afeae4855f47dde1f5c2462a57a5"
+    ],
+    "date": "2026-09-08T23:29:11+02:00",
+    "title": "Recover when verification lift is collision-blocked",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C054_af3dcdd.diff",
+    "diff_sha256": "0ec932b5cd868c1245065ae0ac526c33ef8ead9b9fe73e7076189325ac4a3fbd",
+    "events": [
+      {
+        "event": "E0489",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R49",
+      "title": "Recover when verification lift is collision-blocked",
+      "description": "Seed 5 remains stuck in lift → detect vertical stalls and enter recovery.",
+      "caveats": [],
+      "related_lines": [
+        481,
+        483,
+        485,
+        487,
+        489
+      ],
+      "post_edit_test_lines": [
+        489,
+        491,
+        493
+      ]
+    },
+    "policy_sha256": "d125af27e0e7084c6fb8b5f12bc2bffda4ce5865281d847558a9ce5855570e62",
+    "version": "evidence/versions/C054_af3dcdd_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C055",
+    "commit": "05d09719879202800efd5443054cddd535fa8165",
+    "parents": [
+      "af3dcdd680dad5766ccec9c50f3e6ae84ec4255b"
+    ],
+    "date": "2026-09-08T23:30:57+02:00",
+    "title": "Add boundary columns for dense blocker parking",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C055_05d0971.diff",
+    "diff_sha256": "e0b93b3ed541a110497f7084fed5d2723d6b6b8ad1186384dd22a8798837a1b5",
+    "events": [
+      {
+        "event": "E0500",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R50",
+      "title": "Add boundary columns for dense blocker parking",
+      "description": "Count-4 seed 7 remains unresolved → add parking candidates near both boundaries.",
+      "caveats": [],
+      "related_lines": [
+        493,
+        495,
+        496,
+        498,
+        500
+      ],
+      "post_edit_test_lines": [
+        500,
+        502,
+        509,
+        511
+      ]
+    },
+    "policy_sha256": "cf1d946f58aba0643564a5b49fad1972ed15ec5fb9840d2a3ca109148e91d879",
+    "version": "evidence/versions/C055_05d0971_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C056",
+    "commit": "4897e46269b5d9f885dd2a13e79b864e96a206f2",
+    "parents": [
+      "05d09719879202800efd5443054cddd535fa8165"
+    ],
+    "date": "2026-09-08T23:34:19+02:00",
+    "title": "Skip blockers already displaced from the goal",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C056_4897e46.diff",
+    "diff_sha256": "b96bb55e9227a14367d971f1d25f85f98e8ee8fd39982689a8d6e59f89ec1bfb",
+    "events": [
+      {
+        "event": "E0518",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {
+      "alias": "R51",
+      "title": "Skip blockers already displaced from the goal",
+      "description": "Seed 53 fails after another object has displaced a blocker → recheck relevance and skip blockers already clear of the destination.",
+      "caveats": [
+        "Post-edit context includes final validation and stopping. L528 attempts a confidence-marker commit but returns nothing to commit; it is not a saved new policy revision."
+      ],
+      "related_lines": [
+        507,
+        511,
+        513,
+        514,
+        516,
+        518
+      ],
+      "post_edit_test_lines": [
+        518,
+        523
+      ]
+    },
+    "policy_sha256": "6540af38e538b4fa40e8d05e53f785facef700feb57c99097d8c55e317055a07",
+    "version": "evidence/versions/C056_4897e46_approach.py",
+    "same_policy_as_earlier": []
+  }
+]

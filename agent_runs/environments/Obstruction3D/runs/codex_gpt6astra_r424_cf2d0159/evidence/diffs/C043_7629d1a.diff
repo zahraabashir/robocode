@@ -1,0 +1,467 @@
+diff --git a/approach.py b/approach.py
+index 51b55f3..39c2aaa 100644
+--- a/approach.py
++++ b/approach.py
+@@ -29,6 +29,8 @@ class GeneratedApproach:
+         return self.cache[key]
+     def reset(self,state,info):
+         self.phase='raise'
++        self.drop_goal=None
++        self.final_delivery=False
+         self.yaw=np.pi/2
+         self.yawindex=0
+         self.blocked_attempts=0
+@@ -47,6 +49,16 @@ class GeneratedApproach:
+         self.retries=0
+         self.last_motion=None
+         self.stalled=0
++    def accept_grasp(self,held,ee):
++        if held.name!=self.goal:
++            previous=self.goal
++            self.tasks=[previous]+[name for name in self.tasks if name not in (held.name,previous)]
++            if held.name=='target_block':self.tasks.append('target_block')
++        self.goal=held.name
++        self.final_delivery=self.goal=='target_block' and not self.tasks
++        self.phase='lift'
++        self.height=min(.35,ee[2]+.025)
++        self.blocked_attempts=0
+     def pos(self,state,o):return np.array([state.get(o,'pose_'+a) for a in 'xyz'])
+     def get_action(self,state):
+         self.steps+=1
+@@ -88,7 +100,7 @@ class GeneratedApproach:
+                     self.height=.33;self.phase='descend';continue
+             elif self.phase=='descend':
+                 if held is not None:
+-                    self.goal=held.name;self.phase='lift';self.height=min(.35,ee[2]+.025);continue
++                    self.accept_grasp(held,ee);continue
+                 a[3:10]=self.config(self.height)-q
+                 a[10]=1
+                 if np.max(abs(a[3:10]))<1e-4:
+@@ -96,12 +108,12 @@ class GeneratedApproach:
+                         self.height=max(p[2]+state.get(obj,'half_extent_z')+.03,self.height-.025);continue
+                     self.phase='close';continue
+             elif self.phase=='close':
+-                if held is not None:self.goal=held.name;self.phase='lift';self.height=ee[2]+.025;continue
++                if held is not None:self.accept_grasp(held,ee);continue
+                 a[10]=-1
+                 self.retries+=1
+                 self.phase='reopen'
+             elif self.phase=='reopen':
+-                if held is not None:self.goal=held.name;self.phase='lift';self.height=ee[2]+.025;continue
++                if held is not None:self.accept_grasp(held,ee);continue
+                 a[10]=1
+                 self.height=max(p[2]+.005,self.height-.005)
+                 self.phase='descend'
+@@ -112,7 +124,7 @@ class GeneratedApproach:
+                     self.phase='transfer';continue
+             elif self.phase=='transfer':
+                 dest=self.pos(state,region)
+-                if self.goal!='target_block':
++                if not self.final_delivery:
+                     if not hasattr(self,'drop') or self.drop_goal!=self.goal:
+                         h=np.array([state.get(obj,'half_extent_'+v) for v in 'xy'])
+                         best=None
+@@ -132,7 +144,7 @@ class GeneratedApproach:
+                 a[:2]=dest[:2]-p[:2]
+                 if np.max(abs(a[:2]))<1e-4:
+                     self.destination=dest.copy()
+-                    if self.goal=='target_block':self.destination[2]+=state.get(region,'half_extent_z')+state.get(obj,'half_extent_z')+.001
++                    if self.final_delivery:self.destination[2]+=state.get(region,'half_extent_z')+state.get(obj,'half_extent_z')+.001
+                     self.finalheight=ee[2]+self.destination[2]-p[2]
+                     self.height=max(self.finalheight,ee[2]-.02);self.phase='lower';continue
+             elif self.phase=='lower':
+@@ -142,7 +154,7 @@ class GeneratedApproach:
+                     self.phase='release';continue
+             elif self.phase=='release':
+                 a[10]=1
+-                if held is None and self.goal!='target_block':
++                if held is None and not self.final_delivery:
+                     self.discarded+=1
+                     self.goal=self.tasks.pop(0) if self.tasks else 'target_block'
+                     self.phase='raise';self.retries=0;self.blocked_attempts=0;continue
+diff --git a/probe_latest_dense.log b/probe_latest_dense.log
+index fe4a90a..c74f011 100644
+--- a/probe_latest_dense.log
++++ b/probe_latest_dense.log
+@@ -6,3 +6,349 @@
+ 29 ('obstruction1', 'transfer') height 0.35 held 1.0 ee [0.60000001 0.00134749 0.35      ]
+ 30 ('obstruction1', 'transfer') height 0.35 held 1.0 ee [0.60000001 0.00134749 0.35      ]
+ 32 ('obstruction1', 'lower') height 0.32999999923895146 held 1.0 ee [0.60000003 0.00134759 0.33000002]
++43 ('obstruction1', 'release') height 0.146001288859947 held 0.0 ee [0.59999997 0.0013476  0.146001  ]
++44 ('obstruction0', 'raise') height 0.146001288859947 held 0.0 ee [0.60984712 0.0013476  0.19554684]
++48 ('obstruction0', 'align') height 0.146001288859947 held 0.0 ee [0.60000001 0.00134749 0.35      ]
++51 ('obstruction0', 'descend') height 0.33 held 0.0 ee [0.59999999 0.00134759 0.32999999]
++59 ('obstruction0', 'reopen') height 0.15499999999999997 held 0.0 ee [0.6        0.00134748 0.15499999]
++60 ('obstruction0', 'descend') height 0.14999999999999997 held 0.0 ee [0.6        0.00134748 0.15499999]
++61 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++62 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++63 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++64 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++65 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++66 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++67 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++68 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++69 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++70 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++71 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++72 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++73 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++74 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++75 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++76 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++77 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++78 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++79 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++80 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++81 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++82 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++83 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++84 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++85 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++86 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++87 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++88 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++89 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++90 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++91 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++92 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++93 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++94 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++95 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++96 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++97 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++98 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++99 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++100 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++101 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++102 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++103 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++104 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++105 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++106 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++107 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++108 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++109 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++110 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++111 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++112 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++113 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++114 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++115 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++116 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++117 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++118 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++119 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++120 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++121 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++122 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++123 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++124 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++125 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++126 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++127 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++128 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++129 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++130 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++131 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++132 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++133 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++134 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++135 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++136 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++137 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++138 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++139 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++140 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++141 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++142 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++143 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++144 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++145 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++146 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++147 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++148 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++149 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++150 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++151 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++152 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++153 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++154 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++155 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++156 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++157 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++158 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++159 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++160 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++161 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++162 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++163 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++164 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++165 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++166 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++167 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++168 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++169 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++170 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++171 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++172 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++173 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++174 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++175 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++176 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++177 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++178 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++179 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++180 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++181 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++182 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++183 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++184 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++185 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++186 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++187 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++188 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++189 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++190 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++191 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++192 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++193 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++194 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++195 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++196 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++197 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++198 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++199 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++200 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++201 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++202 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++203 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++204 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++205 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++206 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++207 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++208 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++209 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++210 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++211 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++212 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++213 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++214 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++215 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++216 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++217 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++218 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++219 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++220 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++221 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++222 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++223 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++224 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++225 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++226 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++227 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++228 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++229 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++230 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++231 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++232 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++233 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++234 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++235 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++236 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++237 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++238 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++239 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++240 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++241 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++242 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++243 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++244 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++245 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++246 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++247 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++248 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++249 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++250 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++251 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++252 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++253 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++254 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++255 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++256 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++257 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++258 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++259 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++260 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++261 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++262 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++263 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++264 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++265 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++266 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++267 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++268 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++269 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++270 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++271 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++272 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++273 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++274 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++275 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++276 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++277 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++278 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++279 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++280 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++281 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++282 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++283 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++284 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++285 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++286 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++287 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++288 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++289 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++290 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++291 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++292 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++293 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++294 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++295 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++296 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++297 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++298 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++299 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++300 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++301 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++302 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++303 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++304 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++305 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++306 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++307 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++308 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++309 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++310 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++311 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++312 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++313 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++314 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++315 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++316 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++317 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++318 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++319 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++320 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++321 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++322 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++323 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++324 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++325 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++326 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++327 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++328 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++329 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++330 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++331 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++332 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++333 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++334 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++335 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++336 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++337 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++338 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++339 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++340 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++341 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++342 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++343 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++344 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++345 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++346 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++347 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++348 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++349 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++350 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++351 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++352 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++353 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++354 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++355 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++356 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++357 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++358 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++359 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++360 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++361 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++362 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++363 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++364 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++365 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++366 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++367 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++368 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++369 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++370 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++371 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++372 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++373 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++374 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++375 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++376 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++377 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++378 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++379 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++380 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++381 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++382 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++383 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++384 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++385 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++386 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++387 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++388 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++389 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++390 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++391 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++392 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++393 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++394 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++395 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++396 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++397 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++398 ('obstruction0', 'descend') height 0.14999999353795662 held 0.0 ee [0.6        0.00134748 0.15499999]
++399 ('obstruction0', 'reopen') height 0.15499999353795663 held 0.0 ee [0.6        0.00134748 0.15499999]
++RESULT 399 False False 24.70615839958191
+diff --git a/sweep_current.log b/sweep_current.log
+index 96b0a07..b02b86f 100644
+--- a/sweep_current.log
++++ b/sweep_current.log
+@@ -22,3 +22,9 @@
+ {"seed": 21, "count": null, "success": true, "steps": 42, "phase": "release", "goal": "target_block", "seconds": 0.82, "grasp": 0.0}
+ {"seed": 22, "count": null, "success": true, "steps": 83, "phase": "release", "goal": "target_block", "seconds": 1.95, "grasp": 0.0}
+ {"seed": 23, "count": null, "success": true, "steps": 42, "phase": "release", "goal": "target_block", "seconds": 5.09, "grasp": 0.0}
++{"seed": 24, "count": null, "success": true, "steps": 43, "phase": "release", "goal": "target_block", "seconds": 8.92, "grasp": 0.0}
++{"seed": 25, "count": null, "success": true, "steps": 82, "phase": "release", "goal": "target_block", "seconds": 6.55, "grasp": 0.0}
++{"seed": 26, "count": null, "success": true, "steps": 84, "phase": "release", "goal": "target_block", "seconds": 5.24, "grasp": 0.0}
++{"seed": 27, "count": null, "success": true, "steps": 44, "phase": "release", "goal": "target_block", "seconds": 0.86, "grasp": 0.0}
++{"seed": 28, "count": null, "success": true, "steps": 82, "phase": "release", "goal": "target_block", "seconds": 1.55, "grasp": 0.0}
++{"seed": 29, "count": null, "success": true, "steps": 41, "phase": "release", "goal": "target_block", "seconds": 0.95, "grasp": 0.0}
+diff --git a/sweep_dense_retry.log b/sweep_dense_retry.log
+new file mode 100644
+index 0000000..c54cc82
+--- /dev/null
++++ b/sweep_dense_retry.log
+@@ -0,0 +1 @@
++{"seed": 2, "count": 5, "success": true, "steps": 173, "phase": "release", "goal": "target_block", "seconds": 21.44, "grasp": 0.0}
+diff --git a/sweep_final_count5.log b/sweep_final_count5.log
+new file mode 100644
+index 0000000..db85172
+--- /dev/null
++++ b/sweep_final_count5.log
+@@ -0,0 +1,5 @@
++{"seed": 0, "count": 5, "success": true, "steps": 221, "phase": "release", "goal": "target_block", "seconds": 4.24, "grasp": 0.0}
++{"seed": 1, "count": 5, "success": true, "steps": 201, "phase": "release", "goal": "target_block", "seconds": 3.81, "grasp": 0.0}
++{"seed": 2, "count": 5, "success": true, "steps": 173, "phase": "release", "goal": "target_block", "seconds": 3.34, "grasp": 0.0}
++{"seed": 3, "count": 5, "success": true, "steps": 119, "phase": "release", "goal": "target_block", "seconds": 2.4, "grasp": 0.0}
++{"seed": 4, "count": 5, "success": true, "steps": 211, "phase": "release", "goal": "target_block", "seconds": 3.77, "grasp": 0.0}

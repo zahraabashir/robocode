@@ -1,0 +1,14 @@
+diff --git a/approach.py b/approach.py
+index eead167..726c57f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -122,8 +122,7 @@ class GeneratedApproach:
+             arrived=(np.linalg.norm(poserr[:2])<.004 and pos[2]<self.rest_z+.012)
+         if arrived and np.linalg.norm(feat[3:])<.025:
+             self.waypoint+=1
+-            # Dropping from the clear waypoint avoids wedging the fingers against
+-            # the tabletop; gravity preserves the accurately controlled x/y.
++            # The last waypoint seats the object before opening the fingers.
+             if self.waypoint>=3: self.mode="release"; self.release_t=0; self.release_x=pos[0]
+             elif self.waypoint==1 and self.dest[0]>self.start_x+.03: self.mode="reserve"
+             else: self._start_calibration(state)

@@ -1,0 +1,521 @@
+diff --git a/final_holdout_progress.txt b/final_holdout_progress.txt
+new file mode 100644
+index 0000000..c3d0698
+--- /dev/null
++++ b/final_holdout_progress.txt
+@@ -0,0 +1,11 @@
++PROGRESS 10 success 10 mean 158.2
++PROGRESS 20 success 20 mean 145.95
++PROGRESS 30 success 30 mean 139.33333333333334
++PROGRESS 40 success 40 mean 143.5
++PROGRESS 50 success 50 mean 145.74
++PROGRESS 60 success 60 mean 146.58333333333334
++PROGRESS 70 success 70 mean 146.17142857142858
++PROGRESS 80 success 80 mean 148.0875
++PROGRESS 90 success 90 mean 149.8
++PROGRESS 100 success 100 mean 149.02
++SUMMARY 100 success 100 mean 149.02 max 310 maxseconds 1.127851487020962
+diff --git a/holdout_results.json b/holdout_results.json
+index 481d8f5..eaf17d1 100644
+--- a/holdout_results.json
++++ b/holdout_results.json
+@@ -1 +1 @@
+-[{"seed": 146540, "success": true, "steps": 217, "seconds": 0.6442833140026778}, {"seed": 227779, "success": true, "steps": 194, "seconds": 0.5359158569481224}, {"seed": 79810, "success": true, "steps": 133, "seconds": 0.4165758730378002}, {"seed": 176811, "success": true, "steps": 124, "seconds": 0.30504774709697813}, {"seed": 35239, "success": true, "steps": 208, "seconds": 0.6660460099810734}, {"seed": 748855, "success": true, "steps": 115, "seconds": 0.3733158530667424}, {"seed": 339440, "success": true, "steps": 180, "seconds": 0.5212565860711038}, {"seed": 83063, "success": true, "steps": 164, "seconds": 0.4194700769148767}, {"seed": 805051, "success": true, "steps": 141, "seconds": 0.522512692026794}, {"seed": 28138, "success": true, "steps": 128, "seconds": 0.37945135799236596}, {"seed": 209984, "success": true, "steps": 148, "seconds": 0.45123976294416934}, {"seed": 353027, "success": true, "steps": 159, "seconds": 0.46879949897993356}, {"seed": 281955, "success": true, "steps": 136, "seconds": 0.4164373299572617}, {"seed": 468073, "success": true, "steps": 101, "seconds": 0.3061653410550207}, {"seed": 153290, "success": true, "steps": 102, "seconds": 0.27268252393696457}, {"seed": 104326, "success": true, "steps": 112, "seconds": 0.3341062730178237}, {"seed": 318483, "success": true, "steps": 182, "seconds": 0.5651594819501042}, {"seed": 707047, "success": true, "steps": 96, "seconds": 0.23521790595259517}, {"seed": 902691, "success": true, "steps": 132, "seconds": 0.383297792985104}, {"seed": 907569, "success": true, "steps": 169, "seconds": 0.4807824339950457}, {"seed": 684306, "success": true, "steps": 121, "seconds": 0.3149903540033847}, {"seed": 204168, "success": true, "steps": 137, "seconds": 0.4061895359773189}, {"seed": 868738, "success": true, "steps": 136, "seconds": 0.3350574920186773}, {"seed": 477045, "success": true, "steps": 160, "seconds": 0.4665249550016597}, {"seed": 590476, "success": true, "steps": 131, "seconds": 0.375011048046872}, {"seed": 207383, "success": true, "steps": 92, "seconds": 0.23485747398808599}, {"seed": 206844, "success": true, "steps": 41, "seconds": 0.14044351200573146}, {"seed": 759290, "success": true, "steps": 178, "seconds": 0.450354887987487}, {"seed": 867509, "success": true, "steps": 127, "seconds": 0.3177955800201744}, {"seed": 709794, "success": true, "steps": 111, "seconds": 0.338796345051378}, {"seed": 800642, "success": true, "steps": 175, "seconds": 0.48948465497232974}, {"seed": 674061, "success": true, "steps": 114, "seconds": 0.35920341592282057}, {"seed": 135810, "success": true, "steps": 213, "seconds": 0.6263717989204451}, {"seed": 368328, "success": true, "steps": 187, "seconds": 0.5736566630657762}, {"seed": 658069, "success": true, "steps": 203, "seconds": 0.5674397440161556}, {"seed": 503570, "success": true, "steps": 118, "seconds": 0.37073401699308306}, {"seed": 331606, "success": true, "steps": 215, "seconds": 0.665152896894142}, {"seed": 466715, "success": true, "steps": 113, "seconds": 0.31805914698634297}, {"seed": 256328, "success": true, "steps": 188, "seconds": 0.6535322350682691}, {"seed": 462097, "success": true, "steps": 108, "seconds": 0.2707151820650324}, {"seed": 347577, "success": true, "steps": 118, "seconds": 0.36465339502319694}, {"seed": 311635, "success": true, "steps": 195, "seconds": 0.5437273089773953}, {"seed": 493747, "success": true, "steps": 158, "seconds": 0.4992043389938772}, {"seed": 475918, "success": true, "steps": 204, "seconds": 0.6871609260560945}, {"seed": 25264, "success": true, "steps": 151, "seconds": 0.4328517169924453}, {"seed": 765194, "success": true, "steps": 147, "seconds": 0.39300889102742076}, {"seed": 262269, "success": true, "steps": 113, "seconds": 0.3270672360667959}, {"seed": 705334, "success": true, "steps": 93, "seconds": 0.2449990171007812}, {"seed": 960290, "success": true, "steps": 146, "seconds": 0.4315802319906652}, {"seed": 879842, "success": true, "steps": 176, "seconds": 0.48433934000786394}, {"seed": 609998, "success": true, "steps": 107, "seconds": 0.3304128139279783}, {"seed": 297854, "success": true, "steps": 147, "seconds": 0.38486837199889123}, {"seed": 312193, "success": true, "steps": 51, "seconds": 0.1687301779165864}, {"seed": 680328, "success": true, "steps": 165, "seconds": 0.47914950200356543}, {"seed": 515577, "success": true, "steps": 75, "seconds": 0.24488347803708166}, {"seed": 340334, "success": true, "steps": 167, "seconds": 0.46543742495123297}, {"seed": 520320, "success": true, "steps": 150, "seconds": 0.4162884760880843}, {"seed": 67416, "success": true, "steps": 84, "seconds": 0.21053120808210224}, {"seed": 20617, "success": true, "steps": 153, "seconds": 0.4703220040537417}, {"seed": 501166, "success": true, "steps": 201, "seconds": 0.551519175991416}, {"seed": 358860, "success": true, "steps": 176, "seconds": 0.5087037159828469}, {"seed": 565667, "success": true, "steps": 166, "seconds": 0.47917062195483595}, {"seed": 414624, "success": true, "steps": 129, "seconds": 0.37046367302536964}, {"seed": 577270, "success": true, "steps": 194, "seconds": 0.5283072380116209}, {"seed": 141418, "success": true, "steps": 155, "seconds": 0.44506354501936585}, {"seed": 732526, "success": true, "steps": 97, "seconds": 0.24457281990908086}, {"seed": 522465, "success": true, "steps": 143, "seconds": 0.42548588302452117}, {"seed": 689992, "success": true, "steps": 124, "seconds": 0.3848410089267418}, {"seed": 747248, "success": true, "steps": 105, "seconds": 0.3162323000142351}, {"seed": 733931, "success": true, "steps": 148, "seconds": 0.4163025110028684}, {"seed": 186064, "success": true, "steps": 171, "seconds": 0.4888377879979089}, {"seed": 933981, "success": true, "steps": 296, "seconds": 0.9189865200314671}, {"seed": 186916, "success": true, "steps": 160, "seconds": 0.4540313580073416}, {"seed": 599550, "success": true, "steps": 201, "seconds": 0.5922174990409985}, {"seed": 322604, "success": true, "steps": 179, "seconds": 0.5528617340605706}, {"seed": 380242, "success": true, "steps": 158, "seconds": 0.4005526580149308}, {"seed": 666997, "success": true, "steps": 167, "seconds": 0.4783178569050506}, {"seed": 893185, "success": true, "steps": 187, "seconds": 0.5814697179012001}, {"seed": 341438, "success": true, "steps": 177, "seconds": 0.5611944849370047}, {"seed": 453019, "success": true, "steps": 74, "seconds": 0.19674632197711617}, {"seed": 26285, "success": true, "steps": 178, "seconds": 0.5436956550693139}, {"seed": 234737, "success": true, "steps": 140, "seconds": 0.4224026489537209}, {"seed": 516950, "success": true, "steps": 169, "seconds": 0.4887855181004852}, {"seed": 409597, "success": true, "steps": 181, "seconds": 0.5145631580380723}, {"seed": 410202, "success": true, "steps": 108, "seconds": 0.28650806297082454}, {"seed": 912076, "success": true, "steps": 173, "seconds": 0.4662859570235014}, {"seed": 53988, "success": true, "steps": 129, "seconds": 0.3337411490501836}, {"seed": 513820, "success": true, "steps": 89, "seconds": 0.22712817101273686}, {"seed": 778770, "success": true, "steps": 182, "seconds": 0.4962933490751311}, {"seed": 30242, "success": true, "steps": 123, "seconds": 0.30562625697348267}, {"seed": 142818, "success": true, "steps": 108, "seconds": 0.2877311159390956}, {"seed": 203334, "success": true, "steps": 197, "seconds": 0.6126194890821353}, {"seed": 570889, "success": true, "steps": 148, "seconds": 0.45938574499450624}, {"seed": 617335, "success": true, "steps": 136, "seconds": 0.4099861910799518}, {"seed": 826067, "success": true, "steps": 144, "seconds": 0.3952847629552707}, {"seed": 948076, "success": true, "steps": 190, "seconds": 0.6673185050021857}, {"seed": 760197, "success": true, "steps": 152, "seconds": 0.4457745869876817}, {"seed": 932425, "success": true, "steps": 113, "seconds": 0.32762634998653084}, {"seed": 72082, "success": true, "steps": 156, "seconds": 0.4683101049158722}, {"seed": 924456, "success": true, "steps": 76, "seconds": 0.19050014589447528}]
+\ No newline at end of file
++[{"seed": 146540, "success": true, "steps": 217, "seconds": 0.8219524719752371}, {"seed": 227779, "success": true, "steps": 194, "seconds": 0.7140850879950449}, {"seed": 79810, "success": true, "steps": 133, "seconds": 0.5416118300054222}, {"seed": 176811, "success": true, "steps": 157, "seconds": 0.6417325709480792}, {"seed": 35239, "success": true, "steps": 153, "seconds": 0.5522472170414403}, {"seed": 748855, "success": true, "steps": 115, "seconds": 0.4639603920513764}, {"seed": 339440, "success": true, "steps": 180, "seconds": 0.7034551399992779}, {"seed": 83063, "success": true, "steps": 164, "seconds": 0.5296364880632609}, {"seed": 805051, "success": true, "steps": 141, "seconds": 0.5532118519768119}, {"seed": 28138, "success": true, "steps": 128, "seconds": 0.46729906601831317}, {"seed": 209984, "success": true, "steps": 148, "seconds": 0.6494253609562293}, {"seed": 353027, "success": true, "steps": 159, "seconds": 0.5810035800095648}, {"seed": 281955, "success": true, "steps": 136, "seconds": 0.5222126360749826}, {"seed": 468073, "success": true, "steps": 101, "seconds": 0.4286591580603272}, {"seed": 153290, "success": true, "steps": 102, "seconds": 0.34618617803789675}, {"seed": 104326, "success": true, "steps": 112, "seconds": 0.4249582369811833}, {"seed": 318483, "success": true, "steps": 182, "seconds": 0.6920329839922488}, {"seed": 707047, "success": true, "steps": 96, "seconds": 0.3895500509534031}, {"seed": 902691, "success": true, "steps": 132, "seconds": 0.6213859940180555}, {"seed": 907569, "success": true, "steps": 169, "seconds": 0.6396035429788753}, {"seed": 684306, "success": true, "steps": 121, "seconds": 0.426956327049993}, {"seed": 204168, "success": true, "steps": 137, "seconds": 0.5372455810429528}, {"seed": 868738, "success": true, "steps": 162, "seconds": 0.6100364760495722}, {"seed": 477045, "success": true, "steps": 160, "seconds": 0.6031771519919857}, {"seed": 590476, "success": true, "steps": 131, "seconds": 0.5721498719649389}, {"seed": 207383, "success": true, "steps": 92, "seconds": 0.3328261469723657}, {"seed": 206844, "success": true, "steps": 41, "seconds": 0.12186002102680504}, {"seed": 759290, "success": true, "steps": 179, "seconds": 0.7150322860106826}, {"seed": 867509, "success": true, "steps": 127, "seconds": 0.4144657599972561}, {"seed": 709794, "success": true, "steps": 111, "seconds": 0.4381547379307449}, {"seed": 800642, "success": true, "steps": 175, "seconds": 0.7031702599488199}, {"seed": 674061, "success": true, "steps": 114, "seconds": 0.4286966569488868}, {"seed": 135810, "success": true, "steps": 213, "seconds": 0.8242558249039575}, {"seed": 368328, "success": true, "steps": 187, "seconds": 0.6695979461073875}, {"seed": 658069, "success": true, "steps": 129, "seconds": 0.5063170080538839}, {"seed": 503570, "success": true, "steps": 118, "seconds": 0.5538051419425756}, {"seed": 331606, "success": true, "steps": 215, "seconds": 0.8419245050754398}, {"seed": 466715, "success": true, "steps": 113, "seconds": 0.3562904790742323}, {"seed": 256328, "success": true, "steps": 188, "seconds": 0.7587383770151064}, {"seed": 462097, "success": true, "steps": 108, "seconds": 0.42742057307623327}, {"seed": 347577, "success": true, "steps": 118, "seconds": 0.4367967479629442}, {"seed": 311635, "success": true, "steps": 241, "seconds": 0.9801620929501951}, {"seed": 493747, "success": true, "steps": 158, "seconds": 0.5913669699802995}, {"seed": 475918, "success": true, "steps": 204, "seconds": 0.7590999399544671}, {"seed": 25264, "success": true, "steps": 151, "seconds": 0.5517111109802499}, {"seed": 765194, "success": true, "steps": 147, "seconds": 0.5205150319961831}, {"seed": 262269, "success": true, "steps": 113, "seconds": 0.3325094060273841}, {"seed": 705334, "success": true, "steps": 93, "seconds": 0.41262551699765027}, {"seed": 960290, "success": true, "steps": 146, "seconds": 0.5765226510120556}, {"seed": 879842, "success": true, "steps": 176, "seconds": 0.6332515249960124}, {"seed": 609998, "success": true, "steps": 107, "seconds": 0.44653244293294847}, {"seed": 297854, "success": true, "steps": 147, "seconds": 0.530624223058112}, {"seed": 312193, "success": true, "steps": 51, "seconds": 0.20378195692319423}, {"seed": 680328, "success": true, "steps": 165, "seconds": 0.6619376139715314}, {"seed": 515577, "success": true, "steps": 75, "seconds": 0.2508683509659022}, {"seed": 340334, "success": true, "steps": 233, "seconds": 0.904069981072098}, {"seed": 520320, "success": true, "steps": 310, "seconds": 1.127851487020962}, {"seed": 67416, "success": true, "steps": 84, "seconds": 0.3334724879823625}, {"seed": 20617, "success": true, "steps": 146, "seconds": 0.5706590799381956}, {"seed": 501166, "success": true, "steps": 190, "seconds": 0.7867908150656149}, {"seed": 358860, "success": true, "steps": 176, "seconds": 0.6579939340008423}, {"seed": 565667, "success": true, "steps": 166, "seconds": 0.6417689049849287}, {"seed": 414624, "success": true, "steps": 129, "seconds": 0.5142973200418055}, {"seed": 577270, "success": true, "steps": 194, "seconds": 0.6163748009130359}, {"seed": 141418, "success": true, "steps": 155, "seconds": 0.6373361189616844}, {"seed": 732526, "success": true, "steps": 97, "seconds": 0.37651309999637306}, {"seed": 522465, "success": true, "steps": 143, "seconds": 0.6286995119880885}, {"seed": 689992, "success": true, "steps": 124, "seconds": 0.4316851980984211}, {"seed": 747248, "success": true, "steps": 105, "seconds": 0.45772756705991924}, {"seed": 733931, "success": true, "steps": 148, "seconds": 0.5666811449918896}, {"seed": 186064, "success": true, "steps": 128, "seconds": 0.48727820289786905}, {"seed": 933981, "success": true, "steps": 180, "seconds": 0.6367865989450365}, {"seed": 186916, "success": true, "steps": 160, "seconds": 0.45389226207043976}, {"seed": 599550, "success": true, "steps": 199, "seconds": 0.5632443830836564}, {"seed": 322604, "success": true, "steps": 179, "seconds": 0.5442061119247228}, {"seed": 380242, "success": true, "steps": 164, "seconds": 0.4920804160647094}, {"seed": 666997, "success": true, "steps": 167, "seconds": 0.48807493899948895}, {"seed": 893185, "success": true, "steps": 187, "seconds": 0.537792811053805}, {"seed": 341438, "success": true, "steps": 177, "seconds": 0.5821220410289243}, {"seed": 453019, "success": true, "steps": 74, "seconds": 0.21327010297682136}, {"seed": 26285, "success": true, "steps": 178, "seconds": 0.5051111730281264}, {"seed": 234737, "success": true, "steps": 140, "seconds": 0.43013177905231714}, {"seed": 516950, "success": true, "steps": 169, "seconds": 0.490135767031461}, {"seed": 409597, "success": true, "steps": 180, "seconds": 0.5171683789230883}, {"seed": 410202, "success": true, "steps": 108, "seconds": 0.33060616499278694}, {"seed": 912076, "success": true, "steps": 209, "seconds": 0.626821729936637}, {"seed": 53988, "success": true, "steps": 257, "seconds": 0.7584692519158125}, {"seed": 513820, "success": true, "steps": 89, "seconds": 0.27025379706174135}, {"seed": 778770, "success": true, "steps": 182, "seconds": 0.539369341917336}, {"seed": 30242, "success": true, "steps": 123, "seconds": 0.3539932520361617}, {"seed": 142818, "success": true, "steps": 108, "seconds": 0.34657404804602265}, {"seed": 203334, "success": true, "steps": 197, "seconds": 0.5469900269526988}, {"seed": 570889, "success": true, "steps": 148, "seconds": 0.41303265502210706}, {"seed": 617335, "success": true, "steps": 136, "seconds": 0.3687677780399099}, {"seed": 826067, "success": true, "steps": 144, "seconds": 0.41944780899211764}, {"seed": 948076, "success": true, "steps": 190, "seconds": 0.5846244230633602}, {"seed": 760197, "success": true, "steps": 152, "seconds": 0.5424202120630071}, {"seed": 932425, "success": true, "steps": 113, "seconds": 0.3219170880038291}, {"seed": 72082, "success": true, "steps": 156, "seconds": 0.4502372380811721}, {"seed": 924456, "success": true, "steps": 76, "seconds": 0.24214101198595017}]
+\ No newline at end of file
+diff --git a/results_final400.txt b/results_final400.txt
+new file mode 100644
+index 0000000..a4103ef
+--- /dev/null
++++ b/results_final400.txt
+@@ -0,0 +1,400 @@
++0 success True steps 160 err [-0.0198, -0.0403, -0.0784] time 0.378
++1 success True steps 151 err [0.0441, 0.0104, 0.018] time 0.364
++2 success True steps 123 err [-0.0138, -0.0304, 0.0827] time 0.371
++3 success True steps 129 err [-0.0116, -0.0105, 0.0826] time 0.405
++4 success True steps 124 err [0.023, 0.0156, 0.0551] time 0.331
++5 success True steps 138 err [-0.0116, 0.0032, 0.0324] time 0.528
++6 success True steps 241 err [-0.0004, 0.0026, 0.0091] time 0.954
++7 success True steps 172 err [-0.0066, 0.0163, 0.051] time 0.698
++8 success True steps 135 err [0.0175, -0.0109, 0.0591] time 0.536
++9 success True steps 139 err [-0.0063, 0.0286, -0.0186] time 0.591
++10 success True steps 156 err [-0.0122, 0.0073, 0.024] time 0.586
++11 success True steps 192 err [-0.0053, 0.0086, 0.0023] time 0.736
++12 success True steps 174 err [-0.0108, -0.0001, -0.0138] time 0.625
++13 success True steps 101 err [-0.0272, -0.0009, -0.0594] time 0.314
++14 success True steps 180 err [0.0097, -0.0065, 0.0017] time 0.746
++15 success True steps 72 err [-0.001, -0.0, 0.0101] time 0.288
++16 success True steps 155 err [-0.0094, 0.013, -0.0045] time 0.565
++17 success True steps 85 err [0.0247, 0.0181, -0.0115] time 0.298
++18 success True steps 141 err [0.0243, -0.0063, -0.0718] time 0.525
++19 success True steps 134 err [0.0003, 0.0314, -0.0047] time 0.564
++20 success True steps 104 err [0.0116, 0.0173, 0.0247] time 0.411
++21 success True steps 143 err [0.0131, 0.0298, -0.0297] time 0.566
++22 success True steps 148 err [-0.0242, -0.0095, -0.0225] time 0.513
++23 success True steps 74 err [-0.0133, -0.0148, -0.0467] time 0.369
++24 success True steps 81 err [-0.0106, 0.0021, 0.0235] time 0.297
++25 success True steps 157 err [-0.0007, 0.0093, 0.0316] time 0.515
++26 success True steps 137 err [-0.024, -0.003, 0.0815] time 0.555
++27 success True steps 146 err [0.0089, -0.0155, 0.01] time 0.549
++28 success True steps 27 err [0.0012, 0.0222, 0.0618] time 0.148
++29 success True steps 158 err [-0.0217, -0.0085, 0.0108] time 0.601
++30 success True steps 169 err [0.0157, 0.0024, 0.0182] time 0.648
++31 success True steps 70 err [-0.0316, 0.0131, -0.0094] time 0.294
++32 success True steps 160 err [-0.0014, -0.0012, 0.0091] time 0.685
++33 success True steps 102 err [0.0151, 0.0156, 0.0026] time 0.366
++34 success True steps 219 err [0.0293, 0.0046, -0.0831] time 0.835
++35 success True steps 147 err [-0.0036, -0.0028, -0.0333] time 0.508
++36 success True steps 110 err [-0.0083, -0.0219, -0.0001] time 0.415
++37 success True steps 183 err [0.0085, 0.0053, -0.0183] time 0.773
++38 success True steps 117 err [-0.0058, -0.0254, -0.0195] time 0.398
++39 success True steps 97 err [-0.0138, -0.0117, -0.0786] time 0.369
++40 success True steps 198 err [-0.0083, -0.0022, -0.041] time 0.682
++41 success True steps 111 err [0.0264, -0.0279, 0.0511] time 0.45
++42 success True steps 91 err [0.0279, -0.0216, -0.0204] time 0.452
++43 success True steps 154 err [0.0143, -0.0089, -0.0125] time 0.564
++44 success True steps 202 err [0.0016, 0.0012, 0.0244] time 0.821
++45 success True steps 92 err [-0.0214, -0.0268, -0.0018] time 0.316
++46 success True steps 177 err [-0.0081, 0.0187, -0.0077] time 0.74
++47 success True steps 171 err [0.0111, -0.0237, -0.0535] time 0.649
++48 success True steps 118 err [-0.0106, -0.0071, 0.0368] time 0.378
++49 success True steps 132 err [0.0109, -0.0385, 0.1098] time 0.571
++50 success True steps 174 err [0.01, -0.0108, -0.0096] time 0.684
++51 success True steps 165 err [-0.013, -0.0129, -0.0096] time 0.578
++52 success True steps 216 err [-0.0115, -0.0013, 0.0442] time 0.799
++53 success True steps 153 err [0.0033, -0.0001, 0.0254] time 0.586
++54 success True steps 161 err [-0.0065, -0.0145, -0.0278] time 0.565
++55 success True steps 262 err [0.0141, 0.0057, -0.0051] time 1.035
++56 success True steps 136 err [-0.0147, -0.0057, 0.0046] time 0.566
++57 success True steps 171 err [-0.0136, 0.0133, 0.0205] time 0.718
++58 success True steps 114 err [-0.0118, 0.0245, 0.0003] time 0.397
++59 success True steps 210 err [0.0185, -0.0168, -0.014] time 0.843
++60 success True steps 296 err [-0.0131, -0.0075, -0.0055] time 1.125
++61 success True steps 115 err [-0.0019, 0.0176, -0.0199] time 0.36
++62 success True steps 67 err [0.002, -0.0223, -0.0198] time 0.28
++63 success True steps 131 err [-0.0081, 0.0278, 0.0516] time 0.545
++64 success True steps 198 err [0.008, 0.0177, -0.0403] time 0.75
++65 success True steps 148 err [0.016, -0.0273, 0.0199] time 0.567
++66 success True steps 142 err [0.0146, 0.0011, 0.0182] time 0.561
++67 success True steps 147 err [-0.0238, 0.0283, 0.0511] time 0.516
++68 success True steps 292 err [0.0019, 0.0155, 0.073] time 1.139
++69 success True steps 89 err [-0.0058, 0.0205, 0.0713] time 0.268
++70 success True steps 188 err [0.0121, -0.0032, 0.0405] time 0.768
++71 success True steps 173 err [-0.0083, 0.0129, -0.0618] time 0.716
++72 success True steps 129 err [0.0306, 0.0069, -0.0421] time 0.512
++73 success True steps 104 err [-0.0001, 0.0267, 0.0303] time 0.434
++74 success True steps 103 err [-0.028, 0.0272, -0.0251] time 0.363
++75 success True steps 193 err [-0.0406, -0.0057, -0.0355] time 0.738
++76 success True steps 83 err [0.0197, 0.0176, -0.0197] time 0.316
++77 success True steps 205 err [-0.0268, 0.003, -0.0147] time 0.571
++78 success True steps 175 err [0.0076, -0.0068, 0.0118] time 0.51
++79 success True steps 221 err [-0.0017, 0.0059, -0.0037] time 0.621
++80 success True steps 83 err [-0.014, 0.0294, 0.1024] time 0.219
++81 success True steps 116 err [0.0192, -0.0465, 0.0635] time 0.349
++82 success True steps 198 err [0.0021, 0.0254, -0.1309] time 0.593
++83 success True steps 89 err [0.0022, 0.0278, 0.0337] time 0.28
++84 success True steps 116 err [0.0176, -0.0144, 0.0208] time 0.309
++85 success True steps 170 err [-0.0083, 0.0148, 0.0121] time 0.57
++86 success True steps 114 err [-0.0133, -0.0012, -0.0358] time 0.327
++87 success True steps 182 err [-0.0023, -0.0016, 0.0237] time 0.552
++88 success True steps 233 err [0.0364, -0.008, -0.0124] time 0.669
++89 success True steps 76 err [0.0111, -0.0207, -0.027] time 0.254
++90 success True steps 120 err [0.0257, 0.0091, -0.0332] time 0.376
++91 success True steps 138 err [-0.0097, -0.0068, -0.0182] time 0.354
++92 success True steps 130 err [0.0267, 0.0284, 0.0734] time 0.369
++93 success True steps 91 err [-0.0156, -0.0267, -0.0474] time 0.223
++94 success True steps 119 err [-0.0092, 0.0231, -0.0357] time 0.35
++95 success True steps 40 err [-0.0036, 0.0017, -0.0782] time 0.147
++96 success True steps 188 err [0.009, 0.005, 0.0283] time 0.531
++97 success True steps 151 err [0.006, -0.0129, -0.0828] time 0.448
++98 success True steps 146 err [-0.0079, -0.0153, -0.0135] time 0.445
++99 success True steps 220 err [-0.0063, 0.0255, 0.005] time 0.602
++100 success True steps 204 err [-0.0039, -0.0154, 0.0078] time 0.653
++101 success True steps 136 err [-0.0336, 0.0206, 0.0033] time 0.405
++102 success True steps 143 err [-0.0184, -0.0251, -0.0219] time 0.355
++103 success True steps 152 err [0.0023, 0.0081, 0.0501] time 0.554
++104 success True steps 69 err [-0.0257, 0.0212, 0.0885] time 0.211
++105 success True steps 123 err [0.0046, 0.0075, -0.0166] time 0.36
++106 success True steps 161 err [-0.0134, -0.0038, -0.0208] time 0.489
++107 success True steps 93 err [0.0119, -0.0136, 0.0702] time 0.226
++108 success True steps 182 err [0.0268, 0.018, 0.005] time 0.449
++109 success True steps 154 err [-0.0145, -0.0226, 0.0342] time 0.365
++110 success True steps 91 err [-0.0056, -0.0098, -0.0539] time 0.258
++111 success True steps 194 err [-0.003, -0.0412, -0.0329] time 0.47
++112 success True steps 147 err [-0.0126, -0.0154, -0.0661] time 0.346
++113 success True steps 141 err [0.0198, 0.0001, -0.0186] time 0.33
++114 success True steps 185 err [0.0132, -0.0021, -0.0037] time 0.453
++115 success True steps 168 err [-0.0447, 0.0274, 0.0737] time 0.409
++116 success True steps 226 err [-0.0004, -0.0033, -0.0438] time 0.55
++117 success True steps 109 err [0.0008, -0.0078, -0.0344] time 0.253
++118 success True steps 158 err [-0.0041, 0.0041, -0.1431] time 0.383
++119 success True steps 233 err [0.0047, 0.0416, -0.024] time 0.564
++120 success True steps 78 err [0.0349, 0.0004, 0.0225] time 0.217
++121 success True steps 83 err [-0.0138, -0.0113, 0.0036] time 0.201
++122 success True steps 241 err [-0.0199, -0.0244, -0.0085] time 0.583
++123 success True steps 271 err [-0.0004, -0.0052, -0.0176] time 0.693
++124 success True steps 120 err [0.0082, -0.0283, -0.129] time 0.311
++125 success True steps 131 err [-0.0244, -0.0016, -0.0058] time 0.318
++126 success True steps 171 err [0.0208, -0.0403, -0.0125] time 0.413
++127 success True steps 225 err [-0.015, -0.0299, 0.0933] time 0.558
++128 success True steps 134 err [0.025, -0.0146, -0.0202] time 0.314
++129 success True steps 54 err [-0.0225, 0.0084, 0.0484] time 0.129
++130 success True steps 135 err [0.0022, 0.0115, 0.0246] time 0.3
++131 success True steps 175 err [-0.0121, -0.001, -0.0146] time 0.416
++132 success True steps 195 err [-0.0075, 0.0122, 0.0089] time 0.443
++133 success True steps 116 err [0.0024, 0.0127, 0.0693] time 0.27
++134 success True steps 205 err [-0.0199, -0.0043, -0.0112] time 0.489
++135 success True steps 124 err [0.0298, -0.0199, 0.0081] time 0.302
++136 success True steps 110 err [-0.0153, -0.0218, -0.0297] time 0.264
++137 success True steps 146 err [-0.0098, -0.006, -0.0112] time 0.347
++138 success True steps 226 err [-0.0081, -0.0135, -0.0121] time 0.593
++139 success True steps 127 err [0.0165, -0.0149, -0.0583] time 0.313
++140 success True steps 108 err [-0.0016, -0.0109, -0.0429] time 0.251
++141 success True steps 199 err [0.0149, -0.0003, -0.0124] time 0.481
++142 success True steps 172 err [0.0085, 0.0138, -0.0028] time 0.419
++143 success True steps 169 err [0.0135, 0.0137, 0.0304] time 0.419
++144 success True steps 252 err [-0.0111, -0.0156, -0.0406] time 0.629
++145 success True steps 222 err [0.0215, 0.0164, -0.007] time 0.55
++146 success True steps 122 err [-0.0007, -0.0155, -0.0182] time 0.278
++147 success True steps 104 err [0.0074, 0.015, 0.0686] time 0.244
++148 success True steps 156 err [-0.0068, -0.0089, -0.0018] time 0.402
++149 success True steps 139 err [0.004, 0.0093, 0.0292] time 0.322
++150 success True steps 108 err [0.0039, -0.0088, -0.0257] time 0.27
++151 success True steps 142 err [-0.03, 0.032, 0.0125] time 0.327
++152 success True steps 73 err [-0.0177, 0.0184, 0.0121] time 0.168
++153 success True steps 56 err [0.0293, -0.0166, 0.0834] time 0.126
++154 success True steps 148 err [-0.0189, 0.0143, 0.0019] time 0.348
++155 success True steps 124 err [-0.0014, 0.0012, 0.0156] time 0.367
++156 success True steps 123 err [-0.024, -0.0092, 0.016] time 0.287
++157 success True steps 72 err [-0.0073, -0.0007, -0.0663] time 0.164
++158 success True steps 76 err [-0.0163, -0.0299, 0.099] time 0.18
++159 success True steps 165 err [-0.0193, 0.03, 0.0308] time 0.388
++160 success True steps 129 err [-0.0008, -0.0099, -0.0156] time 0.313
++161 success True steps 166 err [0.0226, -0.005, 0.0053] time 0.383
++162 success True steps 61 err [0.0268, 0.0035, -0.002] time 0.139
++163 success True steps 135 err [0.0197, -0.0081, 0.0221] time 0.315
++164 success True steps 48 err [0.0016, 0.02, -0.0463] time 0.118
++165 success True steps 207 err [-0.0033, -0.0033, 0.0063] time 0.51
++166 success True steps 205 err [0.0113, 0.0147, 0.0581] time 0.491
++167 success True steps 60 err [0.0097, -0.0136, 0.0003] time 0.139
++168 success True steps 141 err [0.0018, -0.0128, 0.0122] time 0.312
++169 success True steps 174 err [0.0063, 0.0052, -0.0373] time 0.399
++170 success True steps 156 err [0.0232, -0.0069, 0.0403] time 0.349
++171 success True steps 200 err [0.0104, -0.0245, 0.0394] time 0.48
++172 success True steps 137 err [0.0133, -0.022, 0.0172] time 0.334
++173 success True steps 123 err [-0.0049, 0.0214, -0.0618] time 0.28
++174 success True steps 164 err [0.0088, 0.0049, 0.0147] time 0.371
++175 success True steps 102 err [-0.0211, 0.0284, 0.1195] time 0.231
++176 success True steps 163 err [0.0008, 0.0024, -0.0238] time 0.372
++177 success True steps 92 err [-0.0093, -0.0156, -0.0048] time 0.205
++178 success True steps 166 err [-0.0009, -0.0185, -0.0357] time 0.392
++179 success True steps 217 err [-0.0212, 0.0254, 0.0105] time 0.512
++180 success True steps 139 err [-0.0077, 0.0221, 0.0206] time 0.322
++181 success True steps 126 err [-0.0106, 0.0102, 0.0282] time 0.274
++182 success True steps 223 err [-0.0012, 0.0022, 0.0234] time 0.502
++183 success True steps 145 err [-0.0377, -0.0043, 0.0541] time 0.322
++184 success True steps 155 err [0.0279, -0.007, 0.0085] time 0.353
++185 success True steps 95 err [0.0168, 0.0052, -0.0384] time 0.223
++186 success True steps 84 err [-0.0052, -0.0163, 0.0209] time 0.186
++187 success True steps 102 err [0.0095, 0.0141, -0.0053] time 0.237
++188 success True steps 143 err [-0.0178, -0.0136, 0.0189] time 0.339
++189 success True steps 189 err [0.017, -0.0002, -0.0662] time 0.436
++190 success True steps 129 err [0.0038, -0.0022, -0.0266] time 0.296
++191 success True steps 42 err [0.0174, -0.0165, -0.065] time 0.095
++192 success True steps 200 err [0.0078, 0.0129, -0.0132] time 0.462
++193 success True steps 189 err [-0.0178, 0.0268, 0.0257] time 0.44
++194 success True steps 129 err [0.0005, -0.0093, 0.0956] time 0.304
++195 success True steps 147 err [-0.0211, 0.008, -0.0217] time 0.351
++196 success True steps 186 err [-0.016, 0.0009, -0.0664] time 0.421
++197 success True steps 119 err [-0.0238, -0.002, -0.041] time 0.272
++198 success True steps 169 err [0.0053, 0.0068, 0.1005] time 0.392
++199 success True steps 84 err [-0.0111, 0.0003, 0.0618] time 0.187
++200 success True steps 101 err [0.0064, 0.011, -0.0047] time 0.22
++201 success True steps 133 err [-0.0064, -0.0, -0.0158] time 0.295
++202 success True steps 75 err [0.0152, 0.009, -0.0196] time 0.167
++203 success True steps 96 err [-0.0271, 0.0022, -0.0315] time 0.218
++204 success True steps 173 err [0.0114, -0.0162, 0.0564] time 0.398
++205 success True steps 158 err [0.0286, 0.0093, 0.1364] time 0.367
++206 success True steps 175 err [-0.0194, -0.0199, -0.0492] time 0.395
++207 success True steps 171 err [-0.0015, -0.0199, -0.01] time 0.387
++208 success True steps 157 err [-0.0006, 0.0119, 0.0153] time 0.364
++209 success True steps 178 err [-0.0088, -0.0102, -0.045] time 0.415
++210 success True steps 220 err [-0.0011, 0.0141, 0.0391] time 0.501
++211 success True steps 100 err [0.0004, 0.0076, -0.0292] time 0.221
++212 success True steps 155 err [0.0003, -0.0163, 0.0336] time 0.34
++213 success True steps 70 err [0.0044, -0.0193, 0.0327] time 0.153
++214 success True steps 189 err [-0.0015, 0.0069, 0.0001] time 0.435
++215 success True steps 179 err [0.0094, -0.0072, 0.011] time 0.434
++216 success True steps 213 err [0.0287, -0.006, 0.0599] time 0.475
++217 success True steps 152 err [-0.0145, -0.0052, 0.0097] time 0.339
++218 success True steps 178 err [-0.0214, 0.0119, 0.014] time 0.472
++219 success True steps 79 err [0.0034, -0.0002, 0.0077] time 0.179
++220 success True steps 276 err [0.001, 0.0034, -0.0102] time 0.646
++221 success True steps 72 err [0.0199, 0.0087, -0.0045] time 0.17
++222 success True steps 126 err [0.003, 0.0153, 0.0151] time 0.302
++223 success True steps 222 err [-0.0049, -0.0217, -0.0187] time 0.527
++224 success True steps 175 err [0.0264, -0.0003, 0.0246] time 0.39
++225 success True steps 123 err [0.0285, 0.0096, -0.0976] time 0.283
++226 success True steps 199 err [0.0138, 0.0075, 0.0123] time 0.474
++227 success True steps 136 err [0.0165, -0.0028, -0.0398] time 0.295
++228 success True steps 136 err [-0.001, 0.0052, 0.0113] time 0.304
++229 success True steps 156 err [-0.0179, -0.0077, -0.007] time 0.347
++230 success True steps 119 err [0.0129, 0.0125, 0.0741] time 0.296
++231 success True steps 102 err [0.0225, -0.0242, 0.108] time 0.226
++232 success True steps 171 err [-0.0103, -0.0059, -0.0205] time 0.409
++233 success True steps 91 err [-0.0293, 0.0294, -0.1085] time 0.212
++234 success True steps 103 err [0.0243, -0.0248, 0.0856] time 0.231
++235 success True steps 182 err [0.0069, -0.0168, -0.009] time 0.447
++236 success True steps 131 err [0.0079, -0.0458, -0.0012] time 0.297
++237 success True steps 92 err [-0.0233, 0.0136, -0.0134] time 0.21
++238 success True steps 178 err [-0.0295, -0.012, -0.0471] time 0.418
++239 success True steps 172 err [0.0202, -0.015, -0.0335] time 0.376
++240 success True steps 105 err [0.005, -0.0013, -0.0496] time 0.238
++241 success True steps 159 err [-0.002, 0.0034, -0.0614] time 0.377
++242 success True steps 157 err [0.0011, -0.0198, 0.0383] time 0.363
++243 success True steps 128 err [0.0038, -0.0133, 0.0362] time 0.285
++244 success True steps 181 err [-0.0271, -0.0171, 0.0] time 0.409
++245 success True steps 202 err [0.0279, 0.0171, -0.0068] time 0.452
++246 success True steps 130 err [0.0066, 0.0106, -0.0068] time 0.302
++247 success True steps 170 err [-0.0111, -0.0126, -0.0348] time 0.398
++248 success True steps 176 err [-0.0085, 0.0105, 0.0125] time 0.402
++249 success True steps 202 err [-0.0086, 0.0026, 0.0415] time 0.46
++250 success True steps 117 err [0.0218, -0.0051, 0.0522] time 0.267
++251 success True steps 103 err [-0.0268, 0.014, 0.0188] time 0.231
++252 success True steps 178 err [0.0033, 0.013, -0.0005] time 0.413
++253 success True steps 175 err [-0.0231, -0.0218, -0.0485] time 0.401
++254 success True steps 173 err [0.0121, -0.0003, -0.0219] time 0.396
++255 success True steps 31 err [-0.0395, 0.0064, -0.0073] time 0.066
++256 success True steps 145 err [-0.0084, -0.0297, 0.0499] time 0.31
++257 success True steps 193 err [0.0113, 0.0014, -0.0223] time 0.452
++258 success True steps 163 err [-0.0135, -0.0028, -0.0052] time 0.374
++259 success True steps 151 err [0.0018, -0.0004, -0.0462] time 0.354
++260 success True steps 142 err [0.005, 0.005, -0.0364] time 0.32
++261 success True steps 84 err [-0.0211, 0.001, -0.0552] time 0.188
++262 success True steps 170 err [-0.0045, 0.0197, -0.0654] time 0.396
++263 success True steps 160 err [0.0197, -0.0412, -0.0334] time 0.383
++264 success True steps 175 err [0.0193, -0.0304, -0.0736] time 0.406
++265 success True steps 152 err [-0.0086, 0.0002, -0.0469] time 0.344
++266 success True steps 139 err [-0.0134, 0.0069, -0.0421] time 0.317
++267 success True steps 252 err [0.0153, -0.0152, 0.0111] time 0.6
++268 success True steps 145 err [-0.0293, 0.0213, 0.0502] time 0.344
++269 success True steps 216 err [-0.0208, 0.0259, 0.0396] time 0.494
++270 success True steps 111 err [-0.0098, -0.0012, 0.0872] time 0.246
++271 success True steps 111 err [-0.0013, 0.0036, 0.0207] time 0.251
++272 success True steps 138 err [0.0057, -0.0001, -0.0204] time 0.295
++273 success True steps 89 err [0.0088, -0.0075, -0.0297] time 0.204
++274 success True steps 123 err [0.0026, 0.024, 0.0011] time 0.258
++275 success True steps 43 err [-0.0056, -0.0093, -0.1242] time 0.09
++276 success True steps 145 err [-0.0107, 0.0002, -0.0751] time 0.331
++277 success True steps 122 err [0.0056, 0.0045, 0.0142] time 0.278
++278 success True steps 155 err [0.0009, -0.0098, 0.0101] time 0.357
++279 success True steps 189 err [-0.0046, -0.0026, -0.0313] time 0.445
++280 success True steps 174 err [-0.0075, 0.0003, 0.0269] time 0.377
++281 success True steps 123 err [-0.0052, -0.0036, 0.0447] time 0.287
++282 success True steps 245 err [0.0005, -0.0079, -0.0341] time 0.558
++283 success True steps 125 err [0.0098, -0.0414, -0.0389] time 0.279
++284 success True steps 193 err [0.0083, -0.0284, -0.0039] time 0.441
++285 success True steps 134 err [0.0011, -0.0094, 0.0159] time 0.301
++286 success True steps 49 err [0.0069, -0.0169, 0.0283] time 0.111
++287 success True steps 138 err [-0.0204, -0.0087, 0.0054] time 0.322
++288 success True steps 142 err [-0.0269, -0.0177, 0.0809] time 0.328
++289 success True steps 229 err [0.0119, 0.0073, 0.0155] time 0.526
++290 success True steps 131 err [-0.0223, -0.0009, 0.0145] time 0.287
++291 success True steps 159 err [-0.0244, 0.012, 0.0278] time 0.351
++292 success True steps 158 err [0.0053, -0.0043, -0.0232] time 0.374
++293 success True steps 154 err [0.0135, 0.0014, -0.0166] time 0.362
++294 success True steps 158 err [-0.0096, 0.0142, -0.0055] time 0.367
++295 success True steps 135 err [-0.0201, -0.0033, 0.0168] time 0.296
++296 success True steps 146 err [0.0079, -0.009, -0.0089] time 0.345
++297 success True steps 73 err [0.0003, 0.0007, -0.0231] time 0.16
++298 success True steps 186 err [0.0069, 0.0016, 0.0192] time 0.481
++299 success True steps 115 err [0.0453, -0.0071, -0.0104] time 0.268
++300 success True steps 184 err [-0.011, 0.01, -0.0111] time 0.419
++301 success True steps 175 err [-0.0015, 0.0089, -0.0036] time 0.399
++302 success True steps 181 err [-0.0261, 0.008, -0.0929] time 0.417
++303 success True steps 162 err [-0.021, 0.0045, -0.0048] time 0.379
++304 success True steps 143 err [-0.0261, 0.0066, 0.0142] time 0.329
++305 success True steps 160 err [-0.0163, -0.0288, 0.0049] time 0.36
++306 success True steps 190 err [-0.0046, -0.0007, -0.0115] time 0.444
++307 success True steps 186 err [-0.0018, -0.0035, -0.02] time 0.427
++308 success True steps 203 err [-0.0073, 0.0175, 0.0133] time 0.476
++309 success True steps 141 err [0.0213, -0.003, 0.0124] time 0.323
++310 success True steps 140 err [0.0137, 0.0234, 0.0342] time 0.311
++311 success True steps 170 err [-0.029, -0.0159, -0.031] time 0.375
++312 success True steps 150 err [-0.0048, -0.0091, -0.0212] time 0.343
++313 success True steps 59 err [-0.0193, -0.0031, 0.0391] time 0.125
++314 success True steps 100 err [-0.0185, -0.0107, -0.0201] time 0.214
++315 success True steps 431 err [-0.0027, 0.0409, -0.0244] time 1.029
++316 success True steps 130 err [0.009, 0.002, 0.0053] time 0.283
++317 success True steps 191 err [0.007, -0.0156, -0.0032] time 0.422
++318 success True steps 144 err [0.0009, 0.0045, -0.0253] time 0.326
++319 success True steps 175 err [-0.0066, -0.0121, -0.0136] time 0.412
++320 success True steps 59 err [-0.0055, -0.0, 0.0569] time 0.125
++321 success True steps 188 err [0.0121, -0.0049, 0.0812] time 0.42
++322 success True steps 95 err [-0.0142, -0.0098, 0.0055] time 0.209
++323 success True steps 218 err [-0.0183, -0.0223, -0.0196] time 0.507
++324 success True steps 239 err [0.0001, -0.0008, -0.0257] time 0.551
++325 success True steps 135 err [-0.0277, 0.0009, 0.0119] time 0.306
++326 success True steps 179 err [0.0388, -0.0243, -0.0224] time 0.427
++327 success True steps 190 err [0.029, 0.0125, -0.0228] time 0.477
++328 success True steps 282 err [0.0048, 0.0078, -0.0041] time 0.668
++329 success True steps 143 err [0.0021, 0.0176, 0.0069] time 0.337
++330 success True steps 189 err [0.0029, -0.0023, -0.012] time 0.459
++331 success True steps 115 err [-0.0427, -0.0174, -0.0224] time 0.245
++332 success True steps 123 err [0.0082, 0.011, 0.0387] time 0.271
++333 success True steps 187 err [-0.0236, -0.0231, 0.0786] time 0.432
++334 success True steps 251 err [0.0028, 0.0018, 0.0089] time 0.573
++335 success True steps 115 err [0.0279, -0.0196, -0.0361] time 0.265
++336 success True steps 214 err [-0.0111, 0.0093, 0.0031] time 0.497
++337 success True steps 238 err [-0.0026, -0.0063, 0.0262] time 0.567
++338 success True steps 161 err [-0.0067, 0.0215, -0.0085] time 0.373
++339 success True steps 212 err [0.011, 0.019, 0.0279] time 0.502
++340 success True steps 153 err [0.0035, 0.0128, 0.0283] time 0.358
++341 success True steps 118 err [-0.0238, -0.007, 0.0092] time 0.26
++342 success True steps 134 err [0.0085, 0.0078, 0.0034] time 0.29
++343 success True steps 88 err [0.0127, 0.0204, 0.0099] time 0.2
++344 success True steps 138 err [0.0206, -0.0234, -0.0287] time 0.319
++345 success True steps 163 err [0.0172, 0.0099, -0.0017] time 0.401
++346 success True steps 147 err [0.0025, -0.0008, 0.0074] time 0.331
++347 success True steps 177 err [0.0113, 0.0082, 0.1251] time 0.393
++348 success True steps 137 err [0.0269, -0.0048, -0.0093] time 0.313
++349 success True steps 132 err [0.0081, -0.0242, -0.0497] time 0.318
++350 success True steps 304 err [-0.009, 0.0185, 0.008] time 0.688
++351 success True steps 135 err [0.0031, 0.0176, -0.0219] time 0.293
++352 success True steps 138 err [0.0192, 0.0016, 0.0517] time 0.319
++353 success True steps 159 err [-0.0077, 0.0061, -0.0303] time 0.354
++354 success True steps 169 err [0.0, 0.0365, -0.0051] time 0.368
++355 success True steps 110 err [0.0313, -0.0013, -0.0032] time 0.242
++356 success True steps 165 err [0.0158, -0.02, -0.0044] time 0.399
++357 success True steps 149 err [-0.0006, -0.005, -0.0026] time 0.323
++358 success True steps 182 err [-0.0196, 0.0028, -0.0217] time 0.416
++359 success True steps 186 err [-0.036, 0.0065, -0.0287] time 0.418
++360 success True steps 110 err [-0.0174, -0.0214, -0.0204] time 0.257
++361 success True steps 103 err [0.019, 0.0011, -0.0834] time 0.245
++362 success True steps 58 err [0.0107, -0.0213, 0.0481] time 0.125
++363 success True steps 167 err [0.0175, -0.003, 0.0091] time 0.391
++364 success True steps 77 err [-0.0105, -0.0276, -0.0324] time 0.166
++365 success True steps 170 err [-0.05, -0.0056, 0.0672] time 0.378
++366 success True steps 148 err [-0.0035, -0.0411, -0.0516] time 0.341
++367 success True steps 179 err [-0.019, -0.0247, 0.0792] time 0.417
++368 success True steps 115 err [-0.0177, -0.003, 0.0579] time 0.244
++369 success True steps 91 err [0.001, 0.0176, 0.0015] time 0.202
++370 success True steps 174 err [0.0114, -0.0074, 0.0192] time 0.405
++371 success True steps 92 err [-0.0119, 0.0174, 0.0565] time 0.194
++372 success True steps 137 err [0.0089, -0.0033, -0.013] time 0.318
++373 success True steps 138 err [-0.0275, -0.027, 0.0239] time 0.371
++374 success True steps 178 err [0.02, 0.0127, -0.021] time 0.417
++375 success True steps 125 err [-0.0003, 0.0131, -0.0553] time 0.283
++376 success True steps 163 err [0.0201, 0.0288, 0.0136] time 0.367
++377 success True steps 153 err [-0.0053, -0.0312, -0.0497] time 0.344
++378 success True steps 145 err [-0.0086, 0.0284, -0.0063] time 0.33
++379 success True steps 141 err [-0.0262, 0.0126, -0.0072] time 0.313
++380 success True steps 150 err [0.0168, 0.0016, 0.0533] time 0.324
++381 success True steps 159 err [0.0133, 0.0085, -0.0279] time 0.365
++382 success True steps 206 err [-0.0051, -0.0079, -0.0278] time 0.533
++383 success True steps 225 err [-0.0135, -0.0241, -0.0074] time 0.52
++384 success True steps 102 err [-0.0296, -0.0153, 0.0875] time 0.236
++385 success True steps 125 err [-0.0347, 0.0005, -0.0066] time 0.299
++386 success True steps 164 err [0.0261, -0.0028, 0.034] time 0.393
++387 success True steps 121 err [0.0032, 0.0084, 0.0002] time 0.287
++388 success True steps 144 err [-0.0059, 0.0023, 0.0168] time 0.342
++389 success True steps 134 err [0.0231, -0.0251, 0.007] time 0.306
++390 success True steps 210 err [-0.004, 0.006, 0.0292] time 0.516
++391 success True steps 125 err [-0.0243, 0.0105, -0.0523] time 0.273
++392 success True steps 147 err [0.012, -0.0055, -0.0144] time 0.354
++393 success True steps 183 err [0.005, 0.0071, -0.0687] time 0.413
++394 success True steps 116 err [0.032, 0.0036, -0.0428] time 0.275
++395 success True steps 171 err [-0.0052, -0.0141, -0.0341] time 0.418
++396 success True steps 167 err [-0.0013, -0.001, -0.034] time 0.379
++397 success True steps 152 err [-0.0104, 0.0121, -0.1384] time 0.361
++398 success True steps 52 err [0.0054, 0.0337, 0.0264] time 0.16
++399 success True steps 197 err [-0.0273, -0.0098, 0.0313] time 0.493
+diff --git a/results_final_stress.txt b/results_final_stress.txt
+new file mode 100644
+index 0000000..0c9dc74
+--- /dev/null
++++ b/results_final_stress.txt
+@@ -0,0 +1,63 @@
++2009 success True steps 85 err [-0.0039, -0.0046, 0.0136] time 0.283
++2025 success True steps 216 err [0.0034, 0.0123, 0.0003] time 0.675
++2035 success True steps 166 err [-0.0092, -0.0063, -0.0253] time 0.635
++2052 success True steps 129 err [0.0604, -0.0228, 0.0255] time 0.477
++2053 success True steps 172 err [-0.0153, -0.0013, -0.049] time 0.66
++2088 success True steps 145 err [0.0297, -0.0109, 0.0093] time 0.532
++2111 success True steps 125 err [0.0191, 0.0143, -0.0531] time 0.574
++2117 success True steps 196 err [-0.0076, 0.0133, -0.0104] time 0.715
++2178 success True steps 148 err [0.0001, -0.0077, 0.0004] time 0.556
++2236 success True steps 400 err [0.0145, -0.0036, 0.0132] time 1.634
++2321 success True steps 169 err [0.0081, -0.0005, 0.0051] time 0.666
++2371 success True steps 182 err [0.0231, -0.0144, 0.0019] time 0.673
++2387 success True steps 164 err [-0.025, 0.0292, 0.0732] time 0.643
++2390 success True steps 120 err [0.0077, 0.0036, 0.0315] time 0.485
++2397 success True steps 124 err [0.0001, -0.0176, -0.0158] time 0.54
++2413 success True steps 162 err [-0.0054, -0.0353, 0.0736] time 0.639
++2414 success True steps 228 err [-0.0023, -0.0165, 0.0051] time 0.98
++2538 success True steps 84 err [-0.0111, -0.016, 0.0183] time 0.311
++2614 success True steps 175 err [-0.0, -0.0426, 0.0795] time 0.728
++2636 success True steps 165 err [0.0184, 0.0023, 0.0086] time 0.654
++2679 success True steps 204 err [-0.0027, -0.0049, 0.0102] time 0.846
++2686 success True steps 144 err [0.023, -0.0031, 0.0096] time 0.543
++2749 success True steps 148 err [-0.0016, -0.0431, -0.064] time 0.601
++2813 success True steps 69 err [0.0224, 0.0036, 0.0419] time 0.323
++2817 success True steps 221 err [-0.0354, 0.0119, 0.0013] time 0.824
++2857 success True steps 221 err [-0.0325, 0.0074, 0.0117] time 0.864
++2896 success True steps 197 err [0.0191, 0.0202, 0.0436] time 0.792
++2898 success True steps 165 err [-0.0238, -0.0153, -0.018] time 0.632
++2954 success True steps 63 err [-0.0164, -0.0296, -0.0645] time 0.246
++2979 success True steps 225 err [0.002, -0.0249, -0.0059] time 0.849
++3008 success True steps 222 err [-0.0023, 0.0306, 0.0902] time 0.854
++3135 success True steps 149 err [0.0036, -0.0177, 0.0427] time 0.661
++3151 success True steps 135 err [-0.005, -0.0127, -0.0175] time 0.543
++3254 success True steps 190 err [0.021, 0.0099, 0.0034] time 0.772
++3279 success True steps 271 err [0.011, 0.0064, 0.0015] time 1.049
++3296 success True steps 162 err [-0.0106, -0.0081, 0.0143] time 0.685
++3326 success True steps 214 err [-0.007, -0.0102, 0.0135] time 0.771
++3381 success True steps 108 err [-0.0169, 0.017, -0.0429] time 0.392
++3392 success True steps 169 err [-0.0146, 0.0213, -0.0327] time 0.656
++3393 success True steps 191 err [-0.0018, -0.0075, -0.0101] time 0.763
++3425 success True steps 128 err [0.0275, 0.0264, 0.0594] time 0.433
++3426 success True steps 221 err [0.0189, 0.0407, 0.0282] time 0.841
++3459 success True steps 194 err [0.01, -0.0043, -0.0329] time 0.776
++3603 success True steps 142 err [0.0234, 0.0046, 0.0695] time 0.527
++3608 success True steps 146 err [0.0157, -0.0071, -0.0319] time 0.575
++3610 success True steps 180 err [-0.0058, 0.0328, -0.0464] time 0.756
++3617 success True steps 74 err [0.0092, -0.0174, 0.0951] time 0.351
++3621 success True steps 205 err [-0.0096, -0.0211, 0.0513] time 0.872
++3633 success True steps 121 err [-0.0112, 0.0289, 0.0412] time 0.45
++3637 success True steps 209 err [-0.0243, 0.0338, 0.0555] time 0.709
++3645 success True steps 159 err [0.0197, 0.011, 0.004] time 0.675
++3647 success True steps 172 err [0.0062, -0.0034, 0.003] time 0.685
++3737 success True steps 165 err [-0.0229, -0.0236, 0.0944] time 0.626
++3780 success True steps 61 err [-0.0197, -0.0161, 0.0024] time 0.252
++3799 success True steps 233 err [-0.0022, -0.004, -0.0656] time 0.927
++3803 success True steps 203 err [-0.0184, 0.0101, 0.027] time 0.848
++3815 success True steps 265 err [0.0053, -0.0334, 0.0047] time 0.944
++3846 success True steps 172 err [0.0033, -0.0007, -0.0025] time 0.709
++3854 success True steps 134 err [-0.0262, 0.0015, -0.0806] time 0.567
++3860 success True steps 230 err [0.0027, -0.0017, 0.0127] time 0.948
++3867 success True steps 90 err [0.0263, 0.0209, -0.047] time 0.382
++3964 success True steps 225 err [0.0171, -0.0015, -0.0893] time 0.901
++3996 success True steps 124 err [0.0324, -0.0039, 0.0143] time 0.509
+diff --git a/validation_summary.json b/validation_summary.json
+new file mode 100644
+index 0000000..51a3ded
+--- /dev/null
++++ b/validation_summary.json
+@@ -0,0 +1,13 @@
++{
++  "policy_sha256": "3dbbda02979672e5c23a61ec92227a1c8850e312c9342dfd06f9c9d7eb7c3eee",
++  "tested": 563,
++  "successes": 563,
++  "mean_steps": 151.31438721136766,
++  "max_steps": 431,
++  "max_seconds": 1.634,
++  "groups": {
++    "regression": 400,
++    "random_holdout": 100,
++    "boundary_and_overlap_stress": 63
++  }
++}
+\ No newline at end of file

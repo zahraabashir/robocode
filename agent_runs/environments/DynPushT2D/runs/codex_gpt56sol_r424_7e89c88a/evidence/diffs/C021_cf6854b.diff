@@ -1,0 +1,62 @@
+diff --git a/approach.py b/approach.py
+index 5e35252..bb2a059 100644
+--- a/approach.py
++++ b/approach.py
+@@ -32,6 +32,7 @@ class GeneratedApproach:
+         self.pair_start_theta = 0.0
+         self.pair_amount = 0.0
+         self.translate_amount = 0.0
++        self.has_oriented = False
+ 
+     def _local_to_world(self, s, point):
+         return s[0:2] + self._rot(float(s[2])).dot(np.asarray(point, dtype=float))
+@@ -84,16 +85,19 @@ class GeneratedApproach:
+             if cur == gk:
+                 found = True
+                 break
+-            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
++            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1),
++                           (1, 1), (1, -1), (-1, 1), (-1, -1)):
+                 nxt = (cur[0] + dx, cur[1] + dy)
+                 p = to_pos(nxt)
+-                if nxt != sk and self._blocked(s, p):
++                midpoint = (to_pos(cur) + p) * 0.5
++                if nxt != sk and (self._blocked(s, p) or self._blocked(s, midpoint)):
+                     continue
+-                nc = cost[cur] + 1.0
++                nc = cost[cur] + (1.41421356237 if dx and dy else 1.0)
+                 if nxt not in cost or nc < cost[nxt]:
+                     cost[nxt] = nc
+                     came[nxt] = cur
+-                    h = abs(nxt[0] - gk[0]) + abs(nxt[1] - gk[1])
++                    ax, ay = abs(nxt[0] - gk[0]), abs(nxt[1] - gk[1])
++                    h = max(ax, ay) + 0.41421356237 * min(ax, ay)
+                     heapq.heappush(frontier, (nc + h, nxt))
+         if not found:
+             return [goal]
+@@ -173,10 +177,12 @@ class GeneratedApproach:
+         raw_angle_error = float(s[31] - s[2])
+         angle_error = self._wrap(raw_angle_error)
+         w, lh, lv = float(s[12]), float(s[13]), float(s[14])
++        distance = float(np.linalg.norm(s[29:31] - s[0:2]))
+         # The environment compares the displayed [-pi,pi] angles directly.
+         # If equivalent poses straddle that branch cut, deliberately cross it.
+         branch_mismatch = abs(raw_angle_error) > math.pi
+-        if abs(angle_error) > 0.11 or branch_mismatch:
++        should_orient = (not self.has_oriented) or distance < 0.15
++        if should_orient and (abs(angle_error) > 0.11 or branch_mismatch):
+             self.pair_sign = 1.0 if angle_error > 0 else -1.0
+             if abs(angle_error) < 1e-4:
+                 self.pair_sign = 1.0 if raw_angle_error < 0 else -1.0
+@@ -187,8 +193,10 @@ class GeneratedApproach:
+             self._start_nav(s, target, "rot1", [0.0, 0.049])
+             return
+ 
++        if abs(angle_error) <= 0.125 and not branch_mismatch:
++            self.has_oriented = True
++
+         delta_world = s[29:31] - s[0:2]
+-        distance = float(np.linalg.norm(delta_world))
+         self.translate_amount = max(0.0, min(0.75, distance - 0.012))
+         if self.translate_amount <= 0.002:
+             self.mode = "idle"

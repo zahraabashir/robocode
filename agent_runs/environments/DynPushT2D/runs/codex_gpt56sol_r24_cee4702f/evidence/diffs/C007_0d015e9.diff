@@ -1,0 +1,18 @@
+diff --git a/test_candidate_strategy.py b/test_candidate_strategy.py
+index 458b497..439d104 100644
+--- a/test_candidate_strategy.py
++++ b/test_candidate_strategy.py
+@@ -11,7 +11,12 @@ def run(seed, verbose=False):
+     policy.reset(obs, info)
+     initial = obs.copy()
+     for step in range(env.max_steps):
+-        obs, reward, term, trunc, info = env.step(policy.get_action(obs))
++        action = policy.get_action(obs)
++        try:
++            obs, reward, term, trunc, info = env.step(action)
++        except Exception:
++            print("BAD ACTION", seed, step, action, action.dtype, policy.mode, policy.phase)
++            raise
+         if verbose and (step % 100 == 99 or term or trunc):
+             ae = (obs[31] - obs[2] + np.pi) % (2*np.pi) - np.pi
+             print(seed, step + 1, policy.mode, policy.phase, "poserr", round(float(np.linalg.norm(obs[29:31]-obs[0:2])), 3), "angerr", round(float(ae), 3))

@@ -1,0 +1,14 @@
+diff --git a/approach.py b/approach.py
+index b29244e..ba7b5f6 100644
+--- a/approach.py
++++ b/approach.py
+@@ -32,8 +32,7 @@ class GeneratedApproach:
+         used = []
+         self.target_park = tx
+         if crowded:
+-            outward = [x for x in candidates if (x - sx) * (tx - sx) > 0]
+-            self.target_park = max(outward, key=lambda x: abs(x - sx)) if outward else candidates[0]
++            self.target_park = candidates[0]
+             used.append((self.target_park, tw))
+         for o in obstacles:
+             ow = state.get(o, "width")

@@ -1,0 +1,47 @@
+diff --git a/approach.py b/approach.py
+index c68fabe..0f62fd5 100644
+--- a/approach.py
++++ b/approach.py
+@@ -201,7 +201,7 @@ class GeneratedApproach:
+                 s2 = self._yaw_scores(state, t[0], 'clear')[0][0] - 0.01 * self.fails.get(t[0], 0)
+                 if best is None or s2 > best[0]:
+                     best = (s2, t)
+-            if best is not None and best[0] > max(0.002, sc[0][0] - 0.01 * f):
++            if best is not None and best[0] > sc[0][0] - 0.01 * f + 0.001:
+                 self.tasks.remove(best[1])
+                 self.tasks.insert(0, best[1])
+                 continue
+@@ -388,6 +388,12 @@ class GeneratedApproach:
+             if self.blocked:
+                 self.stuck += 1
+                 if self.stuck >= 2:
++                    if self._tool(state)[2, 3] > self.grasp_z + 0.012:
++                        # cannot get down to the grasp: try something else
++                        self.fails[self.cur_obj] = self.fails.get(self.cur_obj, 0) + 1
++                        self._start_task(state)
++                        a = self._track(state)
++                        return a if a is not None else self._noop()
+                     self.qpath = []
+             a = self._track(state)
+             if a is not None:
+diff --git a/probe_diag.py b/probe_diag.py
+new file mode 100644
+index 0000000..0c2f864
+--- /dev/null
++++ b/probe_diag.py
+@@ -0,0 +1,15 @@
++import sys, numpy as np
++from env_client import make_env
++import approach
++from approach import GeneratedApproach
++Y=float(sys.argv[2])
++def cy(self,state,name,kind,attempt):
++    p,q,h=self._pose(state,name); self.grasp_z=self._grasp_z(p,h); return approach._yaw_of_quat(q)+Y
++GeneratedApproach._choose_yaw=cy
++env=make_env(); obs,info=env.reset(seed=int(sys.argv[1]))
++ap=GeneratedApproach(env.action_space,env.observation_space,{}); ap.reset(obs,info)
++for t in range(40):
++    a=ap.get_action(obs); obs,*_=env.step(a)
++    if ap.phase=='close':
++        T=ap._tool(obs); print(t,'close at',np.round(T[:3,3],3),ap.cur_obj,np.round(ap._pose(obs,ap.cur_obj)[2],3))
++    if ap.phase=='to_place': print('grasped',ap._grasped_name(obs)); break

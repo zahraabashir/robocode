@@ -1,0 +1,17 @@
+from env_client import make_env
+from kin import *
+E=make_env()
+for dx in [-.12,-.09,-.15,.09,.12,0]:
+ for dy in [0,-.06,.06,-.12,.12]:
+  s,_=E.reset(seed=0);r=s.get_object_from_name('robot');b=s.get_object_from_name('target_block')
+  fs=['joint_'+str(i) for i in range(1,8)]
+  def vec(s):return np.array([s.get(r,f) for f in fs])
+  x,y,z=[s.get(b,'pose_'+f) for f in 'xyz']
+  for zt in [.32]*15+list(np.arange(.32,.065,-.005)):
+   q=ik(x+.12+dx,zt)
+   a=np.zeros(11);a[3:10]=np.clip(q-vec(s),-.12,.12);a[1]=np.clip(y+dy-.001-s.get(r,'pos_base_y'),-.12,.12);a[10]=-1
+   s,*_=E.step(a)
+   if s.get(r,'grasp_active'):
+    print('GRASP',dx,dy,zt,'q',vec(s),'base',s.get(r,'pos_base_y'),'tf',[s.get(r,'grasp_tf_'+f) for f in ['x','y','z','qx','qy','qz','qw']],flush=True);E.close();raise SystemExit
+  print('no',dx,dy,'last',np.round(fk(vec(s))[0],3),flush=True)
+E.close()

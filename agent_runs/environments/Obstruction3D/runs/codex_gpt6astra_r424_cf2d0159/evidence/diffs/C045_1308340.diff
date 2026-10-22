@@ -1,0 +1,55 @@
+diff --git a/probe_lift_recovery.py b/probe_lift_recovery.py
+new file mode 100644
+index 0000000..1fe1827
+--- /dev/null
++++ b/probe_lift_recovery.py
+@@ -0,0 +1,29 @@
++from env_client import make_env
++from approach import GeneratedApproach
++from kinematics_fit import fk
++import numpy as np
++
++e=make_env();s,info=e.reset(seed=10,options={'object_count':5});p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,info)
++for k in range(800):
++ a=p.get_action(s);s,r,t,tr,info=e.step(a)
++ if t:print('SUCCESS',k,flush=True);break
++ if p.stalled>5 and p.phase=='lift':
++  ro=s.get_object_from_name('robot');q=np.array([s.get(ro,'joint_'+str(i)) for i in range(1,8)]);print('STUCK',k,p.goal,'q',q,'ee',fk(q)[0],'height',p.height,flush=True)
++  for obj in s.get_objects(p.cube_type):print(obj.name,[s.get(obj,'pose_'+v) for v in 'xyz'],[s.get(obj,'half_extent_'+v) for v in 'xyz'],s.get(obj,'grasp_active'),flush=True)
++  candidates=[]
++  for factor in [.5,.2,.05,2,4]:
++   aa=np.zeros(11);aa[3:10]=(p.config(min(.35,p.height))-q)*factor;candidates.append(('same_dir_'+str(factor),np.clip(aa,e.action_space.low,e.action_space.high)))
++  aa=np.zeros(11);aa[3:10]=p.config(.35)-q;aa[3:10]*=min(1,.2/max(abs(aa[3:10])));candidates.append(('jump_high',aa))
++  for d in [.05,-.05,.1,-.1]:
++   aa=np.zeros(11);aa[4]=-d;aa[8]=d;candidates.append(('q2lift'+str(d),aa))
++  for ax in [0,1]:
++   for d in [-.05,.05,-.15,.15]:
++    aa=np.zeros(11);aa[ax]=d;candidates.append(('base'+str(ax)+'_'+str(d),aa))
++  for label,aa in candidates:
++   before=np.array([s.get(ro,'joint_'+str(i)) for i in range(1,8)]+[s.get(ro,'pos_base_x'),s.get(ro,'pos_base_y')]);s,*_=e.step(aa);after=np.array([s.get(ro,'joint_'+str(i)) for i in range(1,8)]+[s.get(ro,'pos_base_x'),s.get(ro,'pos_base_y')]);accepted=np.max(abs(after-before))>1e-6
++   print('TRY',label,accepted,flush=True)
++   if accepted:
++    q=after[:7];ee,_=fk(q);p.height=max(ee[2]+.025,p.height);break
++  else:break
++else:print('TIMEOUT',p.phase,p.goal,flush=True)
++e.close()
+diff --git a/sweep_final_count10.log b/sweep_final_count10.log
+new file mode 100644
+index 0000000..eccd88d
+--- /dev/null
++++ b/sweep_final_count10.log
+@@ -0,0 +1,4 @@
++{"seed": 0, "count": 10, "success": true, "steps": 285, "phase": "release", "goal": "target_block", "seconds": 5.87, "grasp": 0.0}
++{"seed": 1, "count": 10, "success": true, "steps": 285, "phase": "release", "goal": "target_block", "seconds": 5.41, "grasp": 0.0}
++{"seed": 2, "count": 10, "success": true, "steps": 205, "phase": "release", "goal": "target_block", "seconds": 4.56, "grasp": 0.0}
++{"seed": 3, "count": 10, "success": true, "steps": 207, "phase": "release", "goal": "target_block", "seconds": 4.33, "grasp": 0.0}
+diff --git a/sweep_final_count5.log b/sweep_final_count5.log
+index 504f40c..f5a0b2f 100644
+--- a/sweep_final_count5.log
++++ b/sweep_final_count5.log
+@@ -11,3 +11,5 @@
+ {"seed": 10, "count": 5, "success": false, "steps": 196, "phase": "lift", "goal": "target_block", "seconds": 3.79, "grasp": 1.0}
+ {"seed": 11, "count": 5, "success": true, "steps": 260, "phase": "release", "goal": "target_block", "seconds": 5.0, "grasp": 0.0}
+ {"seed": 12, "count": 5, "success": true, "steps": 295, "phase": "release", "goal": "target_block", "seconds": 5.7, "grasp": 0.0}
++{"seed": 13, "count": 5, "success": true, "steps": 245, "phase": "release", "goal": "target_block", "seconds": 5.21, "grasp": 0.0}
++{"seed": 14, "count": 5, "success": true, "steps": 121, "phase": "release", "goal": "target_block", "seconds": 2.36, "grasp": 0.0}

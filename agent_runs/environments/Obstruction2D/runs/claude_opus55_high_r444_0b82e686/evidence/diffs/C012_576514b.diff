@@ -1,0 +1,68 @@
+diff --git a/approach.py b/approach.py
+index 8943dfd..ed09c2b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -80,9 +80,9 @@ class GeneratedApproach:
+         for lo, hi, d in parts:
+             a, b = x + lo, x + hi
+             req = max(req, FLOOR + d)  # floor
+-            for (o0, o1, top) in obst:
+-                if a < o1 + XMARGIN and b > o0 - XMARGIN:
+-                    req = max(req, top + d + MARGIN)
++            for ob in obst:
++                if a < ob[1] + XMARGIN and b > ob[0] - XMARGIN:
++                    req = max(req, ob[2] + d + (ob[3] if len(ob) > 3 else MARGIN))
+         return req
+ 
+     def _req_range(self, x0, x1, parts, obst):
+@@ -91,14 +91,21 @@ class GeneratedApproach:
+         for plo, phi, d in parts:
+             a, b = lo + plo, hi + phi
+             req = max(req, FLOOR + d)
+-            for (o0, o1, top) in obst:
+-                if a < o1 + XMARGIN and b > o0 - XMARGIN:
+-                    req = max(req, top + d + MARGIN)
++            for ob in obst:
++                if a < ob[1] + XMARGIN and b > ob[0] - XMARGIN:
++                    req = max(req, ob[2] + d + (ob[3] if len(ob) > 3 else MARGIN))
+         return req
+ 
+     def _obst(self, objs, exclude=()):
+         return [(o["x"], o["x"] + o["w"], o["top"]) for n, o in objs.items() if n not in exclude]
+ 
++    def _obst_pick(self, objs, name):
++        """Obstacles when approaching object `name` for a grasp (target kept, tiny margin)."""
++        res = self._obst(objs, exclude=(name,))
++        o = objs[name]
++        res.append((o["x"], o["x"] + o["w"], o["top"], GRASP_GAP * 0.5))
++        return res
++
+     def _xlim(self, robot):
+         return robot["r"] + 1e-3, W - robot["r"] - 1e-3
+ 
+@@ -295,6 +302,7 @@ class GeneratedApproach:
+                 obst2 = obst + newob
+                 if nxt is not None:
+                     obst_n = [o for o in obst2 if not (o[0] == nxt["x"] and o[2] == nxt["top"])]
++                    obst_n.append((nxt["x"], nxt["x"] + nxt["w"], nxt["top"], GRASP_GAP * 0.5))
+                     cost += self._steps(rx, ty, ngx, ngty, bparts0, obst_n)
+                 if blk is not None and self.place_c is not None:
+                     obst_b = [o for o in obst2 if not (o[0] == blk["x"] and o[2] == blk["top"])]
+@@ -361,7 +369,7 @@ class GeneratedApproach:
+                     prefer = self.stage_g
+                 gx, gty = self._grasp_x(robot, obj, objs, prefer)
+                 parts = self._parts(robot)
+-                obst = self._obst(objs, exclude=(obj["name"],))
++                obst = self._obst_pick(objs, obj["name"])
+                 act, arrived = self._move(robot, gx, gty, parts, obst, 0.0)
+                 self.released = None
+                 if not arrived:
+@@ -463,7 +471,7 @@ class GeneratedApproach:
+             ok, gx, gty = self._grasp_ok(robot, obj, objs, prefer)
+             if not ok:
+                 cost += 1000.0
+-            cost += self._steps(x, y, gx, gty, self._parts(robot), self._obst(objs, exclude=(name,)))
++            cost += self._steps(x, y, gx, gty, self._parts(robot), self._obst_pick(objs, name))
+             g = gx - obj["cx"]
+             depth = gty - obj["y"]
+             rsim = dict(robot)

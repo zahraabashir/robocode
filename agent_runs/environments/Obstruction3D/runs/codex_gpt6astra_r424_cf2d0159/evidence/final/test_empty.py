@@ -1,0 +1,13 @@
+from env_client import make_env
+from approach import GeneratedApproach
+import sys,time
+for seed in map(int,sys.argv[1:] or ['0']):
+ e=make_env();s,i=e.reset(seed=seed,options={'object_count':0}); p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,i)
+ start=time.time(); last=None
+ for k in range(200):
+  a=p.get_action(s); s,r,t,tr,info=e.step(a)
+  ro=s.get_object_from_name('robot');b=s.get_object_from_name('target_block')
+  if p.phase!=last or k%20==0:
+   print(seed,k,'phase',p.phase,'base',[round(s.get(ro,'pos_base_'+v),3) for v in ['x','y']], 'joints',[round(s.get(ro,'joint_'+str(v)),3) for v in [2,4,6]],'grasp',s.get(ro,'grasp_active'),'block',[round(s.get(b,'pose_'+v),3) for v in 'xyz'],flush=True);last=p.phase
+  if t or tr:break
+ print('RESULT',seed,k+1,t,tr,'seconds',time.time()-start,flush=True);e.close()

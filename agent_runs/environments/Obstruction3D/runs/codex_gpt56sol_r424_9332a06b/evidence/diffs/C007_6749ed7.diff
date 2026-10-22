@@ -1,0 +1,19 @@
+diff --git a/test_approach.py b/test_approach.py
+new file mode 100644
+index 0000000..cef8420
+--- /dev/null
++++ b/test_approach.py
+@@ -0,0 +1,13 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import sys
++for seed in map(int,sys.argv[1:] or [11]):
++ e=make_env();s,i=e.reset(seed=seed);p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,i)
++ for t in range(e.max_steps):
++  s,r,d,tr,i=e.step(p.get_action(s))
++  if t%25==0:
++   rob=s.get_object_from_name('robot');b=s.get_object_from_name('target_block')
++   print(seed,t,p.mode,p.waypoint,'held',s.get(rob,'grasp_active'),'b',[round(s.get(b,'pose_'+c),3) for c in 'xyz'])
++  if d or tr: break
++ print('RESULT',seed,t+1,d,tr,p.mode)
++ e.close()

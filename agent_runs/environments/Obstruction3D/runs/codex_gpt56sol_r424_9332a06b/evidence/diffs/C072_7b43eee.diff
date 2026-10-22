@@ -1,0 +1,17 @@
+diff --git a/approach.py b/approach.py
+index cc09e53..b445f05 100644
+--- a/approach.py
++++ b/approach.py
+@@ -63,6 +63,12 @@ class GeneratedApproach:
+                 for q4 in (-2.50,-2.35,-2.20):
+                     for q6 in (-.90,-.75,-.60): triples.append((q2,q4,q6))
+         self.pick_poses=[]
++        if name!="target_block" and .25<model_x<=.38:
++            # Turn the fingers across the narrow face of rectangular blocks.
++            # Besides being easier to acquire, this avoids over-deep grasps
++            # whose finger mechanism cannot reopen after transport.
++            q2,q4,q6=base[0]+.08,base[1],base[2]
++            self.pick_poses.append((np.array([0.,q2,-np.pi,q4,0.,q6,0.]),.00135,pick_bx))
+         for q2,q4,q6 in triples:
+             self.pick_poses.append((np.array([0.,q2,-np.pi,q4,0.,q6,np.pi/2]),.00135,pick_bx))
+         if name!="target_block":

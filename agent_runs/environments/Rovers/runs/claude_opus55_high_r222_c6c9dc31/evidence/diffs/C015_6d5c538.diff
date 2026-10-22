@@ -1,0 +1,138 @@
+diff --git a/approach.py b/approach.py
+index 756596c..25a3fda 100644
+--- a/approach.py
++++ b/approach.py
+@@ -328,8 +328,14 @@ class GeneratedApproach:
+         send = (np.hypot(CX - lx, CY - ly) <= LANDER_RANGE) & free
+         for (px, py, phx, phy) in pillars:
+             send &= seg_point_dist(CX, CY, lx, ly, px, py) > PILLAR_LOS_STRICT
+-        for (bx, by) in self.bad_send[r]:
++        for (bx, by, sector) in self.bad_send[r]:
+             send &= np.hypot(X - bx, Y - by) > 0.04
++            if sector:
++                bcx, bcy = self._cam(r, bx, by)
++                bd = math.hypot(bcx - lx, bcy - ly)
++                bb = math.atan2(bcy - ly, bcx - lx)
++                ang = np.abs(np.angle(np.exp(1j * (np.arctan2(CY - ly, CX - lx) - bb))))
++                send &= ~((np.hypot(CX - lx, CY - ly) >= bd - 0.15) & (ang < math.radians(12)))
+         for other in rnames:
+             if other == r:
+                 continue
+@@ -655,7 +661,15 @@ class GeneratedApproach:
+                 self.bad_view[r].append((x, y))
+                 return True
+             if op == "send" and self._unsent(state, r):
+-                self.bad_send[r].append((x, y))
++                lx = self._get(state, self.w.lander, "x"); ly = self._get(state, self.w.lander, "y")
++                cx, cy = self._cam(r, x, y)
++                sector = True
++                for o2, ob2 in self.w.rovers.items():
++                    if o2 != r:
++                        ox = self._get(state, ob2, "x"); oy = self._get(state, ob2, "y")
++                        if float(seg_point_dist(np.array(cx), np.array(cy), lx, ly, ox, oy)) < 0.45:
++                            sector = False
++                self.bad_send[r].append((x, y, sector))
+                 self.log.append(("send", r, round(x, 3), round(y, 3)))
+                 return True
+         return False
+diff --git a/dbg5.py b/dbg5.py
+new file mode 100644
+index 0000000..473c91d
+--- /dev/null
++++ b/dbg5.py
+@@ -0,0 +1,7 @@
++import sys, math
++from env_client import make_env
++env=make_env(); obs,_=env.reset(seed=int(sys.argv[1]))
++for t in ['lander','obstacle']:
++  for o in obs.get_objects(env.observation_space.get_type(t)):
++    print(o.name, [round(obs.get(o,f),3) for f in ['x','y']], end=' | ')
++print()
+diff --git a/lander_pos.py b/lander_pos.py
+new file mode 100644
+index 0000000..ceb7e77
+--- /dev/null
++++ b/lander_pos.py
+@@ -0,0 +1,5 @@
++from env_client import make_env
++env=make_env()
++for s in range(int(__import__('sys').argv[1]),int(__import__('sys').argv[2])):
++    obs,_=env.reset(seed=s); l=list(obs.get_objects(env.observation_space.get_type('lander')))[0]
++    print(s, round(float(obs.get(l,'x')),2), round(float(obs.get(l,'y')),2), round(float(obs.get(l,'z')),3))
+diff --git a/near_lander.py b/near_lander.py
+new file mode 100644
+index 0000000..01e90b3
+--- /dev/null
++++ b/near_lander.py
+@@ -0,0 +1,9 @@
++import sys, math
++from env_client import make_env
++env=make_env()
++for s in range(int(sys.argv[1]),int(sys.argv[2])):
++    obs,_=env.reset(seed=s)
++    for o in obs.get_objects(env.observation_space.get_type('sample')):
++        x,y=float(obs.get(o,'x')),float(obs.get(o,'y'))
++        d=math.hypot(x+1.9,y+2.0)
++        if d<float(sys.argv[3]): print(s,o.name,round(x,2),round(y,2),round(d,3))
+diff --git a/obs_list.py b/obs_list.py
+new file mode 100644
+index 0000000..40e81da
+--- /dev/null
++++ b/obs_list.py
+@@ -0,0 +1,5 @@
++import sys
++from env_client import make_env
++env=make_env(); obs,_=env.reset(seed=int(sys.argv[1]))
++for o in obs.get_objects(env.observation_space.get_type('obstacle')):
++    print(o.name, [round(float(obs.get(o,f)),3) for f in env.observation_space.type_features[env.observation_space.get_type('obstacle')]])
+diff --git a/probe_send549.py b/probe_send549.py
+new file mode 100644
+index 0000000..3e1ec34
+--- /dev/null
++++ b/probe_send549.py
+@@ -0,0 +1,23 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach, SEL
++env=make_env(); obs,info=env.reset(seed=549)
++ap=GeneratedApproach(env.action_space, env.observation_space,{}); ap.reset(obs,info)
++for i in range(14):
++    obs,*_=env.step(ap.get_action(obs))
++r0=ap.w.rovers['rover0']; r1=ap.w.rovers['rover1']
++smp=ap.w.samples
++def st(): return round(float(obs.get(r0,'x')),3), round(float(obs.get(r0,'y')),3), round(float(obs.get(r1,'x')),3),round(float(obs.get(r1,'y')),3)
++def recv(): return sum(float(obs.get(s,'received_analysis')) for s in smp)
++print('start',st(), recv())
++moves=[(0,0.2)]*8
++for dx,dy in moves:
++    a=np.zeros(8,np.float32); a[0:4]=[dx,dy,0,SEL['send']]; a[7]=SEL['none']
++    b=recv(); obs,*_=env.step(a); print(st(), 'send ok' if recv()>b else 'fail')
++    if recv()>b: break
++print({f: round(float(obs.get(ap.w.lander,f)),3) for f in env.observation_space.type_features[env.observation_space.get_type('lander')]})
++moves=[(-0.2,-0.2)]*6+[(0,-0.2)]*6
++for dx,dy in moves:
++    a=np.zeros(8,np.float32); a[0:4]=[dx,dy,0,SEL['send']]; a[7]=SEL['none']
++    b=recv(); obs,*_=env.step(a); print(st(), 'send ok' if recv()>b else 'fail')
++    if recv()>b: break
+diff --git a/probe_send549b.py b/probe_send549b.py
+new file mode 100644
+index 0000000..7c67c43
+--- /dev/null
++++ b/probe_send549b.py
+@@ -0,0 +1,16 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach, SEL
++env=make_env(); obs,info=env.reset(seed=int(sys.argv[2]))
++ap=GeneratedApproach(env.action_space, env.observation_space,{}); ap.reset(obs,info)
++for i in range(int(sys.argv[1])):
++    obs,*_=env.step(ap.get_action(obs))
++r0=ap.w.rovers['rover0']; r1=ap.w.rovers['rover1']
++smp=ap.w.samples
++def st(): return round(float(obs.get(r0,'x')),3), round(float(obs.get(r0,'y')),3), round(float(obs.get(r1,'x')),3),round(float(obs.get(r1,'y')),3)
++def recv(): return sum(float(obs.get(s,'received_analysis')) for s in smp)
++print('start',st(), recv(), [(s.name,float(obs.get(s,'analyzed_rover0'))) for s in smp])
++for dx,dy in [(0,0)]+[(0,-0.2)]*5+[(0.2,0)]*4:
++    a=np.zeros(8,np.float32); a[0:4]=[dx,dy,0,SEL['send']]; a[7]=SEL['none']
++    b=recv(); obs,*_=env.step(a); print(st(), 'send ok' if recv()>b else 'fail')
++    if recv()>b: break

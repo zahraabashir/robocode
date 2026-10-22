@@ -1,0 +1,551 @@
+[
+  {
+    "id": "C001",
+    "commit": "21d9203d61e751ee157ffd4c7c8d169d3f27dd15",
+    "parents": [],
+    "date": "2026-09-09T08:24:02+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".gitignore",
+      "AGENTS.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_21d9203.diff",
+    "diff_sha256": "34fd1efad4aa6ab3fa93bc5ee0a2b5a2481f3e905e28c23b99eb748ca13db42e",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "2a27e4afcf52ffe998c168533d677badf0a11666",
+    "parents": [
+      "21d9203d61e751ee157ffd4c7c8d169d3f27dd15"
+    ],
+    "date": "2026-09-09T08:24:56+02:00",
+    "title": "Add valid reactive pushing baseline and test harness",
+    "files": [
+      "approach.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C002_2a27e4a.diff",
+    "diff_sha256": "40c328d2df3b569b04883db9f187d63ff066caa5930b836c17099ec2a99b56da",
+    "events": [
+      {
+        "event": "E0009",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "74d7f4b11d615e81a52d69db83d7076bf8645fe62774c7da4b23cef8f2918fbb",
+    "version": "evidence/versions/C002_2a27e4a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "36fdbe55fbf17af71106da9d5c3f0b59b9262fad",
+    "parents": [
+      "2a27e4afcf52ffe998c168533d677badf0a11666"
+    ],
+    "date": "2026-09-09T08:25:35+02:00",
+    "title": "add isolated rotation dynamics probe",
+    "files": [
+      "probe_rotation_agent.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C003_36fdbe5.diff",
+    "diff_sha256": "11388c83a787ef908209c76dfe3fbf9eddfbfb5f5873dcd2dd203a9f07536126",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C004",
+    "commit": "edd2c7d44029e4a07bb664fa166bf2c0ace128f9",
+    "parents": [
+      "36fdbe55fbf17af71106da9d5c3f0b59b9262fad"
+    ],
+    "date": "2026-09-09T08:25:51+02:00",
+    "title": "Keep actions strictly inside server bounds",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C004_edd2c7d.diff",
+    "diff_sha256": "0563fbe5050b11126bd256f3976d551f094a329b914f357c79c23983e4827209",
+    "events": [
+      {
+        "event": "E0023",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "def47b0f35fe08f7d3e304c4f227c9f8f466b7feddf482a3bbd05fcc90651d11",
+    "version": "evidence/versions/C004_edd2c7d_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "96b4b4393638dee6042cc1bc0b099b363965ef1c",
+    "parents": [
+      "edd2c7d44029e4a07bb664fa166bf2c0ace128f9"
+    ],
+    "date": "2026-09-09T08:26:23+02:00",
+    "title": "Add numerical seed survey for policy failures",
+    "files": [
+      "seed_survey.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C005_96b4b43.diff",
+    "diff_sha256": "7cf1e705ab0466171a69632cbcea604de393dd66dc35fa79e22778c1a5b7f0c2",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C006",
+    "commit": "f836fb9ae6c07389b10f8d57e7882de3f770d909",
+    "parents": [
+      "96b4b4393638dee6042cc1bc0b099b363965ef1c"
+    ],
+    "date": "2026-09-09T08:26:23+02:00",
+    "title": "Add isolated black-box geometry probe",
+    "files": [
+      "probe_geometry.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C006_f836fb9.diff",
+    "diff_sha256": "b9e168b506c28c5d5bb8f1f8d75a950e522662bcfb68da556c0de5357034f6be",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C007",
+    "commit": "ad9d002bb23b7e1bfcbcf287ccc7583b8d6fd539",
+    "parents": [
+      "f836fb9ae6c07389b10f8d57e7882de3f770d909"
+    ],
+    "date": "2026-09-09T08:26:34+02:00",
+    "title": "probe T-block contact offsets and induced rotation",
+    "files": [
+      "probe_rotation_agent.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C007_ad9d002.diff",
+    "diff_sha256": "49934873a6018146cef36ddd7fb890a52166e830714486d6d9c654bb80cd84c3",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C008",
+    "commit": "ed758690595e0893c878768fe86d3bd163321df2",
+    "parents": [
+      "ad9d002bb23b7e1bfcbcf287ccc7583b8d6fd539"
+    ],
+    "date": "2026-09-09T08:26:55+02:00",
+    "title": "use action-space dtype in rotation probe",
+    "files": [
+      "probe_rotation_agent.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C008_ed75869.diff",
+    "diff_sha256": "416d8a420b49e4ce76236755269fb0b1ab6c221475391ddbf91ba3ed7eb85cad",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C009",
+    "commit": "dde97e4c2350ee2b00c67a757765f6d45bf884e7",
+    "parents": [
+      "ed758690595e0893c878768fe86d3bd163321df2"
+    ],
+    "date": "2026-09-09T08:27:12+02:00",
+    "title": "stay within strict action bounds in probe",
+    "files": [
+      "probe_rotation_agent.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C009_dde97e4.diff",
+    "diff_sha256": "4b91208f5b9935041bbec945c3dd30ac50cf55ac5f42d3497ddf07d3163d2898",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C010",
+    "commit": "f0d4d6a59a42682e86be99207c0a6fb04b550a17",
+    "parents": [
+      "dde97e4c2350ee2b00c67a757765f6d45bf884e7"
+    ],
+    "date": "2026-09-09T08:27:34+02:00",
+    "title": "Probe uncontaminated radial contacts from reset poses",
+    "files": [
+      "probe_geometry.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C010_f0d4d6a.diff",
+    "diff_sha256": "0fa28cd310bce83b575396fee1b22772e822d174d59737f39b361e9a3818eb73",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C011",
+    "commit": "a7666290d77c31d12c31795c7faf73369baba177",
+    "parents": [
+      "f0d4d6a59a42682e86be99207c0a6fb04b550a17"
+    ],
+    "date": "2026-09-09T08:28:26+02:00",
+    "title": "measure short offset pushes for controlled rotation",
+    "files": [
+      "probe_rotation_agent.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C011_a766629.diff",
+    "diff_sha256": "995c63465a242ec375e8fe2e4589560417406382edca7e2b29d005d86041b5d5",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C012",
+    "commit": "359ffb77f40f5b6e2237bec69eb969a9b34e1ce5",
+    "parents": [
+      "a7666290d77c31d12c31795c7faf73369baba177"
+    ],
+    "date": "2026-09-09T08:29:39+02:00",
+    "title": "Add capped flushed rollouts for efficient policy iteration",
+    "files": [
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C012_359ffb7.diff",
+    "diff_sha256": "6f059291709120aaeb88a5a0c5ca28fc86a69966806432eb157bd5bc8dbf44ee",
+    "events": [
+      {
+        "event": "E0034",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C013",
+    "commit": "0968980d067539e16142d6d0e84ccebcec03b2dc",
+    "parents": [
+      "359ffb77f40f5b6e2237bec69eb969a9b34e1ce5"
+    ],
+    "date": "2026-09-09T08:29:52+02:00",
+    "title": "validate rotation contacts in arbitrary block frames",
+    "files": [
+      "probe_rotation_agent.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C013_0968980.diff",
+    "diff_sha256": "1bb2a7c36f2203a8d50286b71366cf79d9022aec0c63d26bffbfcbcacac804fd",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C014",
+    "commit": "40a0345bf4fc343f1c64c4e0874cfed79acd6345",
+    "parents": [
+      "0968980d067539e16142d6d0e84ccebcec03b2dc"
+    ],
+    "date": "2026-09-09T08:29:57+02:00",
+    "title": "Drive through block center to ensure contact and translation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C014_40a0345.diff",
+    "diff_sha256": "7a9eb71503644274d8fa3471636c810142416a18b671d7aa369ae6972845e4df",
+    "events": [
+      {
+        "event": "E0038",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6828d3f4f797f8b10c91c4e4b2ef074fe68c0aadcacaf6930d5b799b739f4f75",
+    "version": "evidence/versions/C014_40a0345_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C015",
+    "commit": "9e1edf77ba7cbe5ec7aaa74714d0b44f6b12f48a",
+    "parents": [
+      "40a0345bf4fc343f1c64c4e0874cfed79acd6345"
+    ],
+    "date": "2026-09-09T08:30:42+02:00",
+    "title": "test paired torque pushes for translation cancellation",
+    "files": [
+      "probe_rotation_agent.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C015_9e1edf7.diff",
+    "diff_sha256": "07043c493e91b345ee70e6a7a8795549750e25cf4d04d673aa5b370978238a0d",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C016",
+    "commit": "ab58679b54a4b703ef9e33fa045e7dd62632eb2e",
+    "parents": [
+      "9e1edf77ba7cbe5ec7aaa74714d0b44f6b12f48a"
+    ],
+    "date": "2026-09-09T08:31:35+02:00",
+    "title": "Measure sustained push response after clean contact",
+    "files": [
+      "approach.py",
+      "probe_geometry.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C016_ab58679.diff",
+    "diff_sha256": "40729645487f37333aa3dfe1333e017ec8b85309c41e20fc8db86516f8dd1c16",
+    "events": [],
+    "annotation": {},
+    "policy_sha256": "4207ae11c5b01730e06bfd27d69e82bbb34843caa5055c4ce0841499a0616069",
+    "version": "evidence/versions/C016_ab58679_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C017",
+    "commit": "b17244ac89d2d63c88394272dfca7972118a3fd6",
+    "parents": [
+      "ab58679b54a4b703ef9e33fa045e7dd62632eb2e"
+    ],
+    "date": "2026-09-09T08:31:52+02:00",
+    "title": "verify mirrored low-translation rotation pair",
+    "files": [
+      "probe_rotation_agent.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C017_b17244a.diff",
+    "diff_sha256": "0a9e65b47208a1dacef100142d3d42e3fbfe6616e152ff69f7505494a466a201",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C018",
+    "commit": "2fc7f82a1351f900d6caff1f2a01b91a66ee3b1a",
+    "parents": [
+      "b17244ac89d2d63c88394272dfca7972118a3fd6"
+    ],
+    "date": "2026-09-09T08:37:31+02:00",
+    "title": "Implement geometry-aware rotation and centerline translation planner",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C018_2fc7f82.diff",
+    "diff_sha256": "3e4fbe52def4bd7f5abd1afbe921ee8165096068fd53aae1c8f196c9f798a5c6",
+    "events": [
+      {
+        "event": "E0049",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "be0241c8c8c2e90e8d782792fc8df0b71bc42f799be3a960cec78282f4d44691",
+    "version": "evidence/versions/C018_2fc7f82_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C019",
+    "commit": "cc1fc8ace88520e4590daf6ae9aadc82943c0743",
+    "parents": [
+      "2fc7f82a1351f900d6caff1f2a01b91a66ee3b1a"
+    ],
+    "date": "2026-09-09T08:40:04+02:00",
+    "title": "Use accessible center-of-mass rays for faster direct translation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C019_cc1fc8a.diff",
+    "diff_sha256": "ca421f247616377a78d894c2bff9e10d4e343398e8b048803e3b580302454309",
+    "events": [
+      {
+        "event": "E0059",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1131b3e454aed0355c612c8524aaa4fa3513dd8dcbdbf3fec6bad37072d64c04",
+    "version": "evidence/versions/C019_cc1fc8a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C020",
+    "commit": "0b98261ff7aa84974ad2e8528672e678cbf30f36",
+    "parents": [
+      "cc1fc8ace88520e4590daf6ae9aadc82943c0743"
+    ],
+    "date": "2026-09-09T08:41:28+02:00",
+    "title": "Accelerate manipulation and handle angle branch-cut termination",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C020_0b98261.diff",
+    "diff_sha256": "06094ba923464e6455f83ea8923b0e6256031f3af016e8825a4aa3813e7e1d94",
+    "events": [
+      {
+        "event": "E0065",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "734174267efb3aaa6c2b4ec127fb8ce071a885c59d697bb39eff738d6ddb451f",
+    "version": "evidence/versions/C020_0b98261_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C021",
+    "commit": "cf6854bbfda542a0e87b219dbed6d63c2af2295d",
+    "parents": [
+      "0b98261ff7aa84974ad2e8528672e678cbf30f36"
+    ],
+    "date": "2026-09-09T08:42:42+02:00",
+    "title": "Use diagonal routing and defer orientation cleanup during translation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C021_cf6854b.diff",
+    "diff_sha256": "b66ffd07f0065b42871819fde81024bc2fa38b60ebc58e62aac7e128a644dc2f",
+    "events": [
+      {
+        "event": "E0071",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a2c2050421f6ca0c1d43f6d1f4a7fe80c44ed3136d920924f66b48b06e229081",
+    "version": "evidence/versions/C021_cf6854b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C022",
+    "commit": "7d6d4eda7384fa652399a4a6bee2a1d0a372700b",
+    "parents": [
+      "cf6854bbfda542a0e87b219dbed6d63c2af2295d"
+    ],
+    "date": "2026-09-09T08:44:15+02:00",
+    "title": "Recover navigation from wall-limited waypoints",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C022_7d6d4ed.diff",
+    "diff_sha256": "49b9c9902e15e6e362339f237453287290637424e14a2d004ebeda38d0a8257f",
+    "events": [
+      {
+        "event": "E0081",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "aa87a92546eaa52a380e1cf424098c3b0c206e0e0bbb59ecfa87a7d158d52061",
+    "version": "evidence/versions/C022_7d6d4ed_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C023",
+    "commit": "a3e7cd5b308992fe7c6cea88f748faeaecb61bb9",
+    "parents": [
+      "7d6d4eda7384fa652399a4a6bee2a1d0a372700b"
+    ],
+    "date": "2026-09-09T08:45:38+02:00",
+    "title": "Preposition long blocks for wall-safe rotation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C023_a3e7cd5.diff",
+    "diff_sha256": "22c2a7015590c64a47aba8fd75a5276c1ec489146a2de5d6a193c7ce54e51bac",
+    "events": [
+      {
+        "event": "E0086",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1ac921e582ada6f7b737d880f550c96f19f922034792fb45d85ba3df6ae0f9f0",
+    "version": "evidence/versions/C023_a3e7cd5_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C024",
+    "commit": "96336670221c7b16483ff9c8cf87139d1bcb8fae",
+    "parents": [
+      "a3e7cd5b308992fe7c6cea88f748faeaecb61bb9"
+    ],
+    "date": "2026-09-09T08:46:40+02:00",
+    "title": "Allow small final orientation corrections at valid goal poses",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C024_9633667.diff",
+    "diff_sha256": "50ed97557589d815d4f1cfb99e93ac40ff60840f59bcd889479012ff8ca67546",
+    "events": [
+      {
+        "event": "E0092",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "de3ae7881240c921d82d2b1f35773daa569f89f696f6b900bb80bbea163ad0f4",
+    "version": "evidence/versions/C024_9633667_approach.py",
+    "same_policy_as_earlier": []
+  }
+]

@@ -1,0 +1,33 @@
+diff --git a/approach.py b/approach.py
+index 915f4cc..c1e8d7b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -196,7 +196,7 @@ class GeneratedApproach:
+         return tr, dth, g
+ 
+     def pick_trans(self, B, prims, err):
+-        best, bs = None, -1e9
++        cands = []
+         for pr in prims:
+             name, p, n, k, tq = pr
+             if k not in ('t', 'f') or name in self.banned:
+@@ -207,8 +207,17 @@ class GeneratedApproach:
+             s = float(nw @ err)
+             if k == 'f':
+                 s = s * 0.6 - 0.01
+-            if s > 0.02:
+-                s -= self.lam_t * self.path_len(B, self.rp, B.to_world(p - n * (R_ROBOT + 0.04)))
++            cands.append((s, pr))
++        if not cands:
++            return None
++        smax = max(c[0] for c in cands)
++        best, bs = None, -1e9
++        for s, pr in cands:
++            if s < smax * 0.6 and s < smax:
++                continue
++            if self.lam_t > 0 and smax > 0.02:
++                p, n = pr[1], pr[2]
++                s = s - self.lam_t * self.path_len(B, self.rp, B.to_world(p - n * (R_ROBOT + 0.04)))
+             if s > bs:
+                 bs, best = s, pr
+         return best

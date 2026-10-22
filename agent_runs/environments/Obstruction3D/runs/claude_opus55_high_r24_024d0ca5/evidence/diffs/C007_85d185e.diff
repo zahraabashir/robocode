@@ -1,0 +1,51 @@
+diff --git a/approach.py b/approach.py
+index d397b67..601b67f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -91,30 +91,30 @@ class GeneratedApproach:
+         return out
+ 
+     def _free_spot(self, state, name):
+-        """Pick a spot on the table far from region, target block, other objects."""
+-        _, _, h = self._pose(state, name)
++        """Pick a table spot clear of region/other objects, close to the object."""
++        p0, _, h = self._pose(state, name)
+         others = []
+         for n in self.names:
+-            if n == name:
++            if n == name or n == 'target_region':
+                 continue
+             p, _, hh = self._pose(state, n)
+             others.append((p[:2], hh[:2]))
+         rp, rh = self.region
+-        best, best_score = None, -1e9
+-        for x in np.linspace(0.12, 0.48, 13):
+-            for y in np.linspace(-0.32, 0.32, 17):
++        best, best_score = None, 1e9
++        fb, fb_score = None, -1e9
++        for x in np.linspace(0.2, 0.5, 16):
++            for y in np.linspace(-0.34, 0.34, 35):
+                 c = np.array([x, y])
+-                score = 1e9
++                clear = np.max(np.abs(c - rp[:2]) - rh[:2] - h[:2]) - 0.04
+                 for p, hh in others:
+-                    d = np.max(np.abs(c - p) - hh - h[:2])
+-                    score = min(score, d)
+-                d = np.max(np.abs(c - rp[:2]) - rh[:2] - h[:2]) - 0.03
+-                score = min(score, d)
+-                # prefer closer to robot-ish center for reachability
+-                score -= 0.02 * np.hypot(x - 0.3, y)
+-                if score > best_score:
+-                    best, best_score = c, score
+-        return best
++                    clear = min(clear, np.max(np.abs(c - p) - hh - h[:2]) - 0.03)
++                if clear > fb_score:
++                    fb, fb_score = c, clear
++                if clear >= 0:
++                    score = np.linalg.norm(c - p0[:2]) + 0.3 * abs(y) * 0 
++                    if score < best_score:
++                        best, best_score = c, score
++        return best if best is not None else fb
+ 
+     def _start_task(self, state):
+         if not self.tasks:

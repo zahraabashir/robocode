@@ -1,0 +1,100 @@
+diff --git a/approach.py b/approach.py
+index 920561e..7bfc5e3 100644
+--- a/approach.py
++++ b/approach.py
+@@ -18,7 +18,7 @@ class GeneratedApproach:
+         self.action_space=action_space
+         self.robot_type=observation_space.get_type('Kinematic3DRobot')
+         self.cube_type=observation_space.get_type('Kinematic3DCuboid')
+-        self.x=.55
++        self.x=.60
+         self.cache={}
+     def config(self,z):
+         z=round(float(z),6)
+@@ -31,7 +31,7 @@ class GeneratedApproach:
+         region=next(o for o in cubes if o.name=='target_region')
+         rp=self.pos(state,region)
+         obstacles=[o for o in cubes if o.name not in ('target_block','target_region') and all(abs(self.pos(state,o)[i]-rp[i])<state.get(region,'half_extent_'+v)+state.get(o,'half_extent_'+v)+.06 for i,v in enumerate('xy'))]
+-        obstacles.sort(key=lambda o:-self.pos(state,o)[2])
++        obstacles.sort(key=lambda o:-(self.pos(state,o)[2]+state.get(o,'half_extent_z')))
+         self.tasks=[o.name for o in obstacles]+['target_block']
+         self.goal=self.tasks.pop(0)
+         self.discarded=0
+@@ -68,15 +68,19 @@ class GeneratedApproach:
+                 a[3:10]=self.config(self.height)-q
+                 a[10]=1
+                 if np.max(abs(a[3:10]))<1e-4:
+-                    if self.height>p[2]+.05:
+-                        self.height=max(p[2]+.05,self.height-.025);continue
++                    if self.height>p[2]+state.get(obj,'half_extent_z')+.03:
++                        self.height=max(p[2]+state.get(obj,'half_extent_z')+.03,self.height-.025);continue
+                     self.phase='close';continue
+             elif self.phase=='close':
+                 if held is not None:self.goal=held.name;self.phase='lift';self.height=ee[2]+.025;continue
+                 a[10]=-1
+                 self.retries+=1
+-                if self.retries%3==0:
+-                    self.height=max(p[2]+.005,self.height-.005);self.phase='descend'
++                self.phase='reopen'
++            elif self.phase=='reopen':
++                if held is not None:self.goal=held.name;self.phase='lift';self.height=ee[2]+.025;continue
++                a[10]=1
++                self.height=max(p[2]+.005,self.height-.005)
++                self.phase='descend'
+             elif self.phase=='lift':
+                 a[3:10]=self.config(min(.35,self.height))-q
+                 if np.max(abs(a[3:10]))<1e-4:
+diff --git a/probe_cluster_grasp.log b/probe_cluster_grasp.log
+index 5d416d3..fb73afb 100644
+--- a/probe_cluster_grasp.log
++++ b/probe_cluster_grasp.log
+@@ -17,3 +17,4 @@ SUCCESS 1.5707963267948966 0 0 z 0.15499999999999986 held ['obstruction1'] goal
+ SUCCESS 1.5707963267948966 0.015 0 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
+ SUCCESS 1.5707963267948966 -0.015 0 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
+ SUCCESS 1.5707963267948966 0 0.015 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 1.5707963267948966 0 -0.015 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
+diff --git a/sweep_count0.log b/sweep_count0.log
+index 264282d..8f8dfc7 100644
+--- a/sweep_count0.log
++++ b/sweep_count0.log
+@@ -1 +1,5 @@
+ {"seed": 0, "count": 0, "success": true, "steps": 40, "phase": "release", "goal": "target_block", "seconds": 12.82, "grasp": 0.0}
++{"seed": 1, "count": 0, "success": true, "steps": 41, "phase": "release", "goal": "target_block", "seconds": 9.5, "grasp": 0.0}
++{"seed": 2, "count": 0, "success": true, "steps": 42, "phase": "release", "goal": "target_block", "seconds": 15.76, "grasp": 0.0}
++{"seed": 3, "count": 0, "success": true, "steps": 40, "phase": "release", "goal": "target_block", "seconds": 17.66, "grasp": 0.0}
++{"seed": 4, "count": 0, "success": true, "steps": 41, "phase": "release", "goal": "target_block", "seconds": 17.16, "grasp": 0.0}
+diff --git a/sweep_count1.log b/sweep_count1.log
+index e69de29..323f14b 100644
+--- a/sweep_count1.log
++++ b/sweep_count1.log
+@@ -0,0 +1,3 @@
++{"seed": 0, "count": 1, "success": true, "steps": 94, "phase": "release", "goal": "target_block", "seconds": 40.48, "grasp": 0.0}
++{"seed": 1, "count": 1, "success": true, "steps": 84, "phase": "release", "goal": "target_block", "seconds": 38.49, "grasp": 0.0}
++{"seed": 2, "count": 1, "success": true, "steps": 91, "phase": "release", "goal": "target_block", "seconds": 15.85, "grasp": 0.0}
+diff --git a/sweep_count10.log b/sweep_count10.log
+index e69de29..b6e2150 100644
+--- a/sweep_count10.log
++++ b/sweep_count10.log
+@@ -0,0 +1 @@
++{"seed": 0, "count": 10, "success": false, "steps": 110, "phase": "lift", "goal": "obstruction4", "seconds": 55.24, "grasp": 1.0}
+diff --git a/sweep_count5.log b/sweep_count5.log
+index e69de29..043e245 100644
+--- a/sweep_count5.log
++++ b/sweep_count5.log
+@@ -0,0 +1 @@
++{"seed": 0, "count": 5, "success": false, "steps": 132, "phase": "lower", "goal": "obstruction3", "seconds": 56.57, "grasp": 1.0}
+diff --git a/sweep_initial.log b/sweep_initial.log
+index 28f132c..86ccac1 100644
+--- a/sweep_initial.log
++++ b/sweep_initial.log
+@@ -1,2 +1,3 @@
+ {"seed": 5, "count": null, "success": true, "steps": 126, "phase": "release", "goal": "target_block", "seconds": 5.89, "grasp": 0.0}
+ {"seed": 6, "count": null, "success": true, "steps": 83, "phase": "release", "goal": "target_block", "seconds": 4.74, "grasp": 0.0}
++{"seed": 7, "count": null, "success": true, "steps": 125, "phase": "release", "goal": "target_block", "seconds": 53.64, "grasp": 0.0}
+diff --git a/sweep_reopen.log b/sweep_reopen.log
+new file mode 100644
+index 0000000..92ce6f0
+--- /dev/null
++++ b/sweep_reopen.log
+@@ -0,0 +1 @@
++{"seed": 0, "count": null, "success": false, "steps": 118, "phase": "lift", "goal": "target_block", "seconds": 55.08, "grasp": 1.0}

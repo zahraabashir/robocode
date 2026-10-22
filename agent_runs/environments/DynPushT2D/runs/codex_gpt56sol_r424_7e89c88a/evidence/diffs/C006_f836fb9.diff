@@ -1,0 +1,112 @@
+diff --git a/probe_geometry.py b/probe_geometry.py
+new file mode 100644
+index 0000000..a8e06dc
+--- /dev/null
++++ b/probe_geometry.py
+@@ -0,0 +1,106 @@
++"""Small black-box probes for DynPushT2D.  Not used by the submitted policy."""
++import argparse
++import math
++import numpy as np
++
++from env_client import make_env
++
++
++def brief(seed):
++    env = make_env()
++    obs, _ = env.reset(seed=seed)
++    print(seed, "max", env.max_steps,
++          "block", np.round(obs[[0, 1, 2]], 5),
++          "robot", np.round(obs[[16, 17]], 5),
++          "goal", np.round(obs[[29, 30, 31]], 5),
++          "dims", np.round(obs[[12, 13, 14, 15, 28]], 5))
++    env.close()
++
++
++def go(env, obs, target, speed=0.05, max_steps=100):
++    """Move toward a point and return state plus trajectory samples."""
++    out = []
++    for _ in range(max_steps):
++        delta = np.asarray(target, float) - obs[16:18]
++        if np.linalg.norm(delta) < 1e-4:
++            break
++        act = np.clip(delta, -speed, speed)
++        before = obs.copy()
++        obs, _, term, trunc, _ = env.step(act)
++        out.append((before, act.copy(), obs.copy()))
++        if term or trunc:
++            break
++    return obs, out
++
++
++def free_motion(seed, action, n=30):
++    env = make_env()
++    obs, _ = env.reset(seed=seed)
++    initial = obs.copy()
++    print("initial block/robot", initial[:3], initial[16:18])
++    for i in range(n):
++        prev = obs.copy()
++        obs, _, term, trunc, _ = env.step(np.asarray(action, float))
++        if i < 5 or i == n - 1:
++            print(i + 1, "r", np.round(obs[16:22], 5), "b", np.round(obs[:6], 5),
++                  "dr", np.round(obs[16:18] - prev[16:18], 5))
++        if term or trunc:
++            break
++    env.close()
++
++
++def ray(seed, angle, start_dist=0.45, end_dist=-0.05, speed=0.005):
++    """Approach block center along world-space radial ray; report first response."""
++    env = make_env()
++    obs, _ = env.reset(seed=seed)
++    c0 = obs[:2].copy()
++    theta = obs[2]
++    d = np.array([math.cos(angle), math.sin(angle)])
++    start = c0 + d * start_dist
++    # First place robot.  Record contamination from accidental collisions.
++    obs, placement = go(env, obs, start, speed=0.025, max_steps=100)
++    contaminated = np.linalg.norm(obs[:2] - c0) > 1e-5 or abs(obs[2] - theta) > 1e-5
++    first = None
++    samples = []
++    target = c0 + d * end_dist
++    for k in range(160):
++        prev = obs.copy()
++        obs, _, term, trunc, _ = env.step(np.clip(target - obs[16:18], -speed, speed))
++        change = np.linalg.norm(obs[:2] - prev[:2]) + abs(obs[2] - prev[2])
++        if change > 1e-7 and first is None:
++            first = (k, prev.copy(), obs.copy())
++        if first is not None and len(samples) < 4:
++            samples.append(obs.copy())
++        if np.linalg.norm(obs[16:18] - target) < 1e-4 or term or trunc:
++            break
++    label = f"seed={seed} worldang={angle:.3f} localang={(angle-theta):.3f} contam={contaminated}"
++    if first is None:
++        print(label, "NO CONTACT", "final r", np.round(obs[16:18], 4))
++    else:
++        k, before, after = first
++        rel = before[16:18] - before[:2]
++        local = np.array([[math.cos(-before[2]), -math.sin(-before[2])],
++                          [math.sin(-before[2]), math.cos(-before[2])]]) @ rel
++        print(label, "contactstep", k,
++              "world_rel", np.round(rel, 5), "local_rel", np.round(local, 5),
++              "center_dist", round(float(np.linalg.norm(rel)), 5),
++              "block_delta", np.round(after[:3] - before[:3], 6))
++        if samples:
++            print("  after", [(np.round(x[:3], 4).tolist(), np.round(x[16:18], 4).tolist()) for x in samples])
++    env.close()
++
++
++if __name__ == "__main__":
++    ap = argparse.ArgumentParser()
++    ap.add_argument("mode", choices=["brief", "free", "rays"])
++    ap.add_argument("--seed", type=int, default=0)
++    args = ap.parse_args()
++    if args.mode == "brief":
++        for s in range(12):
++            brief(s)
++    elif args.mode == "free":
++        free_motion(args.seed, [0.05, 0.0])
++    else:
++        env = make_env(); o, _ = env.reset(seed=args.seed); th = float(o[2]); env.close()
++        for local_angle in np.linspace(0, 2 * math.pi, 12, endpoint=False):
++            ray(args.seed, th + local_angle)

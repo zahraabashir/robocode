@@ -1,0 +1,15 @@
+diff --git a/probe_ops_design.py b/probe_ops_design.py
+index 5123dbe..77c1a5f 100644
+--- a/probe_ops_design.py
++++ b/probe_ops_design.py
+@@ -34,4 +34,10 @@ for pos_label, delta in (("send-here", (0, 0)), ("south", (0, -.2)), ("south", (
+     a[3] = SEND
+     obs, *_ = env.step(a)
+     status(pos_label)
++for k in range(3):
++    a = np.zeros(8, np.float32)
++    a[1] = -.2
++    a[3] = SEND
++    obs, *_ = env.step(a)
++    status("gap-send")
+ env.close()

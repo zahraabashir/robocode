@@ -1,0 +1,100 @@
+diff --git a/approach.py b/approach.py
+index 0e1a31f..5d9c068 100644
+--- a/approach.py
++++ b/approach.py
+@@ -126,7 +126,7 @@ class GeneratedApproach:
+         p, he = self.objs[n]
+         att = self.fail.get(('grasp', n), 0)
+         self.task['yaw'] = self._choose_yaw(n, p[:2], p[2] + he[2] + GRASP_DZ - 0.05, att)
+-        self.task['yaw_place'] = self._match_yaw(self.task['yaw'], self._yaw_for(self.task['dest']))
++        self.task['yaw_place'] = self.task['yaw']
+         self.phase = 'to_pick'
+         tool = fk(self.base, self.q)[:3, 3]
+         sz = self._safe_z(None, 0.05)
+@@ -169,14 +169,18 @@ class GeneratedApproach:
+         """Object-axis-aligned yaw; fingers (tool x) along the smaller extent
+         when possible, avoiding neighbours."""
+         p, he = self.objs[name]
+-        rad = self._yaw_for(xy)
++        M = fk(self.base, self.q)
++        cur = np.arctan2(M[1, 0], M[0, 0])
+         cands = []
+         for k in range(4):
+             y = k * np.pi / 2
+             finger_ext = he[0] if k % 2 == 0 else he[1]
+             hits = self._footprint_hits(name, xy, y, bottom)
+-            dev = abs(wrap(y - rad))
+-            cands.append((hits * 10 + (finger_ext > 0.036) * 5 + finger_ext * 10 + 0.01 * dev, y))
++            y = cur + wrap(y - cur)
++            if abs(wrap(y + np.pi - cur)) < abs(y - cur):
++                y = cur + wrap(y + np.pi - cur)
++            dev = abs(y - cur)
++            cands.append((hits * 10 + (finger_ext > 0.036) * 5 + finger_ext * 10 + 0.3 * dev, y))
+         cands.sort()
+         return cands[attempt % 4][1]
+ 
+diff --git a/dbg3.py b/dbg3.py
+new file mode 100644
+index 0000000..0e96f4b
+--- /dev/null
++++ b/dbg3.py
+@@ -0,0 +1,13 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++from kin import fk
++seed=int(sys.argv[1]); oc=int(sys.argv[2]) if len(sys.argv)>2 else None
++env = make_env(); obs, info = env.reset(seed=seed, options={'object_count':oc} if oc is not None else None)
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++for n,(p,he) in ap.objs.items(): print(n, p.round(3), he.round(3))
++for t in range(400):
++    a = ap.get_action(obs); obs, r, te, *_ = env.step(a)
++    tool = fk(ap.base, ap.q)[:3,3]
++    print(t, ap.phase[:6], (ap.task or {}).get('name','')[-6:], tool.round(3), 'sc', ap.scale, 'g', int(ap.grasped), 'gr', a[10], 'np', len(ap.path), 'dq', np.abs(a[3:10]).max().round(2))
++    if te: print('DONE', t+1); break
+diff --git a/r_def.txt b/r_def.txt
+index e69de29..949c010 100644
+--- a/r_def.txt
++++ b/r_def.txt
+@@ -0,0 +1,41 @@
++ok   (1, True, 40, 0.2, 32, 'release', 'target_block', 1)
++ok   (5, True, 56, 0.3, 41, 'release', 'target_block', 2)
++ok   (0, True, 81, 0.4, 51, 'release', 'target_block', 2)
++ok   (4, True, 74, 0.4, 59, 'release', 'target_block', 2)
++ok   (3, True, 76, 0.5, 66, 'release', 'target_block', 2)
++ok   (2, True, 98, 0.5, 72, 'release', 'target_block', 2)
++ok   (8, True, 51, 0.2, 30, 'release', 'target_block', 2)
++ok   (6, True, 63, 0.3, 53, 'release', 'target_block', 1)
++ok   (11, True, 19, 0.1, 19, 'release', 'target_block', 0)
++ok   (10, True, 26, 0.1, 27, 'release', 'target_block', 2)
++ok   (9, True, 41, 0.2, 40, 'release', 'target_block', 1)
++ok   (14, True, 11, 0.0, 14, 'release', 'target_block', 0)
++ok   (7, True, 83, 0.5, 76, 'release', 'target_block', 2)
++ok   (16, True, 25, 0.1, 20, 'release', 'target_block', 1)
++ok   (15, True, 41, 0.2, 38, 'release', 'target_block', 2)
++ok   (12, True, 57, 0.4, 56, 'release', 'target_block', 1)
++ok   (19, True, 33, 0.1, 23, 'release', 'target_block', 1)
++ok   (18, True, 38, 0.2, 30, 'release', 'target_block', 2)
++ok   (17, True, 58, 0.3, 47, 'release', 'target_block', 2)
++ok   (24, True, 23, 0.1, 17, 'release', 'target_block', 1)
++ok   (21, True, 44, 0.2, 40, 'release', 'target_block', 0)
++ok   (23, True, 44, 0.2, 37, 'release', 'target_block', 0)
++ok   (22, True, 52, 0.2, 45, 'release', 'target_block', 2)
++ok   (20, True, 87, 0.5, 71, 'release', 'target_block', 2)
++ok   (25, True, 47, 0.2, 35, 'release', 'target_block', 1)
++ok   (13, True, 133, 0.8, 127, 'release', 'target_block', 2)
++ok   (27, True, 36, 0.2, 34, 'release', 'target_block', 0)
++ok   (29, True, 19, 0.1, 18, 'release', 'target_block', 2)
++ok   (30, True, 24, 0.1, 21, 'release', 'target_block', 0)
++ok   (26, True, 58, 0.3, 53, 'release', 'target_block', 2)
++ok   (34, True, 24, 0.1, 18, 'release', 'target_block', 0)
++ok   (32, True, 46, 0.2, 34, 'release', 'target_block', 2)
++ok   (35, True, 28, 0.1, 22, 'release', 'target_block', 0)
++ok   (28, True, 95, 0.5, 77, 'release', 'target_block', 1)
++ok   (33, True, 59, 0.3, 50, 'release', 'target_block', 2)
++ok   (31, True, 69, 0.3, 60, 'release', 'target_block', 1)
++ok   (36, True, 31, 0.2, 30, 'release', 'target_block', 1)
++ok   (38, True, 40, 0.2, 25, 'release', 'target_block', 0)
++ok   (37, True, 53, 0.3, 29, 'release', 'target_block', 0)
++ok   (39, True, 62, 0.3, 15, 'release', 'target_block', 2)
++success 40/40  mean steps(success) 51.1  max compute 0.8s

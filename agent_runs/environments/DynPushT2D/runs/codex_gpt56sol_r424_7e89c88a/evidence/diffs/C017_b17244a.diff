@@ -1,0 +1,51 @@
+diff --git a/probe_rotation_agent.py b/probe_rotation_agent.py
+index d4d161a..dc2197d 100644
+--- a/probe_rotation_agent.py
++++ b/probe_rotation_agent.py
+@@ -145,24 +145,27 @@ def push_until_moved(env, s, action, count=4):
+     return s
+ 
+ 
+-def paired_torque(seed=11):
++def paired_torque(seed=11, sign=1):
+     env = make_env(); s, _ = env.reset(seed=seed); initial = s[:3].copy()
+-    # Right underside, push toward the crossbar: positive torque.
++    # For positive torque: right underside upward, then left topside downward.
++    first_x = 0.5 * sign
++    outer_x = 1.0 * sign
++    second_x = -first_x
+     b, th = s[:2].copy(), float(s[2])
+-    s = move_to(env, s, [b[0]+1.0, s[17]])
+-    s = move_to(env, s, b + rot(th, [1.0, -1.2]))
+-    s = move_to(env, s, b + rot(th, [0.5, -1.2]))
++    s = move_to(env, s, [b[0]+outer_x, s[17]])
++    s = move_to(env, s, b + rot(th, [outer_x, -1.2]))
++    s = move_to(env, s, b + rot(th, [first_x, -1.2]))
+     s = push_until_moved(env, s, rot(th, [0, 0.049]), 4)
+     middle = s[:3].copy()
+     # Retreat and go around the outside to left topside; push down for same torque.
+     b, th = s[:2].copy(), float(s[2])
+     s = move_to(env, s, s[[16,17]] + rot(th, [0, -0.55]))
+-    s = move_to(env, s, b + rot(th, [1.0, -1.2]))
+-    s = move_to(env, s, b + rot(th, [1.0, 1.2]))
+-    s = move_to(env, s, b + rot(th, [-0.5, 1.2]))
++    s = move_to(env, s, b + rot(th, [outer_x, -1.2]))
++    s = move_to(env, s, b + rot(th, [outer_x, 1.2]))
++    s = move_to(env, s, b + rot(th, [second_x, 1.2]))
+     s = push_until_moved(env, s, rot(th, [0, -0.049]), 4)
+     final = s[:3].copy()
+-    print("PAIR", "first", np.round(middle[:2]-initial[:2],3),
++    print("PAIR", sign, "first", np.round(middle[:2]-initial[:2],3),
+           round(wrap(float(middle[2]-initial[2])),3),
+           "net", np.round(final[:2]-initial[:2],3),
+           round(wrap(float(final[2]-initial[2])),3))
+@@ -170,7 +173,8 @@ def paired_torque(seed=11):
+ 
+ 
+ def main():
+-    paired_torque()
++    paired_torque(sign=1)
++    paired_torque(sign=-1)
+ 
+ 
+ if __name__ == "__main__":

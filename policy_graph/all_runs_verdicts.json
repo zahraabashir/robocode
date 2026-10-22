@@ -1,0 +1,459 @@
+[
+ {
+  "run": "claude_opus55_high_r24_1cd6a7a5",
+  "env": "Rovers",
+  "name": "Claude 24",
+  "hand_label": "Search",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[graph-search] graph search: each element of layer `prev` adds its successors to `new`, which becomes the next layer  (approach.py:224, in RoverBFS.run)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r42_181ed19d",
+  "env": "Rovers",
+  "name": "Claude 42",
+  "hand_label": "Search",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[planner-call] scipy.sparse.csgraph.dijkstra (shortest-path search)  (approach.py:148, in Side.field_from)",
+   "[planner-call] scipy.sparse.csgraph.dijkstra (shortest-path search)  (approach.py:153, in Side.dist_from_node)",
+   "[graph-search] graph search: worklist `stack` is popped and refilled with successors of the popped element, with visited/cost table `best`  (approach.py:297, in GeneratedApproach._rover_costs)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r222_c6c9dc31",
+  "env": "Rovers",
+  "name": "Claude 222",
+  "hand_label": "Search",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[graph-search] wavefront expansion: maximum_filter is applied repeatedly to the set it has reached (grid BFS / arrival times)  (approach.py:264, in GeneratedApproach._propagate)",
+   "[graph-search] wavefront expansion: maximum_filter is applied repeatedly to the set it has reached (grid BFS / arrival times)  (approach.py:265, in GeneratedApproach._propagate)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r424_4c49acd0",
+  "env": "Rovers",
+  "name": "Claude 424",
+  "hand_label": "Search",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[graph-search] graph search: each element of layer `ent` adds its successors to `by_mask`, which becomes the next layer  (approach.py:408, in GeneratedApproach._held_karp)",
+   "[graph-search] wavefront expansion: minimum_filter is applied repeatedly to the set it has reached (grid BFS / arrival times)  (approach.py:129, in bfs_field)",
+   "[graph-search] wavefront expansion: minimum_filter is applied repeatedly to the set it has reached (grid BFS / arrival times)  (approach.py:794, in GeneratedApproach._layer_solve)",
+   "[tree-search] tree search: _policy recurses over alternatives and selects among the results  (approach.py:762, in GeneratedApproach._policy)",
+   "[tree-search] tree search: _predict_other recurses over alternatives and selects among the results  (approach.py:704, in GeneratedApproach._predict_other)",
+   "[tree-search] tree search: _rover_action recurses over alternatives and selects among the results  (approach.py:871, in GeneratedApproach._rover_action)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r444_2af61ade",
+  "env": "Rovers",
+  "name": "Claude 444",
+  "hand_label": "Search",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[graph-search] wavefront expansion: minimum_filter is applied repeatedly to the set it has reached (grid BFS / arrival times)  (approach.py:100, in propagate)",
+   "[tree-search] tree search: dfs recurses over alternatives and compares the results of its branches  (approach.py:422, in GeneratedApproach._rover_tables_h.dfs)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "codex_gpt6astra_r24_10c7bc43",
+  "env": "Rovers",
+  "name": "Astra 24",
+  "hand_label": "Greedy",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[planner-call] scipy.sparse.csgraph.dijkstra (shortest-path search)  (approach.py:38, in GeneratedApproach.reset)",
+   "[planner-call] scipy.sparse.csgraph.dijkstra (shortest-path search)  (approach.py:101, in GeneratedApproach.get_action)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "codex_gpt6astra_r424_657f1d25",
+  "env": "Rovers",
+  "name": "Astra 424",
+  "hand_label": "Search (greedy fallback)",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[planner-call] scipy.sparse.csgraph.dijkstra (shortest-path search)  (task_planner.py:35, in assign_tasks.field)",
+   "[graph-search] graph search: worklist `queue` is popped and refilled with successors of the popped element, with visited/cost table `dist`  (approach.py:102, in GeneratedApproach.route)",
+   "[tree-search] tree search: visit recurses over alternatives and compares the results of its branches  (task_planner.py:56, in assign_tasks.visit)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "codex_gpt56sol_r24_de120909",
+  "env": "Rovers",
+  "name": "GPT-5.6 24",
+  "hand_label": "Fixed",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[graph-search] graph search: worklist `openq` is popped and refilled with successors of the popped element, with visited/cost table `cost`  (approach.py:137, in GeneratedApproach._astar)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "codex_gpt56sol_r424_0dc2ee42",
+  "env": "Rovers",
+  "name": "GPT-5.6 424",
+  "hand_label": "Fixed",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[graph-search] graph search: worklist `frontier` is popped and refilled with successors of the popped element, with visited/cost table `cost`  (approach.py:150, in GeneratedApproach._plan_with_margin)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r24_f8729873",
+  "env": "Obstruction2D",
+  "name": "Claude 24",
+  "hand_label": "Greedy",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[graph-search] graph search: entries of cost table `new` are relaxed with candidates computed from earlier costs, recording predecessors in `parent` (shortest-path dynamic programming)  (approach.py:213, in GeneratedApproach._dp_path)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r42_820cc0f3",
+  "env": "Obstruction2D",
+  "name": "Claude 42",
+  "hand_label": "Greedy",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[generate-and-test] generate-and-test: candidates ranked by sorted are tried in order and the first that passes _path_free is returned  (approach.py:173, in GeneratedApproach._plan_path)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r222_c7b08ad0",
+  "env": "Obstruction2D",
+  "name": "Claude 222",
+  "hand_label": "Greedy",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[lookahead] multi-step rollout: candidates are scored by the predicted outcome `y += dy` and chosen by .sort  (approach.py:180, in GeneratedApproach._place_candidates_target)",
+   "[lookahead] multi-step rollout: candidates are scored by the predicted outcome `y += dy` and chosen by max  (approach.py:295, in GeneratedApproach._drop_spot)",
+   "[lookahead] multi-step rollout: candidates are scored by the predicted outcome `y += dy` and chosen by sorted  (approach.py:139, in GeneratedApproach._place_candidates_target)",
+   "[lookahead] multi-step rollout: candidates are scored by the predicted outcome `y += dy` and chosen by sorted  (approach.py:400, in GeneratedApproach._plan)",
+   "[lookahead] multi-step rollout: candidates are scored by the predicted outcome `y += dy` and chosen by min  (approach.py:295, in GeneratedApproach._drop_spot)",
+   "[lookahead] multi-step rollout: candidates are scored by the predicted outcome `y += dy` and chosen by best-so-far loop over best  (approach.py:330, in GeneratedApproach._drop_spot)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r424_b71e4671",
+  "env": "Obstruction2D",
+  "name": "Claude 424",
+  "hand_label": "Search",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[tree-search] tree search: rec recurses over alternatives and selects among the results  (approach.py:320, in GeneratedApproach._plan_subset.rec)",
+   "[lookahead] multi-step rollout: candidates are scored by the predicted outcome `y += dy` and chosen by .sort  (approach.py:207, in GeneratedApproach._plan)",
+   "[lookahead] multi-step rollout: candidates are scored by the predicted outcome `y += dy` and chosen by best-so-far loop over best  (approach.py:215, in GeneratedApproach._plan)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r444_0b82e686",
+  "env": "Obstruction2D",
+  "name": "Claude 444",
+  "hand_label": "Search",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[ordering-search] task-order search: max selects one of the orderings enumerated by itertools.permutations  (approach.py:105, in GeneratedApproach._contact)",
+   "[ordering-search] task-order search: best-so-far loop over best selects one of the orderings enumerated by itertools.permutations  (approach.py:584, in GeneratedApproach._next_task)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "codex_gpt6astra_r24_29375d55",
+  "env": "Obstruction2D",
+  "name": "Astra 24",
+  "hand_label": "Greedy",
+  "verdict": "reactive",
+  "label": "reactive",
+  "status": "supported",
+  "evidence": [],
+  "review_reasons": []
+ },
+ {
+  "run": "codex_gpt6astra_r424_51fd524e",
+  "env": "Obstruction2D",
+  "name": "Astra 424",
+  "hand_label": "Greedy",
+  "verdict": "reactive",
+  "label": "reactive",
+  "status": "supported",
+  "evidence": [],
+  "review_reasons": []
+ },
+ {
+  "run": "codex_gpt56sol_r424_2c85c614",
+  "env": "Obstruction2D",
+  "name": "GPT-5.6 424",
+  "hand_label": "Fixed",
+  "verdict": "reactive",
+  "label": "reactive",
+  "status": "supported",
+  "evidence": [],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r24_024d0ca5",
+  "env": "Obstruction3D",
+  "name": "Claude 24",
+  "hand_label": "Greedy",
+  "verdict": "reactive",
+  "label": "reactive",
+  "status": "supported",
+  "evidence": [],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r42_820c1113",
+  "env": "Obstruction3D",
+  "name": "Claude 42",
+  "hand_label": "Greedy",
+  "verdict": "reactive",
+  "label": "reactive",
+  "status": "supported",
+  "evidence": [],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r222_f6aa665e",
+  "env": "Obstruction3D",
+  "name": "Claude 222",
+  "hand_label": "Greedy",
+  "verdict": "reactive",
+  "label": "reactive",
+  "status": "supported",
+  "evidence": [],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r424_3f9182d7",
+  "env": "Obstruction3D",
+  "name": "Claude 424",
+  "hand_label": "Greedy",
+  "verdict": "reactive",
+  "label": "reactive",
+  "status": "supported",
+  "evidence": [],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r444_4a56791c",
+  "env": "Obstruction3D",
+  "name": "Claude 444",
+  "hand_label": "Greedy",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[graph-search] graph search: each element of layer `frontier` adds its successors to `nxt`, which becomes the next layer  (approach.py:297, in GeneratedApproach._pick_target)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "codex_gpt6astra_r24_512c8dbf",
+  "env": "Obstruction3D",
+  "name": "Astra 24",
+  "hand_label": "Fixed",
+  "verdict": "reactive",
+  "label": "reactive",
+  "status": "supported",
+  "evidence": [],
+  "review_reasons": []
+ },
+ {
+  "run": "codex_gpt6astra_r424_cf2d0159",
+  "env": "Obstruction3D",
+  "name": "Astra 424",
+  "hand_label": "Fixed",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[lookahead] look-ahead: candidates are scored by the predicted outcome `hp[:2] + delta` and chosen by min  (approach.py:98, in GeneratedApproach.get_action)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "codex_gpt56sol_r24_065956b8",
+  "env": "Obstruction3D",
+  "name": "GPT-5.6 24",
+  "hand_label": "Fixed (name order + defer on failure)",
+  "verdict": "reactive",
+  "label": "reactive",
+  "status": "supported",
+  "evidence": [],
+  "review_reasons": []
+ },
+ {
+  "run": "codex_gpt56sol_r424_9332a06b",
+  "env": "Obstruction3D",
+  "name": "GPT-5.6 424",
+  "hand_label": "Fixed",
+  "verdict": "reactive",
+  "label": "reactive",
+  "status": "supported",
+  "evidence": [],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r24_55605190",
+  "env": "DynPushT2D",
+  "name": "Claude 24",
+  "hand_label": "Search (2-push, top-8; off after 25 s)",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[graph-search] graph search: worklist `pq` is popped and refilled with successors of the popped element, with visited/cost table `dist`  (approach.py:147, in GeneratedApproach.nav_path)",
+   "[tree-search] tree search: plan_push recurses over alternatives and selects among the results  (approach.py:376, in GeneratedApproach.plan_push)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r42_39564662",
+  "env": "DynPushT2D",
+  "name": "Claude 42",
+  "hand_label": "Search (2-push, top-16; off after 25 s)",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[graph-search] graph search: worklist `pq` is popped and refilled with successors of the popped element, with visited/cost table `dist`, `done`  (approach.py:113, in GeneratedApproach._plan_paths)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r222_2702c656",
+  "env": "DynPushT2D",
+  "name": "Claude 222",
+  "hand_label": "Search (2-push C021; rotation look-ahead C023; stall guard flips it off/on C025)",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[graph-search] graph search: worklist `pq` is popped and refilled with successors of the popped element, with visited/cost table `distv`  (approach.py:463, in GeneratedApproach.nav_step)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r424_2a46a52d",
+  "env": "DynPushT2D",
+  "name": "Claude 424",
+  "hand_label": "Search (2-push, top-15; shrinks after 20 s, off after 30 s)",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[planner-call] scipy.sparse.csgraph.dijkstra (shortest-path search)  (navgrid.py:48, in NavGrid.from_source)",
+   "[graph-search] graph search: worklist `pq` is popped and refilled with successors of the popped element, with visited/cost table `dist`  (approach.py:436, in GeneratedApproach._astar)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "claude_opus55_high_r444_2bf26d60",
+  "env": "DynPushT2D",
+  "name": "Claude 444",
+  "hand_label": "Greedy",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[graph-search] graph search: worklist `pq` is popped and refilled with successors of the popped element, with visited/cost table `dist`  (approach.py:481, in GeneratedApproach.nav_path)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "codex_gpt6astra_r24_644304ab",
+  "env": "DynPushT2D",
+  "name": "Astra 24",
+  "hand_label": "Greedy",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[graph-search] graph search: worklist `heap` is popped and refilled with successors of the popped element, with visited/cost table `dist`  (approach.py:75, in GeneratedApproach.navigate)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "codex_gpt6astra_r424_4e86deee",
+  "env": "DynPushT2D",
+  "name": "Astra 424",
+  "hand_label": "Greedy",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[graph-search] graph search: worklist `queue` is popped and refilled with successors of the popped element, with visited/cost table `ds`  (approach.py:35, in GeneratedApproach.path)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "codex_gpt56sol_r24_cee4702f",
+  "env": "DynPushT2D",
+  "name": "GPT-5.6 24",
+  "hand_label": "Fixed",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[graph-search] graph search: worklist `heap` is popped and refilled with successors of the popped element, with visited/cost table `cost`  (approach.py:69, in GeneratedApproach._plan)"
+  ],
+  "review_reasons": []
+ },
+ {
+  "run": "codex_gpt56sol_r424_7e89c88a",
+  "env": "DynPushT2D",
+  "name": "GPT-5.6 424",
+  "hand_label": "Fixed",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "evidence": [
+   "[graph-search] graph search: worklist `frontier` is popped and refilled with successors of the popped element, with visited/cost table `cost`  (approach.py:85, in GeneratedApproach._plan)"
+  ],
+  "review_reasons": []
+ }
+]

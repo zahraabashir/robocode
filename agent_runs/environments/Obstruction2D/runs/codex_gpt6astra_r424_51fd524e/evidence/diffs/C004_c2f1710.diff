@@ -1,0 +1,36 @@
+diff --git a/probe_motion.py b/probe_motion.py
+index 10e8e8e..b47784c 100644
+--- a/probe_motion.py
++++ b/probe_motion.py
+@@ -1,11 +1,23 @@
+ from env_client import make_env
+ import numpy as np
+ 
+-def desc(e,s):
+- for ty in e.observation_space.types:
+-  for o in s.get_objects(ty):
+-   print(o.name, {f:round(float(s.get(o,f)),4) for f in e.observation_space.type_features[ty]})
+-e=make_env();s,i=e.reset(seed=0); print('MAX',e.max_steps,'INFO',i);desc(e,s)
+-for a in [[0,0,0,.1,0]]*5+[[0,0,.196,0,0]]*4+[[.05,0,0,0,0]]*3+[[0,-.05,0,0,0]]*3:
+- s,r,t,tr,i=e.step(np.array(a,dtype=np.float32));print('ACTION',a,r,t,tr);desc(e,s)
+-e.close()
++def vals(s,n,fs):
++ o=s.get_object_from_name(n);return [round(float(s.get(o,f)),6) for f in fs.split()]
++def run(vac):
++ e=make_env();s,_=e.reset(seed=0)
++ def step(a,show=True):
++  nonlocal s
++  s,r,t,tr,i=e.step(np.array(a,dtype=np.float32))
++  if show:print(a,'robot',vals(s,'robot','x y arm_joint vacuum'),'block',vals(s,'target_block','x y theta'))
++ bx,by,bw,bh=vals(s,'target_block','x y width height');cx=bx+bw/2
++ for _ in range(20):
++  rx,ry,arm=vals(s,'robot','x y arm_joint')
++  if abs(rx-cx)<1e-5 and abs(ry-.5)<1e-5:break
++  step([np.clip(cx-rx,-.05,.05),np.clip(.5-ry,-.05,.05),0,.1,0],False)
++ print('VAC',vac,'begin',vals(s,'robot','x y arm_joint'))
++ for _ in range(25):step([0,-.01,0,0,vac])
++ for _ in range(6):step([0,.05,0,0,vac])
++ step([0,0,0,0,0])
++ for _ in range(3):step([0,0,0,0,0])
++ e.close()
++run(0);run(1)

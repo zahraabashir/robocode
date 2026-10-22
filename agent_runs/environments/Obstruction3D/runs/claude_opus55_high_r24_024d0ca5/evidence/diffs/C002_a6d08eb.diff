@@ -1,0 +1,722 @@
+diff --git a/approach.py b/approach.py
+new file mode 100644
+index 0000000..2d0f6a3
+--- /dev/null
++++ b/approach.py
+@@ -0,0 +1,15 @@
++import numpy as np
++from kin import fk, ik, down_R
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives): pass
++    def reset(self, state, info):
++        R = state.get_object_from_name('robot'); B = state.get_object_from_name('target_block')
++        self.R=R
++        base=(state.get(R,'pos_base_x'), state.get(R,'pos_base_y'), state.get(R,'pos_base_rot'))
++        q=np.array([state.get(R,f'joint_{i}') for i in range(1,8)])
++        p=np.array([state.get(B,'pose_x'),state.get(B,'pose_y'),0.24])
++        self.qt,_=ik(q,p,down_R(0),base)
++    def get_action(self, state):
++        q=np.array([state.get(self.R,f'joint_{i}') for i in range(1,8)])
++        d=(self.qt-q+np.pi)%(2*np.pi)-np.pi
++        a=np.zeros(11,dtype=np.float32); a[3:10]=np.clip(d,-0.2,0.2); return a
+diff --git a/explore0.py b/explore0.py
+new file mode 100644
+index 0000000..7464081
+--- /dev/null
++++ b/explore0.py
+@@ -0,0 +1,13 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++for seed in [0,1]:
++    obs, info = env.reset(seed=seed)
++    print("info", info)
++    for n in sorted(obs.get_object_names(), key=str):
++        o = obs.get_object_from_name(n) if isinstance(n,str) else n
++        name = n if isinstance(n,str) else n.name
++        t = o.type if hasattr(o,'type') else None
++        print(name, t, {f: round(float(obs.get(o,f)),4) for f in env.observation_space.get_type(t.name if hasattr(t,'name') else t).features} if False else "")
++    print(type(obs), dir(obs)[:60])
++env.close()
+diff --git a/explore1.py b/explore1.py
+new file mode 100644
+index 0000000..35ac471
+--- /dev/null
++++ b/explore1.py
+@@ -0,0 +1,12 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++def dump(obs):
++    for n in sorted(obs.get_object_names(), key=str):
++        o = obs.get_object_from_name(n)
++        feats = obs.type_features[o.type] if o.type in obs.type_features else obs.type_features[o.type.name]
++        print(n, {f: round(float(obs.get(o,f)),4) for f in feats})
++for seed in [0,1,2]:
++    obs, info = env.reset(seed=seed)
++    dump(obs); print()
++env.close()
+diff --git a/explore10.py b/explore10.py
+new file mode 100644
+index 0000000..55d652d
+--- /dev/null
++++ b/explore10.py
+@@ -0,0 +1,36 @@
++from env_client import make_env
++import numpy as np, sys
++from kin import fk, ik, down_R
++env = make_env()
++seed=1
++jn=[f'joint_{i}' for i in range(1,8)]
++def q_of(o): return np.array([o.get(R,f) for f in jn])
++def goto(qt):
++    global obs
++    for _ in range(60):
++        q=q_of(obs); d=qt-q
++        d=(d+np.pi)%(2*np.pi)-np.pi
++        if np.max(np.abs(d))<1e-5: return True
++        a=np.zeros(11,dtype=np.float32); a[3:10]=np.clip(d,-0.2,0.2)
++        obs,r,te,tr,info=env.step(a)
++        if np.allclose(q_of(obs),q,atol=1e-7): return False
++    return False
++bx,by=0.1377,0.1831
++yaw=float(sys.argv[1])
++for dirn in [(1,0),(-1,0),(0,1),(0,-1)]:
++  for z in [0.24,0.28,0.32,0.36]:
++    obs,_=env.reset(seed=seed); R=obs.get_object_from_name('robot')
++    base=(obs.get(R,'pos_base_x'), obs.get(R,'pos_base_y'), obs.get(R,'pos_base_rot'))
++    start=np.array([bx-0.15*dirn[0],by-0.15*dirn[1],z])
++    qt,ok=ik(q_of(obs),start+[0,0,0.1],down_R(yaw),base); goto(qt)
++    qt,ok=ik(q_of(obs),start,down_R(yaw),base); r=goto(qt)
++    if not r: print('start blocked'); continue
++    s=0
++    while s<0.3:
++        p=start+np.array([dirn[0],dirn[1],0])*(s+0.002)
++        qt,ok=ik(q_of(obs),p,down_R(yaw),base)
++        if not goto(qt): break
++        s+=0.002
++    pos=start+np.array([dirn[0],dirn[1],0])*s
++    print('dir',dirn,'z',z,'stopped at',np.round(pos,3),'offset from block ctr',np.round(pos[:2]-[bx,by],3) if s<0.3 else 'passed')
++env.close()
+diff --git a/explore11.py b/explore11.py
+new file mode 100644
+index 0000000..f49bfb9
+--- /dev/null
++++ b/explore11.py
+@@ -0,0 +1,30 @@
++from env_client import make_env
++import numpy as np, sys
++from kin import fk, ik, down_R
++env = make_env()
++seed=1
++jn=[f'joint_{i}' for i in range(1,8)]
++def q_of(o): return np.array([o.get(R,f) for f in jn])
++def goto(qt):
++    global obs
++    for _ in range(60):
++        q=q_of(obs); d=qt-q
++        d=(d+np.pi)%(2*np.pi)-np.pi
++        if np.max(np.abs(d))<1e-5: return True
++        a=np.zeros(11,dtype=np.float32); a[3:10]=np.clip(d,-0.2,0.2)
++        obs,r,te,tr,info=env.step(a)
++        if np.allclose(q_of(obs),q,atol=1e-7): return False
++    return False
++yaw=float(sys.argv[1]); y=float(sys.argv[2])
++for x in np.arange(0.36,0.62,0.02):
++    obs,_=env.reset(seed=seed); R=obs.get_object_from_name('robot')
++    base=(obs.get(R,'pos_base_x'), obs.get(R,'pos_base_y'), obs.get(R,'pos_base_rot'))
++    qt,ok=ik(q_of(obs),np.array([x,y,0.32]),down_R(yaw),base); goto(qt)
++    z=0.32
++    while z>0.0:
++        qt,ok=ik(q_of(obs),np.array([x,y,z-0.004]),down_R(yaw),base)
++        if not ok: print('ikfail'); break
++        if not goto(qt): break
++        z-=0.004
++    print(round(x,3),'lowest',round(z,3))
++env.close()
+diff --git a/explore12.py b/explore12.py
+new file mode 100644
+index 0000000..ff25af5
+--- /dev/null
++++ b/explore12.py
+@@ -0,0 +1,34 @@
++from env_client import make_env
++import numpy as np, sys
++from kin import fk, ik, down_R
++env = make_env()
++seed=1
++jn=[f'joint_{i}' for i in range(1,8)]
++def q_of(o): return np.array([o.get(R,f) for f in jn])
++def goto(qt,g=0):
++    global obs
++    for _ in range(60):
++        q=q_of(obs); d=qt-q
++        d=(d+np.pi)%(2*np.pi)-np.pi
++        if np.max(np.abs(d))<1e-5: return True
++        a=np.zeros(11,dtype=np.float32); a[3:10]=np.clip(d,-0.2,0.2); a[10]=g
++        obs,r,te,tr,info=env.step(a)
++        if obs.get(R,'grasp_active')>0: return 'G'
++        if np.allclose(q_of(obs),q,atol=1e-7): return False
++    return False
++bx,by=0.1377,0.1831
++z=float(sys.argv[1]); yaw=float(sys.argv[2])
++obs,_=env.reset(seed=seed); R=obs.get_object_from_name('robot')
++base=(obs.get(R,'pos_base_x'), obs.get(R,'pos_base_y'), obs.get(R,'pos_base_rot'))
++found=False
++for dx in np.arange(-0.12,0.121,0.02):
++    for dy in np.arange(-0.12,0.121,0.02):
++        p=np.array([bx+dx,by+dy,z])
++        qt,ok=ik(q_of(obs),p+[0,0,0.05],down_R(yaw),base); goto(qt)
++        qt,ok=ik(q_of(obs),p,down_R(yaw),base); r=goto(qt)
++        a=np.zeros(11,dtype=np.float32); a[10]=-1; obs,*_=env.step(a)
++        if obs.get(R,'grasp_active')>0 or r=='G':
++            print('GRASP at',dx,dy,z, [round(obs.get(R,f),4) for f in ['finger_state','grasp_tf_x','grasp_tf_y','grasp_tf_z','grasp_tf_qx','grasp_tf_qy','grasp_tf_qz','grasp_tf_qw']]); found=True; break
++    if found: break
++print('done',z,yaw,found)
++env.close()
+diff --git a/explore13.py b/explore13.py
+new file mode 100644
+index 0000000..a50645a
+--- /dev/null
++++ b/explore13.py
+@@ -0,0 +1,44 @@
++from env_client import make_env
++import numpy as np, sys, json
++from kin import fk, ik, down_R
++env = make_env()
++seed=1
++jn=[f'joint_{i}' for i in range(1,8)]
++def q_of(o): return np.array([o.get(R,f) for f in jn])
++def goto(qt,g=0):
++    global obs
++    for _ in range(60):
++        q=q_of(obs); d=qt-q
++        d=(d+np.pi)%(2*np.pi)-np.pi
++        if np.max(np.abs(d))<1e-5: return True
++        a=np.zeros(11,dtype=np.float32); a[3:10]=np.clip(d,-0.2,0.2); a[10]=g
++        obs,r,te,tr,info=env.step(a)
++        if np.allclose(q_of(obs),q,atol=1e-7): return False
++    return False
++bx,by=0.1377,0.1831
++obs,_=env.reset(seed=seed); R=obs.get_object_from_name('robot')
++base=(obs.get(R,'pos_base_x'), obs.get(R,'pos_base_y'), obs.get(R,'pos_base_rot'))
++p=np.array([bx-0.1,by-0.04,0.235])
++qt,ok=ik(q_of(obs),p+[0,0,0.05],down_R(0),base); goto(qt)
++qt,ok=ik(q_of(obs),p,down_R(0),base); goto(qt)
++a=np.zeros(11,dtype=np.float32); a[10]=-1; obs,*_=env.step(a)
++for n in sorted(obs.get_object_names()):
++    o=obs.get_object_from_name(n)
++    print(n, 'grasp_active', obs.get(o,'grasp_active'))
++recs=[]
++def rec():
++    d={'q':q_of(obs).tolist(),'base':[obs.get(R,f) for f in ['pos_base_x','pos_base_y','pos_base_rot']],
++       'tf':[obs.get(R,f) for f in ['grasp_tf_x','grasp_tf_y','grasp_tf_z','grasp_tf_qx','grasp_tf_qy','grasp_tf_qz','grasp_tf_qw']],
++       'fs':obs.get(R,'finger_state')}
++    for n in ['target_block']:
++        o=obs.get_object_from_name(n); d[n]=[obs.get(o,f) for f in ['pose_x','pose_y','pose_z','pose_qx','pose_qy','pose_qz','pose_qw']]
++    recs.append(d)
++rec()
++qt,ok=ik(q_of(obs),p+[0,0,0.08],down_R(0),base); print('lift',goto(qt)); rec()
++rng=np.random.default_rng(0)
++for i in range(15):
++    a=np.zeros(11,dtype=np.float32); a[3:10]=rng.uniform(-0.1,0.1,7); a[1]=rng.uniform(-0.05,0.05); a[2]=rng.uniform(-0.1,0.1)
++    obs,*_=env.step(a); rec()
++json.dump(recs,open('grasp_recs.json','w'))
++for d in recs: print(np.round(d['target_block'],4), np.round(d['tf'],4), d['fs'])
++env.close()
+diff --git a/explore14.py b/explore14.py
+new file mode 100644
+index 0000000..19b5477
+--- /dev/null
++++ b/explore14.py
+@@ -0,0 +1,39 @@
++from env_client import make_env
++import numpy as np, sys
++from kin import tool_fk, tool_ik, down_R
++env = make_env()
++seed=int(sys.argv[1]); dz=float(sys.argv[2])
++jn=[f'joint_{i}' for i in range(1,8)]
++def q_of(o): return np.array([o.get(R,f) for f in jn])
++def goto(qt,g=0):
++    global obs
++    for _ in range(60):
++        q=q_of(obs); d=qt-q
++        d=(d+np.pi)%(2*np.pi)-np.pi
++        if np.max(np.abs(d))<1e-5: return True
++        a=np.zeros(11,dtype=np.float32); a[3:10]=np.clip(d,-0.2,0.2); a[10]=g
++        obs,r,te,tr,info=env.step(a)
++        if np.allclose(q_of(obs),q,atol=1e-7): return False
++    return False
++def move(p, n=10):
++    cur=tool_fk(q_of(obs),base)[:3,3]
++    for k in range(1,n+1):
++        qt,ok=tool_ik(q_of(obs),cur+(p-cur)*k/n,down_R(0),base)
++        if not goto(qt): return False
++    return True
++obs,_=env.reset(seed=seed); R=obs.get_object_from_name('robot'); B=obs.get_object_from_name('target_block')
++base=(obs.get(R,'pos_base_x'), obs.get(R,'pos_base_y'), obs.get(R,'pos_base_rot'))
++bp=np.array([obs.get(B,f) for f in ['pose_x','pose_y','pose_z']]); hz=obs.get(B,'half_extent_z')
++print('block',bp)
++print(move(bp+[0,0,0.15]), move(bp+[0,0,hz+dz]))
++print('tool',np.round(tool_fk(q_of(obs),base)[:3,3],4))
++a=np.zeros(11,dtype=np.float32); a[10]=-1; obs,*_=env.step(a)
++print('grasp',obs.get(R,'grasp_active'),obs.get(R,'finger_state'),np.round([obs.get(R,f) for f in ['grasp_tf_x','grasp_tf_y','grasp_tf_z','grasp_tf_qw']],4))
++print('lift',move(bp+[0,0,0.2]), 'block', np.round([obs.get(B,f) for f in ['pose_x','pose_y','pose_z']],4))
++print('move',move(bp+[0,-0.1,0.2]))
++print('down',move(bp+[0,-0.1,hz+dz+0.05]), 'block', np.round([obs.get(B,f) for f in ['pose_x','pose_y','pose_z']],4))
++a=np.zeros(11,dtype=np.float32); a[10]=1; obs,*_=env.step(a)
++print('open: grasp',obs.get(R,'grasp_active'),'block', np.round([obs.get(B,f) for f in ['pose_x','pose_y','pose_z']],4))
++obs,*_=env.step(np.zeros(11,dtype=np.float32))
++print('block', np.round([obs.get(B,f) for f in ['pose_x','pose_y','pose_z']],4))
++env.close()
+diff --git a/explore2.py b/explore2.py
+new file mode 100644
+index 0000000..af402d1
+--- /dev/null
++++ b/explore2.py
+@@ -0,0 +1,18 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=0)
++R = obs.get_object_from_name('robot')
++feats = ['pos_base_x','pos_base_y','pos_base_rot']+[f'joint_{i}' for i in range(1,8)]+['finger_state','grasp_active']
++def rs(o): return np.array([o.get(R,f) for f in feats])
++prev = rs(obs)
++tests = [np.eye(11)[i]*0.1 for i in range(10)] + [np.eye(11)[i]*-0.1 for i in range(10)]
++a = np.zeros(11); a[10]=-1; tests.append(a)
++a = np.zeros(11); a[10]=1; tests.append(a)
++a = np.zeros(11); a[3]=0.5; tests.append(a)
++for a in tests:
++    obs, r, term, trunc, info = env.step(a.astype(np.float32))
++    cur = rs(obs)
++    print(np.round(a,2).tolist(), 'd=', np.round(cur-prev,3).tolist(), r, term, trunc)
++    prev = cur
++env.close()
+diff --git a/explore3.py b/explore3.py
+new file mode 100644
+index 0000000..fe6b7a5
+--- /dev/null
++++ b/explore3.py
+@@ -0,0 +1,30 @@
++# descend EE over free table spot, find where motion gets blocked
++from env_client import make_env
++import numpy as np
++from kin import fk, ik, down_R
++env = make_env()
++obs, info = env.reset(seed=1)
++R = obs.get_object_from_name('robot')
++jn=[f'joint_{i}' for i in range(1,8)]
++def q_of(o): return np.array([o.get(R,f) for f in jn])
++base=(o:=obs, o.get(R,'pos_base_x'), o.get(R,'pos_base_y'), o.get(R,'pos_base_rot'))[1:]
++q=q_of(obs)
++print('start ee', fk(q,base)[:3,3])
++x,y=0.25,-0.3
++def goto(qt):
++    global obs
++    for _ in range(40):
++        q=q_of(obs); d=qt-q
++        d=(d+np.pi)%(2*np.pi)-np.pi
++        if np.max(np.abs(d))<1e-4: return True
++        a=np.zeros(11,dtype=np.float32); a[3:10]=np.clip(d,-0.2,0.2)
++        obs,r,te,tr,info=env.step(a)
++        if np.allclose(q_of(obs),q): return False
++    return False
++for z in np.arange(0.35,-0.1,-0.01):
++    qt,ok=ik(q_of(obs),np.array([x,y,z]),down_R(0),base)
++    moved=goto(qt)
++    ee=fk(q_of(obs),base)[:3,3]
++    print(round(z,3),ok,moved,np.round(ee,3))
++    if not moved: break
++env.close()
+diff --git a/explore4.py b/explore4.py
+new file mode 100644
+index 0000000..c69a068
+--- /dev/null
++++ b/explore4.py
+@@ -0,0 +1,36 @@
++from env_client import make_env
++import numpy as np, sys
++from kin import fk, ik, down_R
++env = make_env()
++seed=int(sys.argv[1]); yaw=float(sys.argv[2])
++obs, info = env.reset(seed=seed)
++R = obs.get_object_from_name('robot'); B=obs.get_object_from_name('target_block')
++jn=[f'joint_{i}' for i in range(1,8)]
++def q_of(o): return np.array([o.get(R,f) for f in jn])
++base=(obs.get(R,'pos_base_x'), obs.get(R,'pos_base_y'), obs.get(R,'pos_base_rot'))
++bx,by,bz=[obs.get(B,f) for f in ['pose_x','pose_y','pose_z']]
++print('block',bx,by,bz,[obs.get(B,f) for f in ['half_extent_x','half_extent_y','half_extent_z']])
++def goto(qt, grip=0):
++    global obs
++    for _ in range(40):
++        q=q_of(obs); d=qt-q
++        d=(d+np.pi)%(2*np.pi)-np.pi
++        if np.max(np.abs(d))<1e-4: return True
++        a=np.zeros(11,dtype=np.float32); a[3:10]=np.clip(d,-0.2,0.2); a[10]=grip
++        obs,r,te,tr,info=env.step(a)
++        if np.allclose(q_of(obs),q): return False
++    return False
++for z in np.arange(0.35,0.1,-0.005):
++    qt,ok=ik(q_of(obs),np.array([bx,by,z]),down_R(yaw),base)
++    if not goto(qt): print('blocked at',z); break
++ee=fk(q_of(obs),base)[:3,3]; print('ee',ee)
++a=np.zeros(11,dtype=np.float32); a[10]=-1
++obs,*_=env.step(a)
++print('grasp', obs.get(R,'grasp_active'), obs.get(R,'finger_state'), obs.get(B,'grasp_active'))
++print('tf',[round(obs.get(R,f),4) for f in ['grasp_tf_x','grasp_tf_y','grasp_tf_z','grasp_tf_qx','grasp_tf_qy','grasp_tf_qz','grasp_tf_qw']])
++# lift
++for z in np.arange(ee[2],0.35,0.01):
++    qt,ok=ik(q_of(obs),np.array([bx,by,z]),down_R(yaw),base)
++    goto(qt)
++print('block after lift',[round(obs.get(B,f),4) for f in ['pose_x','pose_y','pose_z','pose_qx','pose_qy','pose_qz','pose_qw']], 'ee',fk(q_of(obs),base)[:3,3])
++env.close()
+diff --git a/explore5.py b/explore5.py
+new file mode 100644
+index 0000000..d4261b4
+--- /dev/null
++++ b/explore5.py
+@@ -0,0 +1,36 @@
++from env_client import make_env
++import numpy as np, sys
++from kin import fk, ik, down_R
++env = make_env()
++obs, info = env.reset(seed=1)
++R = obs.get_object_from_name('robot')
++jn=[f'joint_{i}' for i in range(1,8)]
++def q_of(o): return np.array([o.get(R,f) for f in jn])
++base=(obs.get(R,'pos_base_x'), obs.get(R,'pos_base_y'), obs.get(R,'pos_base_rot'))
++x,y=float(sys.argv[1]),float(sys.argv[2])
++def goto(qt):
++    global obs
++    for _ in range(40):
++        q=q_of(obs); d=qt-q
++        d=(d+np.pi)%(2*np.pi)-np.pi
++        if np.max(np.abs(d))<1e-4: return True
++        a=np.zeros(11,dtype=np.float32); a[3:10]=np.clip(d,-0.2,0.2)
++        obs,r,te,tr,info=env.step(a)
++        if np.allclose(q_of(obs),q): 
++            print('blocked; q',np.round(q,3),'d',np.round(d,3)); return False
++    return False
++for z in np.arange(0.35,0.0,-0.005):
++    qt,ok=ik(q_of(obs),np.array([x,y,z]),down_R(0),base)
++    if not goto(qt): print('blocked at',z); break
++# try single joint moves
++q0=q_of(obs)
++for j in range(7):
++    for s in [0.02,-0.02]:
++        a=np.zeros(11,dtype=np.float32); a[3+j]=s
++        o2,*_=env.step(a)
++        moved=not np.allclose(q_of(o2),q_of(obs))
++        print(j,s,moved, 'eez', round(fk(q_of(o2),base)[2,3],4))
++        obs=o2
++        if moved:
++            a[3+j]=-s; obs,*_=env.step(a)
++env.close()
+diff --git a/explore6.py b/explore6.py
+new file mode 100644
+index 0000000..5e00691
+--- /dev/null
++++ b/explore6.py
+@@ -0,0 +1,30 @@
++from env_client import make_env
++import numpy as np, sys
++from kin import fk, ik, down_R
++env = make_env()
++seed=int(sys.argv[1]); yaw=float(sys.argv[2]); zt=float(sys.argv[3])
++obs, info = env.reset(seed=seed)
++R = obs.get_object_from_name('robot'); B=obs.get_object_from_name('target_block')
++jn=[f'joint_{i}' for i in range(1,8)]
++def q_of(o): return np.array([o.get(R,f) for f in jn])
++base=(obs.get(R,'pos_base_x'), obs.get(R,'pos_base_y'), obs.get(R,'pos_base_rot'))
++bx,by,bz=[obs.get(B,f) for f in ['pose_x','pose_y','pose_z']]
++def goto(qt, grip=0):
++    global obs
++    for _ in range(40):
++        q=q_of(obs); d=qt-q
++        d=(d+np.pi)%(2*np.pi)-np.pi
++        if np.max(np.abs(d))<1e-4: return True
++        a=np.zeros(11,dtype=np.float32); a[3:10]=np.clip(d,-0.2,0.2); a[10]=grip
++        obs,r,te,tr,info=env.step(a)
++        if np.allclose(q_of(obs),q): return False
++    return False
++for z in np.arange(0.35,zt-1e-6,-0.005):
++    qt,ok=ik(q_of(obs),np.array([bx,by,z]),down_R(yaw),base)
++    if not goto(qt): print('blocked at',z); break
++print('ee',fk(q_of(obs),base)[:3,3])
++for g in [-1,-1,-1,0,1,1,-1]:
++    a=np.zeros(11,dtype=np.float32); a[10]=g
++    obs,*_=env.step(a)
++    print(g,'grasp', obs.get(R,'grasp_active'), obs.get(R,'finger_state'), obs.get(B,'grasp_active'), [round(obs.get(R,f),4) for f in ['grasp_tf_x','grasp_tf_y','grasp_tf_z','grasp_tf_qx','grasp_tf_qy','grasp_tf_qz','grasp_tf_qw']])
++env.close()
+diff --git a/explore7.py b/explore7.py
+new file mode 100644
+index 0000000..b29f719
+--- /dev/null
++++ b/explore7.py
+@@ -0,0 +1,35 @@
++# measure blocking height at many xy
++from env_client import make_env
++import numpy as np, sys
++from kin import fk, ik, down_R
++env = make_env()
++seed=int(sys.argv[1])
++obs0, info = env.reset(seed=seed)
++R = obs0.get_object_from_name('robot')
++jn=[f'joint_{i}' for i in range(1,8)]
++def q_of(o): return np.array([o.get(R,f) for f in jn])
++base=(obs0.get(R,'pos_base_x'), obs0.get(R,'pos_base_y'), obs0.get(R,'pos_base_rot'))
++for n in sorted(obs0.get_object_names()):
++    if n=='robot': continue
++    o=obs0.get_object_from_name(n); print(n,[round(obs0.get(o,f),3) for f in ['pose_x','pose_y','pose_z','half_extent_x','half_extent_y','half_extent_z']])
++def goto(qt):
++    global obs
++    for _ in range(40):
++        q=q_of(obs); d=qt-q
++        d=(d+np.pi)%(2*np.pi)-np.pi
++        if np.max(np.abs(d))<1e-5: return True
++        a=np.zeros(11,dtype=np.float32); a[3:10]=np.clip(d,-0.2,0.2)
++        obs,r,te,tr,info=env.step(a)
++        if np.allclose(q_of(obs),q,atol=1e-7): return False
++    return False
++pts=[tuple(map(float,s.split(','))) for s in sys.argv[2:]]
++for (x,y) in pts:
++    obs,_=env.reset(seed=seed)
++    qt,ok=ik(q_of(obs),np.array([x,y,0.32]),down_R(0),base); goto(qt)
++    z=0.32
++    while z>0.0:
++        qt,ok=ik(q_of(obs),np.array([x,y,z-0.002]),down_R(0),base)
++        if not goto(qt): break
++        z-=0.002
++    print((x,y),'lowest flange z',round(z,4))
++env.close()
+diff --git a/explore8.py b/explore8.py
+new file mode 100644
+index 0000000..babb84d
+--- /dev/null
++++ b/explore8.py
+@@ -0,0 +1,35 @@
++from env_client import make_env
++import numpy as np, sys
++from kin import fk, ik, down_R
++env = make_env()
++seed=1
++obs, info = env.reset(seed=seed)
++R = obs.get_object_from_name('robot'); B=obs.get_object_from_name('target_block')
++jn=[f'joint_{i}' for i in range(1,8)]
++def q_of(o): return np.array([o.get(R,f) for f in jn])
++base=(obs.get(R,'pos_base_x'), obs.get(R,'pos_base_y'), obs.get(R,'pos_base_rot'))
++bx,by,bz=[obs.get(B,f) for f in ['pose_x','pose_y','pose_z']]
++def goto(qt):
++    global obs
++    for _ in range(60):
++        q=q_of(obs); d=qt-q
++        d=(d+np.pi)%(2*np.pi)-np.pi
++        if np.max(np.abs(d))<1e-5: return True
++        a=np.zeros(11,dtype=np.float32); a[3:10]=np.clip(d,-0.2,0.2)
++        obs,r,te,tr,info=env.step(a)
++        if np.allclose(q_of(obs),q,atol=1e-7): return False
++    return False
++configs=[]
++for z in [0.235,0.26,0.29]:
++  for yaw in [0,np.pi/4,np.pi/2]:
++    for off in [(0,0),(0.03,0),(0,0.035),(0.05,0),(0,0.05)]:
++        configs.append((z,yaw,off))
++for z,yaw,off in configs:
++    obs,_=env.reset(seed=seed)
++    qt,_=ik(q_of(obs),np.array([bx+off[0],by+off[1],0.32]),down_R(yaw),base); r1=goto(qt)
++    qt,ok=ik(q_of(obs),np.array([bx+off[0],by+off[1],z]),down_R(yaw),base); r2=goto(qt)
++    a=np.zeros(11,dtype=np.float32); a[10]=-1
++    obs,*_=env.step(a)
++    g=obs.get(R,'grasp_active')
++    print(z,round(yaw,2),off,r1,r2,'grasp',g,obs.get(R,'finger_state'))
++env.close()
+diff --git a/explore9.py b/explore9.py
+new file mode 100644
+index 0000000..6e13734
+--- /dev/null
++++ b/explore9.py
+@@ -0,0 +1,32 @@
++from env_client import make_env
++import numpy as np, sys
++from kin import fk, ik, down_R
++env = make_env()
++seed=1
++R=None
++jn=[f'joint_{i}' for i in range(1,8)]
++def q_of(o): return np.array([o.get(R,f) for f in jn])
++def goto(qt):
++    global obs
++    for _ in range(60):
++        q=q_of(obs); d=qt-q
++        d=(d+np.pi)%(2*np.pi)-np.pi
++        if np.max(np.abs(d))<1e-5: return True
++        a=np.zeros(11,dtype=np.float32); a[3:10]=np.clip(d,-0.2,0.2)
++        obs,r,te,tr,info=env.step(a)
++        if np.allclose(q_of(obs),q,atol=1e-7): return False
++    return False
++for (x,y,bdy,bdx) in [(0.3,0.0,0,0),(0.3,0,0.2,0),(0.3,0,-0.2,0),(0.3,0,0,-0.1),(0.45,0.3,0,0),(0.45,0.3,0.2,0),(0.45,0.0,0,0),(0.2,0.0,0,0),(0.1,0,0,0)]:
++    obs,_=env.reset(seed=seed); R=obs.get_object_from_name('robot')
++    for _ in range(2):
++        a=np.zeros(11,dtype=np.float32); a[1]=bdy/2; a[0]=bdx/2; obs,*_=env.step(a)
++    base=(obs.get(R,'pos_base_x'), obs.get(R,'pos_base_y'), obs.get(R,'pos_base_rot'))
++    qt,ok=ik(q_of(obs),np.array([x,y,0.32]),down_R(0),base); goto(qt)
++    z=0.32
++    while z>0.0:
++        qt,ok=ik(q_of(obs),np.array([x,y,z-0.002]),down_R(0),base)
++        if not ok: print('ik fail'); break
++        if not goto(qt): break
++        z-=0.002
++    print((x,y),np.round(base,3),'lowest',round(z,4),'q',np.round(q_of(obs),2))
++env.close()
+diff --git a/fit.py b/fit.py
+new file mode 100644
+index 0000000..9804957
+--- /dev/null
++++ b/fit.py
+@@ -0,0 +1,26 @@
++import json, numpy as np
++from scipy.optimize import least_squares
++from kin import fk
++def q2R(x,y,z,w):
++    return np.array([[1-2*(y*y+z*z),2*(x*y-z*w),2*(x*z+y*w)],[2*(x*y+z*w),1-2*(x*x+z*z),2*(y*z-x*w)],[2*(x*z-y*w),2*(y*z+x*w),1-2*(x*x+y*y)]])
++def T(p,q): M=np.eye(4); M[:3,:3]=q2R(*q); M[:3,3]=p; return M
++recs=json.load(open('grasp_recs.json'))
++W=[]
++for d in recs:
++    To=T(d['target_block'][:3],d['target_block'][3:]); Tg=T(d['tf'][:3],d['tf'][3:])
++    W.append(To@np.linalg.inv(Tg))
++def pred(params,d):
++    mx,my,mz,tx,ty,tz=params
++    b=d['base']; c,s=np.cos(b[2]),np.sin(b[2])
++    base=(b[0]+c*mx-s*my, b[1]+s*mx+c*my, b[2])
++    F=fk(d['q'],base,mz); Tt=np.eye(4); Tt[:3,3]=[tx,ty,tz]
++    return F@Tt
++def res(params):
++    r=[]
++    for d,Wt in zip(recs,W):
++        P=pred(params,d); r.extend(P[:3,3]-Wt[:3,3]); r.extend(0.1*(P[:3,:3]-Wt[:3,:3]).ravel())
++    return np.array(r)
++sol=least_squares(res,np.zeros(6))
++print('params',np.round(sol.x,4),'rms',np.sqrt(np.mean(sol.fun**2)))
++for d,Wt in zip(recs,W):
++    P=pred(sol.x,d); print(np.round(P[:3,3]-Wt[:3,3],4), round(np.linalg.norm(P[:3,:3]-Wt[:3,:3]),4), np.round(d['base'],3))
+diff --git a/grasp_recs.json b/grasp_recs.json
+new file mode 100644
+index 0000000..b0f926f
+--- /dev/null
++++ b/grasp_recs.json
+@@ -0,0 +1 @@
++[{"q": [0.13092538714408875, 0.1355351358652115, -4.070899963378906, -2.4199166297912598, 0.18024161458015442, -0.6480788588523865, -0.9382089376449585], "base": [-0.11999999731779099, 0.0, 0.0], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.13774842023849487, 0.18313223123550415, 0.10000000149011612, 0.0, 0.0, 0.0, 1.0]}, {"q": [0.2602936327457428, 0.005289873108267784, -4.112614154815674, -2.3573458194732666, 0.006321930792182684, -0.7813294529914856, -0.7152383327484131], "base": [-0.11999999731779099, 0.0, 0.0], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.13777418434619904, 0.18315619230270386, 0.12993764877319336, -7.310877845156938e-05, -1.5168604477366898e-05, -2.0737112208735198e-05, 1.0]}, {"q": [0.28768596053123474, -0.04075278714299202, -4.2044196128845215, -2.454040288925171, 0.06897597759962082, -0.6987783312797546, -0.6939111948013306], "base": [-0.11999999731779099, 0.02294965647161007, 0.00872499868273735], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.11841627955436707, 0.18431049585342407, 0.11117354035377502, -0.027075249701738358, -0.029832175001502037, 0.07107656449079514, 0.9966569542884827]}, {"q": [0.3747004568576813, 0.02241792343556881, -4.3038716316223145, -2.3825595378875732, -0.024306906387209892, -0.6528472304344177, -0.7587800621986389], "base": [-0.11999999731779099, 0.0592675507068634, 0.017017241567373276], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.1340419501066208, 0.2859647274017334, 0.12804409861564636, 0.047015685588121414, -0.02168448455631733, 0.013040252029895782, 0.9985736012458801]}, {"q": [0.33464282751083374, 0.006955367513000965, -4.398207664489746, -2.457702875137329, 0.00981797743588686, -0.6234093308448792, -0.7357030510902405], "base": [-0.11999999731779099, 0.04763530194759369, 0.11645923554897308], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.06615465134382248, 0.2772578299045563, 0.11039917916059494, 0.022801784798502922, -0.01819007284939289, 0.154471293091774, 0.9875665903091431]}, {"q": [0.430809885263443, 0.044063761830329895, -4.3681159019470215, -2.420013666152954, -0.012397737242281437, -0.6963900327682495, -0.6914053559303284], "base": [-0.11999999731779099, 0.05017073452472687, 0.07850760966539383], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.08899686485528946, 0.2631990313529968, 0.11706054210662842, 0.021082546561956406, 0.01384740974754095, 0.08626984059810638, 0.9959524273872375]}, {"q": [0.42797696590423584, 0.1219613254070282, -4.281307220458984, -2.4484546184539795, 0.001908229081891477, -0.7320161461830139, -0.6725453734397888], "base": [-0.11999999731779099, 0.033961858600378036, 0.05683140829205513], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.0783730000257492, 0.21458899974822998, 0.10859720408916473, 0.011547951027750969, 0.06979651749134064, 0.04967912659049034, 0.9962565302848816]}, {"q": [0.42797696590423584, 0.1219613254070282, -4.281307220458984, -2.4484546184539795, 0.001908229081891477, -0.7320161461830139, -0.6725453734397888], "base": [-0.11999999731779099, 0.033961858600378036, 0.05683140829205513], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.0783730000257492, 0.21458899974822998, 0.10859720408916473, 0.011547951027750969, 0.06979651749134064, 0.04967912659049034, 0.9962565302848816]}, {"q": [0.39520037174224854, 0.0520172193646431, -4.291239261627197, -2.3891897201538086, -0.05196332931518555, -0.8216118812561035, -0.691635012626648], "base": [-0.11999999731779099, 0.00381316221319139, -0.025017980486154556], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.09280125051736832, 0.18034812808036804, 0.12468945980072021, 0.0019837466534227133, 0.06191391497850418, 0.001145858783274889, 0.9980788826942444]}, {"q": [0.41126686334609985, 0.01175644714385271, -4.256840229034424, -2.449286460876465, 0.036459289491176605, -0.8485898375511169, -0.770535945892334], "base": [-0.11999999731779099, 0.016723977401852608, 0.0604129321873188], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.07642045617103577, 0.15718945860862732, 0.11200276762247086, -0.06127870827913284, 0.05282686650753021, 0.010459961369633675, 0.9966668486595154]}, {"q": [0.39934229850769043, 0.10267455130815506, -4.256861209869385, -2.464240789413452, 0.060501981526613235, -0.7495705485343933, -0.6807472109794617], "base": [-0.11999999731779099, 0.012728490866720676, 0.11195869743824005], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.06889219582080841, 0.1813991814851761, 0.10365962237119675, -0.01990514062345028, 0.060252998024225235, 0.09820836037397385, 0.993140697479248]}, {"q": [0.39934229850769043, 0.10267455130815506, -4.256861209869385, -2.464240789413452, 0.060501981526613235, -0.7495705485343933, -0.6807472109794617], "base": [-0.11999999731779099, 0.012728490866720676, 0.11195869743824005], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.06889219582080841, 0.1813991814851761, 0.10365962237119675, -0.01990514062345028, 0.060252998024225235, 0.09820836037397385, 0.993140697479248]}, {"q": [0.48482707142829895, 0.1962597817182541, -4.353919982910156, -2.391512870788574, 0.15674099326133728, -0.6581284999847412, -0.7509943842887878], "base": [-0.11999999731779099, 0.059991370886564255, 0.18994581699371338], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.10044056177139282, 0.29826128482818604, 0.11269284039735794, 0.0413275845348835, 0.020512929186224937, 0.13962697982788086, 0.9891287088394165]}, {"q": [0.5493018627166748, 0.1922573745250702, -4.407445430755615, -2.331136703491211, 0.24144701659679413, -0.7049024701118469, -0.7432075142860413], "base": [-0.11999999731779099, 0.05426665395498276, 0.27614927291870117], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.11149708181619644, 0.3146091401576996, 0.12423250824213028, 0.031112143769860268, -0.012103511951863766, 0.20791339874267578, 0.9775773882865906]}, {"q": [0.4574039876461029, 0.238658607006073, -4.384570598602295, -2.4254636764526367, 0.28529098629951477, -0.8017041087150574, -0.6916173100471497], "base": [-0.11999999731779099, 0.05554252862930298, 0.36197012662887573], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.03835344314575195, 0.25337013602256775, 0.10227729380130768, -0.04327385127544403, 0.05593603849411011, 0.3320944011211395, 0.9405912160873413]}, {"q": [0.3706204891204834, 0.3069220781326294, -4.471232891082764, -2.456601619720459, 0.2713507115840912, -0.7084916830062866, -0.6791709065437317], "base": [-0.11999999731779099, 0.0314289852976799, 0.31030526757240295], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.0010528229176998138, 0.2471524178981781, 0.0999068096280098, 0.009837355464696884, 0.0719449371099472, 0.39112570881843567, 0.9174681305885315]}, {"q": [0.4482441544532776, 0.2520959675312042, -4.546321868896484, -2.4989354610443115, 0.28857532143592834, -0.6976736187934875, -0.6172288060188293], "base": [-0.11999999731779099, 0.03747658059000969, 0.26798951625823975], "tf": [-0.01984672248363495, -0.04004167020320892, 0.059822000563144684, 1.0, 6.5922113208216615e-06, -7.122983788576676e-06, 2.2484688088297844e-05], "fs": 0.18000000715255737, "target_block": [0.01322268322110176, 0.22675953805446625, 0.09632780402898788, -0.004735234193503857, 0.04927924647927284, 0.4082244038581848, 0.9115382432937622]}]
+\ No newline at end of file
+diff --git a/kin.py b/kin.py
+new file mode 100644
+index 0000000..53f14cb
+--- /dev/null
++++ b/kin.py
+@@ -0,0 +1,95 @@
++import numpy as np
++
++def _rpy(r, p, y):
++    cr, sr, cp, sp, cy, sy = np.cos(r), np.sin(r), np.cos(p), np.sin(p), np.cos(y), np.sin(y)
++    return np.array([[cy*cp, cy*sp*sr - sy*cr, cy*sp*cr + sy*sr],
++                     [sy*cp, sy*sp*sr + cy*cr, sy*sp*cr - cy*sr],
++                     [-sp, cp*sr, cp*cr]])
++
++def _T(xyz, rpy):
++    T = np.eye(4); T[:3, :3] = _rpy(*rpy); T[:3, 3] = xyz; return T
++
++PI = np.pi
++H = PI / 2
++JOINTS = [
++    _T((0, 0, 0.15643), (PI, 0, 0)),
++    _T((0, 0.005375, -0.12838), (H, 0, 0)),
++    _T((0, -0.21038, -0.006375), (-H, 0, 0)),
++    _T((0, 0.006375, -0.21038), (H, 0, 0)),
++    _T((0, -0.20843, -0.006375), (-H, 0, 0)),
++    _T((0, 0.00017505, -0.10593), (H, 0, 0)),
++    _T((0, -0.10593, -0.00017505), (-H, 0, 0)),
++]
++EE = _T((0, 0, -0.061525), (PI, 0, 0))
++
++def _rz(q):
++    c, s = np.cos(q), np.sin(q)
++    T = np.eye(4); T[0, 0] = c; T[0, 1] = -s; T[1, 0] = s; T[1, 1] = c; return T
++
++def fk(q, base=(0, 0, 0), base_z=0.0, tool=0.0):
++    """Return 4x4 world transform of end effector (+tool offset along EE z)."""
++    bx, by, br = base
++    T = _rz(br); T[0, 3] = bx; T[1, 3] = by; T[2, 3] = base_z
++    for Tj, qj in zip(JOINTS, q):
++        T = T @ Tj @ _rz(qj)
++    T = T @ EE
++    if tool:
++        Tt = np.eye(4); Tt[2, 3] = tool; T = T @ Tt
++    return T
++
++def pose_err(T, p, R):
++    ep = p - T[:3, 3]
++    Re = R @ T[:3, :3].T
++    # axis-angle of Re
++    ang = np.arccos(np.clip((np.trace(Re) - 1) / 2, -1, 1))
++    if ang < 1e-9:
++        eo = np.zeros(3)
++    else:
++        v = np.array([Re[2, 1] - Re[1, 2], Re[0, 2] - Re[2, 0], Re[1, 0] - Re[0, 1]])
++        s = np.sin(ang)
++        eo = v / (2 * s) * ang if s > 1e-6 else np.zeros(3)
++    return np.concatenate([ep, eo])
++
++def ik(q0, p, R, base, base_z=0.0, tool=0.0, iters=200, wo=0.3, tol=1e-4):
++    q = np.array(q0, dtype=float)
++    for it in range(iters):
++        T = fk(q, base, base_z, tool)
++        e = pose_err(T, p, R)
++        e[3:] *= wo
++        if np.linalg.norm(e) < tol:
++            return q, True
++        J = np.zeros((6, 7))
++        h = 1e-6
++        for j in range(7):
++            dq = q.copy(); dq[j] += h
++            e2 = pose_err(fk(dq, base, base_z, tool), p, R); e2[3:] *= wo
++            J[:, j] = (e - e2) / h
++        lam = 1e-3
++        dq = J.T @ np.linalg.solve(J @ J.T + lam * np.eye(6), e)
++        n = np.linalg.norm(dq)
++        if n > 0.3: dq *= 0.3 / n
++        q = q + dq
++    return q, False
++
++def down_R(yaw):
++    # EE z axis pointing down, x axis at yaw
++    c, s = np.cos(yaw), np.sin(yaw)
++    x = np.array([c, s, 0.0]); z = np.array([0, 0, -1.0]); y = np.cross(z, x)
++    return np.stack([x, y, z], axis=1)
++
++MOUNT = (0.12, 0.0, -0.0052)
++TOOL = 0.12
++
++def tool_fk(q, base):
++    bx, by, br = base
++    c, s = np.cos(br), np.sin(br)
++    b = (bx + c * MOUNT[0] - s * MOUNT[1], by + s * MOUNT[0] + c * MOUNT[1], br)
++    return fk(q, b, MOUNT[2], TOOL)
++
++def mount_base(base):
++    bx, by, br = base
++    c, s = np.cos(br), np.sin(br)
++    return (bx + c * MOUNT[0] - s * MOUNT[1], by + s * MOUNT[0] + c * MOUNT[1], br)
++
++def tool_ik(q0, p, R, base, **kw):
++    return ik(q0, p, R, mount_base(base), MOUNT[2], TOOL, **kw)
+diff --git a/t_fk.py b/t_fk.py
+new file mode 100644
+index 0000000..ad05b82
+--- /dev/null
++++ b/t_fk.py
+@@ -0,0 +1,4 @@
++import numpy as np
++from kin import fk
++q=[0,-0.35,-np.pi,-2.5,0,-0.87,np.pi/2]
++T=fk(q,(-0.12,0,0)); np.set_printoptions(precision=3,suppress=True); print(T)

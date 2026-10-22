@@ -1,0 +1,17 @@
+diff --git a/probe_dynamics.py b/probe_dynamics.py
+new file mode 100644
+index 0000000..308101d
+--- /dev/null
++++ b/probe_dynamics.py
+@@ -0,0 +1,11 @@
++from env_client import make_env
++import numpy as np
++
++def dump(s):
++ return {n:{f:round(float(s.get(o,f)),5) for f in s.type_features[o.type]} for n in sorted(s.get_object_names()) for o in [s.get_object_from_name(n)]}
++e=make_env(); s,i=e.reset(seed=0); print('INITIAL',dump(s),'INFO',i,flush=True)
++for ix,d in [(0,.2),(1,.2),(2,.2),(3,.2),(4,.2),(5,.2),(6,.2),(7,.2),(8,.2),(9,.2),(10,-1),(10,1)]:
++ s,i=e.reset(seed=0); old=dump(s); a=np.zeros(11); a[ix]=d
++ s,r,t,tr,i=e.step(a); new=dump(s)
++ print('ACTION',ix,d,'DIFF',{n:{f:(v,new[n][f]) for f,v in z.items() if v!=new[n][f]} for n,z in old.items() if z!=new[n]},'R',r,t,tr,i,flush=True)
++e.close()

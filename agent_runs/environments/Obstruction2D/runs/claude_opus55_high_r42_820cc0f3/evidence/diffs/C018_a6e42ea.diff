@@ -1,0 +1,128 @@
+diff --git a/approach.py b/approach.py
+index 2a47316..9a8325b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -192,7 +192,22 @@ class GeneratedApproach:
+         self.carry = None
+         self.stuck_carry = 0
+ 
+-    def _grasp_x(self, b, others, rng=None, pref=None):
++    def _union(self, objs):
++        x0 = min(o["x"] for o in objs)
++        y0 = min(o["y"] for o in objs)
++        x1 = max(o["x"] + o["w"] for o in objs)
++        y1 = max(o["y"] + o["h"] for o in objs)
++        return dict(name=objs[0]["name"], x=x0, y=y0, w=x1 - x0, h=y1 - y0)
++
++    def _cograsp(self, tgt, gx, others):
++        """Objects that will be sucked up together with tgt when grasping at gx."""
++        half = self.robot["gh"] / 2.0
++        btop = tgt["y"] + tgt["h"]
++        return [o for o in others if o["name"] != self.block["name"]
++                and btop - 0.016 <= o["y"] + o["h"] <= btop + 1e-4
++                and o["x"] < gx + half and o["x"] + o["w"] > gx - half]
++
++    def _grasp_x(self, b, others, rng=None, pref=None, allow_group=False):
+         half = self.robot["gh"] / 2.0
+         lo, hi = b["x"] + 0.012 - half, b["x"] + b["w"] - 0.012 + half
+         if rng is not None:
+@@ -211,13 +226,21 @@ class GeneratedApproach:
+         R = self.robot["r"] + 0.005
+         btop = b["y"] + b["h"]
+         self.grasp_conflict = None
++        self.grasp_group = []
++        bname = self.block["name"]
+         for x in cands:
+             if x < X_MIN or x > X_MAX:
+                 continue
+             ok = True
++            group = []
+             for o in others:
+-                if o["y"] + o["h"] > btop - 0.02 and o["x"] < x + half + 0.004 \
++                otop = o["y"] + o["h"]
++                if otop > btop - 0.02 and o["x"] < x + half + 0.004 \
+                         and o["x"] + o["w"] > x - half - 0.004:
++                    if allow_group and o["name"] != bname and btop - 0.009 <= otop <= btop + 1e-4 \
++                            and o["x"] < x + half - 0.004 and o["x"] + o["w"] > x - half + 0.004:
++                        group.append(o)
++                        continue
+                     ok = False
+                     if self.grasp_conflict is None:
+                         self.grasp_conflict = o
+@@ -235,6 +258,7 @@ class GeneratedApproach:
+                         self.grasp_conflict = o
+                     break
+             if ok:
++                self.grasp_group = group
+                 return x
+         return None
+ 
+@@ -357,7 +381,9 @@ class GeneratedApproach:
+         else:
+             tgt = self.block
+         gx = None
++        tried = []
+         for _ in range(10):
++            tried.append(tgt)
+             others = [b for n, b in movable.items() if n != tgt["name"]]
+             if tgt["name"] == self.block["name"]:
+                 bb = self.block
+@@ -368,6 +394,15 @@ class GeneratedApproach:
+             if gx is not None or self.grasp_conflict is None:
+                 break
+             tgt = self.grasp_conflict
++        if gx is None:
++            for t in tried:
++                if t["name"] == self.block["name"]:
++                    continue
++                oth = [b for n, b in movable.items() if n != t["name"]]
++                g = self._grasp_x(t, oth, allow_group=True)
++                if g is not None:
++                    tgt, gx = t, g
++                    break
+         n_att = self.attempts.get(tgt["name"], 0)
+         self.attempts[tgt["name"]] = n_att + 1
+         if n_att >= 3:
+@@ -387,6 +422,11 @@ class GeneratedApproach:
+         is_block = tgt["name"] == self.block["name"]
+         gy = tgt["y"] + tgt["h"] + self._grip_off() + GAP
+         gpos = (gx, gy)
++        group = [] if is_block else self._cograsp(tgt, gx, others)
++        gnames = [tgt["name"]] + [o["name"] for o in group]
++        others = [b for b in others if b["name"] not in gnames]
++        tgt0 = tgt
++        tgt = self._union([tgt0] + group)
+         off = gy - tgt["y"]
+         gx_rel = gx - tgt["x"]
+         if is_block and stage and tgt["name"] == self.block["name"]:
+@@ -416,8 +456,8 @@ class GeneratedApproach:
+         px = min(max(dest_x + gx_rel, X_MIN), X_MAX)
+         py = dest_y + off + PLACE_GAP
+         # approach path (nothing carried)
+-        p1 = self._plan_path((rx, ry, self.robot["arm"]), gpos, others + [tgt], None,
+-                             special_margin={tgt["name"]: 0.0})
++        p1 = self._plan_path((rx, ry, self.robot["arm"]), gpos, others + [tgt0] + group, None,
++                             special_margin={n: 0.0 for n in gnames})
+         carried = (tgt["x"] - gx, tgt["x"] + tgt["w"] - gx, tgt["y"] - gy, tgt["y"] + tgt["h"] - gy)
+         p2 = self._plan_path(gpos, (px, py), others, carried)
+         segs = []
+@@ -428,7 +468,7 @@ class GeneratedApproach:
+             segs.append(dict(x=w[0], y=w[1], a=w[2], vac=1, kind="carry"))
+         # release on the final step of the carry
+         segs[-1]["release_last"] = not is_block
+-        self.carry = dict(name=tgt["name"], px=px, py=py, release=not is_block,
++        self.carry = dict(name=tgt["name"], names=gnames, px=px, py=py, release=not is_block,
+                           rel=(tgt["x"] - gx, tgt["y"] - gy))
+         return segs
+ 
+@@ -445,7 +485,9 @@ class GeneratedApproach:
+         sh = self.robot["arm_max"] - self.robot["arm"]
+         if abs(o["x"] - rx - c["rel"][0]) > 2e-3 or abs(o["y"] - ry - sh - c["rel"][1]) > 2e-3:
+             return None
+-        others = [b for n, b in movable.items() if n != o["name"]]
++        names = c.get("names", [c["name"]])
++        others = [b for n, b in movable.items() if n not in names]
++        o = self._union([movable[n] for n in names if n in movable])
+         carried = (o["x"] - rx, o["x"] + o["w"] - rx, o["y"] - ry - sh, o["y"] + o["h"] - ry - sh)
+         p = self._plan_path((rx, ry, self.robot["arm"]), (c["px"], c["py"]), others, carried)
+         segs = [dict(x=w[0], y=w[1], a=w[2], vac=1, kind="carry") for w in p[1:]]

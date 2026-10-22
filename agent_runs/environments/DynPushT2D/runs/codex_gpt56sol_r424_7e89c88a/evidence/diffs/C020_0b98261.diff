@@ -1,0 +1,53 @@
+diff --git a/approach.py b/approach.py
+index a6e92f9..5e35252 100644
+--- a/approach.py
++++ b/approach.py
+@@ -170,19 +170,26 @@ class GeneratedApproach:
+         self.mode = "nav"
+ 
+     def _begin_decision(self, s):
+-        angle_error = self._wrap(float(s[31] - s[2]))
++        raw_angle_error = float(s[31] - s[2])
++        angle_error = self._wrap(raw_angle_error)
+         w, lh, lv = float(s[12]), float(s[13]), float(s[14])
+-        if abs(angle_error) > 0.065:
++        # The environment compares the displayed [-pi,pi] angles directly.
++        # If equivalent poses straddle that branch cut, deliberately cross it.
++        branch_mismatch = abs(raw_angle_error) > math.pi
++        if abs(angle_error) > 0.11 or branch_mismatch:
+             self.pair_sign = 1.0 if angle_error > 0 else -1.0
++            if abs(angle_error) < 1e-4:
++                self.pair_sign = 1.0 if raw_angle_error < 0 else -1.0
+             self.pair_start_theta = float(s[2])
+-            self.pair_amount = min(0.45, abs(angle_error))
++            wanted = abs(angle_error) + (0.055 if branch_mismatch else 0.0)
++            self.pair_amount = min(0.70, wanted)
+             target = [self.pair_sign * 0.40 * lh, -w - 0.20]
+             self._start_nav(s, target, "rot1", [0.0, 0.049])
+             return
+ 
+         delta_world = s[29:31] - s[0:2]
+         distance = float(np.linalg.norm(delta_world))
+-        self.translate_amount = max(0.0, min(0.50, distance - 0.012))
++        self.translate_amount = max(0.0, min(0.75, distance - 0.012))
+         if self.translate_amount <= 0.002:
+             self.mode = "idle"
+             return
+@@ -232,7 +239,7 @@ class GeneratedApproach:
+         if self.mode == "rot1":
+             signed = self.pair_sign * self._wrap(float(s[2] - self.pair_start_theta))
+             self.push_count += 1
+-            if signed >= 0.45 * self.pair_amount or self.push_count >= 22:
++            if signed >= 0.45 * self.pair_amount or self.push_count >= 28:
+                 self._finish_push("rot2nav")
+                 return np.zeros(2, dtype=float)
+             return self._action(self._rot(float(s[2])).dot(self.force_local))
+@@ -240,7 +247,7 @@ class GeneratedApproach:
+         if self.mode == "rot2":
+             signed = self.pair_sign * self._wrap(float(s[2] - self.pair_start_theta))
+             self.push_count += 1
+-            if signed >= 0.92 * self.pair_amount or self.push_count >= 22:
++            if signed >= 0.92 * self.pair_amount or self.push_count >= 28:
+                 self._finish_push("idle")
+                 return np.zeros(2, dtype=float)
+             return self._action(self._rot(float(s[2])).dot(self.force_local))

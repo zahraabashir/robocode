@@ -1,0 +1,47 @@
+diff --git a/approach.py b/approach.py
+index 2077f7d..3dec854 100644
+--- a/approach.py
++++ b/approach.py
+@@ -83,11 +83,27 @@ class GeneratedApproach:
+                     self.phase='transfer';continue
+             elif self.phase=='transfer':
+                 dest=self.pos(state,region)
+-                if self.goal!='target_block':dest=np.array([.3,(-1 if dest[1]>0 else 1)*(.62+.09*self.discarded),.25])
++                if self.goal!='target_block':
++                    if not hasattr(self,'drop') or self.drop_goal!=self.goal:
++                        h=np.array([state.get(obj,'half_extent_'+v) for v in 'xy'])
++                        best=None
++                        for x in np.linspace(.105+h[0],.495-h[0],9):
++                            for y in np.linspace(-.395+h[1],.395-h[1],15):
++                                xy=np.array([x,y]);clear=10.
++                                for other in cubes:
++                                    if other==obj:continue
++                                    oh=np.array([state.get(other,'half_extent_'+v) for v in 'xy'])
++                                    d=abs(xy-self.pos(state,other)[:2])-oh-h
++                                    clear=min(clear,float(np.max(d)))
++                                score=clear-.03*np.linalg.norm(xy-p[:2])
++                                if best is None or score>best[0]:best=(score,xy)
++                        self.drop=np.r_[best[1],.075+state.get(obj,'half_extent_z')+.001]
++                        self.drop_goal=self.goal
++                    dest=self.drop.copy()
+                 a[:2]=dest[:2]-p[:2]
+                 if np.max(abs(a[:2]))<1e-4:
+-                    if self.goal!='target_block':self.phase='release';continue
+-                    self.destination=dest.copy();self.destination[2]+=state.get(region,'half_extent_z')+state.get(obj,'half_extent_z')+.001
++                    self.destination=dest.copy()
++                    if self.goal=='target_block':self.destination[2]+=state.get(region,'half_extent_z')+state.get(obj,'half_extent_z')+.001
+                     self.finalheight=ee[2]+self.destination[2]-p[2]
+                     self.height=max(self.finalheight,ee[2]-.02);self.phase='lower';continue
+             elif self.phase=='lower':
+diff --git a/probe_seed2.py b/probe_seed2.py
+new file mode 100644
+index 0000000..3ef87b0
+--- /dev/null
++++ b/probe_seed2.py
+@@ -0,0 +1,6 @@
++from env_client import make_env
++e=make_env();s,_=e.reset(seed=2)
++for t in e.observation_space.types:
++ if t.name=='Kinematic3DCuboid':
++  for o in s.get_objects(t):print(o.name,[s.get(o,'pose_'+a) for a in 'xyz'],[s.get(o,'half_extent_'+a) for a in 'xyz'])
++e.close()

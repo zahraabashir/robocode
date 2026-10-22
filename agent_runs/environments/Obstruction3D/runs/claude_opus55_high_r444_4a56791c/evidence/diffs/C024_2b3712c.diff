@@ -1,0 +1,415 @@
+diff --git a/approach_v2.py b/approach_v2.py
+index 8f40652..0333d0c 100644
+--- a/approach_v2.py
++++ b/approach_v2.py
+@@ -328,10 +328,45 @@ class GeneratedApproach:
+                 q = item[1]
+         return c
+ 
++    def _mount(self, base=None):
++        b = self.base if base is None else base
++        return np.array([b[0] + kin.MOUNT_X * np.cos(b[2]), b[1] + kin.MOUNT_X * np.sin(b[2])])
++
++    def _base_for(self, pts, rmin=0.165):
++        m = self._mount()
++        need = m[0]
++        for p in pts:
++            dy = p[1] - m[1]
++            if np.hypot(p[0] - m[0], dy) < rmin - 0.005:
++                need = min(need, p[0] - np.sqrt(max(rmin ** 2 - dy ** 2, 0.0)))
++        if need >= m[0] - 1e-4:
++            return None
++        nb = np.array(self.base, float).copy()
++        nb[0] -= (m[0] - need)
++        return nb
++
++    def _plan_base_move(self, state, objs, held, nb):
++        q = self._q(state)
++        T = self._tool(q)
++        p0 = T[:3, 3]
++        zt = self._ztransit(objs, held)
++        plan = []
++        if p0[2] < zt:
++            qs, _, _ = self._cart_path(q, p0, np.array([p0[0], p0[1], zt]), T[:3, :3], step=0.015)
++            plan = self._seg(qs)
++        self.plan = plan + [('base', nb)]
++
+     def _plan_pick(self, state, name, cand):
+         objs = self._parse(state)
+         o = objs[name]
+         _, yaw, gx, gy, _, _ = cand
++        pts = [(gx, gy)]
++        if name == 'target_block':
++            pts.append(tuple(objs['target_region'].p[:2]))
++        nb = self._base_for(pts)
++        if nb is not None:
++            self._plan_base_move(state, objs, None, nb)
++            return
+         zt = self._ztransit(objs, None)
+         q0 = self._q(state)
+         T = self._tool(q0)
+@@ -369,6 +404,8 @@ class GeneratedApproach:
+             for y in np.arange(TABLE_Y[0] + fp[1], TABLE_Y[1] - fp[1], 0.02):
+                 p = np.array([x, y])
+                 cost = np.linalg.norm(p - cur) + 2.0 * max(0.0, 0.2 - x)
++                if np.linalg.norm(p - self._mount()) < 0.17:
++                    continue
+                 if any(np.linalg.norm(p - bs) < 0.035 for bs in self.bad_spots):
+                     continue
+                 if best is not None and cost >= best[0]:
+@@ -397,6 +434,10 @@ class GeneratedApproach:
+     def _plan_place(self, state, name, xy, support_top, yaw_obj):
+         objs = self._parse(state)
+         o = objs[name]
++        nb = self._base_for([xy])
++        if nb is not None:
++            self._plan_base_move(state, objs, name, nb)
++            return
+         q = self._q(state)
+         T = self._tool(q)
+         G = self._G(state)
+@@ -555,6 +596,7 @@ class GeneratedApproach:
+         self.steps += 1
+         a = np.zeros(11, dtype=np.float32)
+         q = self._q(state)
++        self.base = self._base(state)
+         for _ in range(20):
+             if not self.plan:
+                 self.aborting = False
+@@ -588,6 +630,18 @@ class GeneratedApproach:
+                 a[3:10] = np.clip(wrap(target - q), -0.2, 0.2)
+                 return a
+             self.aborting = False
++            if kind == 'base':
++                cur = np.array(self.base, float)
++                d = np.array(val, float) - cur
++                d[2] = wrap(d[2])
++                lb = getattr(self, 'last_base', None)
++                if np.max(np.abs(d)) < 1e-4 or (lb is not None and np.max(np.abs(cur - lb)) < 1e-7):
++                    self.plan.pop(0)
++                    self.last_base = None
++                    continue
++                self.last_base = cur.copy()
++                a[0:3] = np.clip(d, -0.1, 0.1)
++                return a
+             if kind == 'grip':
+                 self.plan.pop(0)
+                 a[10] = val
+diff --git a/basetest.py b/basetest.py
+new file mode 100644
+index 0000000..fde898d
+--- /dev/null
++++ b/basetest.py
+@@ -0,0 +1,8 @@
++import numpy as np
++from env_client import make_env
++from common import *
++env=make_env(); obs,_=env.reset(seed=312, options={'object_count':15})
++print(env.action_space)
++for d in [(-0.05,0,0),(-0.1,0,0),(0,0.05,0)]:
++    a=np.zeros(11,dtype=np.float32); a[0:3]=d
++    obs,*_=env.step(a); print(d, getbase(obs))
+diff --git a/d312.txt b/d312.txt
+new file mode 100644
+index 0000000..266fa89
+--- /dev/null
++++ b/d312.txt
+@@ -0,0 +1,260 @@
++obstruction0 [0.126 0.034 0.111] [0.015 0.013 0.026]
++obstruction1 [0.171 0.009 0.104] [0.015 0.016 0.019]
++obstruction10 [ 0.192 -0.334  0.095] [0.015 0.012 0.02 ]
++obstruction11 [0.258 0.103 0.09 ] [0.019 0.018 0.015]
++obstruction12 [0.226 0.043 0.097] [0.014 0.019 0.022]
++obstruction13 [0.131 0.059 0.098] [0.012 0.011 0.013]
++obstruction14 [0.431 0.096 0.086] [0.012 0.014 0.011]
++obstruction2 [0.166 0.064 0.113] [0.02  0.018 0.028]
++obstruction3 [0.106 0.006 0.1  ] [0.018 0.013 0.015]
++obstruction4 [0.345 0.1   0.087] [0.014 0.016 0.012]
++obstruction5 [ 0.114 -0.111  0.09 ] [0.012 0.019 0.015]
++obstruction6 [0.302 0.179 0.094] [0.016 0.011 0.019]
++obstruction7 [ 0.387 -0.166  0.09 ] [0.017 0.014 0.015]
++obstruction8 [ 0.331 -0.377  0.088] [0.017 0.011 0.013]
++obstruction9 [ 0.396 -0.04   0.099] [0.017 0.013 0.024]
++target_block [ 0.47  -0.266  0.1  ] [0.029 0.025 0.025]
++target_region [0.143 0.038 0.08 ] [0.036 0.031 0.005]
++step 1 task obstruction0 grasp 0.0 plan 8 fails {} tool [0.154 0.001 0.217] end [0.126 0.034 0.165]
++step 5 task obstruction0 grasp 1.0 plan 26 fails {} tool [0.126 0.034 0.165] end [ 0.205 -0.087  0.157]
++step 17 task obstruction1 grasp 0.0 plan 13 fails {} tool [ 0.205 -0.087  0.157] end [0.171 0.009 0.152]
++step 27 task obstruction1 grasp 1.0 plan 17 fails {} tool [0.171 0.009 0.152] end [ 0.285 -0.004  0.143]
++step 34 task obstruction2 grasp 0.0 plan 15 fails {} tool [ 0.285 -0.004  0.143] end [0.166 0.064 0.141]
++step 44 task obstruction2 grasp 1.0 plan 17 fails {} tool [0.166 0.064 0.141] end [0.21  0.178 0.133]
++step 52 task obstruction13 grasp 0.0 plan 15 fails {} tool [0.21  0.178 0.133] end [0.143 0.064 0.138]
++step 64 task obstruction13 grasp 1.0 plan 18 fails {} tool [0.143 0.064 0.138] end [0.214 0.236 0.129]
++step 72 task obstruction3 grasp 0.0 plan 17 fails {} tool [0.214 0.236 0.129] end [0.158 0.008 0.156]
++step 80 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 1} tool [0.158 0.008 0.156] end [ 0.153 -0.004  0.153]
++step 86 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 2} tool [ 0.153 -0.004  0.153] end [0.15  0.012 0.152]
++step 91 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 3} tool [0.15  0.012 0.152] end [ 0.149 -0.     0.156]
++step 97 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 4} tool [ 0.149 -0.     0.156] end [0.149 0.003 0.148]
++step 102 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 5} tool [0.149 0.003 0.148] end [0.152 0.005 0.153]
++ABORT step 110 tool [0.117 0.005 0.182] q [ 0.537 -0.307 -3.516 -2.594 -0.164 -0.828  3.056] target [ 0.417 -0.319 -3.445 -2.605 -0.125 -0.846  3.353] tgt tool [0.106 0.006 0.182]
++step 113 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 6} tool [0.119 0.005 0.219] end [0.146 0.015 0.151]
++step 122 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 7} tool [0.146 0.015 0.151] end [ 0.147 -0.018  0.152]
++step 128 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 8} tool [ 0.147 -0.018  0.152] end [ 0.146 -0.014  0.156]
++step 134 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 9} tool [ 0.146 -0.014  0.156] end [ 0.147 -0.009  0.148]
++step 139 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 10} tool [ 0.147 -0.009  0.148] end [0.144 0.001 0.156]
++step 145 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 11} tool [0.144 0.001 0.156] end [0.145 0.005 0.148]
++step 150 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 12} tool [0.145 0.005 0.148] end [0.146 0.    0.145]
++step 157 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 13} tool [0.146 0.    0.145] end [ 0.142 -0.012  0.16 ]
++step 164 task obstruction3 grasp 0.0 plan 13 fails {'obstruction3': 14} tool [ 0.142 -0.012  0.16 ] end [0.15  0.01  0.152]
++ABORT step 170 tool [0.115 0.006 0.182] q [ 0.782 -0.363 -3.656 -2.598 -0.248 -0.854  3.229] target [ 0.644 -0.351 -3.611 -2.6   -0.206 -0.868  3.475] tgt tool [0.106 0.012 0.182]
++step 172 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 15} tool [0.115 0.006 0.218] end [ 0.151 -0.004  0.153]
++ABORT step 173 tool [0.115 0.006 0.218] q [ 0.763 -0.458 -3.569 -2.499 -0.227 -1.053  3.257] target [ 0.624 -0.433 -3.48  -2.502 -0.161 -1.056  3.537] tgt tool [0.106 0.001 0.218]
++step 174 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 16} tool [0.115 0.006 0.218] end [0.151 0.004 0.149]
++ABORT step 175 tool [0.115 0.006 0.218] q [ 0.763 -0.458 -3.569 -2.499 -0.227 -1.053  3.257] target [ 0.627 -0.418 -3.523 -2.492 -0.175 -1.047  3.506] tgt tool [0.113 0.006 0.218]
++step 176 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 17} tool [0.115 0.006 0.218] end [0.15  0.001 0.156]
++ABORT step 177 tool [0.115 0.006 0.218] q [ 0.763 -0.458 -3.569 -2.499 -0.227 -1.053  3.257] target [ 0.614 -0.461 -3.483 -2.511 -0.17  -1.075  3.529] tgt tool [0.1   0.006 0.218]
++step 178 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 18} tool [0.115 0.006 0.218] end [ 0.144 -0.029  0.151]
++step 186 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 19} tool [ 0.144 -0.029  0.151] end [0.142 0.017 0.151]
++step 193 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 20} tool [0.142 0.017 0.151] end [0.142 0.006 0.155]
++step 199 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 21} tool [0.142 0.006 0.155] end [0.144 0.011 0.148]
++step 204 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 22} tool [0.144 0.011 0.148] end [ 0.138 -0.031  0.156]
++step 212 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 23} tool [ 0.138 -0.031  0.156] end [ 0.141 -0.022  0.149]
++step 217 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 24} tool [ 0.141 -0.022  0.149] end [ 0.143 -0.011  0.145]
++step 223 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 25} tool [ 0.143 -0.011  0.145] end [0.142 0.003 0.145]
++step 229 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 26} tool [0.142 0.003 0.145] end [ 0.136 -0.027  0.161]
++step 236 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 27} tool [ 0.136 -0.027  0.161] end [ 0.136 -0.011  0.161]
++step 242 task obstruction3 grasp 0.0 plan 13 fails {'obstruction3': 28} tool [ 0.136 -0.011  0.161] end [ 0.149 -0.014  0.152]
++ABORT step 247 tool [ 0.118 -0.007  0.182] q [ 1.109 -0.423 -3.763 -2.597 -0.329 -0.883  3.277] target [ 0.994 -0.391 -3.706 -2.599 -0.278 -0.878  3.476] tgt tool [ 0.112 -0.006  0.182]
++step 249 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 29} tool [ 0.118 -0.007  0.25 ] end [0.148 0.015 0.151]
++ABORT step 250 tool [ 0.118 -0.007  0.25 ] q [ 1.056 -0.563 -3.586 -2.405 -0.263 -1.228  3.297] target [ 0.794 -0.545 -3.57  -2.404 -0.229 -1.25   3.637] tgt tool [0.106 0.017 0.25 ]
++step 251 task obstruction3 grasp 0.0 plan 15 fails {'obstruction3': 30} tool [ 0.118 -0.007  0.28 ] end [ 0.129 -0.025  0.165]
++ABORT step 256 tool [0.085 0.006 0.224] q [ 1.469 -0.75  -3.619 -2.506 -0.328 -1.339  2.756] target [ 1.526 -0.691 -3.749 -2.638 -0.413 -1.135  2.788] tgt tool [0.085 0.006 0.179]
++step 257 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 31} tool [0.085 0.006 0.254] end [ 0.142 -0.002  0.142]
++step 263 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 32} tool [ 0.142 -0.002  0.142] end [ 0.148 -0.006  0.149]
++ABORT step 269 tool [ 0.124 -0.     0.182] q [ 1.264 -0.443 -3.905 -2.571 -0.385 -0.925  3.325] target [ 1.009 -0.386 -3.767 -2.587 -0.287 -0.893  3.744] tgt tool [0.113 0.001 0.182]
++step 271 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 33} tool [ 0.124 -0.     0.25 ] end [0.148 0.008 0.148]
++ABORT step 272 tool [ 0.124 -0.     0.25 ] q [ 1.183 -0.573 -3.69  -2.385 -0.306 -1.263  3.34 ] target [ 0.91  -0.542 -3.61  -2.396 -0.248 -1.248  3.723] tgt tool [0.113 0.012 0.25 ]
++step 273 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 34} tool [ 0.124 -0.     0.28 ] end [ 0.148 -0.01   0.156]
++ABORT step 274 tool [ 0.124 -0.     0.28 ] q [ 1.166 -0.597 -3.636 -2.299 -0.281 -1.378  3.337] target [ 1.02  -0.584 -3.559 -2.313 -0.234 -1.373  3.551] tgt tool [0.112 0.    0.28 ]
++step 275 task obstruction3 grasp 0.0 plan 16 fails {'obstruction3': 35} tool [ 0.124 -0.     0.31 ] end [0.147 0.005 0.155]
++ABORT step 277 tool [0.112 0.006 0.31 ] q [ 1.008 -0.608 -3.537 -2.222 -0.226 -1.486  3.532] target [ 0.86  -0.613 -3.483 -2.234 -0.194 -1.495  3.734] tgt tool [0.1   0.012 0.31 ]
++step 278 task obstruction3 grasp 0.0 plan 17 fails {'obstruction3': 36} tool [0.112 0.006 0.34 ] end [ 0.147 -0.005  0.159]
++ABORT step 279 tool [0.112 0.006 0.34 ] q [ 1.002 -0.61  -3.509 -2.131 -0.211 -1.583  3.528] target [ 0.845 -0.621 -3.424 -2.148 -0.163 -1.596  3.751] tgt tool [0.094 0.006 0.34 ]
++step 280 task obstruction3 grasp 0.0 plan 19 fails {'obstruction3': 37} tool [0.112 0.006 0.37 ] end [0.148 0.004 0.145]
++ABORT step 283 tool [0.119 0.006 0.308] q [ 0.879 -0.554 -3.532 -2.218 -0.203 -1.446  3.71 ] target [ 0.897 -0.512 -3.605 -2.38  -0.234 -1.236  3.706] tgt tool [0.119 0.006 0.253]
++step 284 task obstruction3 grasp 0.0 plan 21 fails {'obstruction3': 38} tool [0.119 0.006 0.338] end [ 0.133 -0.041  0.156]
++step 295 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 39} tool [ 0.133 -0.041  0.156] end [ 0.138 -0.031  0.149]
++step 300 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 40} tool [ 0.138 -0.031  0.149] end [0.133 0.006 0.157]
++step 307 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 41} tool [0.133 0.006 0.157] end [0.137 0.013 0.149]
++step 312 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 42} tool [0.137 0.013 0.149] end [ 0.147 -0.022  0.152]
++ABORT step 317 tool [ 0.119 -0.001  0.182] q [ 1.253 -0.469 -3.863 -2.585 -0.387 -0.935  3.324] target [ 1.121 -0.415 -3.778 -2.592 -0.315 -0.904  3.556] tgt tool [ 0.113 -0.006  0.182]
++step 319 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 43} tool [ 0.119 -0.001  0.25 ] end [0.146 0.021 0.151]
++ABORT step 320 tool [ 0.119 -0.001  0.25 ] q [ 1.178 -0.594 -3.658 -2.395 -0.303 -1.27   3.33 ] target [ 0.883 -0.578 -3.615 -2.402 -0.263 -1.276  3.697] tgt tool [0.106 0.023 0.25 ]
++step 321 task obstruction3 grasp 0.0 plan 15 fails {'obstruction3': 44} tool [ 0.119 -0.001  0.28 ] end [0.138 0.007 0.146]
++step 329 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 45} tool [0.138 0.007 0.146] end [ 0.139 -0.021  0.146]
++step 334 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 46} tool [ 0.139 -0.021  0.146] end [ 0.129 -0.007  0.161]
++step 341 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 47} tool [ 0.129 -0.007  0.161] end [ 0.13  -0.038  0.161]
++step 346 task obstruction3 grasp 0.0 plan 13 fails {'obstruction3': 48} tool [ 0.13  -0.038  0.161] end [0.146 0.014 0.148]
++ABORT step 351 tool [0.118 0.001 0.182] q [ 1.198 -0.469 -3.838 -2.59  -0.378 -0.926  3.475] target [ 1.01  -0.426 -3.834 -2.583 -0.337 -0.922  3.713] tgt tool [0.113 0.017 0.182]
++step 353 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 49} tool [0.118 0.001 0.25 ] end [0.146 0.011 0.155]
++ABORT step 354 tool [0.118 0.001 0.25 ] q [ 1.128 -0.595 -3.639 -2.4   -0.295 -1.262  3.482] target [ 0.912 -0.596 -3.583 -2.411 -0.252 -1.289  3.752] tgt tool [0.1   0.017 0.25 ]
++step 355 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 50} tool [0.118 0.001 0.28 ] end [ 0.148 -0.012  0.149]
++ABORT step 356 tool [0.118 0.001 0.28 ] q [ 1.113 -0.618 -3.59  -2.312 -0.27  -1.377  3.478] target [ 0.923 -0.545 -3.524 -2.31  -0.2   -1.348  3.778] tgt tool [ 0.113 -0.005  0.28 ]
++step 357 task obstruction3 grasp 0.0 plan 16 fails {'obstruction3': 51} tool [0.118 0.001 0.31 ] end [ 0.148 -0.017  0.156]
++ABORT step 358 tool [0.118 0.001 0.31 ] q [ 1.102 -0.628 -3.552 -2.223 -0.249 -1.48   3.472] target [ 0.89  -0.59  -3.445 -2.235 -0.168 -1.476  3.793] tgt tool [ 0.1   -0.005  0.31 ]
++step 359 task obstruction3 grasp 0.0 plan 20 fails {'obstruction3': 52} tool [0.118 0.001 0.34 ] end [ 0.123 -0.037  0.166]
++step 369 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 53} tool [ 0.123 -0.037  0.166] end [ 0.141 -0.01   0.143]
++step 374 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 54} tool [ 0.141 -0.01   0.143] end [ 0.125 -0.019  0.166]
++ABORT step 378 tool [0.102 0.005 0.182] q [ 1.642 -0.736 -3.826 -2.603 -0.477 -1.183  2.862] target [ 1.593 -0.765 -3.732 -2.628 -0.423 -1.218  2.868] tgt tool [0.085 0.013 0.182]
++step 380 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 55} tool [0.102 0.005 0.25 ] end [0.14  0.004 0.143]
++step 385 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 56} tool [0.14  0.004 0.143] end [0.146 0.008 0.145]
++ABORT step 392 tool [0.122 0.011 0.182] q [ 1.205 -0.451 -3.917 -2.569 -0.389 -0.938  3.621] target [ 1.104 -0.419 -3.878 -2.573 -0.351 -0.918  3.773] tgt tool [0.119 0.012 0.182]
++step 394 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 57} tool [0.122 0.011 0.25 ] end [ 0.145 -0.015  0.159]
++ABORT step 395 tool [0.122 0.011 0.25 ] q [ 1.12  -0.578 -3.698 -2.383 -0.309 -1.273  3.634] target [ 0.98  -0.595 -3.527 -2.421 -0.221 -1.287  3.86 ] tgt tool [0.094 0.001 0.25 ]
++step 396 task obstruction3 grasp 0.0 plan 13 fails {'obstruction3': 58} tool [0.122 0.011 0.28 ] end [0.145 0.    0.159]
++ABORT step 397 tool [0.122 0.011 0.28 ] q [ 1.103 -0.601 -3.644 -2.297 -0.283 -1.388  3.631] target [ 0.957 -0.64  -3.514 -2.331 -0.222 -1.421  3.829] tgt tool [0.094 0.012 0.28 ]
++step 398 task obstruction3 grasp 0.0 plan 15 fails {'obstruction3': 59} tool [0.122 0.011 0.31 ] end [ 0.147 -0.004  0.145]
++ABORT step 400 tool [0.119 0.001 0.31 ] q [ 0.985 -0.569 -3.547 -2.213 -0.215 -1.463  3.803] target [ 1.005 -0.527 -3.628 -2.383 -0.251 -1.244  3.8  ] tgt tool [0.119 0.001 0.252]
++step 401 task obstruction3 grasp 0.0 plan 17 fails {'obstruction3': 60} tool [0.119 0.001 0.34 ] end [0.146 0.004 0.142]
++ABORT step 403 tool [0.125 0.006 0.34 ] q [ 0.986 -0.569 -3.553 -2.114 -0.217 -1.559  3.777] target [ 1.001 -0.549 -3.62  -2.288 -0.249 -1.358  3.78 ] tgt tool [0.125 0.006 0.282]
++step 404 task obstruction3 grasp 0.0 plan 19 fails {'obstruction3': 61} tool [0.125 0.006 0.37 ] end [ 0.143 -0.01   0.163]
++ABORT step 406 tool [0.087 0.006 0.37 ] q [ 0.939 -0.646 -3.409 -2.058 -0.161 -1.71   3.843] target [ 0.951 -0.652 -3.459 -2.287 -0.191 -1.483  3.854] tgt tool [0.087 0.006 0.297]
++step 407 task obstruction3 grasp 0.0 plan 25 fails {'obstruction3': 62} tool [0.087 0.006 0.4  ] end [ 0.124 -0.013  0.158]
++step 418 task obstruction3 grasp 0.0 plan 13 fails {'obstruction3': 63} tool [ 0.124 -0.013  0.158] end [ 0.145 -0.022  0.148]
++ABORT step 423 tool [ 0.117 -0.011  0.182] q [ 1.487 -0.543 -3.893 -2.585 -0.436 -0.997  3.652] target [ 1.275 -0.438 -3.838 -2.585 -0.346 -0.931  3.981] tgt tool [ 0.113 -0.01   0.182]
++step 425 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 64} tool [ 0.117 -0.011  0.25 ] end [0.143 0.017 0.148]
++ABORT step 426 tool [ 0.117 -0.011  0.25 ] q [ 1.4   -0.646 -3.682 -2.396 -0.331 -1.313  3.632] target [ 1.141 -0.642 -3.695 -2.392 -0.33  -1.329  3.905] tgt tool [0.113 0.023 0.25 ]
++step 427 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 65} tool [ 0.117 -0.011  0.28 ] end [ 0.144 -0.028  0.155]
++ABORT step 428 tool [ 0.117 -0.011  0.28 ] q [ 1.382 -0.663 -3.629 -2.309 -0.301 -1.423  3.624] target [ 1.123 -0.61  -3.523 -2.324 -0.218 -1.397  3.985] tgt tool [ 0.1  -0.01  0.28]
++step 429 task obstruction3 grasp 0.0 plan 16 fails {'obstruction3': 66} tool [ 0.117 -0.011  0.31 ] end [0.142 0.013 0.155]
++ABORT step 430 tool [ 0.117 -0.011  0.31 ] q [ 1.37  -0.668 -3.589 -2.219 -0.278 -1.523  3.616] target [ 1.093 -0.692 -3.552 -2.23  -0.257 -1.562  3.914] tgt tool [0.1   0.023 0.31 ]
++step 431 task obstruction3 grasp 0.0 plan 19 fails {'obstruction3': 67} tool [ 0.117 -0.011  0.34 ] end [ 0.119 -0.05   0.162]
++step 439 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 68} tool [ 0.119 -0.05   0.162] end [ 0.135 -0.029  0.146]
++step 444 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 69} tool [ 0.135 -0.029  0.146] end [ 0.121 -0.003  0.162]
++step 450 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 70} tool [ 0.121 -0.003  0.162] end [0.135 0.014 0.146]
++step 455 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 71} tool [0.135 0.014 0.146] end [0.143 0.005 0.158]
++ABORT step 460 tool [0.109 0.016 0.182] q [ 1.381 -0.628 -3.874 -2.593 -0.465 -1.076  3.534] target [ 1.109 -0.542 -3.768 -2.614 -0.365 -1.012  3.896] tgt tool [0.094 0.017 0.182]
++step 462 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 72} tool [0.109 0.016 0.25 ] end [ 0.147 -0.011  0.145]
++ABORT step 463 tool [0.109 0.016 0.25 ] q [ 1.291 -0.706 -3.673 -2.402 -0.346 -1.371  3.492] target [ 1.078 -0.531 -3.64  -2.388 -0.259 -1.241  3.866] tgt tool [ 0.119 -0.005  0.25 ]
++step 464 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 73} tool [0.109 0.016 0.28 ] end [0.145 0.014 0.145]
++ABORT step 465 tool [0.109 0.016 0.28 ] q [ 1.272 -0.717 -3.621 -2.314 -0.314 -1.475  3.48 ] target [ 1.037 -0.6   -3.637 -2.299 -0.276 -1.392  3.81 ] tgt tool [0.119 0.017 0.28 ]
++step 466 task obstruction3 grasp 0.0 plan 16 fails {'obstruction3': 74} tool [0.109 0.016 0.31 ] end [ 0.145 -0.022  0.159]
++ABORT step 467 tool [0.109 0.016 0.31 ] q [ 1.26  -0.717 -3.582 -2.225 -0.289 -1.57   3.469] target [ 0.975 -0.621 -3.447 -2.241 -0.177 -1.5    3.878] tgt tool [ 0.094 -0.005  0.31 ]
++step 468 task obstruction3 grasp 0.0 plan 19 fails {'obstruction3': 75} tool [0.109 0.016 0.34 ] end [ 0.119 -0.047  0.166]
++step 477 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 76} tool [ 0.119 -0.047  0.166] end [ 0.139 -0.017  0.143]
++step 482 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 77} tool [ 0.139 -0.017  0.143] end [ 0.122 -0.013  0.166]
++ABORT step 486 tool [0.103 0.007 0.182] q [ 1.717 -0.79  -3.816 -2.602 -0.489 -1.237  2.949] target [ 1.654 -0.831 -3.718 -2.627 -0.433 -1.285  2.942] tgt tool [0.085 0.019 0.182]
++step 488 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 78} tool [0.103 0.007 0.25 ] end [0.139 0.011 0.143]
++step 493 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 79} tool [0.139 0.011 0.143] end [ 0.145 -0.004  0.142]
++ABORT step 501 tool [ 0.127 -0.     0.155] q [ 1.348 -0.304 -4.123 -2.629 -0.385 -0.719  3.826] target [ 1.509 -0.2   -4.367 -2.64  -0.359 -0.563  3.74 ] tgt tool [ 0.145 -0.004  0.142]
++step 504 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 80} tool [ 0.128 -0.     0.22 ] end [0.145 0.008 0.142]
++ABORT step 508 tool [0.126 0.011 0.154] q [ 1.348 -0.348 -4.152 -2.63  -0.436 -0.75   3.836] target [ 1.5   -0.259 -4.378 -2.64  -0.443 -0.599  3.79 ] tgt tool [0.145 0.008 0.142]
++step 511 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 81} tool [0.126 0.011 0.25 ] end [ 0.141 -0.021  0.163]
++ABORT step 512 tool [0.126 0.011 0.25 ] q [ 1.151 -0.574 -3.729 -2.375 -0.319 -1.274  3.879] target [ 1.094 -0.64  -3.528 -2.428 -0.235 -1.324  3.978] tgt tool [0.087 0.001 0.25 ]
++step 513 task obstruction3 grasp 0.0 plan 13 fails {'obstruction3': 82} tool [0.126 0.011 0.28 ] end [ 0.141 -0.006  0.163]
++ABORT step 514 tool [0.126 0.011 0.28 ] q [ 1.132 -0.597 -3.672 -2.29  -0.293 -1.389  3.876] target [ 1.071 -0.685 -3.511 -2.337 -0.232 -1.459  3.948] tgt tool [0.087 0.012 0.28 ]
++step 515 task obstruction3 grasp 0.0 plan 19 fails {'obstruction3': 83} tool [0.126 0.011 0.31 ] end [ 0.123 -0.021  0.158]
++step 524 task obstruction3 grasp 0.0 plan 8 fails {'obstruction3': 84} tool [ 0.123 -0.021  0.158] end [ 0.123 -0.006  0.158]
++step 528 task obstruction3 grasp 0.0 plan 8 fails {'obstruction3': 85} tool [ 0.123 -0.006  0.158] end [ 0.12  -0.018  0.162]
++step 532 task obstruction3 grasp 0.0 plan 8 fails {'obstruction3': 86} tool [ 0.12  -0.018  0.162] end [ 0.128 -0.008  0.154]
++step 536 task obstruction3 grasp 0.0 plan 13 fails {'obstruction3': 87} tool [ 0.128 -0.008  0.154] end [ 0.142 -0.032  0.159]
++ABORT step 540 tool [ 0.114 -0.009  0.182] q [ 1.603 -0.634 -3.884 -2.591 -0.477 -1.071  3.426] target [ 1.343 -0.517 -3.78  -2.609 -0.364 -0.983  3.808] tgt tool [ 0.101 -0.01   0.182]
++step 542 task obstruction3 grasp 0.0 plan 13 fails {'obstruction3': 88} tool [ 0.114 -0.009  0.25 ] end [0.141 0.012 0.158]
++ABORT step 544 tool [0.106 0.003 0.25 ] q [ 1.336 -0.691 -3.645 -2.408 -0.324 -1.355  3.58 ] target [ 1.058 -0.671 -3.603 -2.416 -0.288 -1.353  3.892] tgt tool [0.094 0.023 0.25 ]
++step 545 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 89} tool [0.106 0.003 0.28 ] end [ 0.146 -0.017  0.145]
++ABORT step 546 tool [0.106 0.003 0.28 ] q [ 1.319 -0.703 -3.595 -2.32  -0.294 -1.462  3.57 ] target [ 1.103 -0.556 -3.59  -2.301 -0.237 -1.358  3.907] tgt tool [ 0.119 -0.01   0.28 ]
++step 547 task obstruction3 grasp 0.0 plan 16 fails {'obstruction3': 90} tool [0.106 0.003 0.31 ] end [0.144 0.019 0.145]
++ABORT step 550 tool [0.119 0.023 0.31 ] q [ 1.075 -0.637 -3.617 -2.209 -0.276 -1.517  3.839] target [ 1.105 -0.61  -3.711 -2.378 -0.326 -1.31   3.85 ] tgt tool [0.119 0.023 0.252]
++step 551 task obstruction3 grasp 0.0 plan 17 fails {'obstruction3': 91} tool [0.119 0.023 0.34 ] end [0.144 0.014 0.142]
++ABORT step 558 tool [0.136 0.015 0.145] q [ 1.413 -0.292 -4.305 -2.64  -0.448 -0.651  3.771] target [ 1.468 -0.263 -4.385 -2.64  -0.45  -0.601  3.756] tgt tool [0.144 0.014 0.142]
++step 562 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 92} tool [0.136 0.015 0.25 ] end [0.141 0.003 0.162]
++ABORT step 563 tool [0.136 0.015 0.25 ] q [ 1.121 -0.56  -3.755 -2.367 -0.332 -1.247  3.833] target [ 1.044 -0.672 -3.561 -2.425 -0.263 -1.352  3.909] tgt tool [0.087 0.017 0.25 ]
++step 564 task obstruction3 grasp 0.0 plan 13 fails {'obstruction3': 93} tool [0.136 0.015 0.28 ] end [ 0.146 -0.009  0.142]
++ABORT step 565 tool [0.136 0.015 0.28 ] q [ 1.102 -0.584 -3.696 -2.282 -0.305 -1.363  3.831] target [ 1.103 -0.552 -3.626 -2.292 -0.253 -1.355  3.879] tgt tool [ 0.125 -0.005  0.28 ]
++step 566 task obstruction3 grasp 0.0 plan 16 fails {'obstruction3': 94} tool [0.136 0.015 0.31 ] end [ 0.141 -0.027  0.163]
++ABORT step 567 tool [0.136 0.015 0.31 ] q [ 1.088 -0.596 -3.651 -2.195 -0.283 -1.468  3.827] target [ 1.032 -0.647 -3.439 -2.247 -0.178 -1.521  3.943] tgt tool [ 0.087 -0.005  0.31 ]
++step 568 task obstruction3 grasp 0.0 plan 17 fails {'obstruction3': 95} tool [0.136 0.015 0.34 ] end [ 0.137 -0.002  0.155]
++ABORT step 570 tool [0.106 0.006 0.34 ] q [ 1.046 -0.63  -3.506 -2.135 -0.212 -1.604  3.881] target [ 1.066 -0.612 -3.585 -2.348 -0.254 -1.366  3.89 ] tgt tool [0.106 0.006 0.269]
++step 571 task obstruction3 grasp 0.0 plan 23 fails {'obstruction3': 96} tool [0.106 0.006 0.37 ] end [ 0.116 -0.055  0.166]
++step 582 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 97} tool [ 0.116 -0.055  0.166] end [ 0.138 -0.023  0.143]
++step 587 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 98} tool [ 0.138 -0.023  0.143] end [ 0.119 -0.005  0.166]
++ABORT step 591 tool [0.104 0.008 0.182] q [ 1.755 -0.818 -3.815 -2.6   -0.497 -1.265  2.99 ] target [ 1.674 -0.877 -3.706 -2.625 -0.437 -1.334  2.97 ] tgt tool [0.085 0.025 0.182]
++step 593 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 99} tool [0.104 0.008 0.25 ] end [0.137 0.017 0.143]
++step 597 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 100} tool [0.137 0.017 0.143] end [0.124 0.002 0.157]
++step 601 task obstruction3 grasp 0.0 plan 8 fails {'obstruction3': 101} tool [0.124 0.002 0.157] end [ 0.125 -0.026  0.157]
++step 606 task obstruction3 grasp 0.0 plan 8 fails {'obstruction3': 102} tool [ 0.125 -0.026  0.157] end [ 0.123 -0.024  0.161]
++step 611 task obstruction3 grasp 0.0 plan 8 fails {'obstruction3': 103} tool [ 0.123 -0.024  0.161] end [ 0.129 -0.015  0.153]
++step 616 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 104} tool [ 0.129 -0.015  0.153] end [ 0.123 -0.009  0.161]
++step 620 task obstruction3 grasp 0.0 plan 8 fails {'obstruction3': 105} tool [ 0.123 -0.009  0.161] end [ 0.13  -0.     0.153]
++step 624 task obstruction3 grasp 0.0 plan 8 fails {'obstruction3': 106} tool [ 0.13  -0.     0.153] end [ 0.135 -0.001  0.149]
++step 630 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 107} tool [ 0.135 -0.001  0.149] end [ 0.128 -0.015  0.164]
++step 637 task obstruction3 grasp 0.0 plan 13 fails {'obstruction3': 108} tool [ 0.128 -0.015  0.164] end [ 0.148 -0.014  0.143]
++ABORT step 643 tool [ 0.126 -0.011  0.182] q [ 1.003 -0.326 -3.755 -2.572 -0.257 -0.841  3.452] target [ 0.913 -0.294 -3.721 -2.565 -0.215 -0.836  3.641] tgt tool [ 0.125 -0.01   0.182]
++step 646 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 109} tool [ 0.128 -0.012  0.218] end [0.144 0.024 0.141]
++ABORT step 650 tool [0.126 0.022 0.155] q [ 0.965 -0.221 -4.03  -2.627 -0.273 -0.673  3.445] target [ 1.087 -0.084 -4.261 -2.64  -0.155 -0.51   3.246] tgt tool [0.144 0.024 0.141]
++step 653 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 110} tool [0.126 0.022 0.25 ] end [ 0.144 -0.03   0.163]
++ABORT step 654 tool [0.126 0.022 0.25 ] q [ 0.84  -0.498 -3.667 -2.375 -0.256 -1.217  3.6  ] target [ 0.809 -0.559 -3.414 -2.43  -0.151 -1.257  3.764] tgt tool [ 0.087 -0.01   0.25 ]
++step 655 task obstruction3 grasp 0.0 plan 13 fails {'obstruction3': 111} tool [0.126 0.022 0.28 ] end [0.143 0.018 0.161]
++ABORT step 656 tool [0.126 0.022 0.28 ] q [ 0.826 -0.529 -3.617 -2.289 -0.237 -1.338  3.605] target [ 0.781 -0.64  -3.488 -2.335 -0.207 -1.421  3.672] tgt tool [0.087 0.023 0.28 ]
++step 657 task obstruction3 grasp 0.0 plan 15 fails {'obstruction3': 112} tool [0.126 0.022 0.31 ] end [0.139 0.008 0.155]
++ABORT step 658 tool [0.126 0.022 0.31 ] q [ 0.817 -0.546 -3.578 -2.201 -0.221 -1.446  3.606] target [ 0.795 -0.583 -3.484 -2.227 -0.187 -1.472  3.666] tgt tool [0.106 0.012 0.31 ]
++step 659 task obstruction3 grasp 0.0 plan 17 fails {'obstruction3': 113} tool [0.126 0.022 0.34 ] end [ 0.14  -0.005  0.156]
++ABORT step 661 tool [0.106 0.001 0.34 ] q [ 0.788 -0.571 -3.429 -2.137 -0.154 -1.558  3.688] target [ 0.801 -0.541 -3.49  -2.35  -0.183 -1.309  3.688] tgt tool [0.106 0.001 0.269]
++step 662 task obstruction3 grasp 0.0 plan 19 fails {'obstruction3': 114} tool [0.106 0.001 0.37 ] end [0.14  0.003 0.153]
++ABORT step 664 tool [0.113 0.006 0.37 ] q [ 0.792 -0.561 -3.445 -2.035 -0.16  -1.646  3.663] target [ 0.802 -0.553 -3.497 -2.255 -0.186 -1.414  3.667] tgt tool [0.113 0.006 0.299]
++step 665 task obstruction3 grasp 0.0 plan 21 fails {'obstruction3': 115} tool [0.113 0.006 0.4  ] end [ 0.138 -0.002  0.159]
++ABORT step 667 tool [0.1   0.006 0.4  ] q [ 0.779 -0.58  -3.397 -1.949 -0.141 -1.755  3.679] target [ 0.785 -0.595 -3.434 -2.178 -0.162 -1.538  3.688] tgt tool [0.1   0.006 0.328]
++step 668 task obstruction3 grasp 0.0 plan 27 fails {'obstruction3': 116} tool [0.1   0.006 0.43 ] end [ 0.13  -0.031  0.156]
++step 680 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 117} tool [ 0.13  -0.031  0.156] end [0.128 0.013 0.156]
++step 686 task obstruction3 grasp 0.0 plan 8 fails {'obstruction3': 118} tool [0.128 0.013 0.156] end [0.127 0.002 0.16 ]
++step 691 task obstruction3 grasp 0.0 plan 8 fails {'obstruction3': 119} tool [0.127 0.002 0.16 ] end [0.132 0.009 0.152]
++step 696 task obstruction3 grasp 0.0 plan 8 fails {'obstruction3': 120} tool [0.132 0.009 0.152] end [ 0.129 -0.027  0.16 ]
++step 701 task obstruction3 grasp 0.0 plan 8 fails {'obstruction3': 121} tool [ 0.129 -0.027  0.16 ] end [ 0.133 -0.019  0.152]
++step 706 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 122} tool [ 0.133 -0.019  0.152] end [ 0.145 -0.005  0.152]
++step 713 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 123} tool [ 0.145 -0.005  0.152] end [ 0.13  -0.018  0.155]
++step 723 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 124} tool [ 0.13  -0.018  0.155] end [ 0.135 -0.008  0.149]
++step 730 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 125} tool [ 0.135 -0.008  0.149] end [0.134 0.006 0.149]
++step 736 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 126} tool [0.134 0.006 0.149] end [ 0.127 -0.024  0.164]
++step 742 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 127} tool [ 0.127 -0.024  0.164] end [ 0.127 -0.008  0.164]
++step 747 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 128} tool [ 0.127 -0.008  0.164] end [ 0.14  -0.013  0.156]
++ABORT step 752 tool [ 0.114 -0.006  0.182] q [ 1.12  -0.436 -3.763 -2.6   -0.329 -0.899  3.303] target [ 0.895 -0.371 -3.66  -2.6   -0.235 -0.882  3.699] tgt tool [ 0.106 -0.005  0.182]
++step 754 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 129} tool [ 0.114 -0.006  0.25 ] end [0.138 0.015 0.155]
++ABORT step 755 tool [ 0.114 -0.006  0.25 ] q [ 1.065 -0.572 -3.585 -2.407 -0.261 -1.241  3.321] target [ 0.809 -0.549 -3.575 -2.404 -0.233 -1.252  3.649] tgt tool [0.106 0.017 0.25 ]
++step 756 task obstruction3 grasp 0.0 plan 15 fails {'obstruction3': 130} tool [ 0.114 -0.006  0.28 ] end [ 0.12  -0.022  0.168]
++ABORT step 761 tool [0.085 0.006 0.223] q [ 1.488 -0.757 -3.62  -2.507 -0.33  -1.344  2.775] target [ 1.562 -0.682 -3.785 -2.64  -0.44  -1.095  2.817] tgt tool [ 0.093 -0.001  0.176]
++step 762 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 131} tool [0.085 0.006 0.253] end [0.135 0.002 0.146]
++step 768 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 132} tool [0.135 0.002 0.146] end [ 0.144 -0.009  0.153]
++step 776 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 133} tool [ 0.144 -0.009  0.153] end [ 0.144 -0.005  0.151]
++step 782 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 134} tool [ 0.144 -0.005  0.151] end [ 0.128 -0.018  0.156]
++step 792 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 135} tool [ 0.128 -0.018  0.156] end [ 0.13  -0.019  0.154]
++step 797 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 136} tool [ 0.13  -0.019  0.154] end [ 0.14  -0.004  0.153]
++ABORT step 804 tool [ 0.118 -0.005  0.182] q [ 1.219 -0.448 -3.834 -2.588 -0.362 -0.918  3.286] target [ 1.089 -0.406 -3.79  -2.588 -0.315 -0.897  3.489] tgt tool [ 0.115 -0.002  0.182]
++step 806 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 137} tool [ 0.118 -0.005  0.25 ] end [0.139 0.009 0.152]
++ABORT step 807 tool [ 0.118 -0.005  0.25 ] q [ 1.151 -0.58  -3.637 -2.398 -0.285 -1.257  3.301] target [ 0.868 -0.532 -3.596 -2.396 -0.237 -1.24   3.689] tgt tool [0.113 0.012 0.25 ]
++step 808 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 138} tool [ 0.118 -0.005  0.28 ] end [ 0.139 -0.008  0.159]
++ABORT step 809 tool [ 0.118 -0.005  0.28 ] q [ 1.137 -0.604 -3.587 -2.311 -0.261 -1.373  3.298] target [ 0.985 -0.585 -3.528 -2.319 -0.219 -1.368  3.516] tgt tool [ 0.109 -0.002  0.28 ]
++step 810 task obstruction3 grasp 0.0 plan 16 fails {'obstruction3': 139} tool [ 0.118 -0.005  0.31 ] end [0.138 0.006 0.159]
++ABORT step 811 tool [ 0.118 -0.005  0.31 ] q [ 1.127 -0.615 -3.55  -2.221 -0.242 -1.478  3.294] target [ 0.972 -0.608 -3.508 -2.228 -0.212 -1.482  3.5  ] tgt tool [0.109 0.003 0.31 ]
++step 812 task obstruction3 grasp 0.0 plan 18 fails {'obstruction3': 140} tool [ 0.118 -0.005  0.34 ] end [ 0.138 -0.003  0.162]
++ABORT step 814 tool [0.107 0.    0.34 ] q [ 0.974 -0.613 -3.47  -2.139 -0.192 -1.579  3.487] target [ 0.805 -0.615 -3.415 -2.148 -0.156 -1.59   3.719] tgt tool [0.094 0.006 0.34 ]
++step 815 task obstruction3 grasp 0.0 plan 20 fails {'obstruction3': 141} tool [0.107 0.    0.37 ] end [0.139 0.004 0.15 ]
++ABORT step 818 tool [0.119 0.006 0.309] q [ 0.839 -0.546 -3.519 -2.218 -0.194 -1.441  3.68 ] target [ 0.86  -0.487 -3.608 -2.411 -0.23  -1.182  3.671] tgt tool [0.119 0.006 0.242]
++step 819 task obstruction3 grasp 0.0 plan 19 fails {'obstruction3': 142} tool [0.119 0.006 0.339] end [ 0.144 -0.01   0.153]
++step 828 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 143} tool [ 0.144 -0.01   0.153] end [ 0.145 -0.002  0.151]
++step 834 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 144} tool [ 0.145 -0.002  0.151] end [ 0.128 -0.017  0.157]
++step 844 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 145} tool [ 0.128 -0.017  0.157] end [ 0.131 -0.019  0.154]
++step 849 task obstruction3 grasp 0.0 plan 13 fails {'obstruction3': 146} tool [ 0.131 -0.019  0.154] end [ 0.145 -0.011  0.154]
++step 858 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 147} tool [ 0.145 -0.011  0.154] end [0.145 0.    0.15 ]
++step 864 task obstruction3 grasp 0.0 plan 14 fails {'obstruction3': 148} tool [0.145 0.    0.15 ] end [ 0.128 -0.016  0.157]
++step 874 task obstruction3 grasp 0.0 plan 9 fails {'obstruction3': 149} tool [ 0.128 -0.016  0.157] end [ 0.133 -0.019  0.153]
++step 879 task obstruction3 grasp 0.0 plan 13 fails {'obstruction3': 150} tool [ 0.133 -0.019  0.153] end [ 0.146 -0.008  0.15 ]
++step 888 task obstruction3 grasp 0.0 plan 11 fails {'obstruction3': 151} tool [ 0.146 -0.008  0.15 ] end [ 0.145 -0.001  0.154]
++step 894 task obstruction3 grasp 0.0 plan 13 fails {'obstruction3': 152} tool [ 0.145 -0.001  0.154] end [ 0.129 -0.025  0.157]
++step 903 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 153} tool [ 0.129 -0.025  0.157] end [ 0.133 -0.01   0.152]
++step 908 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 154} tool [ 0.133 -0.01   0.152] end [ 0.13  -0.033  0.159]
++step 915 task obstruction3 grasp 0.0 plan 8 fails {'obstruction3': 155} tool [ 0.13  -0.033  0.159] end [ 0.133 -0.025  0.152]
++step 920 task obstruction3 grasp 0.0 plan 10 fails {'obstruction3': 156} tool [ 0.133 -0.025  0.152] end [0.128 0.012 0.159]
++step 927 task obstruction3 grasp 0.0 plan 8 fails {'obstruction3': 157} tool [0.128 0.012 0.159] end [0.132 0.017 0.152]
++step 932 task obstruction3 grasp 0.0 plan 13 fails {'obstruction3': 158} tool [0.132 0.017 0.152] end [ 0.14  -0.019  0.156]
++ABORT step 937 tool [0.117 0.002 0.182] q [ 1.133 -0.431 -3.823 -2.586 -0.346 -0.911  3.191] target [ 0.995 -0.383 -3.722 -2.594 -0.273 -0.884  3.454] tgt tool [ 0.112 -0.005  0.182]
++step 939 task obstruction3 grasp 0.0 plan 12 fails {'obstruction3': 159} tool [0.117 0.002 0.25 ] end [0.137 0.022 0.154]
++ABORT step 940 tool [0.117 0.002 0.25 ] q [ 1.068 -0.567 -3.629 -2.397 -0.276 -1.252  3.212] target [ 0.772 -0.548 -3.582 -2.402 -0.236 -1.252  3.606] tgt tool [0.106 0.023 0.25 ]
++step 941 task obstruction3 grasp 0.0 plan 15 fails {'obstruction3': 160} tool [0.117 0.002 0.28 ] end [0.133 0.012 0.149]
++step 949 task obstruction3 grasp 1.0 plan 18 fails {'obstruction3': 160} tool [0.133 0.012 0.149] end [ 0.294 -0.1    0.14 ]
++step 959 task target_block grasp 0.0 plan 16 fails {'obstruction3': 160} tool [ 0.294 -0.1    0.14 ] end [ 0.47  -0.266  0.131]
++step 967 task target_block grasp 1.0 plan 25 fails {'obstruction3': 160} tool [ 0.47  -0.266  0.131] end [0.143 0.038 0.143]
++SOLVED 980
++time 117.86067271232605
+diff --git a/reach.py b/reach.py
+new file mode 100644
+index 0000000..9727ab2
+--- /dev/null
++++ b/reach.py
+@@ -0,0 +1,32 @@
++import numpy as np, kin
++from env_client import make_env
++from common import *
++env=make_env(); obs,_=env.reset(seed=312, options={'object_count':15}); b=getbase(obs); q0=getq(obs)
++print('base', b)
++JL=np.array([np.inf,2.41,np.inf,2.66,np.inf,2.23,np.inf])-0.02
++mount=b[:2]+0.12*np.array([np.cos(b[2]),np.sin(b[2])]); print('mount', mount)
++for ang in [0, 0.8, 1.57, -1.57, 2.5]:
++  res=[]
++  for r in np.arange(0.0,0.2,0.01):
++    p=np.array([mount[0]+r*np.cos(ang), mount[1]+r*np.sin(ang), 0.15])
++    ok=False
++    for yaw in [0,np.pi/2,np.pi/4,-np.pi/4]:
++      for t in range(4):
++        qs=q0+np.random.uniform(-1,1,7)*(t>0)
++        q,o=kin.ik(b,qs,p,kin.topdown_R(yaw),iters=200,tol=1e-5,lim=JL)
++        if o: ok=True;break
++      if ok: break
++    res.append(ok)
++  print(ang, ''.join('1' if x else '0' for x in res))
++print('per yaw, angle 0 and 0.8, z .14')
++for ang in [0,0.8,-0.8]:
++ for yaw in np.arange(0,np.pi,np.pi/8):
++  res=[]
++  for r in np.arange(0.10,0.17,0.005):
++    p=np.array([r*np.cos(ang), r*np.sin(ang), 0.14]); ok=False
++    for t in range(4):
++        qs=q0+np.random.uniform(-1,1,7)*(t>0)
++        q,o=kin.ik(b,qs,p,kin.topdown_R(yaw),iters=200,tol=1e-5,lim=JL)
++        if o: ok=True;break
++    res.append(ok)
++  print(ang, round(yaw,2), ''.join('1' if x else '0' for x in res))

@@ -1,0 +1,154 @@
+diff --git a/approach.py b/approach.py
+index b1d624a..f3fb83c 100644
+--- a/approach.py
++++ b/approach.py
+@@ -57,7 +57,7 @@ class GeneratedApproach:
+     def placement_collisions(self, s, obj, left, bottom, offsetx, offsety):
+         _,_,w,h=self.rect(s,obj)
+         cx=left-offsetx;cy=bottom-offsety
+-        parts=[(left,bottom,left+w,bottom+h),
++        parts=[(left-.003,bottom,left+w+.003,bottom+h),
+                (cx-.055,cy-.225,cx+.055,cy-.185),
+                (cx-.008,cy-.2,cx+.008,cy)]
+         blocked=[]
+@@ -160,7 +160,7 @@ class GeneratedApproach:
+                 self.phase='carry'
+             if self.phase == 'carry':
+                 goal=self.dropx-self.offsetx
+-                if abs(rx-goal)>.001:return self.action(s,x=goal,vac=1)
++                if abs(rx-goal)>.0001:return self.action(s,x=goal,vac=1)
+                 self.phase='place'
+             if self.phase == 'place':
+                 goal=self.dropy-self.offsety
+diff --git a/results_2_1_4.json b/results_2_1_4.json
+index 5351e56..e6aad0c 100644
+--- a/results_2_1_4.json
++++ b/results_2_1_4.json
+@@ -1 +1 @@
+-[{"seed": 2, "count": 4, "done": false, "steps": 1000, "seconds": 102.677, "policy_seconds": 0.1575, "trace": [[840, "place", "target_block", 1.06, 0.439], [880, "place", "target_block", 1.06, 0.439], [920, "place", "target_block", 1.06, 0.439], [960, "place", "target_block", 1.06, 0.439]], "state": {"obstruction0": {"x": 0.41724511981010437, "y": 0.10000099986791611, "width": 0.16559429466724396, "height": 0.19393038749694824}, "obstruction1": {"x": 1.1710095405578613, "y": 0.10099999606609344, "width": 0.18252427875995636, "height": 0.16370268166065216}, "obstruction2": {"x": 0.6930773258209229, "y": 0.10000099986791611, "width": 0.19260691106319427, "height": 0.13893510401248932}, "obstruction3": {"x": 0.9658926725387573, "y": 0.10000099986791611, "width": 0.06577402353286743, "height": 0.09953121095895767}, "target_block": {"x": 1.0440634489059448, "y": 0.1701126992702484, "width": 0.0980890691280365, "height": 0.06211165711283684}, "target_surface": {"x": 1.0282063484191895, "y": 0.0, "width": 0.1298033446073532, "height": 0.10000000149011612}}}]
+\ No newline at end of file
++[{"seed": 2, "count": 4, "done": true, "steps": 137, "seconds": 12.336, "policy_seconds": 0.0332}]
+\ No newline at end of file
+diff --git a/results_sequential_0_10_4.json b/results_sequential_0_10_4.json
+new file mode 100644
+index 0000000..6ee07ba
+--- /dev/null
++++ b/results_sequential_0_10_4.json
+@@ -0,0 +1 @@
++[{"seed": 0, "count": 4, "done": true, "steps": 51, "seconds": 4.431, "policy_seconds": 0.0176}, {"seed": 1, "count": 4, "done": true, "steps": 79, "seconds": 10.312, "policy_seconds": 0.0261}, {"seed": 2, "count": 4, "done": false, "steps": 1000, "seconds": 136.432, "policy_seconds": 0.1705, "trace": [[840, "down", "target_block", 1.517, 0.489], [880, "down", "target_block", 1.517, 0.489], [920, "down", "target_block", 1.517, 0.489], [960, "down", "target_block", 1.517, 0.489]], "state": {"obstruction0": {"x": 0.41724511981010437, "y": 0.10000099986791611, "width": 0.16559429466724396, "height": 0.19393038749694824}, "obstruction1": {"x": 1.3055542707443237, "y": 0.10099999606609344, "width": 0.18252427875995636, "height": 0.16370268166065216}, "obstruction2": {"x": 0.6930773258209229, "y": 0.10000099986791611, "width": 0.19260691106319427, "height": 0.13893510401248932}, "obstruction3": {"x": 0.06811296939849854, "y": 0.10100000351667404, "width": 0.06577402353286743, "height": 0.09953121095895767}, "target_block": {"x": 1.5010786056518555, "y": 0.10000099986791611, "width": 0.0980890691280365, "height": 0.06211165711283684}, "target_surface": {"x": 1.0282063484191895, "y": 0.0, "width": 0.1298033446073532, "height": 0.10000000149011612}}}, {"seed": 3, "count": 4, "done": true, "steps": 101, "seconds": 12.335, "policy_seconds": 0.0343}, {"seed": 4, "count": 4, "done": true, "steps": 158, "seconds": 10.732, "policy_seconds": 0.033}, {"seed": 5, "count": 4, "done": true, "steps": 83, "seconds": 5.098, "policy_seconds": 0.0155}, {"seed": 6, "count": 4, "done": true, "steps": 115, "seconds": 10.369, "policy_seconds": 0.0351}, {"seed": 7, "count": 4, "done": true, "steps": 91, "seconds": 9.357, "policy_seconds": 0.0253}, {"seed": 8, "count": 4, "done": true, "steps": 102, "seconds": 14.707, "policy_seconds": 0.0215}, {"seed": 9, "count": 4, "done": true, "steps": 79, "seconds": 9.597, "policy_seconds": 0.0256}]
+\ No newline at end of file
+diff --git a/sweep_300_700.log b/sweep_300_700.log
+index d1cee4f..4276ca6 100644
+--- a/sweep_300_700.log
++++ b/sweep_300_700.log
+@@ -182,3 +182,110 @@
+ 481 OK 42
+ 483 OK 21
+ 485 OK 18
++486 OK 24
++484 OK 67
++480 OK 104
++487 OK 26
++490 OK 57
++491 OK 56
++488 OK 92
++493 OK 48
++494 OK 45
++492 OK 70
++495 OK 27
++497 OK 25
++496 OK 33
++500 OK 18
++498 OK 61
++502 OK 26
++501 OK 64
++503 OK 24
++499 OK 109
++506 OK 50
++504 OK 80
++505 OK 84
++508 OK 49
++507 OK 78
++510 OK 27
++509 OK 68
++512 OK 26
++511 OK 70
++513 OK 46
++515 OK 41
++516 OK 34
++514 OK 74
++518 OK 41
++517 OK 71
++519 OK 28
++520 OK 21
++521 OK 35
++522 OK 53
++524 OK 20
++523 OK 41
++526 OK 33
++489 FAIL 1000
++{'seed': 489, 'count': None, 'done': False, 'steps': 1000, 'seconds': 68.581, 'policy_seconds': 0.1308, 'trace': [[840, 'place', 'target_block', 0.5194, 0.4876], [880, 'place', 'target_block', 0.5194, 0.4876], [920, 'place', 'target_block', 0.5194, 0.4876], [960, 'place', 'target_block', 0.5194, 0.4876]], 'state': {'obstruction0': {'x': 0.6125882863998413, 'y': 0.10000099986791611, 'width': 0.08571477979421616, 'height': 0.09336432069540024}, 'obstruction1': {'x': 0.8762147426605225, 'y': 0.10100002586841583, 'width': 0.07839120179414749, 'height': 0.1896573305130005}, 'target_block': {'x': 0.5144228339195251, 'y': 0.21765734255313873, 'width': 0.09879190474748611, 'height': 0.06392852216959}, 'target_surface': {'x': 0.5127172470092773, 'y': 0.0, 'width': 0.12958014011383057, 'height': 0.10000000149011612}}}
++528 OK 17
++527 OK 59
++525 OK 80
++529 OK 23
++530 OK 30
++531 OK 51
++533 OK 31
++535 OK 21
++532 OK 67
++537 OK 22
++534 OK 78
++538 OK 29
++539 OK 24
++536 OK 90
++540 OK 20
++541 OK 72
++544 OK 27
++542 OK 85
++543 OK 64
++546 OK 29
++547 OK 24
++545 OK 80
++548 OK 44
++549 OK 53
++551 OK 33
++552 OK 30
++554 OK 19
++550 OK 95
++553 OK 85
++555 OK 56
++558 OK 28
++556 OK 56
++559 OK 27
++557 OK 52
++561 OK 19
++562 OK 30
++564 OK 19
++563 OK 30
++560 OK 77
++567 OK 26
++565 OK 76
++566 OK 60
++569 OK 23
++570 OK 36
++568 OK 72
++571 OK 47
++572 OK 48
++574 OK 22
++573 OK 61
++576 OK 36
++575 OK 58
++577 OK 69
++580 OK 33
++579 OK 77
++578 OK 76
++581 OK 19
++582 OK 61
++583 OK 30
++585 OK 29
++584 OK 33
++587 OK 47
++586 OK 54
++588 OK 44
++589 OK 31

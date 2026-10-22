@@ -1,0 +1,26 @@
+diff --git a/probe_los_details.py b/probe_los_details.py
+new file mode 100644
+index 0000000..f493bbb
+--- /dev/null
++++ b/probe_los_details.py
+@@ -0,0 +1,20 @@
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++for seed in [2,3,4]:
++ e=make_env();s,info=e.reset(seed=seed);p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,info)
++ for t in range(65):s,*_=e.step(p.get_action(s))
++ print('\nSEED',seed,'tasks',p.tasks)
++ for r,rob in enumerate(p.rovers):
++  x=p.xy(s,rob);print('rover',r,x,'cal',s.get(rob,'calibrated'))
++  task=p.tasks[r]
++  target=p.lander if task[0]=='send' else p.xy(s,p.objectives[task[1]]) if task[0]=='image' else x
++  d=target-x;print('target',target,'dist',np.linalg.norm(d))
++  for ob in p.objects(s,'obstacle'):
++   q=p.xy(s,ob);a=np.clip(np.dot(q-x,d)/(np.dot(d,d)+1e-20),0,1);dl=np.linalg.norm(q-x-a*d)
++   if dl<.5:print('near LOS',ob.name,q,'distance',dl,'t',a,'half',s.get(ob,'half_x'),s.get(ob,'half_z'))
++  for delta in [(0,0),(.1,0),(.1,0),(0,.1),(-.1,0),(-.1,0),(-.1,0),(0,-.1),(0,-.1)]:
++   a=np.zeros(8,np.float32);a[r*4:r*4+2]=delta;a[r*4+3]=-.5 if task[0]=='image' else .5
++   s,*_=e.step(a)
++   print('probe',r,p.xy(s,rob),'cal',s.get(rob,'calibrated'),'pending',p.pending(s,r))
++ e.close()

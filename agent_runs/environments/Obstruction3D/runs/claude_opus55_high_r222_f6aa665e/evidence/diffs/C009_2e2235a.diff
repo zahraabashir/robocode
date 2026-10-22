@@ -1,0 +1,98 @@
+diff --git a/approach.py b/approach.py
+index 8744db5..744426d 100644
+--- a/approach.py
++++ b/approach.py
+@@ -197,6 +197,8 @@ class GeneratedApproach:
+         self.stall = 0
+         self.q_home = self._q(state)
+         self.nsteps = 0
++        self.scale = 1.0
++        self.max_top = 0.15
+         # a nominal top-down configuration used as an extra IK seed
+         b = self._base(state)
+         qn, e = self._ik_world(self.q_home, [0.30, 0.0, 0.33], down_R(0.0), b, iters=200)
+@@ -474,6 +476,8 @@ class GeneratedApproach:
+     # ---------------------------------------------------------------- control
+     def get_action(self, state):
+         self.nsteps += 1
++        boxes0 = self._boxes(state)
++        self.max_top = max([b["z"] + b["hz"] for n, b in boxes0.items() if b["g"] < 0.5] + [0.1])
+         q = self._q(state)
+         base = self._base(state)
+         act = np.zeros(11, dtype=np.float32)
+@@ -497,8 +501,15 @@ class GeneratedApproach:
+                 self.segs = []
+                 self.cur = None
+ 
++        if rejected:
++            self.scale = max(self.scale * 0.35, 0.01)
++        elif self.last_q is not None:
++            self.scale = min(1.0, self.scale * 1.5)
+         if rejected and self.cur is not None and self.cur[0] in ("move", "base"):
+-            self._handle_reject(state)
++            if self.scale > 0.02 and self.cur[0] == "move":
++                pass            # retry the same segment with a smaller step
++            else:
++                self._handle_reject(state)
+ 
+         for _ in range(30):
+             if self.cur is None:
+@@ -549,12 +560,17 @@ class GeneratedApproach:
+                     self._handle_reject(state)
+                     continue
+             step = 0.08
++            low = p[2] - FINGER < self.max_top + 0.03
++            if low and seg[3] in ("lift", "grasp_descend", "place_descend", "retreat"):
++                step = 0.03
++            step *= self.scale
+             tgt = goal if nd < step else p + d * step / nd
+             qt, err = self._ik_world(q, tgt, Rt, base)
+             dq = qt - q
+             m = np.max(np.abs(dq))
+-            if m > 0.2:
+-                dq *= 0.2 / m
++            lim = 0.2 * max(self.scale, 0.05)
++            if m > lim:
++                dq *= lim / m
+             if m < 1e-7:
+                 self.stall += 1
+                 continue
+diff --git a/dbg_run.py b/dbg_run.py
+index 659869e..d434e54 100644
+--- a/dbg_run.py
++++ b/dbg_run.py
+@@ -2,8 +2,8 @@ import sys, numpy as np
+ from env_client import make_env
+ from approach import GeneratedApproach, fk
+ import approach as AP
+-seed=int(sys.argv[1]); N=int(sys.argv[2]) if len(sys.argv)>2 else 1000
+-env = make_env(); obs, info = env.reset(seed=seed)
++seed=int(sys.argv[1]); N=int(sys.argv[2]) if len(sys.argv)>2 else 1000; OC=int(sys.argv[3]) if len(sys.argv)>3 else None
++env = make_env(); obs, info = env.reset(seed=seed, options=({"object_count":OC} if OC else None))
+ ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
+ bx = ap._boxes(obs)
+ for n,b in sorted(bx.items()): print(n, {k: round(v,3) for k,v in b.items()})
+diff --git a/probe_lift.py b/probe_lift.py
+new file mode 100644
+index 0000000..74329a9
+--- /dev/null
++++ b/probe_lift.py
+@@ -0,0 +1,18 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach, down_R
++env = make_env(); obs, info = env.reset(seed=4, options={"object_count":4})
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++for t in range(34):
++    a = ap.get_action(obs); obs,*_ = env.step(a)
++bx = ap._boxes(obs)
++for n in ['obstruction0','obstruction1','obstruction2']: print(n, {k: round(v,4) for k,v in bx[n].items()})
++R=ap._robot(obs); print("finger", obs.get(R,'finger_state'), np.round(obs.data[R][11:],4))
++q=ap._q(obs); base=ap._base(obs); T=ap._ee_world(q,base); print("EE", np.round(T[:3,3],4))
++for d in [(0,0,0.002),(0,0.003,0),(0,0.003,0.002),(0.003,0,0),(-0.003,0,0),(0,-0.003,0)]:
++    qt,e=ap._ik_world(q, T[:3,3]+np.array(d), T[:3,:3], base)
++    a=np.zeros(11,np.float32); a[3:10]=qt-q; o2,*_=env.step(a)
++    moved = not np.allclose(ap._q(o2), q)
++    print(d, "moved", moved)
++    if moved:
++        a[3:10]=q-qt; o2,*_=env.step(a)

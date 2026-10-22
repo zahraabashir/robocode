@@ -1,0 +1,37 @@
+diff --git a/approach.py b/approach.py
+index 8068d7e..cc6e81f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -30,7 +30,10 @@ class GeneratedApproach:
+         self.lastpos = list(self.home)
+ 
+     def _rects(self, s):
+-        ans = []
++        # The central wall is a fixed part of the arena but is intentionally not
++        # listed among observation objects.  Its narrow ends leave routes around
++        # it at the north and south edges.
++        ans = [(0.0, 0.0, .20, 1.50)]
+         for o in self._get(s, "obstacle"):
+             ans.append((s.get(o,"x"), s.get(o,"y"), s.get(o,"half_x"), s.get(o,"half_y")))
+         # Lander is a physical obstacle; use a conservative footprint.
+@@ -85,7 +88,7 @@ class GeneratedApproach:
+             _,g,k=heapq.heappop(openq)
+             if g != cost.get(k): continue
+             p=pos(k)
+-            if any((p[0]-q[0])**2+(p[1]-q[1])**2 <= .10**2 for q in goals):
++            if any((p[0]-q[0])**2+(p[1]-q[1])**2 <= .15**2 for q in goals):
+                 end=k; break
+             for dx,dy in ((1,0),(-1,0),(0,1),(0,-1),(1,1),(1,-1),(-1,1),(-1,-1)):
+                 nk=(k[0]+dx,k[1]+dy); np_=pos(nk)
+@@ -152,7 +155,10 @@ class GeneratedApproach:
+             cs=self._candidates(s,lq,3.8,True); return ("nav_send",min(cs,key=lambda p:math.dist(pos,p)) if cs else self.home[i])
+         # One rover takes stone, the other soil, choosing nearest unreceived sample.
+         soil=bool(i)
+-        samples=[o for o in self._get(s,"sample") if bool(s.get(o,"is_soil")>.5)==soil and s.get(o,"received_analysis")<.5]
++        matching=[o for o in self._get(s,"sample") if bool(s.get(o,"is_soil")>.5)==soil]
++        if any(s.get(o,"received_analysis")>.5 for o in matching):
++            return ("home",self.home[i])
++        samples=[o for o in matching if s.get(o,"received_analysis")<.5]
+         if samples:
+             candidates=[]
+             for o in samples:

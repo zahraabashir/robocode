@@ -1,0 +1,25 @@
+from probe_samp_util import *
+def S(obs,n):
+    o=obs.get_object_from_name(n); return {f:round(float(obs.get(o,f)),3) for f in obs.type_features[o.type]}
+def pr(D,tag): print(tag,'r',D.last[0],'term',D.last[1],'trunc',D.last[2],D.last[3],'steps',D.steps,'R',D.R)
+D=Driver(1)
+# facing test for rover1 at (-1.7,0.9)
+goto_fine(D,1,-1.7,-1.0); goto_fine(D,1,-1.7,0.9)
+D.turn(1,math.atan2(2.096-0.9,-2.114+1.7)+math.pi); D.act(1,'calibrate'); print('calib facing away',rov(D.obs,1)['calibrated'])
+for off in [0.3,0.6,0.9,1.2]:
+  D.turn(1,math.atan2(2.096-0.9,-2.114+1.7)+off); D.act(1,'calibrate'); print('calib off',off,rov(D.obs,1)['calibrated'])
+D.turn(1,math.atan2(2.096-0.9,-2.114+1.7)); D.act(1,'calibrate'); D.act(1,'image'); print('obj1',S(D.obs,'objective1'))
+D.act(1,'send'); print('obj1 after send',S(D.obs,'objective1'))
+goto_fine(D,1,-1.7,-1.0); goto_fine(D,1,-1,-1.75); D.turn(1,0)
+D.goto(0,0.747,-1.348); D.act(0,'sample'); goto_fine(D,0,0.8,-2.0); D.act(0,'send')
+D.goto(1,-1.285,-1.367); D.act(1,'sample'); D.act(1,'send'); goto_fine(D,1,-1,-1.75); D.turn(1,0)
+print('s1',S(D.obs,'sample1')['received_analysis'],'s3',S(D.obs,'sample3')['received_analysis'])
+for wp in [(1.7,-1.5),(1.7,0.3)]: print(goto_fine(D,0,*wp))
+p=rov(D.obs,0); D.turn(0,math.atan2(1.923-p['y'],2.118-p['x'])); D.act(0,'calibrate'); D.act(0,'image'); print('obj0',S(D.obs,'objective0'))
+goto_fine(D,0,1.7,-1.5); goto_fine(D,0,0.8,-2.0); D.act(0,'send'); print('obj0',S(D.obs,'objective0')); pr(D,'after send')
+goto_fine(D,0,1.0,-1.75); pr(D,'r0 home pos'); D.turn(0,math.pi); pr(D,'r0 home theta')
+print(rov(D.obs,0),rov(D.obs,1))
+D.step(); pr(D,"extra step")
+D.act(0,"drop"); pr(D,"drop r0"); print(rov(D.obs,0)["store_full"])
+D.act(1,"drop"); pr(D,"drop r1")
+D.step(); pr(D,"post")

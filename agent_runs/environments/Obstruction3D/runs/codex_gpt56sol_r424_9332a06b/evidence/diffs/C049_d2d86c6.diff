@@ -1,0 +1,30 @@
+diff --git a/release_probe_openonly.py b/release_probe_openonly.py
+new file mode 100644
+index 0000000..7e7cb27
+--- /dev/null
++++ b/release_probe_openonly.py
+@@ -0,0 +1,24 @@
++"""Test whether an unwedged target releases with gripper motion alone."""
++import sys
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++
++
++for seed in map(int, sys.argv[1:] or [0]):
++    env = make_env()
++    state, info = env.reset(seed=seed)
++    policy = GeneratedApproach(env.action_space, env.observation_space, {})
++    policy.reset(state, info)
++    for step in range(env.max_steps):
++        action = policy.get_action(state)
++        if policy.mode == "release" and policy.object_name == "target_block":
++            action = np.zeros(env.action_space.shape, dtype=env.action_space.dtype)
++            action[10] = 1.0
++        state, reward, done, trunc, info = env.step(action)
++        if done or trunc:
++            block = state.get_object_from_name("target_block")
++            print(seed, step + 1, done, trunc,
++                  [round(state.get(block, "pose_" + c), 5) for c in "xyz"])
++            break
++    env.close()

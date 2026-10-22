@@ -1,0 +1,21 @@
+diff --git a/approach.py b/approach.py
+index 4cf693c..b697140 100644
+--- a/approach.py
++++ b/approach.py
+@@ -843,6 +843,16 @@ class GeneratedApproach:
+             self.cur = None
+             return
+         if tag == "grasp_descend":
++            name = seg[4] if len(seg) > 4 else None
++            boxes = self._boxes(state)
++            if name in boxes:
++                ob = boxes[name]
++                tip = T[2, 3] - FINGER
++                if tip <= ob["z"] + ob["hz"] + 0.002 and tip >= ob["z"] - ob["hz"] + 0.016:
++                    # fingers already straddle the object: try closing here
++                    self.segs = [("grip", -1.0, name)] + [sg for sg in self.segs if sg[0] != "grip"]
++                    self.cur = None
++                    return
+             key = getattr(self, "cur_key", None)
+             if key is not None:
+                 self.fail[key] = self.fail.get(key, 0) + 1

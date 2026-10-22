@@ -1,0 +1,32 @@
+diff --git a/approach.py b/approach.py
+index 2311190..6a315a5 100644
+--- a/approach.py
++++ b/approach.py
+@@ -105,8 +105,9 @@ class GeneratedApproach:
+ 
+         if self.mode == "choose":
+             branch_mismatch = pd < 0.06 and abs(goal_theta-theta) > 0.14
++            turn_threshold = 0.06 if pd < 0.18 else 0.11
+             boundary_recover = min(obj) < 0.72 or max(obj) > 4.28
+-            if (abs(ae) > 0.11 or branch_mismatch) and not boundary_recover:
++            if (abs(ae) > turn_threshold or branch_mismatch) and not boundary_recover:
+                 self.turn_sign = 1.0 if ae > 0.0 else -1.0
+                 self.mode = "rot_far"
+                 side = -self.turn_sign
+@@ -204,13 +205,13 @@ class GeneratedApproach:
+             # Once contact is established, keep following through in short
+             # closed-loop segments instead of paying to reacquire every time.
+             near_boundary = min(obj) < 0.78 or max(obj) > 4.22
+-            if moved > 0.11 and (now_ae < 0.14 or near_boundary) and pd > 0.05:
++            if moved > 0.08 and (now_ae < 0.16 or near_boundary) and pd > 0.05:
+                 dtheta = self._angle(theta-self.start_pose[2])
+-                self.line_offset = float(np.clip(self.line_offset + 0.7*dtheta, -0.24, 0.24))
++                self.line_offset = float(np.clip(self.line_offset + 1.2*dtheta, -0.28, 0.28))
+                 self.start_pose = np.array([obj[0], obj[1], theta])
+                 self.push_dir = dp / max(pd, 1e-9)
+                 self.count = 0
+-            elif self.count >= 60 or (now_ae > 0.13 and not near_boundary):
++            elif self.count >= 60 or (now_ae > 0.155 and not near_boundary):
+                 self.mode = "move_retreat"
+             speed = 0.012 if pd < 0.12 else 0.025
+             return self._safe((com + self.push_dir * 0.20) - robot, speed)

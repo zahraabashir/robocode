@@ -1,0 +1,44 @@
+diff --git a/approach.py b/approach.py
+index 07b2344..227a351 100644
+--- a/approach.py
++++ b/approach.py
+@@ -212,7 +212,13 @@ class GeneratedApproach:
+         N = len(sw)
+         # filter starts that are outside walls
+         ok = np.all((sw > WALL_LO + R_ROBOT + 0.01) & (sw < WALL_HI - R_ROBOT - 0.01), 1)
+-        sw, dw = sw[ok], dw[ok]
++        # start point must not overlap block, staging point must be clear
++        pre = sw - dw * 0.12
++        ds = dist_to_T_local(to_local(sw, pose), self.model.rects)
++        dp = dist_to_T_local(to_local(pre, pose), self.model.rects)
++        ok &= (ds > R_ROBOT + 0.005) & (dp > R_ROBOT + 0.035)
++        if np.any(ok):
++            sw, dw = sw[ok], dw[ok]
+         N = len(sw)
+         poses = np.repeat(pose[None], N, 0)
+         rob = sw.copy()
+@@ -314,7 +320,7 @@ class GeneratedApproach:
+                 st, d, k, sc, c0 = self.plan_push(pose, robot)
+                 self.push = (st, d)
+                 self.push_left = k + 3
+-                self.path = self.nav_path(robot, st, pose)
++                self.path = self.nav_path(robot, st - d * 0.12, pose) + [st]
+                 self.plan_pose = pose.copy()
+                 self.mode = "nav"
+             if self.mode == "nav":
+diff --git a/test_approach.py b/test_approach.py
+index 0268fd7..6a75de4 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -13,7 +13,10 @@ def run(seed):
+     steps = 0
+     done = False
+     for steps in range(1, env.max_steps + 1):
+-        a = ap.get_action(obs)
++        try:
++            a = ap.get_action(obs)
++        except Exception as e:
++            print("EXC", seed, steps, obs[[0,1,2,16,17]], repr(e)); break
+         obs, r, term, trunc, _ = env.step(np.clip(a, -0.05, 0.05))
+         if term:
+             done = True

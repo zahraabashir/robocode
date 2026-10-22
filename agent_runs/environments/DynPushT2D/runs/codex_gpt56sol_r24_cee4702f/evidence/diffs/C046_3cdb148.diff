@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index ce5fbcb..7ca4411 100644
+--- a/approach.py
++++ b/approach.py
+@@ -225,7 +225,7 @@ class GeneratedApproach:
+                 self.push_dir = dp / max(pd, 1e-9)
+                 self.count = 0
+             elif self.count >= 60 or (now_ae > 0.13 and not near_boundary and not self.force_move):
+-                if moved > 0.02:
++                if moved > 0.02 and pd < 0.30:
+                     dtheta = self._angle(theta-self.start_pose[2])
+                     self.line_offset = float(np.clip(self.line_offset + 0.7*dtheta, -0.24, 0.24))
+                 self.mode = "move_retreat"

@@ -1,0 +1,29 @@
+diff --git a/approach.py b/approach.py
+index 7f9de6b..92b2e69 100644
+--- a/approach.py
++++ b/approach.py
+@@ -244,15 +244,20 @@ class GeneratedApproach:
+         if self.phase == "lift":
+             # At table height a simultaneous Cartesian move may be rejected by
+             # collision checking. Joint 4 positive is a reliable vertical escape.
+-            if self._xyz(state, held)[2] < self.lift_start_z + .10 and self.phase_steps <= 10:
++            if self._xyz(state, held)[2] < self.lift_start_z + .10 and self.phase_steps <= 14:
+                 action = self._act_to(q, q)
+-                action[4] = -.05
++                if self.phase_steps % 2 == 0:
++                    action[4] = -.05
++                else:
++                    region_y = self._xyz(state, "target_region")[1]
++                    away = np.sign(self._xyz(state, held)[1] - region_y)
++                    action[5] = -.04 * (away if away != 0 else 1)
+                 return action
+-            if self._xyz(state, held)[2] < self.lift_start_z + .10 and self.phase_steps <= 18:
++            if self._xyz(state, held)[2] < self.lift_start_z + .10 and self.phase_steps <= 22:
+                 action = self._act_to(q, q)
+                 action[6] = .04
+                 return action
+-            if self._xyz(state, held)[2] < self.lift_start_z + .10 and self.phase_steps <= 25:
++            if self._xyz(state, held)[2] < self.lift_start_z + .10 and self.phase_steps <= 29:
+                 action = self._act_to(q, q)
+                 action[4], action[6] = -.03, .03
+                 return action

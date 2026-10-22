@@ -1,0 +1,35 @@
+diff --git a/approach.py b/approach.py
+index 9d7d605..53de72b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -15,6 +15,8 @@ class GeneratedApproach:
+         self.todo.append(state.get_objects(self.types["target_block"])[0].name)
+         xs = [state.get(state.get_object_from_name(n), "x") for n in state.get_object_names()]
+         self.park_base = max(xs) + 0.45
++        robot = state.get_objects(self.types["crv_robot"])[0]
++        self.safe_y = state.get(robot, "y")
+         self.index, self.phase, self.retry = 0, "orient", 0
+         self.stalled, self.last_robot_y = 0, None
+         self.pick_y, self.attached, self.release_wait = 0.0, False, 0
+@@ -46,10 +48,10 @@ class GeneratedApproach:
+             else:
+                 return self._action(dtheta=self._clip(err, 0.196))
+         if self.phase == "rise":
+-            if ry >= 0.88:
++            if ry >= self.safe_y - 0.004:
+                 self.phase = "align"
+             else:
+-                return self._action(dy=min(0.05, 0.9 - ry))
++                return self._action(dy=min(0.05, self.safe_y - ry))
+         if self.phase == "align":
+             offsets = (0.0, -0.22, 0.22, -0.38, 0.38)
+             tx = ox + offsets[min(self.retry, 4)] * width
+@@ -108,7 +110,7 @@ class GeneratedApproach:
+                 return self._action()
+             self.phase = "retreat"
+         if self.phase == "retreat":
+-            if ry < 0.89:
++            if ry < self.safe_y - 0.004:
+                 return self._action(dy=0.05)
+             self.index += 1
+             self.retry, self.attached, self.release_wait = 0, False, 0

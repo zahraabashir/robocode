@@ -1,0 +1,23 @@
+diff --git a/approach.py b/approach.py
+index 39ec4dd..4b89bd0 100644
+--- a/approach.py
++++ b/approach.py
+@@ -92,14 +92,14 @@ class GeneratedApproach:
+             i = self.park_count
+             self.park_count += 1
+             self.destination = np.array((.13 + .06*(i % 6), -.34 if ry >= 0 else .34,
+-                                         .075 + self._get(state, self.object, "half_extent_z")))
++                                         .078 + self._get(state, self.object, "half_extent_z")))
+             return
+         self.object = "target_block"
+         reg = self._xyz(state, "target_region")
+         z = reg[2] + self._get(state, "target_region", "half_extent_z")
+-        # A tiny penetration request lets collision resolution establish support;
+-        # airborne objects intentionally cannot be released by this environment.
+-        z += self._get(state, "target_block", "half_extent_z") - .002
++        # Contact is recognized a few millimeters above the analytical surface.
++        # Airborne objects intentionally cannot be released by this environment.
++        z += self._get(state, "target_block", "half_extent_z") + .003
+         self.destination = np.array((reg[0], reg[1], z))
+ 
+     def _set_goal_for_object_delta(self, state, desired_object_xyz):

@@ -1,0 +1,21 @@
+diff --git a/approach.py b/approach.py
+index ae3bc41..4c6407f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -20,6 +20,7 @@ LANDER_RANGE_EXEC = 3.975
+ SAMPLE_RANGE = 0.24
+ SAMPLE_RANGE_EXEC = 0.245
+ HOME_RANGE = 0.15
++IMG_PEN = 1.0
+ PILLAR_INFL_X = 0.21
+ PILLAR_INFL_Y = 0.20
+ MOUND_INFL = 0.20
+@@ -291,7 +292,7 @@ class GeneratedApproach:
+             if seq:
+                 c = np.min(F + send_home)
+                 n_img = sum(1 for t in seq if t[0] == "O")
+-                cost = c / CELLS_PER_STEP + 1.0 * n_img + 1.0
++                cost = c / CELLS_PER_STEP + IMG_PEN * n_img + 1.0
+                 key = frozenset(seq)
+                 if key not in best or cost < best[key][0]:
+                     best[key] = (cost, seq)

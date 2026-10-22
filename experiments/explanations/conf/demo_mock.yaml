@@ -1,0 +1,52 @@
+# Offline demo: mock LLM + simulated participants. No API calls.
+#   python experiments/explanations/build_test_bank.py --config experiments/explanations/conf/demo_mock.yaml
+#   python experiments/explanations/run_simulated_study.py --config experiments/explanations/conf/demo_mock.yaml
+#   python experiments/explanations/analyze_study.py outputs/explanations/demo_mock
+# Any key can be overridden on the command line, e.g. num_rounds=8 study_seed=1.
+
+study_id: demo_mock
+study_seed: 0
+output_dir: outputs/explanations/${study_id}
+
+# Policy pool (agent_runs archive) and the environments to draw from.
+policy_root: agent_runs
+envs: [Obstruction2D, DynPushT2D, Rovers]
+
+# A/B test bank, built once, offline, from rollouts only (see understanding.py).
+test_bank_dir: outputs/explanations/test_banks/o2d_dpt_rovers_v1
+test_bank:
+  seeds: [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112]
+  object_counts: [null]  # null lets variable-count envs pick the count from the seed
+  max_steps: 400
+  require_same_outcome: true
+  require_solved: false
+  min_divergence: 0.05
+  tests_per_pair: 2
+  frame_stride: 2
+  fps: 15
+
+# Rounds per participant. Policies never repeat within a participant; the last
+# num_eval_rounds rounds are flagged for held-out evaluation.
+num_rounds: 9
+num_eval_rounds: 3
+balance_difficulty: true
+conditions: [no_learning, understanding_only, understanding_preference]
+
+# LLMs. provider: mock | cli | anthropic | openai_compatible. The non-mock
+# providers take the same keys as experiments/conf/approach/completion/*.yaml.
+explainer_llm:
+  provider: mock
+updater_llm:
+  provider: mock
+
+# Simulated participants: each persona x repeat is one user, run in every
+# condition with its own isolated memory (a paired design).
+simulation:
+  personas: [concise_algorithmic, detail_oriented, quiet_rater]
+  repeats: 2
+
+ui:
+  host: 127.0.0.1
+  port: 8765
+  show_explanation_during_test: false
+  reveal_correctness: false

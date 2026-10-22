@@ -1,0 +1,17 @@
+diff --git a/probe_instances.py b/probe_instances.py
+index a5fa577..9f7f5d8 100644
+--- a/probe_instances.py
++++ b/probe_instances.py
+@@ -178,6 +178,12 @@ def full_place(seed):
+         drive(qpick, 1.)
+         a = np.zeros(11, np.float32); a[10] = -1.; s, r, term, trunc, _ = env.step(a)
+         print("PICK", snapshot(s)["robot"], qpick.tolist())
++        if seed == 112:
++            for gi in range(3):
++                a = np.zeros(11, np.float32); a[10] = 1.
++                s, r, term, trunc, _ = env.step(a)
++                print("OPEN_AT_PICK", gi, snapshot(s)["robot"], snapshot(s)["target_block"])
++            return
+         region = start["target_region"]
+         # Lift vertically before translating so the held block clears the table.
+         qlift = ik(np.array([target["pose_x"], target["pose_y"], .30]), off=.16)

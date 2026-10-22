@@ -1,0 +1,50 @@
+diff --git a/approach.py b/approach.py
+index b568c06..0fcf890 100644
+--- a/approach.py
++++ b/approach.py
+@@ -85,9 +85,9 @@ class GeneratedApproach:
+         R = _quat_R(*[s.get(o, f) for f in ('pose_qx', 'pose_qy', 'pose_qz', 'pose_qw')])
+         return np.arctan2(R[1, 0], R[0, 0])
+ 
+-    def _finger_clearance(self, s, obj, yaw, others):
++    def _finger_clearance(self, s, obj, yaw, others, center=None):
+         """Min clearance between finger boxes (at obj, given yaw) and other objects' footprints."""
+-        p = _pose(s, obj)
++        p = _pose(s, obj) if center is None else center
+         c, sn = np.cos(yaw), np.sin(yaw)
+         ax = np.array([c, sn]); ay = np.array([-sn, c])
+         best = 1e9
+@@ -111,7 +111,7 @@ class GeneratedApproach:
+                 best = min(best, d)
+         return best
+ 
+-    def _grasp_yaw(self, s, obj, q, base, others, aligned_only):
++    def _grasp_yaw(self, s, obj, q, base, others, aligned_only, place=None):
+         h = _he(s, obj)
+         oyaw = self._obj_yaw(s, obj)
+         M = fk(base, q, TOOL)
+@@ -125,6 +125,9 @@ class GeneratedApproach:
+             if span > 0.041:
+                 continue
+             clr = self._finger_clearance(s, obj, yaw, others)
++            if place is not None:
++                pc, pyaw = place
++                clr = min(clr, self._finger_clearance(s, obj, pyaw + rel, others, center=pc))
+             score = min(clr, 0.02) - 0.002 * abs(_wrap(yaw - cy)) - 0.01 * span \
+                 - (0.0 if abs(np.sin(2 * rel)) < 1e-6 else 0.005)
+             cands.append((score, _wrap(yaw)))
+@@ -139,11 +142,12 @@ class GeneratedApproach:
+         _, q, base = self._robot(s)
+         p = _pose(s, obj)
+         h = _he(s, obj)
+-        yaw = self._grasp_yaw(s, obj, q, base, others, place_yaw is not None)
++        place_center = np.array([place_xy[0], place_xy[1], support_top + h[2] + 0.002])
++        yaw = self._grasp_yaw(s, obj, q, base, others, place_yaw is not None,
++                              None if place_yaw is None else (place_center, place_yaw))
+         self.place_yaw = place_yaw
+         self.cur_obj = obj.name
+         gz = p[2] + 0.035  # TCP height for grasp (object centre 2-5 cm below TCP works)
+-        place_center = np.array([place_xy[0], place_xy[1], support_top + h[2] + 0.002])
+         return [
+             ('move', np.array([p[0], p[1], max(SAFE_Z, gz + 0.05)]), yaw, False),
+             ('move', np.array([p[0], p[1], gz + 0.02]), yaw, False),

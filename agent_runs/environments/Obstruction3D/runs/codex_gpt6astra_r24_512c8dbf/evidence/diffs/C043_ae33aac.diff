@@ -1,0 +1,107 @@
+diff --git a/dense_agent_0_50.out b/dense_agent_0_50.out
+new file mode 100644
+index 0000000..4914f39
+--- /dev/null
++++ b/dense_agent_0_50.out
+@@ -0,0 +1,21 @@
++progress 0 above obstruction7:Kinematic3DCuboid 0 7 0 0 0.27
++progress 50 above obstruction4:Kinematic3DCuboid 2 7 0 0 19.55
++progress 100 grasp obstruction1:Kinematic3DCuboid 3 7 0 1 26.56
++progress 150 above obstruction0:Kinematic3DCuboid 5 7 5 0 28.65
++progress 200 above obstruction0:Kinematic3DCuboid 5 7 55 0 29.03
++progress 250 above obstruction0:Kinematic3DCuboid 5 7 105 0 29.36
++progress 300 above obstruction0:Kinematic3DCuboid 5 7 155 0 29.68
++progress 350 above obstruction0:Kinematic3DCuboid 5 7 205 0 29.99
++progress 400 above obstruction0:Kinematic3DCuboid 5 7 255 0 30.3
++progress 450 above obstruction0:Kinematic3DCuboid 5 7 305 0 30.6
++progress 500 above obstruction0:Kinematic3DCuboid 5 7 355 0 30.86
++progress 550 above obstruction0:Kinematic3DCuboid 5 7 405 0 31.18
++progress 600 above obstruction0:Kinematic3DCuboid 5 7 455 0 31.51
++progress 650 above obstruction0:Kinematic3DCuboid 5 7 505 0 31.79
++progress 700 above obstruction0:Kinematic3DCuboid 5 7 555 0 32.07
++progress 750 above obstruction0:Kinematic3DCuboid 5 7 605 0 32.3
++progress 800 above obstruction0:Kinematic3DCuboid 5 7 655 0 32.52
++progress 850 above obstruction0:Kinematic3DCuboid 5 7 705 0 32.76
++progress 900 above obstruction0:Kinematic3DCuboid 5 7 755 0 32.99
++progress 950 above obstruction0:Kinematic3DCuboid 5 7 805 0 33.26
++{"seed": 0, "count": 50, "success": false, "steps": 1000, "seconds": 33.55, "compute": 0.796, "phase": "above", "obj": "obstruction0:Kinematic3DCuboid", "stall": 854, "attempt": 0}
+diff --git a/dense_agent_2_20.out b/dense_agent_2_20.out
+new file mode 100644
+index 0000000..eaf8162
+--- /dev/null
++++ b/dense_agent_2_20.out
+@@ -0,0 +1,4 @@
++progress 0 above obstruction8:Kinematic3DCuboid 0 5 0 0 0.12
++progress 50 grasp obstruction1:Kinematic3DCuboid 1 5 0 1 3.52
++progress 100 align obstruction2:Kinematic3DCuboid 3 5 0 0 5.24
++{"seed": 2, "count": 20, "success": true, "steps": 143, "seconds": 6.41, "compute": 0.127, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
+diff --git a/dense_agent_3_20.out b/dense_agent_3_20.out
+new file mode 100644
+index 0000000..322ab55
+--- /dev/null
++++ b/dense_agent_3_20.out
+@@ -0,0 +1,4 @@
++progress 0 above obstruction1:Kinematic3DCuboid 0 5 0 0 0.05
++progress 50 grasp obstruction5:Kinematic3DCuboid 2 5 0 0 1.94
++progress 100 align target_block:Kinematic3DCuboid 4 5 0 0 3.71
++{"seed": 3, "count": 20, "success": true, "steps": 119, "seconds": 4.25, "compute": 0.203, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
+diff --git a/final_regression.txt b/final_regression.txt
+new file mode 100644
+index 0000000..41092b1
+--- /dev/null
++++ b/final_regression.txt
+@@ -0,0 +1,5 @@
++{"seed": 2, "count": 2, "success": true, "steps": 98, "seconds": 2.09, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
++{"seed": 8, "count": 2, "success": true, "steps": 68, "seconds": 14.65, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
++{"seed": 9, "count": 1, "success": true, "steps": 46, "seconds": 4.15, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
++{"seed": 10, "count": 2, "success": true, "steps": 46, "seconds": 5.23, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
++{"seed": 11, "count": 0, "success": true, "steps": 24, "seconds": 2.1, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
+diff --git a/probe_escape_dense.py b/probe_escape_dense.py
+new file mode 100644
+index 0000000..4173e00
+--- /dev/null
++++ b/probe_escape_dense.py
+@@ -0,0 +1,30 @@
++from env_client import make_env
++from approach import GeneratedApproach
++from kin import fk,ik
++import numpy as np,time
++E=make_env();s,info=E.reset(seed=0,options={'object_count':50});p=GeneratedApproach(E.action_space,E.observation_space,{});p.reset(s,info);r=p.robot;fs=['joint_'+str(i) for i in range(1,8)]
++def signature(s):return np.array([s.get(r,f) for f in ['pos_base_x','pos_base_y']+fs])
++for t in range(1000):
++ a=p.get_action(s)
++ if p.phase=='above' and p.stall>=3:break
++ s,rw,done,tr,info=E.step(a)
++ if done:print('EARLYSUCCESS');raise SystemExit
++v=signature(s);m,rot=fk(v[2:]);m+=np.r_[v[:2]+[.12,0],0]
++print('STALLED',t,'obj',p.obj.name,'model',m.tolist(),'signature',v.tolist(),flush=True)
++for o in p.objects:
++ if np.linalg.norm(p.pos(s,o)[:2]-m[:2])<.12:print('NEAR',o.name,p.pos(s,o).tolist(),p.size(s,o).tolist(),flush=True)
++trials=[]
++for dz in [.1,.2,.04,.01,.005]:
++ for dx,dy in [(0,0),(-.05,0),(0,-.05),(0,.05),(.05,0)]:
++  q=ik(.5,m[2]+dz);q[6]=v[-1];a=np.zeros(11,dtype=np.float32);a[0]=dx;a[1]=dy;a[3:10]=q-v[2:];a[:10]/=max(1,np.max(np.abs(a[:10]))/.2);trials.append((str((dz,dx,dy)),a))
++for da in [-.2,.2]:
++ q=ik(.5,m[2]+.1);q[6]=v[-1]+da;a=np.zeros(11,dtype=np.float32);a[3:10]=q-v[2:];a[:10]/=max(1,np.max(np.abs(a[:10]))/.2);trials.append(('rotate'+str(da),a))
++for label,a in trials:
++ s,rw,done,tr,info=E.step(a);accepted=np.max(abs(signature(s)-v))>1e-6;print('ESCAPE',label,'accepted',accepted,'action',a.tolist(),flush=True)
++ if accepted:break
++for k in range(1000-t):
++ s,rw,done,tr,info=E.step(p.get_action(s))
++ if done or tr:break
++ if p.stall>10:break
++print('RESULT',done,'steps',t+k+1,'phase',p.phase,'obj',p.obj.name,'stall',p.stall,flush=True)
++E.close()
+diff --git a/stress20_reordered.txt b/stress20_reordered.txt
+new file mode 100644
+index 0000000..cb1d8fd
+--- /dev/null
++++ b/stress20_reordered.txt
+@@ -0,0 +1,7 @@
++progress 0 above obstruction13:Kinematic3DCuboid 0 9 0 0 0.05
++progress 50 lower obstruction3:Kinematic3DCuboid 0 9 0 0 2.63
++progress 100 align obstruction4:Kinematic3DCuboid 2 9 0 0 4.53
++progress 150 grasp obstruction18:Kinematic3DCuboid 3 9 1 1 6.11
++progress 200 lower obstruction1:Kinematic3DCuboid 4 9 0 0 7.72
++progress 250 release obstruction13:Kinematic3DCuboid 6 9 0 0 9.3
++{"seed": 1, "count": 20, "success": true, "steps": 298, "seconds": 16.82, "compute": 0.431, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}

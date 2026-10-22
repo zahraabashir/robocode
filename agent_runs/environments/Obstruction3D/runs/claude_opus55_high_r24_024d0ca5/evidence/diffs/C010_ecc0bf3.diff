@@ -1,0 +1,172 @@
+diff --git a/approach.py b/approach.py
+index 987d3b0..731a453 100644
+--- a/approach.py
++++ b/approach.py
+@@ -232,6 +232,7 @@ class GeneratedApproach:
+         cur = tool_fk(q, base)[:3, 3]
+         R = down_R(yaw)
+         path = []
++        self.corners = set()
+         qc = q.copy()
+         for w in wps:
+             d = np.linalg.norm(w - cur)
+@@ -242,8 +243,10 @@ class GeneratedApproach:
+                 qn = qc + _wrap(qn - qc)
+                 path.append(qn)
+                 qc = qn
++            self.corners.add(len(path) - 1)
+             cur = w
+         self.qpath = path
++        self.popped = 0
+         self.wp_yaw = yaw
+         self.final_grip = final_grip
+         self.travel_grip = 1.0 if final_grip < 0 else 0.0
+@@ -255,17 +258,21 @@ class GeneratedApproach:
+         q = self._q(state)
+         while self.qpath and np.max(np.abs(_wrap(self.qpath[0] - q))) < 1e-4:
+             self.qpath.pop(0)
++            self.popped += 1
+         if not self.qpath:
+             return None
+         k = -1
+         for i, qp in enumerate(self.qpath):
+             if np.max(np.abs(_wrap(qp - q))) <= STEP:
+                 k = i
++                if (i + self.popped) in self.corners:
++                    break
+             else:
+                 break
+         a = np.zeros(11, dtype=np.float32)
+         if k >= 0:
+             self.qpath = self.qpath[k:]
++            self.popped += k
+             k = 0
+             d = _wrap(self.qpath[0] - q)
+             a[3:10] = d
+diff --git a/dbg_pp.py b/dbg_pp.py
+new file mode 100644
+index 0000000..9ed102a
+--- /dev/null
++++ b/dbg_pp.py
+@@ -0,0 +1,15 @@
++import sys, numpy as np
++from env_client import make_env
++import approach
++from approach import GeneratedApproach
++env=make_env(); obs,info=env.reset(seed=int(sys.argv[1]))
++ap=GeneratedApproach(env.action_space,env.observation_space,{}); ap.reset(obs,info)
++for t in range(int(sys.argv[2])):
++    a=ap.get_action(obs); obs,*_=env.step(a)
++orig=ap._set_path
++def sp(state,wps,yaw,final_grip=0.0,res=0.01):
++    print('wps',[np.round(w,3) for w in wps],'yaw',round(float(yaw),3))
++    orig(state,wps,yaw,final_grip,res); print('len',len(ap.qpath))
++ap._set_path=sp
++ap._plan_place(obs)
++for n in ap.names: print(n,np.round(ap._pose(obs,n)[0],3),np.round(ap._pose(obs,n)[2],3))
+diff --git a/res_new.txt b/res_new.txt
+new file mode 100644
+index 0000000..a141397
+--- /dev/null
++++ b/res_new.txt
+@@ -0,0 +1,100 @@
++seed 9: success=True steps=27 time=14.8s nobs=1 phase=open
++seed 3: success=True steps=33 time=34.6s nobs=2 phase=open
++seed 1: success=True steps=43 time=37.9s nobs=1 phase=open
++seed 0: success=True steps=41 time=35.0s nobs=2 phase=open
++seed 11: success=True steps=19 time=12.5s nobs=0 phase=open
++seed 7: success=True steps=47 time=36.7s nobs=2 phase=open
++seed 5: success=True steps=45 time=34.3s nobs=2 phase=open
++seed 2: success=True steps=65 time=59.8s nobs=2 phase=open
++seed 10: success=True steps=34 time=35.5s nobs=2 phase=open
++seed 12: success=True steps=29 time=24.8s nobs=1 phase=open
++seed 8: success=True steps=72 time=76.8s nobs=2 phase=open
++seed 16: success=True steps=33 time=26.4s nobs=1 phase=open
++seed 15: success=True steps=33 time=31.0s nobs=2 phase=open
++seed 4: success=True steps=95 time=90.6s nobs=2 phase=open
++seed 13: success=True steps=52 time=51.5s nobs=2 phase=open
++seed 17: success=True steps=46 time=36.4s nobs=2 phase=open
++seed 18: success=True steps=43 time=40.2s nobs=2 phase=open
++seed 19: success=True steps=42 time=35.9s nobs=1 phase=open
++seed 21: success=True steps=26 time=26.0s nobs=0 phase=open
++seed 24: success=True steps=22 time=20.4s nobs=1 phase=open
++seed 22: success=True steps=32 time=30.7s nobs=2 phase=open
++seed 23: success=True steps=26 time=25.4s nobs=0 phase=open
++seed 20: success=True steps=51 time=44.2s nobs=2 phase=open
++seed 29: success=True steps=17 time=15.2s nobs=2 phase=open
++seed 27: success=True steps=31 time=28.3s nobs=0 phase=open
++seed 30: success=True steps=25 time=21.7s nobs=0 phase=open
++seed 26: success=True steps=40 time=44.7s nobs=2 phase=open
++seed 28: success=True steps=49 time=46.8s nobs=1 phase=open
++seed 34: success=True steps=24 time=19.9s nobs=0 phase=open
++seed 25: success=True steps=61 time=71.7s nobs=1 phase=open
++seed 35: success=True steps=29 time=28.0s nobs=0 phase=open
++seed 32: success=True steps=54 time=55.7s nobs=2 phase=open
++seed 37: success=True steps=20 time=24.0s nobs=0 phase=open
++seed 38: success=True steps=19 time=19.2s nobs=0 phase=open
++seed 31: success=True steps=67 time=75.8s nobs=1 phase=open
++seed 36: success=True steps=46 time=52.1s nobs=1 phase=open
++seed 41: success=True steps=34 time=26.7s nobs=1 phase=open
++seed 33: success=True steps=69 time=77.8s nobs=2 phase=open
++seed 42: success=True steps=24 time=15.8s nobs=0 phase=open
++seed 40: success=True steps=48 time=50.7s nobs=1 phase=open
++seed 48: success=True steps=17 time=9.2s nobs=0 phase=open
++seed 39: success=True steps=54 time=62.6s nobs=2 phase=open
++seed 47: success=True steps=24 time=19.1s nobs=0 phase=open
++seed 44: success=True steps=45 time=45.1s nobs=2 phase=open
++seed 43: success=True steps=53 time=50.5s nobs=1 phase=open
++seed 49: success=True steps=24 time=20.8s nobs=0 phase=open
++seed 46: success=True steps=41 time=39.9s nobs=1 phase=open
++seed 54: success=True steps=19 time=11.5s nobs=0 phase=open
++seed 51: success=True steps=41 time=28.7s nobs=1 phase=open
++seed 56: success=True steps=28 time=13.6s nobs=1 phase=open
++seed 57: success=True steps=25 time=12.4s nobs=0 phase=open
++seed 14: success=False steps=1000 time=245.7s nobs=0 phase=done
++seed 55: success=True steps=48 time=38.4s nobs=2 phase=open
++seed 58: success=True steps=29 time=19.7s nobs=1 phase=open
++seed 60: success=True steps=23 time=13.0s nobs=0 phase=open
++seed 61: success=True steps=33 time=24.0s nobs=1 phase=open
++seed 62: success=True steps=36 time=26.3s nobs=1 phase=open
++seed 63: success=True steps=28 time=16.8s nobs=1 phase=open
++seed 59: success=True steps=63 time=52.3s nobs=2 phase=open
++seed 64: success=True steps=42 time=27.2s nobs=1 phase=open
++seed 65: success=True steps=32 time=21.6s nobs=0 phase=open
++seed 68: success=True steps=23 time=14.4s nobs=1 phase=open
++seed 69: success=True steps=21 time=11.6s nobs=0 phase=open
++seed 67: success=True steps=46 time=32.7s nobs=2 phase=open
++seed 70: success=True steps=41 time=22.9s nobs=1 phase=open
++seed 66: success=True steps=72 time=50.5s nobs=2 phase=open
++seed 74: success=True steps=25 time=11.3s nobs=0 phase=open
++seed 71: success=True steps=55 time=36.3s nobs=2 phase=open
++seed 77: success=True steps=20 time=5.4s nobs=0 phase=open
++seed 75: success=True steps=38 time=22.3s nobs=1 phase=open
++seed 78: success=True steps=33 time=13.8s nobs=2 phase=open
++seed 79: success=True steps=21 time=8.3s nobs=0 phase=open
++seed 72: success=True steps=109 time=70.1s nobs=2 phase=open
++seed 81: success=True steps=20 time=9.3s nobs=0 phase=open
++seed 83: success=True steps=29 time=10.5s nobs=2 phase=open
++seed 82: success=True steps=53 time=23.4s nobs=2 phase=open
++seed 80: success=True steps=62 time=37.2s nobs=2 phase=open
++seed 84: success=True steps=28 time=14.6s nobs=1 phase=open
++seed 6: success=False steps=1000 time=484.4s nobs=1 phase=to_place
++seed 85: success=True steps=60 time=31.6s nobs=2 phase=open
++seed 87: success=True steps=40 time=19.7s nobs=1 phase=open
++seed 90: success=True steps=42 time=15.3s nobs=1 phase=open
++seed 88: success=True steps=60 time=30.2s nobs=1 phase=open
++seed 89: success=True steps=61 time=34.8s nobs=2 phase=open
++seed 91: success=True steps=47 time=24.1s nobs=2 phase=open
++seed 92: success=True steps=43 time=21.8s nobs=1 phase=open
++seed 52: success=False steps=1000 time=309.2s nobs=2 phase=close
++seed 93: success=True steps=56 time=32.2s nobs=2 phase=open
++seed 94: success=True steps=30 time=22.2s nobs=0 phase=open
++seed 97: success=True steps=21 time=11.1s nobs=0 phase=open
++seed 95: success=True steps=56 time=31.0s nobs=1 phase=open
++seed 98: success=True steps=35 time=12.2s nobs=1 phase=open
++seed 96: success=True steps=53 time=28.0s nobs=2 phase=open
++seed 45: success=False steps=1000 time=386.7s nobs=2 phase=close
++seed 99: success=True steps=68 time=15.5s nobs=2 phase=open
++seed 50: success=False steps=1000 time=359.2s nobs=2 phase=close
++seed 53: success=False steps=1000 time=349.5s nobs=2 phase=open
++seed 73: success=False steps=1000 time=244.4s nobs=2 phase=retreat
++seed 76: success=False steps=1000 time=216.7s nobs=1 phase=to_place
++seed 86: success=False steps=1000 time=151.2s nobs=2 phase=to_place

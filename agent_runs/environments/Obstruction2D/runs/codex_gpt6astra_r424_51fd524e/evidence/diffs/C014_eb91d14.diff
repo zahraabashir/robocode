@@ -1,0 +1,62 @@
+diff --git a/approach.py b/approach.py
+index 4468226..d5dea37 100644
+--- a/approach.py
++++ b/approach.py
+@@ -38,15 +38,20 @@ class GeneratedApproach:
+             if self.phase == 'select':
+                 bx,by,bw,bh=self.rect(s,self.block)
+                 sx,sy,sw,sh=self.rect(s,self.surface)
+-                self.destx=sx+(sw-bw)/2
+                 obs=[o for o in s.get_objects(self.ot) if o not in (self.block,self.surface)]
++                choices=np.linspace(sx+.001,sx+sw-bw-.001,21)
++                def cost(left):
++                    overlap=[o for o in obs if s.get(o,'x')<left+bw+.004 and s.get(o,'x')+s.get(o,'width')>left-.004 and s.get(o,'y')<sy+sh+bh+.04]
++                    return (len(overlap),abs(left-(sx+(sw-bw)/2)))
++                self.destx=min(choices,key=cost)
+                 blocking=[o for o in obs if s.get(o,'x')<self.destx+bw+.004 and s.get(o,'x')+s.get(o,'width')>self.destx-.004 and s.get(o,'y')<sy+sh+bh+.04]
+                 self.obj=max(blocking,key=lambda o:s.get(o,'y')+s.get(o,'height')) if blocking else self.block
+                 self.phase='above'
+             x,y,w,h=self.rect(s,self.obj)
+             if self.phase == 'above':
+                 if ry<.72: return self.action(s,y=.75)
+-                if abs(rx-(x+w/2))>.001: return self.action(s,x=x+w/2,y=.75)
++                grasp_x=float(np.clip(x+w/2,.101,1.517))
++                if abs(rx-grasp_x)>.001: return self.action(s,x=grasp_x,y=.75)
+                 self.phase='down'; self.n=0; self.last_down=None
+             if self.phase == 'down':
+                 self.n+=1
+diff --git a/test_batch.py b/test_batch.py
+new file mode 100644
+index 0000000..b805256
+--- /dev/null
++++ b/test_batch.py
+@@ -0,0 +1,29 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import sys,time,json,concurrent.futures
++start=int(sys.argv[1]) if len(sys.argv)>1 else 0
++n=int(sys.argv[2]) if len(sys.argv)>2 else 100
++count=int(sys.argv[3]) if len(sys.argv)>3 else None
++
++def run(seed):
++ e=make_env()
++ try:
++  s,i=e.reset(seed=seed,options={'object_count':count} if count is not None else None)
++  p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,i)
++  st=time.time();trace=[]
++  for t in range(e.max_steps):
++   a=p.get_action(s);s,r,d,tr,i=e.step(a)
++   if t%40==0:trace.append([t,p.phase,p.obj.name if p.obj else '',round(s.get(p.robot,'x'),4),round(s.get(p.robot,'y'),4)])
++   if d or tr:break
++  out=dict(seed=seed,count=count,done=d,steps=t+1,seconds=round(time.time()-st,3))
++  if not d:out['trace']=trace[-4:];out['state']={o.name:{f:s.get(o,f) for f in ('x','y','width','height')} for o in s.get_objects(p.ot)}
++  return out
++ except Exception as ex:return dict(seed=seed,count=count,error=str(ex))
++ finally:e.close()
++
++with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
++ results=list(ex.map(run,range(start,start+n)))
++for r in results:
++ if not r.get('done'):print(r)
++print('SUMMARY',len(results),'success',sum(r.get('done',False) for r in results),'mean_steps',round(sum(r.get('steps',0) for r in results)/len(results),2),'max_time',max(r.get('seconds',0) for r in results),flush=True)
++json.dump(results,open('results_%s_%s_%s.json'%(start,n,count),'w'))

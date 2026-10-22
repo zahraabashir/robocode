@@ -1,0 +1,32 @@
+diff --git a/approach.py b/approach.py
+index 0f62fd5..a80cd54 100644
+--- a/approach.py
++++ b/approach.py
+@@ -117,6 +117,7 @@ class GeneratedApproach:
+         self.blocked = False
+         self.look = STEP
+         self.fails = {}
++        self.blk_moves = {}
+         self.stuck = 0
+         self.descent_len = 0
+         self.release_tries = 0
+@@ -149,7 +150,8 @@ class GeneratedApproach:
+                 g = _gap(fc, fh, c, hh)
+                 if g < clear:
+                     clear = g
+-                    self._blocker = n
++                    if g < 0.005:
++                        self._blocker = n
+         return clear
+ 
+     def _choose_yaw(self, state, name, kind, attempt):
+@@ -209,7 +211,9 @@ class GeneratedApproach:
+             blk = sc[0][2]
+             if (blk is not None and blk.startswith('obstruction')
+                     and all(t[0] != blk for t in self.tasks)
++                    and self.blk_moves.get(blk, 0) < 2
+                     and self._yaw_scores(state, blk, 'clear')[0][0] > 0.002):
++                self.blk_moves[blk] = self.blk_moves.get(blk, 0) + 1
+                 self.tasks.insert(0, (blk, 'clear'))
+                 continue
+             return

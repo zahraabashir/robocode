@@ -1,0 +1,45 @@
+diff --git a/approach.py b/approach.py
+index f56f2e5..90147c6 100644
+--- a/approach.py
++++ b/approach.py
+@@ -19,7 +19,7 @@ class GeneratedApproach:
+         obs=[o for o in self.objects if o not in [self.block,self.region] and np.all(np.abs(self.pos(state,o)[:2]-rp[:2]) < self.size(state,o)[:2]+rs[:2]+.012)]
+         obs.sort(key=lambda o:-self.pos(state,o)[2])
+         self.todo=obs+[self.block];self.index=0;self.phase='above';self.t=0;self.stall=0;self.last=None
+-        self.attempt=0;self.wrist=np.pi/2;self.failed_places=[];self.obj=self.todo[0];self.destination=self.choose_destination(state)
++        self.attempts={};self.attempt=0;self.wrist=np.pi/2;self.failed_places=[];self.obj=self.todo[0];self.destination=self.choose_destination(state)
+     def choose_destination(self,state):
+         self.placing_goal=self.obj==self.block and not any(o!=self.block for o in self.todo[self.index+1:])
+         if self.placing_goal:
+@@ -66,7 +66,19 @@ class GeneratedApproach:
+         else:self.stall=0
+         self.last=signature
+         if not held and self.phase=='grasp' and self.stall>=3:
+-            self.attempt+=1;self.wrist=[np.pi/2,0,np.pi/4,-np.pi/4][self.attempt%4];self.phase='above';self.stall=0
++            self.attempt+=1;self.attempts[self.obj]=self.attempt
++            if self.attempt%2==0:
++                pending=[o for o in self.todo[self.index:] if o not in [self.obj,self.block]]
++                if not pending:
++                    pending=[o for o in self.objects if o not in [self.obj,self.block,self.region] and np.all(np.abs(self.pos(state,o)[:2]-bp[:2])<.095)]
++                    pending.sort(key=lambda o:-self.pos(state,o)[2])
++                if pending:
++                    postponed=[] if self.obj==self.block else [self.obj]
++                    self.todo=self.todo[:self.index]+pending+postponed+[self.block]
++                    self.obj=self.todo[self.index];bp=self.pos(state,self.obj)
++                    self.attempt=self.attempts.get(self.obj,0);self.failed_places=[]
++                    self.destination=self.choose_destination(state)
++            self.wrist=[np.pi/2,0,np.pi/4,-np.pi/4][self.attempt%4];self.phase='above';self.stall=0
+         if held and self.phase in ['above','align','grasp']:
+             grabbed=[o for o in self.objects if state.get(o,'grasp_active')>0]
+             if grabbed and grabbed[0]!=self.obj:
+diff --git a/test_sweep_current.out b/test_sweep_current.out
+index b29cf81..4ec1abc 100644
+--- a/test_sweep_current.out
++++ b/test_sweep_current.out
+@@ -24,3 +24,6 @@
+ {"seed": 84, "count": 1, "success": true, "steps": 54, "sec": 5.1}
+ {"seed": 85, "count": 2, "success": true, "steps": 80, "sec": 6.64}
+ {"seed": 86, "count": 2, "success": true, "steps": 83, "sec": 3.66}
++{"seed": 87, "count": 1, "success": true, "steps": 54, "sec": 3.8}
++{"seed": 88, "count": 1, "success": true, "steps": 55, "sec": 0.9}
++{"seed": 89, "count": 2, "success": true, "steps": 78, "sec": 1.52}

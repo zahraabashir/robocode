@@ -1,0 +1,21 @@
+diff --git a/test_approach.py b/test_approach.py
+index 4956428..9521ace 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -12,6 +12,9 @@ def run(seed, verbose=False):
+     initial = obs.copy()
+     for step in range(env.max_steps):
+         obs, reward, term, trunc, info = env.step(policy.get_action(obs))
++        if verbose and step % 50 == 0:
++            print(' ', step, policy.mode, 'pose', np.round(obs[:3], 3),
++                  'robot', np.round(obs[16:18], 3))
+         if term or trunc:
+             break
+     env.close()
+@@ -24,5 +27,5 @@ def run(seed, verbose=False):
+ 
+ if __name__ == '__main__':
+     seeds = [int(x) for x in sys.argv[1:]] or list(range(10))
+-    results = [run(s) for s in seeds]
++    results = [run(s, verbose=len(seeds) == 1) for s in seeds]
+     print('success', sum(x[0] for x in results), '/', len(results))

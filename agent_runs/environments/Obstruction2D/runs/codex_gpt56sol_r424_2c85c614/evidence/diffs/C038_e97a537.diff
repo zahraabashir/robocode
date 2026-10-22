@@ -1,0 +1,22 @@
+diff --git a/approach.py b/approach.py
+index ef555ac..2f8b395 100644
+--- a/approach.py
++++ b/approach.py
+@@ -18,7 +18,16 @@ class GeneratedApproach:
+         tx, tw = state.get(target, "x"), state.get(target, "width")
+         crowded = any(abs(tx - state.get(o, "x")) <
+                       0.5 * (tw + state.get(o, "width")) + 0.14 for o in obstacles)
+-        self.todo = ([target_name] if crowded else []) + [o.name for o in obstacles]
++        tasks = list(obstacles)
++        if crowded:
++            tasks.append(target)
++        def top_y(o):
++            angle = state.get(o, "theta")
++            vertical_half = 0.5 * (abs(math.sin(angle)) * state.get(o, "width") +
++                                   abs(math.cos(angle)) * state.get(o, "height"))
++            return state.get(o, "y") + vertical_half
++        tasks.sort(key=top_y, reverse=True)
++        self.todo = [o.name for o in tasks]
+         self.todo.append(target_name)  # retrieve it last for the actual placement
+         surface = state.get_objects(self.types["target_surface"])[0]
+         sx, sw = state.get(surface, "x"), state.get(surface, "width")

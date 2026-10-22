@@ -1,0 +1,92 @@
+diff --git a/approach.py b/approach.py
+new file mode 100644
+index 0000000..e72d96e
+--- /dev/null
++++ b/approach.py
+@@ -0,0 +1,30 @@
++import math
++import numpy as np
++
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.low = np.asarray(action_space.low, dtype=float)
++        self.high = np.asarray(action_space.high, dtype=float)
++        self.reset(None, None)
++
++    def reset(self, state, info):
++        self.step = 0
++
++    def get_action(self, state):
++        s = np.asarray(state, dtype=float)
++        obj = s[0:2]
++        robot = s[16:18]
++        goal = s[29:31]
++        delta = goal - obj
++        dist = float(np.linalg.norm(delta))
++        if dist > 1e-9:
++            direction = delta / dist
++        else:
++            direction = np.array([1.0, 0.0])
++        # First get behind the object, then push through its centre.
++        stand = obj - direction * 0.16
++        target = stand if np.linalg.norm(robot - stand) > 0.055 else obj + direction * 0.10
++        action = np.clip(target - robot, self.low, self.high)
++        self.step += 1
++        return action.astype(float)
+diff --git a/probe_strategy.py b/probe_strategy.py
+new file mode 100644
+index 0000000..0e2735c
+--- /dev/null
++++ b/probe_strategy.py
+@@ -0,0 +1,16 @@
++from env_client import make_env
++import numpy as np
++
++
++def main():
++    for seed in range(10):
++        env = make_env()
++        obs, _ = env.reset(seed=seed)
++        print(seed, "block", np.round(obs[0:3], 3), "robot", np.round(obs[16:18], 3),
++              "goal", np.round(obs[29:32], 3), "dims", np.round(obs[12:15], 3),
++              "r", round(float(obs[28]), 3))
++        env.close()
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/test_approach.py b/test_approach.py
+new file mode 100644
+index 0000000..4956428
+--- /dev/null
++++ b/test_approach.py
+@@ -0,0 +1,28 @@
++import sys
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++
++
++def run(seed, verbose=False):
++    env = make_env()
++    obs, info = env.reset(seed=seed)
++    policy = GeneratedApproach(env.action_space, env.observation_space, {})
++    policy.reset(obs, info)
++    initial = obs.copy()
++    for step in range(env.max_steps):
++        obs, reward, term, trunc, info = env.step(policy.get_action(obs))
++        if term or trunc:
++            break
++    env.close()
++    pe = np.linalg.norm(obs[:2] - obs[29:31])
++    ae = abs((obs[2] - obs[31] + np.pi) % (2*np.pi) - np.pi)
++    print(seed, term, step + 1, 'err', round(float(pe), 3), round(float(ae), 3),
++          'init', np.round(initial[[0,1,2,16,17,29,30,31]], 3))
++    return term, step + 1
++
++
++if __name__ == '__main__':
++    seeds = [int(x) for x in sys.argv[1:]] or list(range(10))
++    results = [run(s) for s in seeds]
++    print('success', sum(x[0] for x in results), '/', len(results))

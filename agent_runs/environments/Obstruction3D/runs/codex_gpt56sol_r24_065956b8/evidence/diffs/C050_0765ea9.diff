@@ -1,0 +1,63 @@
+diff --git a/approach.py b/approach.py
+index f8e968d..c04e3a5 100644
+--- a/approach.py
++++ b/approach.py
+@@ -131,6 +131,8 @@ class GeneratedApproach:
+         self.park_count = 0
+         self.park_spots = {}
+         self.deferred = set()
++        self.generic_objects = set()
++        self.using_generic = False
+         self.abandoning = False
+         self.carry_rotation = None
+         self.base_x = self._get(state, "robot", "pos_base_x")
+@@ -148,6 +150,13 @@ class GeneratedApproach:
+             self._choose_task(state)
+             self.carry_rotation = None
+             self.pick_xyz = self._xyz(state, self.object)
++            self.using_generic = self.object in self.generic_objects
++            if self.using_generic:
++                self.generic_objects.discard(self.object)
++                self.goal_q = _HOME.copy()
++                self.pick_bx = self.pick_xyz[0]-.4559817 if self.pick_xyz[0] <= .3359817 else -.12
++                self.pick_by = self.pick_xyz[1]
++                self.phase, self.phase_steps = "prepick_base", 0
+             if self.object.startswith("obstruction"):
+                 # Pinch near the top: center-height grasps can put fingertips
+                 # into the target plate or an immediately adjacent blocker.
+@@ -155,7 +164,10 @@ class GeneratedApproach:
+             # A calibrated vertical grasp pose plus base translation is more
+             # collision-robust than interpolating through a low joint-space IK
+             # path. It works for both target-sized and small obstruction blocks.
+-            u = np.clip((self.pick_xyz[0]-.3359817)/(.4644086-.3359817), 0, 1)
++            if not self.using_generic:
++                u = np.clip((self.pick_xyz[0]-.3359817)/(.4644086-.3359817), 0, 1)
++            else:
++                u = 0.0
+             center_z = self._xyz(state, self.object)[2]
+             height_q = (.1-center_z)/.3445
+             self.anchor_q = np.array((0, .25+.2*u, -np.pi, -2.30+.2*u,
+@@ -165,8 +177,9 @@ class GeneratedApproach:
+             if self.pick_xyz[0] <= .3359817:
+                 self.anchor_bx += .1625*height_q
+             self.anchor_by = self.pick_xyz[1]
+-            self.goal_q = _HOME.copy()
+-            self.phase, self.phase_steps = "target_home", 0
++            if not self.using_generic:
++                self.goal_q = _HOME.copy()
++                self.phase, self.phase_steps = "target_home", 0
+ 
+         if self.phase == "prepick_base":
+             bxerr, byerr = self.pick_bx-self.base_x, self.pick_by-self.base_y
+@@ -253,7 +266,10 @@ class GeneratedApproach:
+                 if self.object.startswith("obstruction"):
+                     self.pick_xyz[2] += .3*self._get(state, self.object, "half_extent_z")
+                 if self.object != "target_block":
+-                    self.deferred.add(self.object)
++                    if self.using_generic:
++                        self.deferred.add(self.object)
++                    else:
++                        self.generic_objects.add(self.object)
+                     self.phase, self.phase_steps = "retract", 0
+                 else:
+                     self.goal_q = _HOME.copy()

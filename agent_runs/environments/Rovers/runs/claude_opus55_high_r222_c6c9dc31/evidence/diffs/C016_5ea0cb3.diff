@@ -1,0 +1,1962 @@
+diff --git a/ana.py b/ana.py
+new file mode 100644
+index 0000000..dc73ae2
+--- /dev/null
++++ b/ana.py
+@@ -0,0 +1,15 @@
++import sys, json, math
++# summarise: for each run, list last fail & first success positions (post-move camera)
++th={'rover0':math.pi,'rover1':0.0}
++def cam(r,x,y):
++    t=th[r]+math.radians(188); return x+0.0875*math.cos(t), y+0.0875*math.sin(t)
++for f in sys.argv[1:]:
++    for L in open(f):
++        if not L.startswith("{"): continue
++        d=json.loads(L); a=d['args']; res=[r for r in d['res'] if r[0]!='start']
++        if not res: print(a['seed'],a['rover'],a['path'],'NO SENDS', d['res']); continue
++        fails=[r for r in res if r[2] is False]; succ=[r for r in res if r[2] is True]
++        def fm(r):
++            cx,cy=cam(a['rover'],*r[1]); D=math.hypot(cx+1.9,cy+2.0); b=math.degrees(math.atan2(cy+2.0,cx+1.9))
++            return f"pre({r[0][0]:.2f},{r[0][1]:.2f})post({r[1][0]:.2f},{r[1][1]:.2f}) D={D:.2f} brg={b:.1f}"
++        print(a['seed'],a['rover'],a['path'],'n=',len(res),'| firstfail',fm(fails[0]) if fails else '-','| lastfail', fm(fails[-1]) if fails else '-', '| succ', fm(succ[0]) if succ else '-')
+diff --git a/approach.py b/approach.py
+index 25a3fda..d0a9634 100644
+--- a/approach.py
++++ b/approach.py
+@@ -27,6 +27,9 @@ LOS_MARGIN = 0.012
+ OBJ_RANGE_LIB = 2.005
+ PILLAR_LOS_STRICT = 0.08
+ PILLAR_LOS_LIB = -1.0
++NBIN = 16
++ROT = True
++PILLAR_ROT_CLEAR = 0.42
+ NEAR_MARGIN = 0.03
+ HOME_R = 0.245
+ HOME_THETA = {"rover0": math.pi, "rover1": 0.0}
+@@ -89,6 +92,7 @@ class GeneratedApproach:
+ 
+     def reset(self, state, info):
+         self.w = World(state, self.obs_space)
++        self.thplan = {}
+         self.home = {}
+         for n, o in self.w.rovers.items():
+             self.home[n] = (self._get(state, o, "x"), self._get(state, o, "y"))
+@@ -150,7 +154,12 @@ class GeneratedApproach:
+     def _plan(self, state):
+         t0 = time.time()
+         try:
++            self.rot = ROT
+             self._plan_inner(state)
++            if not self._theta_dp(state):
++                self.rot = False
++                self._plan_inner(state)
++                self._theta_dp(state)
+         finally:
+             self.plan_time += time.time() - t0
+ 
+@@ -207,9 +216,12 @@ class GeneratedApproach:
+                         p = (ox0, oy0)
+                     th = self.home_theta[r]
+                     cx = x + CAM_OFF * math.cos(th + CAM_ANG); cy = y + CAM_OFF * math.sin(th + CAM_ANG)
++                    rr = ROVER_BLOCK_R
++                    if self.rot:
++                        cx, cy, rr = x, y, ROVER_BLOCK_R + CAM_OFF
+                     lx, ly = g(w.lander, "x"), g(w.lander, "y")
+                     dd = float(seg_point_dist(np.array(cx), np.array(cy), lx, ly, p[0], p[1]))
+-                    if dd <= ROVER_BLOCK_R:
++                    if dd <= rr:
+                         blockers[r].append(p)
+                         per.pop(r, None)
+                         changed = True
+@@ -238,8 +250,75 @@ class GeneratedApproach:
+             _, S0, S1 = best
+             self.plans[r0] = self._extract(res0, S0)
+             self.plans[r1] = self._extract(res1, S1)
++        self.per = per
+         self.t = 0
+ 
++    def _theta_dp(self, state):
++        self.thplan = {}
++        if not self.rot:
++            for r, p in self.plans.items():
++                self.thplan[r] = [0.0] * len(p)
++            return True
++        angs = np.array([2 * math.pi * b / NBIN for b in range(NBIN)])
++        acost = np.abs(np.angle(np.exp(1j * angs)))
++        for r, plan in self.plans.items():
++            T = len(plan)
++            if T == 0:
++                self.thplan[r] = []
++                continue
++            res = self.per[r]
++            X, Y = res["X"], res["Y"]
++            th = self._get(state, self.w.rovers[r], "theta")
++            home = self.home_theta[r]
++            held = set(res["held0"])
++            allow = np.ones((T, NBIN), bool)
++            for t, ((x, y), op) in enumerate(plan):
++                i = np.unravel_index(np.argmin(np.abs(X - x) + np.abs(Y - y)), X.shape)
++                if any(max(abs(x - px), abs(y - py)) < PILLAR_ROT_CLEAR for (px, py, _, _) in res["pillars"]):
++                    keep = allow[t, 0], allow[t, NBIN // 2]
++                    allow[t, :] = False
++                    allow[t, 0], allow[t, NBIN // 2] = keep
++                if op == "calibrate":
++                    allow[t] &= np.array([res["vany_l"][b][i] for b in range(NBIN)])
++                elif op == "send":
++                    allow[t] &= np.array([res["send_l"][b][i] for b in range(NBIN)])
++                elif op.startswith("image:"):
++                    me = op[6:]
++                    ok = []
++                    for b in range(NBIN):
++                        v = bool(res["visA"][me][b][i])
++                        dm = res["odist"][me][b][i]
++                        for ob in self.w.objectives:
++                            n = ob.name
++                            if n == me or n in held:
++                                continue
++                            if res["ovis_lib"][n][b][i] and res["odist"][n][b][i] <= dm + NEAR_MARGIN:
++                                v = False
++                        ok.append(v)
++                    allow[t] &= np.array(ok)
++                    held.add(me)
++            allow[T - 1, 1:] = False
++            cost = np.full((T, NBIN), np.inf)
++            par = np.zeros((T, NBIN), int)
++            d0 = np.abs(np.angle(np.exp(1j * (home + angs - th)))) <= 0.4 - 1e-6
++            cost[0] = np.where(allow[0] & d0, acost, np.inf)
++            for t in range(1, T):
++                for b in range(NBIN):
++                    if not allow[t, b]:
++                        continue
++                    for bp in ((b - 1) % NBIN, b, (b + 1) % NBIN):
++                        c = cost[t - 1, bp] + acost[b]
++                        if c < cost[t, b]:
++                            cost[t, b] = c; par[t, b] = bp
++            if not np.isfinite(cost[T - 1, 0]):
++                return False
++            seq = [0]
++            for t in range(T - 1, 0, -1):
++                seq.append(par[t, seq[-1]])
++            seq.reverse()
++            self.thplan[r] = [float(angs[b]) for b in seq]
++        return True
++
+     def _propagate(self, sU, sC, free, vany):
+         TU = np.full(free.shape, INF, np.int32)
+         TC = np.full(free.shape, INF, np.int32)
+@@ -281,7 +360,9 @@ class GeneratedApproach:
+         X, Y, start = self._grid(state, r)
+         free = self._free(state, X, Y)
+         free[start] = True
+-        CX, CY = self._cam(r, X, Y)
++        th0 = self.home_theta[r]
++        angs = [2 * math.pi * b / NBIN for b in range(NBIN)] if self.rot else [0.0]
++        cams = [(X + CAM_OFF * math.cos(th0 + a + CAM_ANG), Y + CAM_OFF * math.sin(th0 + a + CAM_ANG)) for a in angs]
+         regions = []
+         names = []
+         vany = np.zeros(X.shape, bool)
+@@ -293,19 +374,27 @@ class GeneratedApproach:
+         held0 = set(ob.name for ob in w.objectives if g(ob, "have_image_" + r) > 0.5)
+         odist = {}
+         ovis_lib = {}
++        visA = {}
+         img_obj = {}
++        vany_l = [np.zeros(X.shape, bool) for _ in cams]
+         for ob in w.objectives:
+             ox, oy = g(ob, "x"), g(ob, "y")
+-            d = np.hypot(CX - ox, CY - oy)
+-            vis = (d <= OBJ_RANGE) & free & ~badv
+-            vlib = d <= OBJ_RANGE_LIB
+-            for (px, py, phx, phy) in pillars:
+-                dseg = seg_point_dist(CX, CY, ox, oy, px, py)
+-                vis &= dseg > PILLAR_LOS_STRICT
+-                if math.hypot(px - ox, py - oy) < 0.95:
+-                    vlib &= dseg > PILLAR_LOS_LIB
+-            odist[ob.name] = d
+-            ovis_lib[ob.name] = vlib
++            odist[ob.name] = []; ovis_lib[ob.name] = []; visA[ob.name] = []
++            vis = np.zeros(X.shape, bool)
++            for b, (CX, CY) in enumerate(cams):
++                d = np.hypot(CX - ox, CY - oy)
++                vb = (d <= OBJ_RANGE) & free & ~badv
++                vlib = d <= OBJ_RANGE_LIB
++                for (px, py, phx, phy) in pillars:
++                    dseg = seg_point_dist(CX, CY, ox, oy, px, py)
++                    vb &= dseg > PILLAR_LOS_STRICT
++                    if PILLAR_LOS_LIB > 0 and math.hypot(px - ox, py - oy) < 0.95:
++                        vlib &= dseg > PILLAR_LOS_LIB
++                odist[ob.name].append(d)
++                ovis_lib[ob.name].append(vlib)
++                visA[ob.name].append(vb)
++                vany_l[b] |= vb
++                vis |= vb
+             vany |= vis
+             if ob in need_img and vis.any():
+                 img_obj[len(regions)] = ob.name
+@@ -325,10 +414,12 @@ class GeneratedApproach:
+                 regions.append(("sample", reg)); names.append(("kind", kind))
+         # send region
+         lx, ly = g(w.lander, "x"), g(w.lander, "y")
+-        send = (np.hypot(CX - lx, CY - ly) <= LANDER_RANGE) & free
+-        for (px, py, phx, phy) in pillars:
++        send_l = []
++        for (CX, CY) in cams:
++          send = (np.hypot(CX - lx, CY - ly) <= LANDER_RANGE) & free
++          for (px, py, phx, phy) in pillars:
+             send &= seg_point_dist(CX, CY, lx, ly, px, py) > PILLAR_LOS_STRICT
+-        for (bx, by, sector) in self.bad_send[r]:
++          for (bx, by, sector) in self.bad_send[r]:
+             send &= np.hypot(X - bx, Y - by) > 0.04
+             if sector:
+                 bcx, bcy = self._cam(r, bx, by)
+@@ -336,11 +427,13 @@ class GeneratedApproach:
+                 bb = math.atan2(bcy - ly, bcx - lx)
+                 ang = np.abs(np.angle(np.exp(1j * (np.arctan2(CY - ly, CX - lx) - bb))))
+                 send &= ~((np.hypot(CX - lx, CY - ly) >= bd - 0.15) & (ang < math.radians(12)))
+-        for other in rnames:
++          for other in rnames:
+             if other == r:
+                 continue
+             for (px, py) in [self.home[other], (g(w.rovers[other], "x"), g(w.rovers[other], "y"))] + list(blockers):
+                 send &= seg_point_dist(CX, CY, lx, ly, px, py) > ROVER_BLOCK_R
++          send_l.append(send)
++        send = np.logical_or.reduce(send_l)
+         hx, hy = self.home[r]
+         homereg = (np.hypot(X - hx, Y - hy) <= HOME_R) & free
+         if not homereg.any():
+@@ -376,11 +469,14 @@ class GeneratedApproach:
+                 return reg_cache[key]
+             held = set(held0) | set(img_obj[i] for i in img_obj if imask >> i & 1)
+             me = img_obj[j]
+-            reg = regions[j][1].copy()
+-            for ob in w.objectives:
+-                if ob.name == me or ob.name in held:
+-                    continue
+-                reg &= ~(ovis_lib[ob.name] & (odist[ob.name] <= odist[me] + NEAR_MARGIN))
++            reg = np.zeros(X.shape, bool)
++            for b in range(len(cams)):
++                rb = visA[me][b].copy()
++                for ob in w.objectives:
++                    if ob.name == me or ob.name in held:
++                        continue
++                    rb &= ~(ovis_lib[ob.name][b] & (odist[ob.name][b] <= odist[me][b] + NEAR_MARGIN))
++                reg |= rb
+             reg_cache[key] = reg
+             return reg
+ 
+@@ -448,7 +544,9 @@ class GeneratedApproach:
+                 final[S] = (v, j, extra)
+         res = dict(img_obj=img_obj, X=X, Y=Y, free=free, vany=vany, regions=regions, names=names,
+                    maps=maps, seeds=seeds, start_maps=start_maps, s0=(s0U, s0C),
+-                   final=final, store_full=store_full, homereg=homereg, send=send, must_send=must_send, r=r)
++                   final=final, store_full=store_full, homereg=homereg, send=send, must_send=must_send, r=r,
++                   visA=visA, odist=odist, ovis_lib=ovis_lib, vany_l=vany_l, send_l=send_l, nang=len(cams),
++                   held0=held0, pillars=pillars)
+         res["final_any_empty"] = 0 if 0 in final else (min(final, key=lambda s: final[s][0]) if final else None)
+         return res
+ 
+@@ -614,7 +712,10 @@ class GeneratedApproach:
+             if op == "none" and store:
+                 op = "drop"
+             dx = float(np.clip(tx - x, -0.2, 0.2)); dy = float(np.clip(ty - y, -0.2, 0.2))
+-            dth = float(np.clip(wrap(self.home_theta[r] - th), -0.4, 0.4))
++            tgt = self.home_theta[r]
++            if self.t < len(plan) and r in self.thplan and self.t < len(self.thplan[r]):
++                tgt = tgt + self.thplan[r][self.t]
++            dth = float(np.clip(wrap(tgt - th), -0.4, 0.4))
+             act[4 * k:4 * k + 4] = [dx, dy, dth, SEL[op.split(":")[0]]]
+             self.expect[r] = (x + dx, y + dy, op, self._snapshot(state, r))
+         self.t += 1
+diff --git a/approach_norot.py b/approach_norot.py
+new file mode 100644
+index 0000000..25a3fda
+--- /dev/null
++++ b/approach_norot.py
+@@ -0,0 +1,685 @@
++"""Rovers approach: per-rover layered grid BFS + Held-Karp over task subsets,
++joint assignment of tasks to the two rovers (they cannot cross the middle wall)."""
++import math
++import time
++import numpy as np
++from scipy.ndimage import maximum_filter, minimum_filter
++
++H = 0.025
++K = 8
++INF = 10 ** 6
++SEL = {"sample": -5 / 6, "calibrate": -0.5, "image": -1 / 6, "none": 1 / 6,
++       "send": 0.5, "drop": 5 / 6}
++
++ARENA = 2.2729 - 0.004
++WALL = 0.227 + 0.006
++MOUND_R = 0.177 + 0.006
++SQ_HALF = 0.21
++OCT_SUM = 0.44
++LANDER_HALF = (0.69 + 0.012, 0.514 + 0.012)
++CAM_OFF = 0.0875
++CAM_ANG = math.radians(188.0)
++OBJ_RANGE = 1.99
++LANDER_RANGE = 3.98
++ROVER_BLOCK_R = 0.26
++SAMPLE_R = 0.245
++LOS_MARGIN = 0.012
++OBJ_RANGE_LIB = 2.005
++PILLAR_LOS_STRICT = 0.08
++PILLAR_LOS_LIB = -1.0
++NEAR_MARGIN = 0.03
++HOME_R = 0.245
++HOME_THETA = {"rover0": math.pi, "rover1": 0.0}
++
++
++def wrap(a):
++    return (a + math.pi) % (2 * math.pi) - math.pi
++
++
++def seg_point_dist(ax, ay, bx, by, px, py):
++    """Distance arrays from point (px,py) to segments a->b (a arrays)."""
++    dx = bx - ax
++    dy = by - ay
++    L2 = dx * dx + dy * dy + 1e-12
++    t = np.clip(((px - ax) * dx + (py - ay) * dy) / L2, 0.0, 1.0)
++    qx = ax + t * dx - px
++    qy = ay + t * dy - py
++    return np.sqrt(qx * qx + qy * qy)
++
++
++def seg_hits_box(ax, ay, bx, by, cx, cy, hx, hy):
++    """Vectorised: does segment (ax,ay)->(bx,by) intersect box centred (cx,cy)?"""
++    dx = bx - ax
++    dy = by - ay
++    t0 = np.zeros(np.shape(ax))
++    t1 = np.ones(np.shape(ax))
++    for d, a, c, h in ((dx, ax, cx, hx), (dy, ay, cy, hy)):
++        d = np.where(np.abs(d) < 1e-12, 1e-12, d)
++        u = (c - h - a) / d
++        v = (c + h - a) / d
++        lo = np.minimum(u, v)
++        hi = np.maximum(u, v)
++        t0 = np.maximum(t0, lo)
++        t1 = np.minimum(t1, hi)
++    return t0 <= t1
++
++
++class World:
++    def __init__(self, state, obs_space):
++        self.space = obs_space
++        T = lambda n: obs_space.get_type(n) if hasattr(obs_space, "get_type") else n
++        self.rovers = {}
++        for o in state.get_objects(T("rover")):
++            self.rovers[o.name] = o
++        self.lander = list(state.get_objects(T("lander")))[0]
++        self.objectives = sorted(state.get_objects(T("objective")), key=lambda o: o.name)
++        self.samples = sorted(state.get_objects(T("sample")), key=lambda o: o.name)
++        self.obstacles = list(state.get_objects(T("obstacle")))
++
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.action_space = action_space
++        self.obs_space = observation_space
++        self.plans = None
++
++    # ------------------------------------------------------------------ utils
++    def _get(self, state, o, f):
++        return float(state.get(o, f))
++
++    def reset(self, state, info):
++        self.w = World(state, self.obs_space)
++        self.home = {}
++        for n, o in self.w.rovers.items():
++            self.home[n] = (self._get(state, o, "x"), self._get(state, o, "y"))
++        self.home_theta = {}
++        for n, o in self.w.rovers.items():
++            self.home_theta[n] = self._get(state, o, "theta")
++        self.plans = None
++        self.bad_points = []
++        self.bad_view = {n: [] for n in self.w.rovers}
++        self.bad_send = {n: [] for n in self.w.rovers}
++        self.expect = None
++        self.nreplan = 0
++        self.plan_time = 0.0
++        self.log = []
++        self._plan(state)
++
++    # --------------------------------------------------------------- planning
++    def _grid(self, state, rname):
++        o = self.w.rovers[rname]
++        x0 = self._get(state, o, "x")
++        y0 = self._get(state, o, "y")
++        right = self.home[rname][0] > 0
++        xmin, xmax = (WALL, ARENA) if right else (-ARENA, -WALL)
++        ymin, ymax = -ARENA, ARENA
++        i0 = math.ceil((xmin - x0) / H - 1e-9)
++        i1 = math.floor((xmax - x0) / H + 1e-9)
++        j0 = math.ceil((ymin - y0) / H - 1e-9)
++        j1 = math.floor((ymax - y0) / H + 1e-9)
++        # ensure start included
++        i0 = min(i0, 0); i1 = max(i1, 0); j0 = min(j0, 0); j1 = max(j1, 0)
++        xs = x0 + H * np.arange(i0, i1 + 1)
++        ys = y0 + H * np.arange(j0, j1 + 1)
++        X, Y = np.meshgrid(xs, ys, indexing="ij")
++        start = (-i0, -j0)
++        return X, Y, start
++
++    def _free(self, state, X, Y):
++        free = np.ones(X.shape, bool)
++        for ob in self.w.obstacles:
++            ox = self._get(state, ob, "x"); oy = self._get(state, ob, "y")
++            hx = self._get(state, ob, "half_x"); hy = self._get(state, ob, "half_y")
++            ddx = np.maximum(np.abs(X - ox) - hx, 0)
++            ddy = np.maximum(np.abs(Y - oy) - hy, 0)
++            blocked = np.sqrt(ddx ** 2 + ddy ** 2) < MOUND_R
++            if hx < 0.12 and hy < 0.12:
++                ax = np.abs(X - ox); ay = np.abs(Y - oy)
++                blocked |= (ax < hx + SQ_HALF) & (ay < hy + SQ_HALF) & (ax + ay < OCT_SUM + hx + hy - 0.1)
++            free &= ~blocked
++        lx = self._get(state, self.w.lander, "x"); ly = self._get(state, self.w.lander, "y")
++        free &= ~((np.abs(X - lx) < LANDER_HALF[0]) & (np.abs(Y - ly) < LANDER_HALF[1]))
++        for (bx, by) in self.bad_points:
++            free &= np.hypot(X - bx, Y - by) > 0.04
++        return free
++
++    def _cam(self, rname, X, Y):
++        th = self.home_theta[rname]
++        return X + CAM_OFF * math.cos(th + CAM_ANG), Y + CAM_OFF * math.sin(th + CAM_ANG)
++
++    def _plan(self, state):
++        t0 = time.time()
++        try:
++            self._plan_inner(state)
++        finally:
++            self.plan_time += time.time() - t0
++
++    def _plan_inner(self, state):
++        w = self.w
++        g = lambda o, f: self._get(state, o, f)
++        rnames = sorted(w.rovers.keys())
++        # ---- remaining requirements
++        need_img = []           # objectives needing imaging
++        must_send = {r: False for r in rnames}
++        for ob in w.objectives:
++            if g(ob, "received_image") > 0.5:
++                continue
++            held = False
++            for r in rnames:
++                if g(ob, "have_image_" + r) > 0.5:
++                    must_send[r] = True
++                    held = True
++            if not held:
++                need_img.append(ob)
++        need_kind = []          # 'stone' / 'soil' needing sampling
++        for kind, soil in (("stone", 0.0), ("soil", 1.0)):
++            ss = [s for s in w.samples if abs(g(s, "is_soil") - soil) < 0.5]
++            if any(g(s, "received_analysis") > 0.5 for s in ss):
++                continue
++            held = False
++            for r in rnames:
++                if any(g(s, "analyzed_" + r) > 0.5 for s in ss):
++                    must_send[r] = True
++                    held = True
++            if not held:
++                need_kind.append(kind)
++
++        blockers = {r: [] for r in rnames}
++        per = {}
++        for it in range(4):
++            for r in rnames:
++                if r not in per:
++                    per[r] = self._rover_hk(state, r, need_img, need_kind, must_send[r], rnames, blockers[r])
++            self._assign(per, rnames, need_img, need_kind)
++            changed = False
++            for k, r in enumerate(rnames):
++                other = rnames[1 - k]
++                op_ = self.plans[other]
++                ox0 = g(w.rovers[other], "x"); oy0 = g(w.rovers[other], "y")
++                for t, ((x, y), op) in enumerate(self.plans[r]):
++                    if op != "send":
++                        continue
++                    if t < len(op_):
++                        p = op_[t][0]
++                    elif op_:
++                        p = op_[-1][0]
++                    else:
++                        p = (ox0, oy0)
++                    th = self.home_theta[r]
++                    cx = x + CAM_OFF * math.cos(th + CAM_ANG); cy = y + CAM_OFF * math.sin(th + CAM_ANG)
++                    lx, ly = g(w.lander, "x"), g(w.lander, "y")
++                    dd = float(seg_point_dist(np.array(cx), np.array(cy), lx, ly, p[0], p[1]))
++                    if dd <= ROVER_BLOCK_R:
++                        blockers[r].append(p)
++                        per.pop(r, None)
++                        changed = True
++            if not changed:
++                break
++
++    def _assign(self, per, rnames, need_img, need_kind):
++        best = None
++        tasks_all = [("img", ob.name) for ob in need_img] + [("kind", k) for k in need_kind]
++        r0, r1 = rnames
++        res0, res1 = per[r0], per[r1]
++        for S0, v0 in res0["final"].items():
++            for S1, v1 in res1["final"].items():
++                cov = set(res0["names"][i] for i in range(len(res0["names"])) if S0 >> i & 1)
++                cov |= set(res1["names"][i] for i in range(len(res1["names"])) if S1 >> i & 1)
++                if not all(t in cov for t in tasks_all):
++                    continue
++                key = (max(v0[0], v1[0]), v0[0] + v1[0], bin(S0).count("1") + bin(S1).count("1"))
++                if best is None or key < best[0]:
++                    best = (key, S0, S1)
++        self.plans = {}
++        if best is None:
++            for r in rnames:
++                self.plans[r] = self._extract(per[r], per[r]["final_any_empty"])
++        else:
++            _, S0, S1 = best
++            self.plans[r0] = self._extract(res0, S0)
++            self.plans[r1] = self._extract(res1, S1)
++        self.t = 0
++
++    def _propagate(self, sU, sC, free, vany):
++        TU = np.full(free.shape, INF, np.int32)
++        TC = np.full(free.shape, INF, np.int32)
++        AU = np.full(free.shape, INF, np.int32)
++        AC = np.full(free.shape, INF, np.int32)
++        RU = np.zeros(free.shape, bool)
++        RC = np.zeros(free.shape, bool)
++        mU = sU.min(); mC = sC.min()
++        t = int(min(mU, mC))
++        if t >= INF:
++            return TU, TC, AU, AC
++        maxseed = max(int(sU[sU < INF].max()) if mU < INF else 0,
++                      int(sC[sC < INF].max()) if mC < INF else 0)
++        nfree = int(free.sum())
++        while True:
++            RU |= sU == t
++            RC |= sC == t
++            TU[RU & (TU == INF)] = t
++            TC[RC & (TC == INF)] = t
++            if t >= maxseed and RU.sum() + RC.sum() >= 2 * nfree:
++                break
++            dU = maximum_filter(RU, size=2 * K + 1, mode="constant") & free
++            dC = maximum_filter(RC, size=2 * K + 1, mode="constant") & free
++            AU[dU & (AU == INF)] = t + 1
++            AC[dC & (AC == INF)] = t + 1
++            nRU = RU | dU
++            nRC = RC | dC | (dU & vany)
++            if t >= maxseed and (nRU == RU).all() and (nRC == RC).all():
++                break
++            RU, RC = nRU, nRC
++            t += 1
++            if t > 600:
++                break
++        return TU, TC, AU, AC
++
++    def _rover_hk(self, state, r, need_img, need_kind, must_send, rnames, blockers=()):
++        w = self.w
++        g = lambda o, f: self._get(state, o, f)
++        X, Y, start = self._grid(state, r)
++        free = self._free(state, X, Y)
++        free[start] = True
++        CX, CY = self._cam(r, X, Y)
++        regions = []
++        names = []
++        vany = np.zeros(X.shape, bool)
++        pillars = [(g(o, "x"), g(o, "y"), g(o, "half_x") + LOS_MARGIN, g(o, "half_y") + LOS_MARGIN)
++                   for o in w.obstacles if g(o, "half_x") < 0.12 and g(o, "half_y") < 0.12]
++        badv = np.zeros(X.shape, bool)
++        for (bx, by) in self.bad_view[r]:
++            badv |= np.hypot(X - bx, Y - by) < 0.04
++        held0 = set(ob.name for ob in w.objectives if g(ob, "have_image_" + r) > 0.5)
++        odist = {}
++        ovis_lib = {}
++        img_obj = {}
++        for ob in w.objectives:
++            ox, oy = g(ob, "x"), g(ob, "y")
++            d = np.hypot(CX - ox, CY - oy)
++            vis = (d <= OBJ_RANGE) & free & ~badv
++            vlib = d <= OBJ_RANGE_LIB
++            for (px, py, phx, phy) in pillars:
++                dseg = seg_point_dist(CX, CY, ox, oy, px, py)
++                vis &= dseg > PILLAR_LOS_STRICT
++                if math.hypot(px - ox, py - oy) < 0.95:
++                    vlib &= dseg > PILLAR_LOS_LIB
++            odist[ob.name] = d
++            ovis_lib[ob.name] = vlib
++            vany |= vis
++            if ob in need_img and vis.any():
++                img_obj[len(regions)] = ob.name
++                regions.append(("img", vis)); names.append(("img", ob.name))
++        for kind in need_kind:
++            soil = 1.0 if kind == "soil" else 0.0
++            dme = np.full(X.shape, 9.0)
++            doth = np.full(X.shape, 9.0)
++            for s in w.samples:
++                dd = np.hypot(X - g(s, "x"), Y - g(s, "y"))
++                if abs(g(s, "is_soil") - soil) < 0.5:
++                    dme = np.minimum(dme, dd)
++                else:
++                    doth = np.minimum(doth, dd)
++            reg = (dme < SAMPLE_R) & ((doth > 0.26) | (dme < doth - 0.02)) & free
++            if reg.any():
++                regions.append(("sample", reg)); names.append(("kind", kind))
++        # send region
++        lx, ly = g(w.lander, "x"), g(w.lander, "y")
++        send = (np.hypot(CX - lx, CY - ly) <= LANDER_RANGE) & free
++        for (px, py, phx, phy) in pillars:
++            send &= seg_point_dist(CX, CY, lx, ly, px, py) > PILLAR_LOS_STRICT
++        for (bx, by, sector) in self.bad_send[r]:
++            send &= np.hypot(X - bx, Y - by) > 0.04
++            if sector:
++                bcx, bcy = self._cam(r, bx, by)
++                bd = math.hypot(bcx - lx, bcy - ly)
++                bb = math.atan2(bcy - ly, bcx - lx)
++                ang = np.abs(np.angle(np.exp(1j * (np.arctan2(CY - ly, CX - lx) - bb))))
++                send &= ~((np.hypot(CX - lx, CY - ly) >= bd - 0.15) & (ang < math.radians(12)))
++        for other in rnames:
++            if other == r:
++                continue
++            for (px, py) in [self.home[other], (g(w.rovers[other], "x"), g(w.rovers[other], "y"))] + list(blockers):
++                send &= seg_point_dist(CX, CY, lx, ly, px, py) > ROVER_BLOCK_R
++        hx, hy = self.home[r]
++        homereg = (np.hypot(X - hx, Y - hy) <= HOME_R) & free
++        if not homereg.any():
++            homereg = np.zeros(X.shape, bool)
++            d = np.hypot(X - hx, Y - hy) + (~free) * 100
++            homereg[np.unravel_index(np.argmin(d), d.shape)] = True
++
++        n = len(regions)
++        calib = g(w.rovers[r], "calibrated") > 0.5
++        s0U = np.full(X.shape, INF, np.int32)
++        s0C = np.full(X.shape, INF, np.int32)
++        (s0C if calib else s0U)[start] = 0
++        maps = {}      # (S, j) -> (seedU, seedC, TU, TC, AU, AC)
++        seeds = {}
++        def drop_step(a):
++            m = minimum_filter(a, size=2 * K + 1, mode="constant", cval=INF)
++            return np.where(free & (m < INF), m + 1, INF).astype(np.int32)
++
++        store_full = g(w.rovers[r], "store_full") > 0.5
++        if store_full:
++            s0U, s0C = drop_step(s0U), drop_step(s0C)
++        start_maps = self._propagate(s0U, s0C, free, vany)
++
++        reg_cache = {}
++
++        def img_region(j, S):
++            imask = 0
++            for i in img_obj:
++                if S >> i & 1:
++                    imask |= 1 << i
++            key = (j, imask)
++            if key in reg_cache:
++                return reg_cache[key]
++            held = set(held0) | set(img_obj[i] for i in img_obj if imask >> i & 1)
++            me = img_obj[j]
++            reg = regions[j][1].copy()
++            for ob in w.objectives:
++                if ob.name == me or ob.name in held:
++                    continue
++                reg &= ~(ovis_lib[ob.name] & (odist[ob.name] <= odist[me] + NEAR_MARGIN))
++            reg_cache[key] = reg
++            return reg
++
++        def op_maps(M, j, S=0):
++            TU, TC, AU, AC = M
++            kind, reg = regions[j]
++            if kind == "img":
++                reg = img_region(j, S)
++                return np.where(reg, AC, INF), np.full(X.shape, INF, np.int32)
++            return drop_step(np.where(reg, AU, INF)), drop_step(np.where(reg, AC, INF))
++
++        for j in range(n):
++            seeds[(1 << j, j)] = op_maps(start_maps, j)
++        order = sorted(seeds.keys(), key=lambda k: bin(k[0]).count("1"))
++        full = (1 << n) - 1
++        # BFS over subsets in increasing size
++        for size in range(1, n + 1):
++            for S in range(1, full + 1):
++                if bin(S).count("1") != size:
++                    continue
++                for j in range(n):
++                    if (S, j) not in seeds:
++                        continue
++                    sU, sC = seeds[(S, j)]
++                    if min(sU.min(), sC.min()) >= INF:
++                        continue
++                    M = self._propagate(sU, sC, free, vany)
++                    maps[(S, j)] = M
++                    for k in range(n):
++                        if S >> k & 1:
++                            continue
++                        nU, nC = op_maps(M, k, S)
++                        key = (S | 1 << k, k)
++                        if key in seeds:
++                            oU, oC = seeds[key]
++                            seeds[key] = (np.minimum(oU, nU), np.minimum(oC, nC))
++                        else:
++                            seeds[key] = (nU, nC)
++        # completions
++        final = {}
++        comp = {}
++
++        def complete(M, need_send):
++            TU, TC, AU, AC = M
++            if need_send:
++                op = np.where(send, np.minimum(AU, AC), INF)
++                if op.min() >= INF:
++                    return INF, None
++                M2 = self._propagate(op, np.full(X.shape, INF, np.int32), free, vany)
++                at = np.minimum(M2[0], M2[1])
++                v = np.where(homereg, at, INF)
++                return int(v.min()), (op, M2)
++            at = np.minimum(TU, TC)
++            v = np.where(homereg, at, INF)
++            return int(v.min()), None
++
++        v, extra = complete(start_maps, must_send)
++        if v < INF:
++            final[0] = (v, None, extra)
++        for (S, j), M in maps.items():
++            v, extra = complete(M, True)
++            if v >= INF:
++                continue
++            if S not in final or v < final[S][0]:
++                final[S] = (v, j, extra)
++        res = dict(img_obj=img_obj, X=X, Y=Y, free=free, vany=vany, regions=regions, names=names,
++                   maps=maps, seeds=seeds, start_maps=start_maps, s0=(s0U, s0C),
++                   final=final, store_full=store_full, homereg=homereg, send=send, must_send=must_send, r=r)
++        res["final_any_empty"] = 0 if 0 in final else (min(final, key=lambda s: final[s][0]) if final else None)
++        return res
++
++    # ------------------------------------------------------------ extraction
++    def _back_stage(self, M, sU, sC, vany, free, c, t, L, steps):
++        """Backtrack within stage until hitting a seed. Appends (cell, op) in
++        reverse order. Returns (cell, t, layer) at the seed."""
++        TU, TC, AU, AC = M
++        nx, ny = free.shape
++        while True:
++            if L == "U" and sU[c] == t:
++                return c, t, "U"
++            if L == "C" and sC[c] == t:
++                return c, t, "C"
++            T = TU if L == "U" else TC
++            if T[c] < t:
++                steps.append((c, "none")); t -= 1
++                continue
++            i, j = c
++            i0, i1 = max(0, i - K), min(nx, i + K + 1)
++            j0, j1 = max(0, j - K), min(ny, j + K + 1)
++            found = None
++            sub = T[i0:i1, j0:j1]
++            cand = np.argwhere(sub <= t - 1)
++            if len(cand):
++                # prefer farthest-consistent (any)
++                a, b = cand[0]
++                found = ((i0 + a, j0 + b), L, "none")
++            elif L == "C" and vany[c]:
++                cand = np.argwhere(TU[i0:i1, j0:j1] <= t - 1)
++                if len(cand):
++                    a, b = cand[0]
++                    found = ((i0 + a, j0 + b), "U", "calibrate")
++            if found is None:
++                raise RuntimeError("backtrack failed")
++            steps.append((c, found[2]))
++            c, L, t = found[0], found[1], t - 1
++
++    def _arrive(self, M, c, t, L, op, vany, free, steps):
++        """c reached by a move arrival at time t in layer L (for op)."""
++        TU, TC, AU, AC = M
++        nx, ny = free.shape
++        T = TU if L == "U" else TC
++        i, j = c
++        i0, i1 = max(0, i - K), min(nx, i + K + 1)
++        j0, j1 = max(0, j - K), min(ny, j + K + 1)
++        cand = np.argwhere(T[i0:i1, j0:j1] <= t - 1)
++        a, b = cand[0]
++        steps.append((c, op))
++        return (i0 + a, j0 + b), t - 1, L
++
++    def _extract(self, res, S):
++        if S is None or S not in res["final"]:
++            return []
++        X, Y, free, vany = res["X"], res["Y"], res["free"], res["vany"]
++        v, j, extra = res["final"][S]
++        steps = []
++        homereg = res["homereg"]
++        # final stage maps
++        if extra is not None:
++            op, M2 = extra
++            at = np.minimum(M2[0], M2[1])
++            vv = np.where(homereg, at, INF)
++            c = np.unravel_index(np.argmin(vv), vv.shape); t = int(vv[c])
++            L = "U" if M2[0][c] <= t else "C"
++            # send stage seeds are U only
++            c, t, L = self._back_stage(M2, op, np.full(op.shape, INF, np.int32), vany, free, c, t, L, steps)
++            Mprev = res["maps"][(S, j)] if S else res["start_maps"]
++            TU, TC, AU, AC = Mprev
++            Lp = "U" if AU[c] == t else "C"
++            c, t, L = self._arrive(Mprev, c, t, Lp, "send", vany, free, steps)
++        else:
++            Mprev = res["maps"][(S, j)] if S else res["start_maps"]
++            at = np.minimum(Mprev[0], Mprev[1])
++            vv = np.where(homereg, at, INF)
++            c = np.unravel_index(np.argmin(vv), vv.shape); t = int(vv[c])
++            L = "U" if Mprev[0][c] <= t else "C"
++        # walk back through task stages
++        curS, curj = S, j
++        while curS:
++            M = res["maps"][(curS, curj)]
++            sU, sC = res["seeds"][(curS, curj)]
++            c, t, L = self._back_stage(M, sU, sC, vany, free, c, t, L, steps)
++            kind = res["regions"][curj][0]
++            prevS = curS & ~(1 << curj)
++            # find predecessor
++            found = None
++            if prevS == 0:
++                cands = [(None, res["start_maps"])]
++            else:
++                cands = [(pj, res["maps"][(prevS, pj)]) for pj in range(len(res["regions"]))
++                         if (prevS >> pj & 1) and (prevS, pj) in res["maps"]]
++            if kind != "img":
++                # undo the forced drop step
++                reg = res["regions"][curj][1]
++                nx, ny = free.shape
++                i, jj = c
++                i0, i1 = max(0, i - K), min(nx, i + K + 1)
++                j0, j1 = max(0, jj - K), min(ny, jj + K + 1)
++                hit = None
++                for pj, Mp in cands:
++                    A = Mp[2] if L == "U" else Mp[3]
++                    sub = np.where(reg[i0:i1, j0:j1], A[i0:i1, j0:j1], INF)
++                    cand = np.argwhere(sub == t - 1)
++                    if len(cand):
++                        hit = (pj, Mp, (i0 + cand[0][0], j0 + cand[0][1]))
++                        break
++                if hit is None:
++                    raise RuntimeError("drop pred not found")
++                steps.append((c, "drop"))
++                c = hit[2]; t -= 1
++                cands = [(hit[0], hit[1])]
++            for pj, Mp in cands:
++                TU, TC, AU, AC = Mp
++                if kind == "img":
++                    if L == "U" and AC[c] == t:
++                        found = (pj, Mp, "C"); break
++                else:
++                    if L == "U" and AU[c] == t:
++                        found = (pj, Mp, "U"); break
++                    if L == "C" and AC[c] == t:
++                        found = (pj, Mp, "C"); break
++            if found is None:
++                raise RuntimeError("pred not found")
++            pj, Mp, Lp = found
++            c, t, L = self._arrive(Mp, c, t, Lp, ("image:" + res["img_obj"][curj]) if kind == "img" else ("sample:" + res["names"][curj][1]), vany, free, steps)
++            curS, curj = prevS, pj
++        # back to start
++        sU, sC = res["s0"]
++        c, t, L = self._back_stage(res["start_maps"], sU, sC, vany, free, c, t, L, steps)
++        if res["store_full"] and t == 1:
++            steps.append((c, "drop"))
++        steps.reverse()
++        return [((float(X[c]), float(Y[c])), op) for c, op in steps]
++
++    # -------------------------------------------------------------- acting
++    def get_action(self, state):
++        rnames = sorted(self.w.rovers.keys())
++        if self.expect is not None and self._deviated(state):
++            self.nreplan += 1
++            if self.plan_time < 40.0:
++                try:
++                    self._plan(state)
++                except Exception:
++                    self.plans = {r: [] for r in rnames}
++                    self.t = 0
++        act = np.zeros(8, np.float32)
++        self.expect = {}
++        for k, r in enumerate(rnames):
++            o = self.w.rovers[r]
++            x = self._get(state, o, "x"); y = self._get(state, o, "y")
++            th = self._get(state, o, "theta")
++            plan = self.plans.get(r, [])
++            if self.t < len(plan):
++                (tx, ty), op = plan[self.t]
++            else:
++                tx, ty = x, y
++                op = "none"
++                hx, hy = self.home[r]
++                if math.hypot(x - hx, y - hy) > HOME_R:
++                    tx, ty = hx, hy
++            store = self._get(state, o, "store_full") > 0.5
++            if op == "none" and store:
++                op = "drop"
++            dx = float(np.clip(tx - x, -0.2, 0.2)); dy = float(np.clip(ty - y, -0.2, 0.2))
++            dth = float(np.clip(wrap(self.home_theta[r] - th), -0.4, 0.4))
++            act[4 * k:4 * k + 4] = [dx, dy, dth, SEL[op.split(":")[0]]]
++            self.expect[r] = (x + dx, y + dy, op, self._snapshot(state, r))
++        self.t += 1
++        return act
++
++    def _snapshot(self, state, r):
++        o = self.w.rovers[r]
++        g = lambda ob, f: self._get(state, ob, f)
++        imgs = sum(g(ob, "have_image_" + r) for ob in self.w.objectives)
++        recv = sum(g(ob, "received_image") for ob in self.w.objectives) + \
++            sum(g(s, "received_analysis") for s in self.w.samples)
++        return (g(o, "store_full"), g(o, "calibrated"), imgs, recv)
++
++    def _deviated(self, state):
++        for r, (ex, ey, op, snap) in self.expect.items():
++            o = self.w.rovers[r]
++            x = self._get(state, o, "x"); y = self._get(state, o, "y")
++            if abs(x - ex) > 1e-3 or abs(y - ey) > 1e-3:
++                self.bad_points.append((ex, ey))
++                self.log.append(("move", r, round(ex, 3), round(ey, 3)))
++                return True
++            store, cal, imgs, recv = self._snapshot(state, r)
++            if op.startswith("sample") and store < 0.5:
++                self.log.append(("sample", r, op, round(x, 3), round(y, 3)))
++                return True
++            if op.startswith("sample:"):
++                soil = 1.0 if op[7:] == "soil" else 0.0
++                if not any(self._get(state, sm, "analyzed_" + r) > 0.5 for sm in self.w.samples
++                           if abs(self._get(state, sm, "is_soil") - soil) < 0.5):
++                    self.log.append(("samplekind", r, op, round(x, 3), round(y, 3)))
++                    return True
++            if op == "calibrate" and cal < 0.5:
++                self.bad_view[r].append((x, y))
++                self.log.append(("calib", r, round(x, 3), round(y, 3)))
++                return True
++            if op.startswith("image:"):
++                tgt = [ob for ob in self.w.objectives if ob.name == op[6:]][0]
++                if self._get(state, tgt, "have_image_" + r) < 0.5:
++                    self.log.append(("image", r, op, round(x, 3), round(y, 3), imgs > snap[2]))
++                    if imgs <= snap[2]:
++                        self.bad_view[r].append((x, y))
++                    return True
++            if op == "image" and imgs <= snap[2]:
++                self.bad_view[r].append((x, y))
++                return True
++            if op == "send" and self._unsent(state, r):
++                lx = self._get(state, self.w.lander, "x"); ly = self._get(state, self.w.lander, "y")
++                cx, cy = self._cam(r, x, y)
++                sector = True
++                for o2, ob2 in self.w.rovers.items():
++                    if o2 != r:
++                        ox = self._get(state, ob2, "x"); oy = self._get(state, ob2, "y")
++                        if float(seg_point_dist(np.array(cx), np.array(cy), lx, ly, ox, oy)) < 0.45:
++                            sector = False
++                self.bad_send[r].append((x, y, sector))
++                self.log.append(("send", r, round(x, 3), round(y, 3)))
++                return True
++        return False
++
++    def _unsent(self, state, r):
++        g = lambda ob, f: self._get(state, ob, f)
++        for ob in self.w.objectives:
++            if g(ob, "have_image_" + r) > 0.5 and g(ob, "received_image") < 0.5:
++                return True
++        for s in self.w.samples:
++            if g(s, "analyzed_" + r) > 0.5 and g(s, "received_analysis") < 0.5:
++                return True
++        return False
+diff --git a/approach_rot.py b/approach_rot.py
+new file mode 100644
+index 0000000..a511dc9
+--- /dev/null
++++ b/approach_rot.py
+@@ -0,0 +1,685 @@
++"""Rovers approach: per-rover layered grid BFS + Held-Karp over task subsets,
++joint assignment of tasks to the two rovers (they cannot cross the middle wall)."""
++import math
++import time
++import numpy as np
++from scipy.ndimage import maximum_filter, minimum_filter
++
++H = 0.025
++K = 8
++INF = 10 ** 6
++SEL = {"sample": -5 / 6, "calibrate": -0.5, "image": -1 / 6, "none": 1 / 6,
++       "send": 0.5, "drop": 5 / 6}
++
++ARENA = 2.2729 - 0.004
++WALL = 0.227 + 0.006
++MOUND_R = 0.177 + 0.006
++SQ_HALF = 0.21
++OCT_SUM = 0.44
++LANDER_HALF = (0.69 + 0.012, 0.514 + 0.012)
++CAM_OFF = 0.0875
++CAM_ANG = math.radians(188.0)
++OBJ_RANGE = 1.99 + 0.0875
++LANDER_RANGE = 3.98 + 0.0875
++ROVER_BLOCK_R = 0.26
++SAMPLE_R = 0.245
++LOS_MARGIN = 0.012
++OBJ_RANGE_LIB = 2.005
++PILLAR_LOS_STRICT = 0.08
++PILLAR_LOS_LIB = -1.0
++NEAR_MARGIN = 0.03
++HOME_R = 0.245
++HOME_THETA = {"rover0": math.pi, "rover1": 0.0}
++
++
++def wrap(a):
++    return (a + math.pi) % (2 * math.pi) - math.pi
++
++
++def seg_point_dist(ax, ay, bx, by, px, py):
++    """Distance arrays from point (px,py) to segments a->b (a arrays)."""
++    dx = bx - ax
++    dy = by - ay
++    L2 = dx * dx + dy * dy + 1e-12
++    t = np.clip(((px - ax) * dx + (py - ay) * dy) / L2, 0.0, 1.0)
++    qx = ax + t * dx - px
++    qy = ay + t * dy - py
++    return np.sqrt(qx * qx + qy * qy)
++
++
++def seg_hits_box(ax, ay, bx, by, cx, cy, hx, hy):
++    """Vectorised: does segment (ax,ay)->(bx,by) intersect box centred (cx,cy)?"""
++    dx = bx - ax
++    dy = by - ay
++    t0 = np.zeros(np.shape(ax))
++    t1 = np.ones(np.shape(ax))
++    for d, a, c, h in ((dx, ax, cx, hx), (dy, ay, cy, hy)):
++        d = np.where(np.abs(d) < 1e-12, 1e-12, d)
++        u = (c - h - a) / d
++        v = (c + h - a) / d
++        lo = np.minimum(u, v)
++        hi = np.maximum(u, v)
++        t0 = np.maximum(t0, lo)
++        t1 = np.minimum(t1, hi)
++    return t0 <= t1
++
++
++class World:
++    def __init__(self, state, obs_space):
++        self.space = obs_space
++        T = lambda n: obs_space.get_type(n) if hasattr(obs_space, "get_type") else n
++        self.rovers = {}
++        for o in state.get_objects(T("rover")):
++            self.rovers[o.name] = o
++        self.lander = list(state.get_objects(T("lander")))[0]
++        self.objectives = sorted(state.get_objects(T("objective")), key=lambda o: o.name)
++        self.samples = sorted(state.get_objects(T("sample")), key=lambda o: o.name)
++        self.obstacles = list(state.get_objects(T("obstacle")))
++
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.action_space = action_space
++        self.obs_space = observation_space
++        self.plans = None
++
++    # ------------------------------------------------------------------ utils
++    def _get(self, state, o, f):
++        return float(state.get(o, f))
++
++    def reset(self, state, info):
++        self.w = World(state, self.obs_space)
++        self.home = {}
++        for n, o in self.w.rovers.items():
++            self.home[n] = (self._get(state, o, "x"), self._get(state, o, "y"))
++        self.home_theta = {}
++        for n, o in self.w.rovers.items():
++            self.home_theta[n] = self._get(state, o, "theta")
++        self.plans = None
++        self.bad_points = []
++        self.bad_view = {n: [] for n in self.w.rovers}
++        self.bad_send = {n: [] for n in self.w.rovers}
++        self.expect = None
++        self.nreplan = 0
++        self.plan_time = 0.0
++        self.log = []
++        self._plan(state)
++
++    # --------------------------------------------------------------- planning
++    def _grid(self, state, rname):
++        o = self.w.rovers[rname]
++        x0 = self._get(state, o, "x")
++        y0 = self._get(state, o, "y")
++        right = self.home[rname][0] > 0
++        xmin, xmax = (WALL, ARENA) if right else (-ARENA, -WALL)
++        ymin, ymax = -ARENA, ARENA
++        i0 = math.ceil((xmin - x0) / H - 1e-9)
++        i1 = math.floor((xmax - x0) / H + 1e-9)
++        j0 = math.ceil((ymin - y0) / H - 1e-9)
++        j1 = math.floor((ymax - y0) / H + 1e-9)
++        # ensure start included
++        i0 = min(i0, 0); i1 = max(i1, 0); j0 = min(j0, 0); j1 = max(j1, 0)
++        xs = x0 + H * np.arange(i0, i1 + 1)
++        ys = y0 + H * np.arange(j0, j1 + 1)
++        X, Y = np.meshgrid(xs, ys, indexing="ij")
++        start = (-i0, -j0)
++        return X, Y, start
++
++    def _free(self, state, X, Y):
++        free = np.ones(X.shape, bool)
++        for ob in self.w.obstacles:
++            ox = self._get(state, ob, "x"); oy = self._get(state, ob, "y")
++            hx = self._get(state, ob, "half_x"); hy = self._get(state, ob, "half_y")
++            ddx = np.maximum(np.abs(X - ox) - hx, 0)
++            ddy = np.maximum(np.abs(Y - oy) - hy, 0)
++            blocked = np.sqrt(ddx ** 2 + ddy ** 2) < MOUND_R
++            if hx < 0.12 and hy < 0.12:
++                ax = np.abs(X - ox); ay = np.abs(Y - oy)
++                blocked |= (ax < hx + SQ_HALF) & (ay < hy + SQ_HALF) & (ax + ay < OCT_SUM + hx + hy - 0.1)
++            free &= ~blocked
++        lx = self._get(state, self.w.lander, "x"); ly = self._get(state, self.w.lander, "y")
++        free &= ~((np.abs(X - lx) < LANDER_HALF[0]) & (np.abs(Y - ly) < LANDER_HALF[1]))
++        for (bx, by) in self.bad_points:
++            free &= np.hypot(X - bx, Y - by) > 0.04
++        return free
++
++    def _cam(self, rname, X, Y):
++        th = self.home_theta[rname]
++        return X + CAM_OFF * math.cos(th + CAM_ANG), Y + CAM_OFF * math.sin(th + CAM_ANG)
++
++    def _plan(self, state):
++        t0 = time.time()
++        try:
++            self._plan_inner(state)
++        finally:
++            self.plan_time += time.time() - t0
++
++    def _plan_inner(self, state):
++        w = self.w
++        g = lambda o, f: self._get(state, o, f)
++        rnames = sorted(w.rovers.keys())
++        # ---- remaining requirements
++        need_img = []           # objectives needing imaging
++        must_send = {r: False for r in rnames}
++        for ob in w.objectives:
++            if g(ob, "received_image") > 0.5:
++                continue
++            held = False
++            for r in rnames:
++                if g(ob, "have_image_" + r) > 0.5:
++                    must_send[r] = True
++                    held = True
++            if not held:
++                need_img.append(ob)
++        need_kind = []          # 'stone' / 'soil' needing sampling
++        for kind, soil in (("stone", 0.0), ("soil", 1.0)):
++            ss = [s for s in w.samples if abs(g(s, "is_soil") - soil) < 0.5]
++            if any(g(s, "received_analysis") > 0.5 for s in ss):
++                continue
++            held = False
++            for r in rnames:
++                if any(g(s, "analyzed_" + r) > 0.5 for s in ss):
++                    must_send[r] = True
++                    held = True
++            if not held:
++                need_kind.append(kind)
++
++        blockers = {r: [] for r in rnames}
++        per = {}
++        for it in range(4):
++            for r in rnames:
++                if r not in per:
++                    per[r] = self._rover_hk(state, r, need_img, need_kind, must_send[r], rnames, blockers[r])
++            self._assign(per, rnames, need_img, need_kind)
++            changed = False
++            for k, r in enumerate(rnames):
++                other = rnames[1 - k]
++                op_ = self.plans[other]
++                ox0 = g(w.rovers[other], "x"); oy0 = g(w.rovers[other], "y")
++                for t, ((x, y), op) in enumerate(self.plans[r]):
++                    if op != "send":
++                        continue
++                    if t < len(op_):
++                        p = op_[t][0]
++                    elif op_:
++                        p = op_[-1][0]
++                    else:
++                        p = (ox0, oy0)
++                    th = self.home_theta[r]
++                    cx = x + CAM_OFF * math.cos(th + CAM_ANG); cy = y + CAM_OFF * math.sin(th + CAM_ANG)
++                    lx, ly = g(w.lander, "x"), g(w.lander, "y")
++                    dd = float(seg_point_dist(np.array(cx), np.array(cy), lx, ly, p[0], p[1]))
++                    if dd <= ROVER_BLOCK_R:
++                        blockers[r].append(p)
++                        per.pop(r, None)
++                        changed = True
++            if not changed:
++                break
++
++    def _assign(self, per, rnames, need_img, need_kind):
++        best = None
++        tasks_all = [("img", ob.name) for ob in need_img] + [("kind", k) for k in need_kind]
++        r0, r1 = rnames
++        res0, res1 = per[r0], per[r1]
++        for S0, v0 in res0["final"].items():
++            for S1, v1 in res1["final"].items():
++                cov = set(res0["names"][i] for i in range(len(res0["names"])) if S0 >> i & 1)
++                cov |= set(res1["names"][i] for i in range(len(res1["names"])) if S1 >> i & 1)
++                if not all(t in cov for t in tasks_all):
++                    continue
++                key = (max(v0[0], v1[0]), v0[0] + v1[0], bin(S0).count("1") + bin(S1).count("1"))
++                if best is None or key < best[0]:
++                    best = (key, S0, S1)
++        self.plans = {}
++        if best is None:
++            for r in rnames:
++                self.plans[r] = self._extract(per[r], per[r]["final_any_empty"])
++        else:
++            _, S0, S1 = best
++            self.plans[r0] = self._extract(res0, S0)
++            self.plans[r1] = self._extract(res1, S1)
++        self.t = 0
++
++    def _propagate(self, sU, sC, free, vany):
++        TU = np.full(free.shape, INF, np.int32)
++        TC = np.full(free.shape, INF, np.int32)
++        AU = np.full(free.shape, INF, np.int32)
++        AC = np.full(free.shape, INF, np.int32)
++        RU = np.zeros(free.shape, bool)
++        RC = np.zeros(free.shape, bool)
++        mU = sU.min(); mC = sC.min()
++        t = int(min(mU, mC))
++        if t >= INF:
++            return TU, TC, AU, AC
++        maxseed = max(int(sU[sU < INF].max()) if mU < INF else 0,
++                      int(sC[sC < INF].max()) if mC < INF else 0)
++        nfree = int(free.sum())
++        while True:
++            RU |= sU == t
++            RC |= sC == t
++            TU[RU & (TU == INF)] = t
++            TC[RC & (TC == INF)] = t
++            if t >= maxseed and RU.sum() + RC.sum() >= 2 * nfree:
++                break
++            dU = maximum_filter(RU, size=2 * K + 1, mode="constant") & free
++            dC = maximum_filter(RC, size=2 * K + 1, mode="constant") & free
++            AU[dU & (AU == INF)] = t + 1
++            AC[dC & (AC == INF)] = t + 1
++            nRU = RU | dU
++            nRC = RC | dC | (dU & vany)
++            if t >= maxseed and (nRU == RU).all() and (nRC == RC).all():
++                break
++            RU, RC = nRU, nRC
++            t += 1
++            if t > 600:
++                break
++        return TU, TC, AU, AC
++
++    def _rover_hk(self, state, r, need_img, need_kind, must_send, rnames, blockers=()):
++        w = self.w
++        g = lambda o, f: self._get(state, o, f)
++        X, Y, start = self._grid(state, r)
++        free = self._free(state, X, Y)
++        free[start] = True
++        CX, CY = X, Y
++        regions = []
++        names = []
++        vany = np.zeros(X.shape, bool)
++        pillars = [(g(o, "x"), g(o, "y"), g(o, "half_x") + LOS_MARGIN, g(o, "half_y") + LOS_MARGIN)
++                   for o in w.obstacles if g(o, "half_x") < 0.12 and g(o, "half_y") < 0.12]
++        badv = np.zeros(X.shape, bool)
++        for (bx, by) in self.bad_view[r]:
++            badv |= np.hypot(X - bx, Y - by) < 0.04
++        held0 = set(ob.name for ob in w.objectives if g(ob, "have_image_" + r) > 0.5)
++        odist = {}
++        ovis_lib = {}
++        img_obj = {}
++        for ob in w.objectives:
++            ox, oy = g(ob, "x"), g(ob, "y")
++            d = np.hypot(CX - ox, CY - oy)
++            vis = (d <= OBJ_RANGE) & free & ~badv
++            vlib = d <= OBJ_RANGE_LIB
++            for (px, py, phx, phy) in pillars:
++                dseg = seg_point_dist(CX, CY, ox, oy, px, py)
++                vis &= dseg > PILLAR_LOS_STRICT
++                if math.hypot(px - ox, py - oy) < 0.95:
++                    vlib &= dseg > PILLAR_LOS_LIB
++            odist[ob.name] = d
++            ovis_lib[ob.name] = vlib
++            vany |= vis
++            if ob in need_img and vis.any():
++                img_obj[len(regions)] = ob.name
++                regions.append(("img", vis)); names.append(("img", ob.name))
++        for kind in need_kind:
++            soil = 1.0 if kind == "soil" else 0.0
++            dme = np.full(X.shape, 9.0)
++            doth = np.full(X.shape, 9.0)
++            for s in w.samples:
++                dd = np.hypot(X - g(s, "x"), Y - g(s, "y"))
++                if abs(g(s, "is_soil") - soil) < 0.5:
++                    dme = np.minimum(dme, dd)
++                else:
++                    doth = np.minimum(doth, dd)
++            reg = (dme < SAMPLE_R) & ((doth > 0.26) | (dme < doth - 0.02)) & free
++            if reg.any():
++                regions.append(("sample", reg)); names.append(("kind", kind))
++        # send region
++        lx, ly = g(w.lander, "x"), g(w.lander, "y")
++        send = (np.hypot(CX - lx, CY - ly) <= LANDER_RANGE) & free
++        for (px, py, phx, phy) in pillars:
++            send &= seg_point_dist(CX, CY, lx, ly, px, py) > PILLAR_LOS_STRICT
++        for (bx, by, sector) in self.bad_send[r]:
++            send &= np.hypot(X - bx, Y - by) > 0.04
++            if sector:
++                bcx, bcy = self._cam(r, bx, by)
++                bd = math.hypot(bcx - lx, bcy - ly)
++                bb = math.atan2(bcy - ly, bcx - lx)
++                ang = np.abs(np.angle(np.exp(1j * (np.arctan2(CY - ly, CX - lx) - bb))))
++                send &= ~((np.hypot(CX - lx, CY - ly) >= bd - 0.15) & (ang < math.radians(12)))
++        for other in rnames:
++            if other == r:
++                continue
++            for (px, py) in [self.home[other], (g(w.rovers[other], "x"), g(w.rovers[other], "y"))] + list(blockers):
++                send &= seg_point_dist(CX, CY, lx, ly, px, py) > ROVER_BLOCK_R
++        hx, hy = self.home[r]
++        homereg = (np.hypot(X - hx, Y - hy) <= HOME_R) & free
++        if not homereg.any():
++            homereg = np.zeros(X.shape, bool)
++            d = np.hypot(X - hx, Y - hy) + (~free) * 100
++            homereg[np.unravel_index(np.argmin(d), d.shape)] = True
++
++        n = len(regions)
++        calib = g(w.rovers[r], "calibrated") > 0.5
++        s0U = np.full(X.shape, INF, np.int32)
++        s0C = np.full(X.shape, INF, np.int32)
++        (s0C if calib else s0U)[start] = 0
++        maps = {}      # (S, j) -> (seedU, seedC, TU, TC, AU, AC)
++        seeds = {}
++        def drop_step(a):
++            m = minimum_filter(a, size=2 * K + 1, mode="constant", cval=INF)
++            return np.where(free & (m < INF), m + 1, INF).astype(np.int32)
++
++        store_full = g(w.rovers[r], "store_full") > 0.5
++        if store_full:
++            s0U, s0C = drop_step(s0U), drop_step(s0C)
++        start_maps = self._propagate(s0U, s0C, free, vany)
++
++        reg_cache = {}
++
++        def img_region(j, S):
++            imask = 0
++            for i in img_obj:
++                if S >> i & 1:
++                    imask |= 1 << i
++            key = (j, imask)
++            if key in reg_cache:
++                return reg_cache[key]
++            held = set(held0) | set(img_obj[i] for i in img_obj if imask >> i & 1)
++            me = img_obj[j]
++            reg = regions[j][1].copy()
++            for ob in w.objectives:
++                if ob.name == me or ob.name in held:
++                    continue
++                reg &= ~(ovis_lib[ob.name] & (odist[ob.name] <= odist[me] + NEAR_MARGIN))
++            reg_cache[key] = reg
++            return reg
++
++        def op_maps(M, j, S=0):
++            TU, TC, AU, AC = M
++            kind, reg = regions[j]
++            if kind == "img":
++                reg = img_region(j, S)
++                return np.where(reg, AC, INF), np.full(X.shape, INF, np.int32)
++            return drop_step(np.where(reg, AU, INF)), drop_step(np.where(reg, AC, INF))
++
++        for j in range(n):
++            seeds[(1 << j, j)] = op_maps(start_maps, j)
++        order = sorted(seeds.keys(), key=lambda k: bin(k[0]).count("1"))
++        full = (1 << n) - 1
++        # BFS over subsets in increasing size
++        for size in range(1, n + 1):
++            for S in range(1, full + 1):
++                if bin(S).count("1") != size:
++                    continue
++                for j in range(n):
++                    if (S, j) not in seeds:
++                        continue
++                    sU, sC = seeds[(S, j)]
++                    if min(sU.min(), sC.min()) >= INF:
++                        continue
++                    M = self._propagate(sU, sC, free, vany)
++                    maps[(S, j)] = M
++                    for k in range(n):
++                        if S >> k & 1:
++                            continue
++                        nU, nC = op_maps(M, k, S)
++                        key = (S | 1 << k, k)
++                        if key in seeds:
++                            oU, oC = seeds[key]
++                            seeds[key] = (np.minimum(oU, nU), np.minimum(oC, nC))
++                        else:
++                            seeds[key] = (nU, nC)
++        # completions
++        final = {}
++        comp = {}
++
++        def complete(M, need_send):
++            TU, TC, AU, AC = M
++            if need_send:
++                op = np.where(send, np.minimum(AU, AC), INF)
++                if op.min() >= INF:
++                    return INF, None
++                M2 = self._propagate(op, np.full(X.shape, INF, np.int32), free, vany)
++                at = np.minimum(M2[0], M2[1])
++                v = np.where(homereg, at, INF)
++                return int(v.min()), (op, M2)
++            at = np.minimum(TU, TC)
++            v = np.where(homereg, at, INF)
++            return int(v.min()), None
++
++        v, extra = complete(start_maps, must_send)
++        if v < INF:
++            final[0] = (v, None, extra)
++        for (S, j), M in maps.items():
++            v, extra = complete(M, True)
++            if v >= INF:
++                continue
++            if S not in final or v < final[S][0]:
++                final[S] = (v, j, extra)
++        res = dict(img_obj=img_obj, X=X, Y=Y, free=free, vany=vany, regions=regions, names=names,
++                   maps=maps, seeds=seeds, start_maps=start_maps, s0=(s0U, s0C),
++                   final=final, store_full=store_full, homereg=homereg, send=send, must_send=must_send, r=r)
++        res["final_any_empty"] = 0 if 0 in final else (min(final, key=lambda s: final[s][0]) if final else None)
++        return res
++
++    # ------------------------------------------------------------ extraction
++    def _back_stage(self, M, sU, sC, vany, free, c, t, L, steps):
++        """Backtrack within stage until hitting a seed. Appends (cell, op) in
++        reverse order. Returns (cell, t, layer) at the seed."""
++        TU, TC, AU, AC = M
++        nx, ny = free.shape
++        while True:
++            if L == "U" and sU[c] == t:
++                return c, t, "U"
++            if L == "C" and sC[c] == t:
++                return c, t, "C"
++            T = TU if L == "U" else TC
++            if T[c] < t:
++                steps.append((c, "none")); t -= 1
++                continue
++            i, j = c
++            i0, i1 = max(0, i - K), min(nx, i + K + 1)
++            j0, j1 = max(0, j - K), min(ny, j + K + 1)
++            found = None
++            sub = T[i0:i1, j0:j1]
++            cand = np.argwhere(sub <= t - 1)
++            if len(cand):
++                # prefer farthest-consistent (any)
++                a, b = cand[0]
++                found = ((i0 + a, j0 + b), L, "none")
++            elif L == "C" and vany[c]:
++                cand = np.argwhere(TU[i0:i1, j0:j1] <= t - 1)
++                if len(cand):
++                    a, b = cand[0]
++                    found = ((i0 + a, j0 + b), "U", "calibrate")
++            if found is None:
++                raise RuntimeError("backtrack failed")
++            steps.append((c, found[2]))
++            c, L, t = found[0], found[1], t - 1
++
++    def _arrive(self, M, c, t, L, op, vany, free, steps):
++        """c reached by a move arrival at time t in layer L (for op)."""
++        TU, TC, AU, AC = M
++        nx, ny = free.shape
++        T = TU if L == "U" else TC
++        i, j = c
++        i0, i1 = max(0, i - K), min(nx, i + K + 1)
++        j0, j1 = max(0, j - K), min(ny, j + K + 1)
++        cand = np.argwhere(T[i0:i1, j0:j1] <= t - 1)
++        a, b = cand[0]
++        steps.append((c, op))
++        return (i0 + a, j0 + b), t - 1, L
++
++    def _extract(self, res, S):
++        if S is None or S not in res["final"]:
++            return []
++        X, Y, free, vany = res["X"], res["Y"], res["free"], res["vany"]
++        v, j, extra = res["final"][S]
++        steps = []
++        homereg = res["homereg"]
++        # final stage maps
++        if extra is not None:
++            op, M2 = extra
++            at = np.minimum(M2[0], M2[1])
++            vv = np.where(homereg, at, INF)
++            c = np.unravel_index(np.argmin(vv), vv.shape); t = int(vv[c])
++            L = "U" if M2[0][c] <= t else "C"
++            # send stage seeds are U only
++            c, t, L = self._back_stage(M2, op, np.full(op.shape, INF, np.int32), vany, free, c, t, L, steps)
++            Mprev = res["maps"][(S, j)] if S else res["start_maps"]
++            TU, TC, AU, AC = Mprev
++            Lp = "U" if AU[c] == t else "C"
++            c, t, L = self._arrive(Mprev, c, t, Lp, "send", vany, free, steps)
++        else:
++            Mprev = res["maps"][(S, j)] if S else res["start_maps"]
++            at = np.minimum(Mprev[0], Mprev[1])
++            vv = np.where(homereg, at, INF)
++            c = np.unravel_index(np.argmin(vv), vv.shape); t = int(vv[c])
++            L = "U" if Mprev[0][c] <= t else "C"
++        # walk back through task stages
++        curS, curj = S, j
++        while curS:
++            M = res["maps"][(curS, curj)]
++            sU, sC = res["seeds"][(curS, curj)]
++            c, t, L = self._back_stage(M, sU, sC, vany, free, c, t, L, steps)
++            kind = res["regions"][curj][0]
++            prevS = curS & ~(1 << curj)
++            # find predecessor
++            found = None
++            if prevS == 0:
++                cands = [(None, res["start_maps"])]
++            else:
++                cands = [(pj, res["maps"][(prevS, pj)]) for pj in range(len(res["regions"]))
++                         if (prevS >> pj & 1) and (prevS, pj) in res["maps"]]
++            if kind != "img":
++                # undo the forced drop step
++                reg = res["regions"][curj][1]
++                nx, ny = free.shape
++                i, jj = c
++                i0, i1 = max(0, i - K), min(nx, i + K + 1)
++                j0, j1 = max(0, jj - K), min(ny, jj + K + 1)
++                hit = None
++                for pj, Mp in cands:
++                    A = Mp[2] if L == "U" else Mp[3]
++                    sub = np.where(reg[i0:i1, j0:j1], A[i0:i1, j0:j1], INF)
++                    cand = np.argwhere(sub == t - 1)
++                    if len(cand):
++                        hit = (pj, Mp, (i0 + cand[0][0], j0 + cand[0][1]))
++                        break
++                if hit is None:
++                    raise RuntimeError("drop pred not found")
++                steps.append((c, "drop"))
++                c = hit[2]; t -= 1
++                cands = [(hit[0], hit[1])]
++            for pj, Mp in cands:
++                TU, TC, AU, AC = Mp
++                if kind == "img":
++                    if L == "U" and AC[c] == t:
++                        found = (pj, Mp, "C"); break
++                else:
++                    if L == "U" and AU[c] == t:
++                        found = (pj, Mp, "U"); break
++                    if L == "C" and AC[c] == t:
++                        found = (pj, Mp, "C"); break
++            if found is None:
++                raise RuntimeError("pred not found")
++            pj, Mp, Lp = found
++            c, t, L = self._arrive(Mp, c, t, Lp, ("image:" + res["img_obj"][curj]) if kind == "img" else ("sample:" + res["names"][curj][1]), vany, free, steps)
++            curS, curj = prevS, pj
++        # back to start
++        sU, sC = res["s0"]
++        c, t, L = self._back_stage(res["start_maps"], sU, sC, vany, free, c, t, L, steps)
++        if res["store_full"] and t == 1:
++            steps.append((c, "drop"))
++        steps.reverse()
++        return [((float(X[c]), float(Y[c])), op) for c, op in steps]
++
++    # -------------------------------------------------------------- acting
++    def get_action(self, state):
++        rnames = sorted(self.w.rovers.keys())
++        if self.expect is not None and self._deviated(state):
++            self.nreplan += 1
++            if self.plan_time < 40.0:
++                try:
++                    self._plan(state)
++                except Exception:
++                    self.plans = {r: [] for r in rnames}
++                    self.t = 0
++        act = np.zeros(8, np.float32)
++        self.expect = {}
++        for k, r in enumerate(rnames):
++            o = self.w.rovers[r]
++            x = self._get(state, o, "x"); y = self._get(state, o, "y")
++            th = self._get(state, o, "theta")
++            plan = self.plans.get(r, [])
++            if self.t < len(plan):
++                (tx, ty), op = plan[self.t]
++            else:
++                tx, ty = x, y
++                op = "none"
++                hx, hy = self.home[r]
++                if math.hypot(x - hx, y - hy) > HOME_R:
++                    tx, ty = hx, hy
++            store = self._get(state, o, "store_full") > 0.5
++            if op == "none" and store:
++                op = "drop"
++            dx = float(np.clip(tx - x, -0.2, 0.2)); dy = float(np.clip(ty - y, -0.2, 0.2))
++            dth = float(np.clip(wrap(self.home_theta[r] - th), -0.4, 0.4))
++            act[4 * k:4 * k + 4] = [dx, dy, dth, SEL[op.split(":")[0]]]
++            self.expect[r] = (x + dx, y + dy, op, self._snapshot(state, r))
++        self.t += 1
++        return act
++
++    def _snapshot(self, state, r):
++        o = self.w.rovers[r]
++        g = lambda ob, f: self._get(state, ob, f)
++        imgs = sum(g(ob, "have_image_" + r) for ob in self.w.objectives)
++        recv = sum(g(ob, "received_image") for ob in self.w.objectives) + \
++            sum(g(s, "received_analysis") for s in self.w.samples)
++        return (g(o, "store_full"), g(o, "calibrated"), imgs, recv)
++
++    def _deviated(self, state):
++        for r, (ex, ey, op, snap) in self.expect.items():
++            o = self.w.rovers[r]
++            x = self._get(state, o, "x"); y = self._get(state, o, "y")
++            if abs(x - ex) > 1e-3 or abs(y - ey) > 1e-3:
++                self.bad_points.append((ex, ey))
++                self.log.append(("move", r, round(ex, 3), round(ey, 3)))
++                return True
++            store, cal, imgs, recv = self._snapshot(state, r)
++            if op.startswith("sample") and store < 0.5:
++                self.log.append(("sample", r, op, round(x, 3), round(y, 3)))
++                return True
++            if op.startswith("sample:"):
++                soil = 1.0 if op[7:] == "soil" else 0.0
++                if not any(self._get(state, sm, "analyzed_" + r) > 0.5 for sm in self.w.samples
++                           if abs(self._get(state, sm, "is_soil") - soil) < 0.5):
++                    self.log.append(("samplekind", r, op, round(x, 3), round(y, 3)))
++                    return True
++            if op == "calibrate" and cal < 0.5:
++                self.bad_view[r].append((x, y))
++                self.log.append(("calib", r, round(x, 3), round(y, 3)))
++                return True
++            if op.startswith("image:"):
++                tgt = [ob for ob in self.w.objectives if ob.name == op[6:]][0]
++                if self._get(state, tgt, "have_image_" + r) < 0.5:
++                    self.log.append(("image", r, op, round(x, 3), round(y, 3), imgs > snap[2]))
++                    if imgs <= snap[2]:
++                        self.bad_view[r].append((x, y))
++                    return True
++            if op == "image" and imgs <= snap[2]:
++                self.bad_view[r].append((x, y))
++                return True
++            if op == "send" and self._unsent(state, r):
++                lx = self._get(state, self.w.lander, "x"); ly = self._get(state, self.w.lander, "y")
++                cx, cy = self._cam(r, x, y)
++                sector = True
++                for o2, ob2 in self.w.rovers.items():
++                    if o2 != r:
++                        ox = self._get(state, ob2, "x"); oy = self._get(state, ob2, "y")
++                        if float(seg_point_dist(np.array(cx), np.array(cy), lx, ly, ox, oy)) < 0.45:
++                            sector = False
++                self.bad_send[r].append((x, y, sector))
++                self.log.append(("send", r, round(x, 3), round(y, 3)))
++                return True
++        return False
++
++    def _unsent(self, state, r):
++        g = lambda ob, f: self._get(state, ob, f)
++        for ob in self.w.objectives:
++            if g(ob, "have_image_" + r) > 0.5 and g(ob, "received_image") < 0.5:
++                return True
++        for s in self.w.samples:
++            if g(s, "analyzed_" + r) > 0.5 and g(s, "received_analysis") < 0.5:
++                return True
++        return False
+diff --git a/batch.py b/batch.py
+index 886e443..52c9027 100644
+--- a/batch.py
++++ b/batch.py
+@@ -4,7 +4,7 @@ def run(seed):
+     import numpy as np
+     from env_client import make_env
+     from approach import GeneratedApproach
+-    env = make_env(); obs, info = env.reset(seed=seed)
++    env = make_env(); obs, info = env.reset(seed=seed, options=({"object_count":int(sys.argv[3])} if len(sys.argv)>3 else None))
+     t0=time.time()
+     ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
+     steps=0; term=False
+diff --git a/batch.sh b/batch.sh
+new file mode 100755
+index 0000000..a603306
+--- /dev/null
++++ b/batch.sh
+@@ -0,0 +1,4 @@
++#!/bin/bash
++# usage: batch.sh outfile json...
++out=$1; shift
++for a in "$@"; do (timeout 600 /opt/robocode-strict/bin/python sw.py "$a" 2>&1 | tail -1 >> $out) & done; wait
+diff --git a/count_test.py b/count_test.py
+new file mode 100644
+index 0000000..57fc48c
+--- /dev/null
++++ b/count_test.py
+@@ -0,0 +1,13 @@
++import sys, time
++from env_client import make_env
++from approach import GeneratedApproach
++env=make_env()
++n=int(sys.argv[1])
++for seed in range(int(sys.argv[2]),int(sys.argv[3])):
++    obs,info=env.reset(seed=seed, options={"object_count":n})
++    T=env.observation_space.get_type
++    t0=time.time(); ap=GeneratedApproach(env.action_space, env.observation_space,{}); ap.reset(obs,info)
++    steps=0; term=False
++    while not term and steps<300:
++        obs,r,term,tr,info=env.step(ap.get_action(obs)); steps+=1
++    print(seed, len(list(obs.get_objects(T('objective')))), len(list(obs.get_objects(T('sample')))), steps, term, round(time.time()-t0,1), flush=True)
+diff --git a/mk.py b/mk.py
+new file mode 100644
+index 0000000..e343c54
+--- /dev/null
++++ b/mk.py
+@@ -0,0 +1,8 @@
++import math, json, sys
++seed=int(sys.argv[1]); out=[]
++for b,Dfar,Dnear in [(0,1.6,0.75),(15,1.65,0.75),(30,1.85,0.8),(45,2.3,0.75),(60,3.2,0.6),(75,3.9,0.55),(90,4.0,0.5),(105,2.0,0.55),(120,0.9,0.6)]:
++    c,s=math.cos(math.radians(b)),math.sin(math.radians(b))
++    # rover centre such that camera(theta=0) on ray: camera = rover + (-0.0866,-0.0122)
++    f=lambda D:[round(-1.9+D*c+0.0866,3),round(-2.0+D*s+0.0122,3)]
++    out.append({"seed":seed,"rover":"rover1","path":[f(Dfar),f(Dnear)],"park":[1.5,0.3],"h":0.1,"pre":[[-0.6,-1.0],[f(Dfar)[0],-1.0]]})
++print('\n'.join(json.dumps(o) for o in out))
+diff --git a/near.txt b/near.txt
+new file mode 100644
+index 0000000..fe2f685
+--- /dev/null
++++ b/near.txt
+@@ -0,0 +1,24 @@
++357 sample3 -2.014 -2.0 0.114 0.004
++369 sample0 -1.986 -1.965 0.093 0.006
++549 sample3 -1.863 -1.986 0.039 0.004
++582 sample2 -1.878 -1.894 0.109 0.006
++614 sample0 -1.823 -2.031 0.083 0.006
++683 sample5 -1.97 -1.928 0.101 0.004
++706 sample1 -1.864 -2.026 0.045 0.006
++877 sample4 -1.946 -1.994 0.047 0.004
++960 sample1 -1.875 -1.92 0.084 0.006
++973 sample0 -1.989 -1.94 0.107 0.006
++1039 sample5 -1.898 -2.02 0.02 0.004
++1069 sample5 -1.891 -2.09 0.09 0.004
++1101 sample3 -1.861 -2.073 0.082 0.004
++1125 sample1 -1.948 -1.957 0.064 0.006
++1139 sample4 -1.917 -2.104 0.105 0.004
++1212 sample3 -1.837 -1.959 0.075 0.004
++1519 sample5 -1.943 -1.889 0.119 0.004
++1706 sample3 -1.981 -2.087 0.119 0.004
++1808 sample5 -1.881 -1.965 0.039 0.004
++1834 sample1 -1.881 -1.958 0.046 0.006
++1849 sample4 -1.866 -2.01 0.036 0.004
++1861 sample0 -1.954 -2.057 0.079 0.006
++1955 sample3 -1.933 -1.996 0.033 0.004
++1966 sample4 -1.827 -2.022 0.076 0.004
+diff --git a/near_lander.py b/near_lander.py
+index 01e90b3..3ac2524 100644
+--- a/near_lander.py
++++ b/near_lander.py
+@@ -6,4 +6,4 @@ for s in range(int(sys.argv[1]),int(sys.argv[2])):
+     for o in obs.get_objects(env.observation_space.get_type('sample')):
+         x,y=float(obs.get(o,'x')),float(obs.get(o,'y'))
+         d=math.hypot(x+1.9,y+2.0)
+-        if d<float(sys.argv[3]): print(s,o.name,round(x,2),round(y,2),round(d,3))
++        if d<float(sys.argv[3]): print(s,o.name,round(x,3),round(y,3),round(d,3),round(float(obs.get(o,"z")),3),flush=True)
+diff --git a/plancmp.py b/plancmp.py
+new file mode 100644
+index 0000000..bdfe65e
+--- /dev/null
++++ b/plancmp.py
+@@ -0,0 +1,11 @@
++import sys
++from env_client import make_env
++import approach, approach_rot
++env=make_env(); tot=[0,0]
++for s in range(int(sys.argv[1]),int(sys.argv[2])):
++    obs,info=env.reset(seed=s); out=[]
++    for i,m in enumerate([approach, approach_rot]):
++        ap=m.GeneratedApproach(env.action_space, env.observation_space,{}); ap.reset(obs,info)
++        v=max(len(p) for p in ap.plans.values()); tot[i]+=v; out.append(v)
++    if out[0]!=out[1]: print(s,out)
++print(tot)
+diff --git a/r0_549.txt b/r0_549.txt
+new file mode 100644
+index 0000000..b2df136
+--- /dev/null
++++ b/r0_549.txt
+@@ -0,0 +1,4 @@
++{"args": {"seed": 549, "rover": "rover0", "path": [[0.3, -0.2], [2.3, -0.2]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.30000001192092896, -0.19999998807907104]], [[0.30000001192092896, -0.19999998807907104], [0.4000000059604645, -0.20000000298023224], true]]}
++{"args": {"seed": 549, "rover": "rover0", "path": [[0.3, -2.3], [2.3, -2.3]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.30000001192092896, -2.1840884685516357]], [[0.30000001192092896, -2.1840884685516357], [0.30000001192092896, -2.1840884685516357], false]]}
++{"args": {"seed": 549, "rover": "rover0", "path": [[0.3, -1.0], [2.3, -1.0]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.30000001192092896, -1.0]], [[0.30000001192092896, -1.0], [0.4000000059604645, -1.0], false], [[0.4000000059604645, -1.0], [0.5, -1.0], false], [[0.5, -1.0], [0.6000000238418579, -1.0], false], [[0.6000000238418579, -1.0], [0.699999988079071, -1.0], false], [[0.699999988079071, -1.0], [0.800000011920929, -1.0], false], [[0.800000011920929, -1.0], [0.9000000357627869, -1.0], false], [[0.9000000357627869, -1.0], [1.0, -1.0], false], [[1.0, -1.0], [1.100000023841858, -1.0], false], [[1.100000023841858, -1.0], [1.2000000476837158, -1.0], false], [[1.2000000476837158, -1.0], [1.3000000715255737, -1.0], false], [[1.3000000715255737, -1.0], [1.399999976158142, -1.0], false], [[1.399999976158142, -1.0], [1.5, -1.0], false], [[1.5, -1.0], [1.600000023841858, -1.0], false], [[1.600000023841858, -1.0], [1.7000000476837158, -1.0], false], [[1.7000000476837158, -1.0], [1.8000000715255737, -1.0], false], [[1.8000000715255737, -1.0], [1.899999976158142, -1.0], false], [[1.899999976158142, -1.0], [2.0, -1.0], false], [[2.0, -1.0], [2.1000001430511475, -1.0], false], [[2.1000001430511475, -1.0], [2.200000047683716, -1.0], false], [[2.200000047683716, -1.0], [2.200000047683716, -1.0], false]]}
++{"args": {"seed": 549, "rover": "rover0", "path": [[0.3, -1.9], [2.3, -1.9]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.29999998211860657, -1.899999976158142]], [[0.29999998211860657, -1.899999976158142], [0.3999999761581421, -1.899999976158142], false], [[0.3999999761581421, -1.899999976158142], [0.5, -1.9000000953674316], false], [[0.5, -1.9000000953674316], [0.5999999642372131, -1.899999976158142], false], [[0.5999999642372131, -1.899999976158142], [0.699999988079071, -1.899999976158142], false], [[0.699999988079071, -1.899999976158142], [0.800000011920929, -1.899999976158142], false], [[0.800000011920929, -1.899999976158142], [0.8999999761581421, -1.899999976158142], false], [[0.8999999761581421, -1.899999976158142], [1.0, -1.9000000953674316], false], [[1.0, -1.9000000953674316], [1.100000023841858, -1.899999976158142], false], [[1.100000023841858, -1.899999976158142], [1.2000000476837158, -1.899999976158142], false], [[1.2000000476837158, -1.899999976158142], [1.2999999523162842, -1.899999976158142], false], [[1.2999999523162842, -1.899999976158142], [1.399999976158142, -1.899999976158142], false], [[1.399999976158142, -1.899999976158142], [1.5, -1.9000000953674316], false], [[1.5, -1.9000000953674316], [1.600000023841858, -1.899999976158142], false], [[1.600000023841858, -1.899999976158142], [1.7000000476837158, -1.899999976158142], false], [[1.7000000476837158, -1.899999976158142], [1.7999999523162842, -1.899999976158142], false], [[1.7999999523162842, -1.899999976158142], [1.899999976158142, -1.899999976158142], false], [[1.899999976158142, -1.899999976158142], [2.0, -1.9000000953674316], false], [[2.0, -1.9000000953674316], [2.0999999046325684, -1.899999976158142], false], [[2.0999999046325684, -1.899999976158142], [2.200000047683716, -1.899999976158142], false], [[2.200000047683716, -1.899999976158142], [2.200000047683716, -1.899999976158142], false]]}
+diff --git a/r0_549b.txt b/r0_549b.txt
+new file mode 100644
+index 0000000..015dcf2
+--- /dev/null
++++ b/r0_549b.txt
+@@ -0,0 +1,8 @@
++{"args": {"seed": 549, "rover": "rover0", "path": [[0.3, -0.45], [2.3, -0.45]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.30000001192092896, -0.44999998807907104]], [[0.30000001192092896, -0.44999998807907104], [0.4000000059604645, -0.44999998807907104], true]]}
++{"args": {"seed": 549, "rover": "rover0", "path": [[0.3, -0.7], [2.3, -0.7]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.30000001192092896, -0.699999988079071]], [[0.30000001192092896, -0.699999988079071], [0.4000000059604645, -0.699999988079071], false], [[0.4000000059604645, -0.699999988079071], [0.5, -0.699999988079071], false], [[0.5, -0.699999988079071], [0.6000000238418579, -0.699999988079071], false], [[0.6000000238418579, -0.699999988079071], [0.699999988079071, -0.7000000476837158], false], [[0.699999988079071, -0.7000000476837158], [0.800000011920929, -0.699999988079071], false], [[0.800000011920929, -0.699999988079071], [0.9000000357627869, -0.699999988079071], false], [[0.9000000357627869, -0.699999988079071], [1.0, -0.699999988079071], false], [[1.0, -0.699999988079071], [1.100000023841858, -0.699999988079071], false], [[1.100000023841858, -0.699999988079071], [1.2000000476837158, -0.7000000476837158], false], [[1.2000000476837158, -0.7000000476837158], [1.3000000715255737, -0.699999988079071], false], [[1.3000000715255737, -0.699999988079071], [1.399999976158142, -0.699999988079071], false], [[1.399999976158142, -0.699999988079071], [1.5, -0.699999988079071], false], [[1.5, -0.699999988079071], [1.600000023841858, -0.699999988079071], false], [[1.600000023841858, -0.699999988079071], [1.7000000476837158, -0.7000000476837158], false], [[1.7000000476837158, -0.7000000476837158], [1.8000000715255737, -0.699999988079071], false], [[1.8000000715255737, -0.699999988079071], [1.899999976158142, -0.699999988079071], false], [[1.899999976158142, -0.699999988079071], [2.0, -0.699999988079071], false], [[2.0, -0.699999988079071], [2.1000001430511475, -0.699999988079071], false], [[2.1000001430511475, -0.699999988079071], [2.200000047683716, -0.7000000476837158], false], [[2.200000047683716, -0.7000000476837158], [2.200000047683716, -0.7000000476837158], false]]}
++{"args": {"seed": 549, "rover": "rover0", "path": [[2.1, -1.0], [2.1, -2.18]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [2.0999999046325684, -1.0]], [[2.0999999046325684, -1.0], [2.1000001430511475, -1.100000023841858], false], [[2.1000001430511475, -1.100000023841858], [2.0999999046325684, -1.2000000476837158], false], [[2.0999999046325684, -1.2000000476837158], [2.1000001430511475, -1.3000000715255737], false], [[2.1000001430511475, -1.3000000715255737], [2.0999999046325684, -1.399999976158142], false], [[2.0999999046325684, -1.399999976158142], [2.0999999046325684, -1.5], false], [[2.0999999046325684, -1.5], [2.1000001430511475, -1.600000023841858], false], [[2.1000001430511475, -1.600000023841858], [2.0999999046325684, -1.7000000476837158], false], [[2.0999999046325684, -1.7000000476837158], [2.1000001430511475, -1.8000000715255737], false], [[2.1000001430511475, -1.8000000715255737], [2.0999999046325684, -1.9000000953674316], false], [[2.0999999046325684, -1.9000000953674316], [2.0999999046325684, -2.0], false], [[2.0999999046325684, -2.0], [2.1000001430511475, -2.1000001430511475], false], [[2.1000001430511475, -2.1000001430511475], [2.0999999046325684, -2.179999828338623], false]]}
++{"args": {"seed": 549, "rover": "rover0", "path": [[0.3, -1.6], [2.3, -1.6]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.30000001192092896, -1.5999999046325684]], [[0.30000001192092896, -1.5999999046325684], [0.4000000059604645, -1.600000023841858], false], [[0.4000000059604645, -1.600000023841858], [0.5, -1.600000023841858], false], [[0.5, -1.600000023841858], [0.6000000238418579, -1.600000023841858], false], [[0.6000000238418579, -1.600000023841858], [0.699999988079071, -1.5999999046325684], false], [[0.699999988079071, -1.5999999046325684], [0.800000011920929, -1.600000023841858], false], [[0.800000011920929, -1.600000023841858], [0.9000000357627869, -1.600000023841858], false], [[0.9000000357627869, -1.600000023841858], [1.0, -1.600000023841858], false], [[1.0, -1.600000023841858], [1.100000023841858, -1.600000023841858], false], [[1.100000023841858, -1.600000023841858], [1.2000000476837158, -1.5999999046325684], false], [[1.2000000476837158, -1.5999999046325684], [1.3000000715255737, -1.600000023841858], false], [[1.3000000715255737, -1.600000023841858], [1.399999976158142, -1.600000023841858], false], [[1.399999976158142, -1.600000023841858], [1.5, -1.600000023841858], false], [[1.5, -1.600000023841858], [1.600000023841858, -1.600000023841858], false], [[1.600000023841858, -1.600000023841858], [1.7000000476837158, -1.5999999046325684], false], [[1.7000000476837158, -1.5999999046325684], [1.8000000715255737, -1.600000023841858], false], [[1.8000000715255737, -1.600000023841858], [1.899999976158142, -1.600000023841858], false], [[1.899999976158142, -1.600000023841858], [2.0, -1.600000023841858], false], [[2.0, -1.600000023841858], [2.1000001430511475, -1.600000023841858], false], [[2.1000001430511475, -1.600000023841858], [2.200000047683716, -1.5999999046325684], false], [[2.200000047683716, -1.5999999046325684], [2.200000047683716, -1.5999999046325684], false]]}
++{"args": {"seed": 549, "rover": "rover0", "path": [[0.3, -1.3], [2.3, -1.3]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.30000001192092896, -1.2999999523162842]], [[0.30000001192092896, -1.2999999523162842], [0.4000000059604645, -1.3000000715255737], false], [[0.4000000059604645, -1.3000000715255737], [0.5, -1.2999999523162842], false], [[0.5, -1.2999999523162842], [0.6000000238418579, -1.3000000715255737], false], [[0.6000000238418579, -1.3000000715255737], [0.699999988079071, -1.2999999523162842], false], [[0.699999988079071, -1.2999999523162842], [0.800000011920929, -1.2999999523162842], false], [[0.800000011920929, -1.2999999523162842], [0.9000000357627869, -1.3000000715255737], false], [[0.9000000357627869, -1.3000000715255737], [1.0, -1.2999999523162842], false], [[1.0, -1.2999999523162842], [1.100000023841858, -1.3000000715255737], false], [[1.100000023841858, -1.3000000715255737], [1.2000000476837158, -1.2999999523162842], false], [[1.2000000476837158, -1.2999999523162842], [1.3000000715255737, -1.2999999523162842], false], [[1.3000000715255737, -1.2999999523162842], [1.399999976158142, -1.3000000715255737], false], [[1.399999976158142, -1.3000000715255737], [1.5, -1.2999999523162842], false], [[1.5, -1.2999999523162842], [1.600000023841858, -1.3000000715255737], false], [[1.600000023841858, -1.3000000715255737], [1.7000000476837158, -1.2999999523162842], false], [[1.7000000476837158, -1.2999999523162842], [1.8000000715255737, -1.2999999523162842], false], [[1.8000000715255737, -1.2999999523162842], [1.899999976158142, -1.3000000715255737], false], [[1.899999976158142, -1.3000000715255737], [2.0, -1.2999999523162842], false], [[2.0, -1.2999999523162842], [2.1000001430511475, -1.3000000715255737], false], [[2.1000001430511475, -1.3000000715255737], [2.200000047683716, -1.2999999523162842], false], [[2.200000047683716, -1.2999999523162842], [2.200000047683716, -1.2999999523162842], false]]}
++{"args": {"seed": 549, "rover": "rover0", "path": [[1.2, -2.18], [1.2, 0.5]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [1.1999999284744263, -2.180000066757202]], [[1.1999999284744263, -2.180000066757202], [1.2000000476837158, -2.0799999237060547], false], [[1.2000000476837158, -2.0799999237060547], [1.2000000476837158, -1.9800000190734863], false], [[1.2000000476837158, -1.9800000190734863], [1.1999999284744263, -1.8799999952316284], false], [[1.1999999284744263, -1.8799999952316284], [1.2000000476837158, -1.7799999713897705], false], [[1.2000000476837158, -1.7799999713897705], [1.1999999284744263, -1.6799999475479126], false], [[1.1999999284744263, -1.6799999475479126], [1.2000000476837158, -1.5799999237060547], false], [[1.2000000476837158, -1.5799999237060547], [1.2000000476837158, -1.4800000190734863], false], [[1.2000000476837158, -1.4800000190734863], [1.1999999284744263, -1.3799999952316284], false], [[1.1999999284744263, -1.3799999952316284], [1.2000000476837158, -1.2799999713897705], false], [[1.2000000476837158, -1.2799999713897705], [1.1999999284744263, -1.1799999475479126], false], [[1.1999999284744263, -1.1799999475479126], [1.2000000476837158, -1.0799999237060547], false], [[1.2000000476837158, -1.0799999237060547], [1.2000000476837158, -0.9799999594688416], false], [[1.2000000476837158, -0.9799999594688416], [1.1999999284744263, -0.8799999356269836], false], [[1.1999999284744263, -0.8799999356269836], [1.2000000476837158, -0.7799999713897705], false], [[1.2000000476837158, -0.7799999713897705], [1.1999999284744263, -0.6799999475479126], false], [[1.1999999284744263, -0.6799999475479126], [1.2000000476837158, -0.5799999237060547], false], [[1.2000000476837158, -0.5799999237060547], [1.2000000476837158, -0.47999995946884155], false], [[1.2000000476837158, -0.47999995946884155], [1.1999999284744263, -0.37999993562698364], false], [[1.1999999284744263, -0.37999993562698364], [1.2000000476837158, -0.2799999415874481], false], [[1.2000000476837158, -0.2799999415874481], [1.1999999284744263, -0.1799999475479126], false], [[1.1999999284744263, -0.1799999475479126], [1.2000000476837158, -0.07999993860721588], false], [[1.2000000476837158, -0.07999993860721588], [1.2000000476837158, 0.02000006102025509], true]]}
++{"args": {"seed": 549, "rover": "rover0", "path": [[0.3, -2.18], [0.3, 0.5]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.30000001192092896, -2.180000066757202]], [[0.30000001192092896, -2.180000066757202], [0.29999998211860657, -2.0799999237060547], false], [[0.29999998211860657, -2.0799999237060547], [0.30000001192092896, -1.9800000190734863], false], [[0.30000001192092896, -1.9800000190734863], [0.30000001192092896, -1.8799999952316284], false], [[0.30000001192092896, -1.8799999952316284], [0.29999998211860657, -1.7799999713897705], false], [[0.29999998211860657, -1.7799999713897705], [0.30000001192092896, -1.6799999475479126], false], [[0.30000001192092896, -1.6799999475479126], [0.29999998211860657, -1.5799999237060547], false], [[0.29999998211860657, -1.5799999237060547], [0.30000001192092896, -1.4800000190734863], false], [[0.30000001192092896, -1.4800000190734863], [0.30000001192092896, -1.3799999952316284], false], [[0.30000001192092896, -1.3799999952316284], [0.29999998211860657, -1.2799999713897705], false], [[0.29999998211860657, -1.2799999713897705], [0.30000001192092896, -1.1799999475479126], false], [[0.30000001192092896, -1.1799999475479126], [0.29999998211860657, -1.0799999237060547], false], [[0.29999998211860657, -1.0799999237060547], [0.30000001192092896, -0.9799999594688416], false], [[0.30000001192092896, -0.9799999594688416], [0.30000001192092896, -0.8799999356269836], false], [[0.30000001192092896, -0.8799999356269836], [0.29999998211860657, -0.7799999713897705], false], [[0.29999998211860657, -0.7799999713897705], [0.30000001192092896, -0.6799999475479126], false], [[0.30000001192092896, -0.6799999475479126], [0.29999998211860657, -0.5799999237060547], true]]}
++{"args": {"seed": 549, "rover": "rover0", "path": [[2.1, -2.18], [2.1, 0.5]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [2.0999999046325684, -2.180000066757202]], [[2.0999999046325684, -2.180000066757202], [2.1000001430511475, -2.0799999237060547], false], [[2.1000001430511475, -2.0799999237060547], [2.0999999046325684, -1.9800000190734863], false], [[2.0999999046325684, -1.9800000190734863], [2.1000001430511475, -1.8799999952316284], false], [[2.1000001430511475, -1.8799999952316284], [2.0999999046325684, -1.7799999713897705], false], [[2.0999999046325684, -1.7799999713897705], [2.0999999046325684, -1.6799999475479126], false], [[2.0999999046325684, -1.6799999475479126], [2.1000001430511475, -1.5799999237060547], false], [[2.1000001430511475, -1.5799999237060547], [2.0999999046325684, -1.4800000190734863], false], [[2.0999999046325684, -1.4800000190734863], [2.1000001430511475, -1.3799999952316284], false], [[2.1000001430511475, -1.3799999952316284], [2.0999999046325684, -1.2799999713897705], false], [[2.0999999046325684, -1.2799999713897705], [2.0999999046325684, -1.1799999475479126], false], [[2.0999999046325684, -1.1799999475479126], [2.1000001430511475, -1.0799999237060547], false], [[2.1000001430511475, -1.0799999237060547], [2.0999999046325684, -0.9799999594688416], false], [[2.0999999046325684, -0.9799999594688416], [2.1000001430511475, -0.8799999356269836], false], [[2.1000001430511475, -0.8799999356269836], [2.0999999046325684, -0.7799999713897705], false], [[2.0999999046325684, -0.7799999713897705], [2.0999999046325684, -0.6799999475479126], false], [[2.0999999046325684, -0.6799999475479126], [2.1000001430511475, -0.5799999237060547], false], [[2.1000001430511475, -0.5799999237060547], [2.0999999046325684, -0.47999995946884155], false], [[2.0999999046325684, -0.47999995946884155], [2.1000001430511475, -0.37999993562698364], false], [[2.1000001430511475, -0.37999993562698364], [2.0999999046325684, -0.2799999415874481], false], [[2.0999999046325684, -0.2799999415874481], [2.0999999046325684, -0.1799999475479126], false], [[2.0999999046325684, -0.1799999475479126], [2.1000001430511475, -0.07999993860721588], false], [[2.1000001430511475, -0.07999993860721588], [2.0999999046325684, 0.02000006102025509], false], [[2.0999999046325684, 0.02000006102025509], [2.1000001430511475, 0.12000006437301636], false], [[2.1000001430511475, 0.12000006437301636], [2.0999999046325684, 0.22000005841255188], false], [[2.0999999046325684, 0.22000005841255188], [2.0999999046325684, 0.3200000524520874], false], [[2.0999999046325684, 0.3200000524520874], [2.1000001430511475, 0.4200000762939453], false], [[2.1000001430511475, 0.4200000762939453], [2.0999999046325684, 0.5], false]]}
+diff --git a/r0_col.txt b/r0_col.txt
+new file mode 100644
+index 0000000..5c1d471
+--- /dev/null
++++ b/r0_col.txt
+@@ -0,0 +1,7 @@
++ValueError: min() arg is an empty sequence
++{"args": {"seed": 1955, "rover": "rover0", "path": [[0.3, -2.18], [0.3, 0.5]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.30000001192092896, -2.180000066757202]], [[0.30000001192092896, -2.180000066757202], [0.30000001192092896, -2.0799999237060547], false], [[0.30000001192092896, -2.0799999237060547], [0.29999998211860657, -1.9800000190734863], false], [[0.29999998211860657, -1.9800000190734863], [0.30000001192092896, -1.8799999952316284], false], [[0.30000001192092896, -1.8799999952316284], [0.29999998211860657, -1.7799999713897705], false], [[0.29999998211860657, -1.7799999713897705], [0.30000001192092896, -1.6800000667572021], false], [[0.30000001192092896, -1.6800000667572021], [0.30000001192092896, -1.5800000429153442], false], [[0.30000001192092896, -1.5800000429153442], [0.29999998211860657, -1.4800000190734863], false], [[0.29999998211860657, -1.4800000190734863], [0.30000001192092896, -1.3799999952316284], false], [[0.30000001192092896, -1.3799999952316284], [0.29999998211860657, -1.2799999713897705], false], [[0.29999998211860657, -1.2799999713897705], [0.30000001192092896, -1.1799999475479126], false], [[0.30000001192092896, -1.1799999475479126], [0.30000001192092896, -1.0800000429153442], false], [[0.30000001192092896, -1.0800000429153442], [0.29999998211860657, -0.9800000190734863], false], [[0.29999998211860657, -0.9800000190734863], [0.30000001192092896, -0.8799999952316284], false], [[0.30000001192092896, -0.8799999952316284], [0.29999998211860657, -0.7799999713897705], false], [[0.29999998211860657, -0.7799999713897705], [0.30000001192092896, -0.6800000071525574], false], [[0.30000001192092896, -0.6800000071525574], [0.30000001192092896, -0.5799999833106995], true]]}
++{"args": {"seed": 877, "rover": "rover0", "path": [[0.3, -2.18], [0.3, 0.5]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.30000001192092896, -2.180000066757202]], [[0.30000001192092896, -2.180000066757202], [0.29999998211860657, -2.0799999237060547], false], [[0.29999998211860657, -2.0799999237060547], [0.30000001192092896, -1.9800000190734863], false], [[0.30000001192092896, -1.9800000190734863], [0.30000001192092896, -1.8799999952316284], false], [[0.30000001192092896, -1.8799999952316284], [0.29999998211860657, -1.7799999713897705], false], [[0.29999998211860657, -1.7799999713897705], [0.30000001192092896, -1.6799999475479126], false], [[0.30000001192092896, -1.6799999475479126], [0.29999998211860657, -1.5800000429153442], false], [[0.29999998211860657, -1.5800000429153442], [0.30000001192092896, -1.4800000190734863], false], [[0.30000001192092896, -1.4800000190734863], [0.30000001192092896, -1.3799999952316284], false], [[0.30000001192092896, -1.3799999952316284], [0.29999998211860657, -1.2799999713897705], false], [[0.29999998211860657, -1.2799999713897705], [0.30000001192092896, -1.1799999475479126], false], [[0.30000001192092896, -1.1799999475479126], [0.29999998211860657, -1.0799999237060547], false], [[0.29999998211860657, -1.0799999237060547], [0.30000001192092896, -0.9799999594688416], false], [[0.30000001192092896, -0.9799999594688416], [0.30000001192092896, -0.8799999952316284], false], [[0.30000001192092896, -0.8799999952316284], [0.29999998211860657, -0.7799999713897705], false], [[0.29999998211860657, -0.7799999713897705], [0.30000001192092896, -0.6799999475479126], false], [[0.30000001192092896, -0.6799999475479126], [0.29999998211860657, -0.5799999833106995], true]]}
++AssertionError: ('sample failed', 'sample0', (2.195852518081665, -0.3830025792121887), (1.399999976158142, -1.350000023841858), (-0.5999999642372131, 0.30000001192092896), [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++{"args": {"seed": 1849, "rover": "rover0", "path": [[0.3, -2.18], [0.3, 0.5]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.29999998211860657, -2.180000066757202]], [[0.29999998211860657, -2.180000066757202], [0.30000001192092896, -2.0799999237060547], false], [[0.30000001192092896, -2.0799999237060547], [0.30000001192092896, -1.9800000190734863], false], [[0.30000001192092896, -1.9800000190734863], [0.29999998211860657, -1.8799999952316284], false], [[0.29999998211860657, -1.8799999952316284], [0.30000001192092896, -1.7799999713897705], false], [[0.30000001192092896, -1.7799999713897705], [0.29999998211860657, -1.6800000667572021], false], [[0.29999998211860657, -1.6800000667572021], [0.30000001192092896, -1.5800000429153442], false], [[0.30000001192092896, -1.5800000429153442], [0.30000001192092896, -1.4800000190734863], false], [[0.30000001192092896, -1.4800000190734863], [0.29999998211860657, -1.3799999952316284], false], [[0.29999998211860657, -1.3799999952316284], [0.30000001192092896, -1.2799999713897705], false], [[0.30000001192092896, -1.2799999713897705], [0.29999998211860657, -1.1800000667572021], false], [[0.29999998211860657, -1.1800000667572021], [0.30000001192092896, -1.0800000429153442], false], [[0.30000001192092896, -1.0800000429153442], [0.30000001192092896, -0.9800000190734863], false], [[0.30000001192092896, -0.9800000190734863], [0.29999998211860657, -0.8799999952316284], false], [[0.29999998211860657, -0.8799999952316284], [0.30000001192092896, -0.7800000309944153], false], [[0.30000001192092896, -0.7800000309944153], [0.29999998211860657, -0.6800000071525574], false], [[0.29999998211860657, -0.6800000071525574], [0.30000001192092896, -0.5799999833106995], true]]}
++AssertionError: ('sample failed', 'sample5', (1.9046692848205566, -2.180248737335205), (1.2000000476837158, -1.9500000476837158), (-0.5999999642372131, 0.30000001192092896), [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++{"args": {"seed": 1, "rover": "rover0", "path": [[0.3, -2.18], [0.3, 0.5]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.29999998211860657, -2.180000066757202]], [[0.29999998211860657, -2.180000066757202], [0.30000001192092896, -2.0799999237060547], true]]}
+diff --git a/r0_col2.txt b/r0_col2.txt
+new file mode 100644
+index 0000000..5a5a347
+--- /dev/null
++++ b/r0_col2.txt
+@@ -0,0 +1,6 @@
++ValueError: min() arg is an empty sequence
++{"args": {"seed": 3, "rover": "rover0", "path": [[0.3, -2.18], [0.3, 0.5]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.30000001192092896, -2.180000066757202]], [[0.30000001192092896, -2.180000066757202], [0.29999998211860657, -2.080000162124634], true]]}
++{"args": {"seed": 4, "rover": "rover0", "path": [[0.3, -2.18], [0.3, 0.5]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.30000001192092896, -2.180000066757202]], [[0.30000001192092896, -2.180000066757202], [0.30000001192092896, -2.0799999237060547], true]]}
++AssertionError: ('sample failed', 'sample0', (2.195852518081665, -0.3830025792121887), (1.399999976158142, -1.350000023841858), (-0.5999999642372131, 0.30000001192092896), [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
++{"args": {"seed": 2, "rover": "rover0", "path": [[0.3, -2.18], [0.3, 0.5]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.30000001192092896, -2.180000066757202]], [[0.30000001192092896, -2.180000066757202], [0.30000001192092896, -2.0799999237060547], true]]}
++AssertionError: ('sample failed', 'sample5', (1.9046692848205566, -2.180248737335205), (1.2000000476837158, -1.9500000476837158), (-0.5999999642372131, 0.30000001192092896), [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+diff --git a/r0_col3.txt b/r0_col3.txt
+new file mode 100644
+index 0000000..c723083
+--- /dev/null
++++ b/r0_col3.txt
+@@ -0,0 +1,2 @@
++{"args": {"seed": 1039, "rover": "rover0", "path": [[0.3, -2.18], [0.3, 0.5]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.29999998211860657, -2.180000066757202]], [[0.29999998211860657, -2.180000066757202], [0.30000001192092896, -2.0799999237060547], false], [[0.30000001192092896, -2.0799999237060547], [0.30000001192092896, -1.9800000190734863], false], [[0.30000001192092896, -1.9800000190734863], [0.29999998211860657, -1.8799999952316284], false], [[0.29999998211860657, -1.8799999952316284], [0.30000001192092896, -1.7799999713897705], false], [[0.30000001192092896, -1.7799999713897705], [0.29999998211860657, -1.6799999475479126], false], [[0.29999998211860657, -1.6799999475479126], [0.30000001192092896, -1.5799999237060547], false], [[0.30000001192092896, -1.5799999237060547], [0.30000001192092896, -1.5799999237060547], false]]}
++{"args": {"seed": 706, "rover": "rover0", "path": [[0.3, -2.18], [0.3, 0.5]], "park": [-0.6, 0.3], "h": 0.1}, "res": [["start", [0.30000001192092896, -2.179999828338623]], [[0.30000001192092896, -2.179999828338623], [0.29999998211860657, -2.0799999237060547], false], [[0.29999998211860657, -2.0799999237060547], [0.30000001192092896, -1.9799998998641968], false], [[0.30000001192092896, -1.9799998998641968], [0.30000001192092896, -1.8799998760223389], false], [[0.30000001192092896, -1.8799998760223389], [0.29999998211860657, -1.779999852180481], false], [[0.29999998211860657, -1.779999852180481], [0.30000001192092896, -1.6799999475479126], false], [[0.30000001192092896, -1.6799999475479126], [0.29999998211860657, -1.5799999237060547], false], [[0.29999998211860657, -1.5799999237060547], [0.30000001192092896, -1.4799998998641968], false], [[0.30000001192092896, -1.4799998998641968], [0.30000001192092896, -1.3799998760223389], false], [[0.30000001192092896, -1.3799998760223389], [0.29999998211860657, -1.279999852180481], false], [[0.29999998211860657, -1.279999852180481], [0.30000001192092896, -1.1799999475479126], false], [[0.30000001192092896, -1.1799999475479126], [0.29999998211860657, -1.0799999237060547], false], [[0.29999998211860657, -1.0799999237060547], [0.30000001192092896, -0.9799998998641968], false], [[0.30000001192092896, -0.9799998998641968], [0.30000001192092896, -0.8799998760223389], false], [[0.30000001192092896, -0.8799998760223389], [0.29999998211860657, -0.7799999117851257], false], [[0.29999998211860657, -0.7799999117851257], [0.30000001192092896, -0.6799998879432678], false], [[0.30000001192092896, -0.6799998879432678], [0.29999998211860657, -0.5799998641014099], true]]}
+diff --git a/r0_off.txt b/r0_off.txt
+new file mode 100644
+index 0000000..e69de29
+diff --git a/r1_549.txt b/r1_549.txt
+new file mode 100644
+index 0000000..dfb756f
+--- /dev/null
++++ b/r1_549.txt
+@@ -0,0 +1,9 @@
++{"args": {"seed": 549, "rover": "rover1", "path": [[-2.263, -1.208], [-2.113, -1.468]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-2.263, -1.0]]}, "res": [["start", [-2.263000011444092, -1.2000000476837158]], [[-2.263000011444092, -1.2000000476837158], [-2.1629998683929443, -1.2999999523162842], true]]}
++{"args": {"seed": 549, "rover": "rover1", "path": [[-0.804, 1.779], [-1.671, -1.457]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-0.804, -1.0]]}, "res": [["start", [-0.8040000200271606, -0.19999998807907104]], [[-0.8040000200271606, -0.19999998807907104], [-0.9040000438690186, -0.29999998211860657], true]]}
++{"args": {"seed": 549, "rover": "rover1", "path": [[-1.813, 2.012], [-1.813, -1.488]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-1.813, -1.0]]}, "res": [["start", [-1.8130000829696655, 0.6000000238418579]], [[-1.8130000829696655, 0.6000000238418579], [-1.812999963760376, 0.5], false], [[-1.812999963760376, 0.5], [-1.812999963760376, 0.4000000059604645], false], [[-1.812999963760376, 0.4000000059604645], [-1.812999963760376, 0.30000001192092896], false], [[-1.812999963760376, 0.30000001192092896], [-1.8130000829696655, 0.20000000298023224], false], [[-1.8130000829696655, 0.20000000298023224], [-1.812999963760376, 0.10000000149011612], false], [[-1.812999963760376, 0.10000000149011612], [-1.812999963760376, 2.682210453741618e-09], false], [[-1.812999963760376, 2.682210453741618e-09], [-1.8130000829696655, -0.10000000149011612], false], [[-1.8130000829696655, -0.10000000149011612], [-1.812999963760376, -0.20000000298023224], false], [[-1.812999963760376, -0.20000000298023224], [-1.812999963760376, -0.30000001192092896], false], [[-1.812999963760376, -0.30000001192092896], [-1.8130000829696655, -0.4000000059604645], false], [[-1.8130000829696655, -0.4000000059604645], [-1.812999963760376, -0.5], false], [[-1.812999963760376, -0.5], [-1.812999963760376, -0.6000000238418579], false], [[-1.812999963760376, -0.6000000238418579], [-1.8130000829696655, -0.699999988079071], false], [[-1.8130000829696655, -0.699999988079071], [-1.812999963760376, -0.800000011920929], false], [[-1.812999963760376, -0.800000011920929], [-1.812999963760376, -0.9000000357627869], false], [[-1.812999963760376, -0.9000000357627869], [-1.812999963760376, -1.0], false], [[-1.812999963760376, -1.0], [-1.8130000829696655, -1.100000023841858], false], [[-1.8130000829696655, -1.100000023841858], [-1.812999963760376, -1.2000000476837158], false], [[-1.812999963760376, -1.2000000476837158], [-1.812999963760376, -1.3000000715255737], false], [[-1.812999963760376, -1.3000000715255737], [-1.8130000829696655, -1.399999976158142], true]]}
++{"args": {"seed": 549, "rover": "rover1", "path": [[-2.331, -0.056], [-1.956, -1.457]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-2.331, -1.0]]}, "res": [["start", [-2.200000047683716, 0.20000001788139343]], [[-2.200000047683716, 0.20000001788139343], [-2.0999999046325684, 0.10000000894069672], false], [[-2.0999999046325684, 0.10000000894069672], [-2.0, 8.642675020098523e-09], false], [[-2.0, 8.642675020098523e-09], [-1.9559999704360962, -0.09999999403953552], false], [[-1.9559999704360962, -0.09999999403953552], [-1.9559999704360962, -0.19999998807907104], false], [[-1.9559999704360962, -0.19999998807907104], [-1.9560000896453857, -0.29999998211860657], false], [[-1.9560000896453857, -0.29999998211860657], [-1.9559999704360962, -0.4000000059604645], false], [[-1.9559999704360962, -0.4000000059604645], [-1.9559999704360962, -0.5], false], [[-1.9559999704360962, -0.5], [-1.9559999704360962, -0.6000000238418579], false], [[-1.9559999704360962, -0.6000000238418579], [-1.9560000896453857, -0.699999988079071], false], [[-1.9560000896453857, -0.699999988079071], [-1.9559999704360962, -0.800000011920929], false], [[-1.9559999704360962, -0.800000011920929], [-1.9559999704360962, -0.8999999761581421], false], [[-1.9559999704360962, -0.8999999761581421], [-1.9559999704360962, -1.0], false], [[-1.9559999704360962, -1.0], [-1.9560000896453857, -1.100000023841858], false], [[-1.9560000896453857, -1.100000023841858], [-1.9559999704360962, -1.2000000476837158], false], [[-1.9559999704360962, -1.2000000476837158], [-1.9559999704360962, -1.2999999523162842], false], [[-1.9559999704360962, -1.2999999523162842], [-1.9559999704360962, -1.399999976158142], true]]}
++{"args": {"seed": 549, "rover": "rover1", "path": [[-0.211, -1.063], [-1.121, -1.588]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-0.211, -1.0]]}, "res": [["start", [-0.4000000059604645, -1.4109998941421509]], [[-0.4000000059604645, -1.4109998941421509], [-0.5, -1.5109999179840088], true]]}
++{"args": {"seed": 549, "rover": "rover1", "path": [[-0.213, -1.988], [-1.063, -1.988]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-0.213, -1.0]]}, "res": [["start", [-0.4000000059604645, -1.600000023841858]], [[-0.4000000059604645, -1.600000023841858], [-0.5, -1.7000000476837158], true]]}
++{"args": {"seed": 549, "rover": "rover1", "path": [[-0.22, -1.561], [-1.089, -1.794]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-0.22, -1.0]]}, "res": [["start", [-0.4000000059604645, -1.8489997386932373]], [[-0.4000000059604645, -1.8489997386932373], [-0.5, -1.7940000295639038], true]]}
++{"args": {"seed": 549, "rover": "rover1", "path": [[-0.187, -0.361], [-1.283, -1.457]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-0.187, -1.0]]}, "res": [["start", [-0.4000000059604645, -0.6490002274513245]], [[-0.4000000059604645, -0.6490002274513245], [-0.5, -0.7490001916885376], true]]}
++{"args": {"seed": 549, "rover": "rover1", "path": [[-0.213, 0.783], [-1.513, -1.468]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-0.213, -1.0]]}, "res": [["start", [-0.4000000059604645, 0.6000000238418579]], [[-0.4000000059604645, 0.6000000238418579], [-0.5, 0.5], true]]}
+diff --git a/r1_877.txt b/r1_877.txt
+new file mode 100644
+index 0000000..852b0de
+--- /dev/null
++++ b/r1_877.txt
+@@ -0,0 +1,9 @@
++{"args": {"seed": 877, "rover": "rover1", "path": [[-0.804, 1.779], [-1.671, -1.457]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-0.804, -1.0]]}, "res": [["start", [-0.8040000200271606, 0.800000011920929]], [[-0.8040000200271606, 0.800000011920929], [-0.9040000438690186, 0.699999988079071], true]]}
++{"args": {"seed": 877, "rover": "rover1", "path": [[-1.813, 2.012], [-1.813, -1.488]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-1.813, -1.0]]}, "res": [["start", [-1.812999963760376, 1.399999976158142]], [[-1.812999963760376, 1.399999976158142], [-1.812999963760376, 1.2999999523162842], false], [[-1.812999963760376, 1.2999999523162842], [-1.8130000829696655, 1.2000000476837158], false], [[-1.8130000829696655, 1.2000000476837158], [-1.812999963760376, 1.100000023841858], false], [[-1.812999963760376, 1.100000023841858], [-1.812999963760376, 1.0], false], [[-1.812999963760376, 1.0], [-1.8130000829696655, 0.8999999761581421], false], [[-1.8130000829696655, 0.8999999761581421], [-1.812999963760376, 0.800000011920929], false], [[-1.812999963760376, 0.800000011920929], [-1.812999963760376, 0.699999988079071], false], [[-1.812999963760376, 0.699999988079071], [-1.812999963760376, 0.5999999642372131], false], [[-1.812999963760376, 0.5999999642372131], [-1.8130000829696655, 0.5], false], [[-1.8130000829696655, 0.5], [-1.812999963760376, 0.3999999761581421], false], [[-1.812999963760376, 0.3999999761581421], [-1.812999963760376, 0.29999998211860657], false], [[-1.812999963760376, 0.29999998211860657], [-1.8130000829696655, 0.19999998807907104], false], [[-1.8130000829696655, 0.19999998807907104], [-1.812999963760376, 0.09999998658895493], false], [[-1.812999963760376, 0.09999998658895493], [-1.812999963760376, -1.609325472884393e-08], false], [[-1.812999963760376, -1.609325472884393e-08], [-1.8130000829696655, -0.10000001639127731], false], [[-1.8130000829696655, -0.10000001639127731], [-1.812999963760376, -0.20000001788139343], false], [[-1.812999963760376, -0.20000001788139343], [-1.812999963760376, -0.30000001192092896], false], [[-1.812999963760376, -0.30000001192092896], [-1.8130000829696655, -0.40000003576278687], false], [[-1.8130000829696655, -0.40000003576278687], [-1.812999963760376, -0.5], false], [[-1.812999963760376, -0.5], [-1.812999963760376, -0.6000000238418579], false], [[-1.812999963760376, -0.6000000238418579], [-1.812999963760376, -0.7000000476837158], false], [[-1.812999963760376, -0.7000000476837158], [-1.8130000829696655, -0.800000011920929], false], [[-1.8130000829696655, -0.800000011920929], [-1.812999963760376, -0.9000000357627869], false], [[-1.812999963760376, -0.9000000357627869], [-1.812999963760376, -1.0], false], [[-1.812999963760376, -1.0], [-1.8130000829696655, -1.100000023841858], false], [[-1.8130000829696655, -1.100000023841858], [-1.812999963760376, -1.2000000476837158], false], [[-1.812999963760376, -1.2000000476837158], [-1.812999963760376, -1.2000000476837158], false]]}
++{"args": {"seed": 877, "rover": "rover1", "path": [[-0.211, -1.063], [-1.121, -1.588]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-0.211, -1.0]]}, "res": [["start", [-0.40000003576278687, -1.4109998941421509]], [[-0.40000003576278687, -1.4109998941421509], [-0.5000000596046448, -1.5109999179840088], true]]}
++{"args": {"seed": 877, "rover": "rover1", "path": [[-0.213, -1.988], [-1.063, -1.988]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-0.213, -1.0]]}, "res": [["start", [-0.40000003576278687, -1.600000023841858]], [[-0.40000003576278687, -1.600000023841858], [-0.5000000596046448, -1.7000000476837158], true]]}
++{"args": {"seed": 877, "rover": "rover1", "path": [[-0.187, -0.361], [-1.283, -1.457]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-0.187, -1.0]]}, "res": [["start", [-0.40000003576278687, -0.6489999294281006]], [[-0.40000003576278687, -0.6489999294281006], [-0.5000000596046448, -0.7489999532699585], true]]}
++{"args": {"seed": 877, "rover": "rover1", "path": [[-0.22, -1.561], [-1.089, -1.794]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-0.22, -1.0]]}, "res": [["start", [-0.40000003576278687, -1.8489997386932373]], [[-0.40000003576278687, -1.8489997386932373], [-0.5000000596046448, -1.7940000295639038], true]]}
++{"args": {"seed": 877, "rover": "rover1", "path": [[-2.331, -0.056], [-1.956, -1.457]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-2.331, -1.0]]}, "res": [["start", [-2.200000047683716, -0.0559999980032444]], [[-2.200000047683716, -0.0559999980032444], [-2.1000001430511475, -0.15600000321865082], false], [[-2.1000001430511475, -0.15600000321865082], [-2.0, -0.25600001215934753], false], [[-2.0, -0.25600001215934753], [-1.9559999704360962, -0.35600000619888306], false], [[-1.9559999704360962, -0.35600000619888306], [-1.9560000896453857, -0.4560000002384186], false], [[-1.9560000896453857, -0.4560000002384186], [-1.9559999704360962, -0.5559999942779541], false], [[-1.9559999704360962, -0.5559999942779541], [-1.9559999704360962, -0.656000018119812], false], [[-1.9559999704360962, -0.656000018119812], [-1.9559999704360962, -0.7559999823570251], false], [[-1.9559999704360962, -0.7559999823570251], [-1.9560000896453857, -0.8560000061988831], false], [[-1.9560000896453857, -0.8560000061988831], [-1.9559999704360962, -0.956000030040741], false], [[-1.9559999704360962, -0.956000030040741], [-1.9559999704360962, -1.055999994277954], false], [[-1.9559999704360962, -1.055999994277954], [-1.9559999704360962, -1.156000018119812], false], [[-1.9559999704360962, -1.156000018119812], [-1.9559999704360962, -1.156000018119812], false]]}
++{"args": {"seed": 877, "rover": "rover1", "path": [[-0.213, 0.783], [-1.513, -1.468]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-0.213, -1.0]]}, "res": [["start", [-0.40000003576278687, 0.4000000059604645]], [[-0.40000003576278687, 0.4000000059604645], [-0.5000000596046448, 0.30000001192092896], true]]}
++{"args": {"seed": 877, "rover": "rover1", "path": [[-2.263, -1.208], [-2.113, -1.468]], "park": [1.5, 0.3], "h": 0.1, "pre": [[-0.6, -1.0], [-2.263, -1.0]]}, "res": [["start", [-0.800000011920929, -0.6000000238418579]], [[-0.800000011920929, -0.6000000238418579], [-0.800000011920929, -0.6000000238418579], true]]}
+diff --git a/sp_probe.py b/sp_probe.py
+new file mode 100644
+index 0000000..c2666b7
+--- /dev/null
++++ b/sp_probe.py
+@@ -0,0 +1,24 @@
++import sys, math, numpy as np
++from env_client import make_env
++from approach import SEL
++env=make_env()
++def trial(seed, rover, x, y, th, other=None, smp=None):
++    obs,_=env.reset(seed=seed)
++    st=env.get_state()
++    R={o.name:o for o in st.get_objects(env.observation_space.get_type('rover'))}
++    S=[o for o in st.get_objects(env.observation_space.get_type('sample'))]
++    r=R[rover]; st.set(r,'x',x); st.set(r,'y',y); st.set(r,'theta',th)
++    if other: o=R[other[0]]; st.set(o,'x',other[1]); st.set(o,'y',other[2])
++    s=S[smp] if smp is not None else S[0]
++    st.set(s,'analyzed_'+rover,1.0)
++    env.set_state(st)
++    a=np.zeros(8,np.float32); a[3]=SEL['none']; a[7]=SEL['none']
++    k=0 if rover=='rover0' else 4
++    a[k+3]=SEL['send']
++    obs,*_=env.step(a)
++    ss=[o for o in obs.get_objects(env.observation_space.get_type('sample'))]
++    return float(obs.get(ss[smp if smp is not None else 0],'received_analysis'))
++if __name__=='__main__':
++    print(trial(549,'rover0',0.975,-2.075,math.pi))
++    print(trial(549,'rover1',-1.175,-1.675,0.0))
++    print(trial(549,'rover0',0.975,-2.075,math.pi, smp=1))
+diff --git a/sw.py b/sw.py
+new file mode 100644
+index 0000000..1c495ed
+--- /dev/null
++++ b/sw.py
+@@ -0,0 +1,72 @@
++import sys, math, json, numpy as np
++from env_client import make_env
++from approach import SEL
++LX,LY=-1.9,-2.0
++env=make_env()
++T=env.observation_space
++def objs(obs,t): return list(obs.get_objects(T.get_type(t)))
++def pos(obs,o): return float(obs.get(o,'x')),float(obs.get(o,'y'))
++def run(seed, rover, path, park=None, a_h=0.05, pre=()):
++    """path: list of waypoints; after sampling, rover drives through waypoints issuing send each step."""
++    obs,_=env.reset(seed=seed)
++    R={o.name:o for o in objs(obs,'rover')}; S=objs(obs,'sample')
++    me=R[rover]; oth=R['rover1' if rover=='rover0' else 'rover0']
++    k=0 if rover=='rover0' else 4; ko=4-k
++    side=1 if rover=='rover0' else -1
++    mx,my=pos(obs,me)
++    cand=[s for s in S if pos(obs,s)[0]*side>0.3 and (abs(pos(obs,s)[0]-LX)>0.85 or abs(pos(obs,s)[1]-LY)>0.7) and abs(pos(obs,s)[0])<2.3 and abs(pos(obs,s)[1])<2.3]
++    tgt=min(cand,key=lambda s:math.hypot(pos(obs,s)[0]-mx,pos(obs,s)[1]-my))
++    log=[]
++    def step(dx,dy,sel,odx=0,ody=0):
++        nonlocal obs
++        a=np.zeros(8,np.float32); a[k:k+4]=[dx,dy,0,sel]; a[ko:ko+4]=[odx,ody,0,SEL['none']]
++        obs,*_=env.step(a)
++    def goto(tx,ty,sel=SEL['none'],tol=0.02,maxn=200,oth_t=None,h=0.2):
++        out=[]
++        for _ in range(maxn):
++            x,y=pos(obs,me); dx,dy=np.clip(tx-x,-h,h),np.clip(ty-y,-h,h)
++            odx=ody=0
++            if oth_t:
++                ox,oy=pos(obs,oth); odx,ody=np.clip(oth_t[0]-ox,-.2,.2),np.clip(oth_t[1]-oy,-.2,.2)
++            if abs(dx)<tol and abs(dy)<tol and (not oth_t or (abs(odx)<tol and abs(ody)<tol)): break
++            before=pos(obs,me)
++            rec=sum(float(obs.get(s,'received_analysis')) for s in S)
++            step(dx,dy,sel,odx,ody)
++            if pos(obs,me)==before and sel!=SEL['send']:
++                for ax,ay in [(dx,0),(0,dy),(0,0.2),(0,-0.2),(0.2,0),(-0.2,0)]:
++                    if abs(ax)+abs(ay)<1e-6: continue
++                    for _r in range(3):
++                        b2=pos(obs,me); step(ax,ay,sel)
++                        if pos(obs,me)==b2: break
++                    if pos(obs,me)!=before: break
++            if sel==SEL['send']:
++                ok=sum(float(obs.get(s,'received_analysis')) for s in S)>rec
++                # send happens at pre-move or post-move pos? record both
++                out.append((before,pos(obs,me),ok))
++                if ok: return out,True
++            if pos(obs,me)==before and not oth_t: 
++                return out,'stuck'
++        return out,False
++    sx,sy=pos(obs,tgt)
++    # move toward sample, park other
++    goto(sx-0.12*np.sign(sx),sy-0.12*np.sign(sy),oth_t=park)
++    for ox_,oy_ in [(0,-0.12*np.sign(sy)),(-0.12*np.sign(sx),0),(0,0.12),(0,-0.12),(0.12,0),(-0.12,0)]:
++        if math.hypot(pos(obs,me)[0]-sx,pos(obs,me)[1]-sy)<0.22: break
++        goto(sx+ox_,sy+oy_)
++    step(0,0,SEL['sample']); 
++    assert float(obs.get(tgt,'analyzed_'+rover))==1, ('sample failed',tgt.name,pos(obs,tgt),pos(obs,me),pos(obs,oth),[float(obs.get(s,'analyzed_'+rover)) for s in S])
++    step(0,0,SEL['drop'])
++    res=[]
++    for i_,(wx,wy) in enumerate(path):
++        # move to first waypoint silently, then send along the rest
++        if i_==0:
++            for px,py in pre: goto(px,py)
++            o,_=goto(wx,wy); res.append(('start',pos(obs,me))); continue
++        o,f=goto(wx,wy,sel=SEL['send'],h=a_h,tol=0.005)
++        res+=o
++        if f is True or f=='stuck': break
++    return res
++if __name__=='__main__':
++    a=json.loads(sys.argv[1])
++    r=run(a['seed'],a['rover'],a['path'],a.get('park'),a.get('h',0.05),a.get('pre',[[-0.6,-1.0]] if a['rover']=='rover1' else [[1.0,-1.0]]))
++    print(json.dumps({'args':a,'res':r}))

@@ -1,0 +1,22 @@
+diff --git a/approach.py b/approach.py
+index 28903fd..022df89 100644
+--- a/approach.py
++++ b/approach.py
+@@ -203,7 +203,16 @@ class GeneratedApproach:
+                     if self._overlaps(s, o, reg, 0.004 if self.place_fail == 0 else 0.06)]
+         if blocking:
+             # remove the tallest (top-most) first
+-            o = max(blocking, key=lambda c: _pose(s, c)[2] + _he(s, c)[2]
++            def acc(c):
++                oth = [d for d in cubes if d.name != c.name] + [tb]
++                h = _he(s, c); oy = self._obj_yaw(s, c); best = -1.0
++                for k in range(4):
++                    rel = k * np.pi / 2
++                    if abs(np.cos(rel)) * h[0] + abs(np.sin(rel)) * h[1] > 0.041:
++                        continue
++                    best = max(best, self._finger_clearance(s, c, oy + rel, oth))
++                return best
++            o = max(blocking, key=lambda c: (acc(c) > 0.002) + _pose(s, c)[2] + _he(s, c)[2]
+                     - 0.05 * self.fail_count.get(c.name, 0))
+             others = [c for c in cubes if c.name != o.name] + [reg, tb]
+             spot = self._free_spot(s, o, others, cur)

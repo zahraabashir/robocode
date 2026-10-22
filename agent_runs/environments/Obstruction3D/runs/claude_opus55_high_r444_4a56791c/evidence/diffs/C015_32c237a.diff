@@ -1,0 +1,76 @@
+diff --git a/approach_v2.py b/approach_v2.py
+index a55dc27..82ba011 100644
+--- a/approach_v2.py
++++ b/approach_v2.py
+@@ -339,11 +339,11 @@ class GeneratedApproach:
+             q = q0
+             plan = []
+             if p0[2] < zt - 0.005:
+-                qs, q, _ = self._cart_path(q, p0, start, T[:3, :3], step=0.05)
++                qs, q, _ = self._cart_path(q, p0, start, T[:3, :3], step=0.015)
+                 plan += self._seg(qs)
+-            qs, q, ok1 = self._cart_path(q, start, above, R, step=0.08, R_from=T[:3, :3])
++            qs, q, ok1 = self._cart_path(q, start, above, R, step=0.04, R_from=T[:3, :3])
+             plan += self._seg(qs)
+-            qs, q, ok2 = self._cart_path(q, above, np.array([gx, gy, zg]), R, step=0.05)
++            qs, q, ok2 = self._cart_path(q, above, np.array([gx, gy, zg]), R, step=0.015)
+             plan += self._seg(qs)
+             plan += [('grip', -1.0), ('check', 'grasp')]
+             c = self._plan_cost(q0, plan) + (0 if (ok1 and ok2) else 100)
+@@ -440,11 +440,11 @@ class GeneratedApproach:
+                 p0 = p1
+             up = np.array([p0[0], p0[1], lift_z])
+             above = np.array([Tt[0, 3], Tt[1, 3], lift_z])
+-            qs, q, _ = self._cart_path(q, p0, up, T[:3, :3], step=0.05)
++            qs, q, _ = self._cart_path(q, p0, up, T[:3, :3], step=0.015)
+             plan += self._seg(qs)
+-            qs, q, _ = self._cart_path(q, up, above, R, step=0.08, R_from=T[:3, :3])
++            qs, q, _ = self._cart_path(q, up, above, R, step=0.04, R_from=T[:3, :3])
+             plan += self._seg(qs)
+-            qs, q, _ = self._cart_path(q, above, Tt[:3, 3], R, step=0.05)
++            qs, q, _ = self._cart_path(q, above, Tt[:3, 3], R, step=0.015)
+             plan += self._seg(qs)
+             plan += [('grip', 1.0), ('check', 'release')]
+             c = self._plan_cost(q_init, plan)
+@@ -495,7 +495,7 @@ class GeneratedApproach:
+         q = self._q(state)
+         T = self._tool(q)
+         p0 = T[:3, 3]
+-        qs, _, _ = self._cart_path(q, p0, np.array([p0[0], p0[1], max(p0[2] + 0.03, Z_SAFE)]), T[:3, :3], step=0.05)
++        qs, _, _ = self._cart_path(q, p0, np.array([p0[0], p0[1], max(p0[2] + 0.03, Z_SAFE)]), T[:3, :3], step=0.015)
+         self.plan = self._seg(qs)
+ 
+     # ---------------------------------------------------------------- acting
+diff --git a/probe4.py b/probe4.py
+new file mode 100644
+index 0000000..c21b1c8
+--- /dev/null
++++ b/probe4.py
+@@ -0,0 +1,27 @@
++import sys, numpy as np, kin, os, importlib as _il
++from env_client import make_env
++from common import *
++GA = _il.import_module("approach_v2").GeneratedApproach
++env = make_env()
++obs, info = env.reset(seed=4, options={'object_count': 7})
++ap = GA(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++for t in range(44):
++    obs, *_ = env.step(ap.get_action(obs))
++print('grasp', obs.get(robot(obs),'grasp_active'))
++for n in sorted(obs.get_object_names()):
++    try: d=objd(obs,n); print(n, round(d['pose_x'],3), round(d['pose_y'],3), round(d['pose_z'],3), round(d['half_extent_x'],3), round(d['half_extent_y'],3), round(d['half_extent_z'],3))
++    except Exception: pass
++q0=getq(obs); T=kin.fk(getbase(obs), q0); print('tool', T[:3,3])
++import pickle
++for dv in [(0,0,0.003),(0,0,0.01),(0.003,0,0),(-0.003,0,0),(0,0.003,0),(0,-0.003,0),(0.008,0,0.002)]:
++    q,ok=kin.ik(getbase(obs), q0, T[:3,3]+np.array(dv), T[:3,:3], iters=100, tol=1e-6)
++    o2,bl=move_to(env, obs, q, grip=0.0)
++    print(dv, 'blocked', bl, 'dq', np.round(q-q0,3))
++    if not bl: obs,_=move_to(env,o2,q0)
++print('--- incremental lift')
++q=q0
++for k in range(1,10):
++    q,ok=kin.ik(getbase(obs), q, T[:3,3]+np.array([0,0,0.005*k]), T[:3,:3], iters=100, tol=1e-6)
++    obs,bl=move_to(env, obs, q, grip=0.0)
++    print(k, 'blocked', bl, np.round(kin.fk(getbase(obs), getq(obs))[:3,3],3), 'objz', round(objd(obs,'obstruction1')['pose_z'],3))
++    if bl: break

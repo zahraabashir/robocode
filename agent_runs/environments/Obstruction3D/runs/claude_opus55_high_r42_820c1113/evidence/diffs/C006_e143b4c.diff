@@ -1,0 +1,104 @@
+diff --git a/approach.py b/approach.py
+index 00dd1c0..0e1a31f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -7,7 +7,9 @@ from kin import fk, ik, down_R, jac, rot_err
+ TABLE_Z = 0.075
+ TABLE_X = (0.10, 0.50)
+ TABLE_Y = (-0.40, 0.40)
+-SAFE_Z = 0.30          # tool height for transport
++SAFE_MARGIN = 0.03
++VSTEP = 0.08
++HSTEP = 0.10
+ GRASP_DZ = 0.028       # tool height above object top when closing
+ PLACE_EPS = 0.0015     # clearance above support surface when releasing
+ MAX_DQ = 0.2
+@@ -127,13 +129,14 @@ class GeneratedApproach:
+         self.task['yaw_place'] = self._match_yaw(self.task['yaw'], self._yaw_for(self.task['dest']))
+         self.phase = 'to_pick'
+         tool = fk(self.base, self.q)[:3, 3]
+-        pick_above = np.array([p[0], p[1], SAFE_Z])
++        sz = self._safe_z(None, 0.05)
++        pick_above = np.array([p[0], p[1], sz])
+         path = []
+-        if tool[2] < SAFE_Z - 0.01:
+-            path += self._line(tool, np.array([tool[0], tool[1], SAFE_Z]), 0.05)
+-            tool = np.array([tool[0], tool[1], SAFE_Z])
+-        path += self._line(tool, pick_above, 0.06)
+-        path += self._line(pick_above, np.array([p[0], p[1], p[2] + he[2] + GRASP_DZ]), 0.05)
++        if tool[2] < sz - 0.01:
++            path += self._line(tool, np.array([tool[0], tool[1], sz]), VSTEP)
++            tool = np.array([tool[0], tool[1], sz])
++        path += self._line(tool, pick_above, HSTEP)
++        path += self._line(pick_above, np.array([p[0], p[1], p[2] + he[2] + GRASP_DZ]), VSTEP)
+         self._set_path(path, self.task['yaw'])
+ 
+     def _footprint_hits(self, name, xy, yaw, bottom):
+@@ -188,6 +191,13 @@ class GeneratedApproach:
+         k = np.round((ydes - y0) / np.pi)
+         return y0 + k * np.pi
+ 
++    def _safe_z(self, held, depth):
++        top = TABLE_Z
++        for n, (p, he) in self.objs.items():
++            if n != held:
++                top = max(top, p[2] + he[2])
++        return max(top + depth + SAFE_MARGIN, 0.18)
++
+     @staticmethod
+     def _line(a, b, step):
+         d = np.linalg.norm(b - a)
+@@ -213,7 +223,7 @@ class GeneratedApproach:
+             pos, yaw = self.path[0]
+             M = fk(self.base, self.q)
+             final = len(self.path) == 1
+-            tol = 5e-4 if final else 0.02
++            tol = 5e-4 if final else 0.03
+             e = np.linalg.norm(M[:3, 3] - pos)
+             eo = np.linalg.norm(rot_err(M[:3, :3], down_R(yaw)))
+             if e < tol and (eo < (0.01 if final else 0.1)):
+@@ -287,12 +297,13 @@ class GeneratedApproach:
+                 tool = fk(self.base, self.q)[:3, 3]
+                 self.grasp_off = tool[2] - p[2]   # tool z above object center
+                 dest = self.task['dest']
+-                up = np.array([tool[0], tool[1], SAFE_Z])
+-                above = np.array([dest[0], dest[1], SAFE_Z])
++                sz = self._safe_z(n, self.grasp_off + he[2])
++                up = np.array([tool[0], tool[1], sz])
++                above = np.array([dest[0], dest[1], sz])
+                 place = np.array([dest[0], dest[1], self.task['surf'] + he[2] + self.grasp_off + PLACE_EPS])
+-                pts = self._line(tool, up, 0.05)
+-                pts2 = self._line(up, above, 0.06)
+-                pts3 = self._line(above, place, 0.05)
++                pts = self._line(tool, up, VSTEP)
++                pts2 = self._line(up, above, HSTEP)
++                pts3 = self._line(above, place, VSTEP)
+                 y0, y1 = self.task['yaw'], self.task['yaw_place']
+                 self.path = [(p_, y0) for p_ in pts]
+                 k = len(pts2)
+diff --git a/r_def.txt b/r_def.txt
+new file mode 100644
+index 0000000..e69de29
+diff --git a/r_oc5.txt b/r_oc5.txt
+new file mode 100644
+index 0000000..e69de29
+diff --git a/r_oc8.txt b/r_oc8.txt
+new file mode 100644
+index 0000000..e69de29
+diff --git a/test_approach.py b/test_approach.py
+index 5ad95bb..489a6cd 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -1,9 +1,11 @@
+ import sys, time, numpy as np
+ from env_client import make_env
+ from approach import GeneratedApproach
++import os
++OC=os.environ.get('OC')
+ def run(seed, verbose=False):
+     env = make_env()
+-    obs, info = env.reset(seed=seed)
++    obs, info = env.reset(seed=seed, options={'object_count': int(OC)} if OC else None)
+     ap = GeneratedApproach(env.action_space, env.observation_space, {})
+     t0 = time.time(); ap.reset(obs, info); tc = 0
+     for t in range(env.max_steps):

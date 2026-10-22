@@ -1,0 +1,111 @@
+diff --git a/probe_lander_exact.py b/probe_lander_exact.py
+new file mode 100644
+index 0000000..5b438da
+--- /dev/null
++++ b/probe_lander_exact.py
+@@ -0,0 +1,19 @@
++from env_client import make_env
++import numpy as np
++for mode in ['front','side']:
++ e=make_env();s,_=e.reset(seed=29);o=s.get_object_from_name('rover1')
++ def p():return np.array([s.get(o,'x'),s.get(o,'y')])
++ def st(d):
++  global s
++  a=np.zeros(8);a[4:6]=d;s,*_=e.step(a)
++ targets=[[-1,-1],[-1.9,-1],[-1.9,-1.46]] if mode=='front' else [[-1.19,-1.75]]
++ for target in targets:
++  for k in range(50):
++   d=np.clip(np.array(target)-p(),-.1,.1)
++   if np.linalg.norm(d)<1e-6:break
++   st(d)
++ for k in range(100):
++  old=p();st([0,-.0001] if mode=='front' else [-.0001,0])
++  if np.allclose(p(),old,atol=1e-7,rtol=0):break
++ print(mode,p(),k)
++ e.close()
+diff --git a/probe_send_distance.py b/probe_send_distance.py
+new file mode 100644
+index 0000000..ca8481c
+--- /dev/null
++++ b/probe_send_distance.py
+@@ -0,0 +1,13 @@
++import numpy as np
++from env_client import make_env
++from probe_policy_old import GeneratedApproach
++for pt in [(1.4,0),(1.3,.2),(1.39,.1),(1.38,.1),(1.37,.1),(1.36,.1)]:
++ e=make_env();s,info=e.reset(seed=3);p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,info)
++ for _ in range(55):s,*_=e.step(p.get_action(s))
++ a=np.zeros(8,np.float32);a[:2]=np.array(pt)-p.xy(s,p.rovers[0]);a[3]=.5;s,*_=e.step(a)
++ print(pt,'dist',np.linalg.norm(np.array(pt)-p.lander),'pending',p.pending(s,0))
++ if pt==(1.4,0):
++  x=np.array([1.4,.1]);d=p.lander-x
++  for o in p.objects(s,'obstacle'):
++   q=p.xy(s,o);u=np.clip(np.dot(q-x,d)/np.dot(d,d),0,1);print(o.name,q,'dist',np.linalg.norm(q-x-u*d),'half',s.get(o,'half_x'),s.get(o,'half_z'))
++ e.close()
+diff --git a/test_results_more.txt b/test_results_more.txt
+index e543dba..a85a9c6 100644
+--- a/test_results_more.txt
++++ b/test_results_more.txt
+@@ -4,3 +4,62 @@ RESULT 31 {'object_count': 2} True 32 0.92
+ RESULT 32 {'object_count': 3} True 28 0.923
+ RESULT 33 {'object_count': 3} True 34 1.012
+ RESULT 34 {'object_count': 1} True 21 0.805
++RESULT 35 {'object_count': 1} True 21 0.9
++RESULT 36 {'object_count': 2} True 22 0.801
++RESULT 37 {'object_count': 1} True 24 0.919
++RESULT 38 {'object_count': 1} True 22 0.422
++RESULT 39 {'object_count': 3} True 27 0.871
++RESULT 40 {'object_count': 2} True 34 0.591
++RESULT 41 {'object_count': 2} True 21 0.834
++RESULT 42 {'object_count': 1} True 28 0.543
++RESULT 43 {'object_count': 2} True 34 0.85
++RESULT 44 {'object_count': 3} True 24 0.828
++RESULT 45 {'object_count': 3} True 30 1.27
++RESULT 46 {'object_count': 2} True 23 0.767
++RESULT 47 {'object_count': 1} True 26 1.056
++RESULT 48 {'object_count': 1} True 21 0.649
++RESULT 49 {'object_count': 1} True 38 1.174
++RESULT 50 {'object_count': 3} True 30 0.638
++RESULT 51 {'object_count': 2} True 23 0.428
++RESULT 52 {'object_count': 3} True 28 0.851
++RESULT 53 {'object_count': 3} True 25 0.466
++RESULT 54 {'object_count': 1} True 22 0.488
++RESULT 55 {'object_count': 3} True 29 0.498
++RESULT 56 {'object_count': 2} True 27 0.372
++RESULT 57 {'object_count': 1} True 19 0.257
++RESULT 58 {'object_count': 2} True 30 0.416
++RESULT 59 {'object_count': 3} True 27 0.353
++RESULT 60 {'object_count': 1} True 23 0.309
++RESULT 61 {'object_count': 2} True 27 0.386
++RESULT 62 {'object_count': 2} True 29 0.406
++RESULT 63 {'object_count': 2} True 30 0.426
++RESULT 64 {'object_count': 2} True 27 0.362
++RESULT 65 {'object_count': 1} True 20 0.276
++RESULT 66 {'object_count': 3} True 27 0.445
++RESULT 67 {'object_count': 3} True 25 0.357
++RESULT 68 {'object_count': 2} True 25 0.346
++RESULT 69 {'object_count': 1} True 29 0.406
++RESULT 70 {'object_count': 2} True 25 0.36
++RESULT 71 {'object_count': 3} True 31 0.434
++RESULT 72 {'object_count': 3} True 29 0.413
++RESULT 73 {'object_count': 3} True 24 0.367
++RESULT 74 {'object_count': 1} True 23 0.302
++RESULT 75 {'object_count': 2} True 26 0.357
++RESULT 76 {'object_count': 2} True 27 0.384
++RESULT 77 {'object_count': 1} True 23 0.31
++RESULT 78 {'object_count': 3} True 27 0.398
++RESULT 79 {'object_count': 1} True 35 0.465
++RESULT 80 {'object_count': 3} True 26 0.397
++RESULT 81 {'object_count': 1} True 23 0.354
++RESULT 82 {'object_count': 3} True 32 0.487
++RESULT 83 {'object_count': 3} True 28 0.431
++RESULT 84 {'object_count': 2} True 26 0.59
++RESULT 85 {'object_count': 3} True 23 0.528
++RESULT 86 {'object_count': 3} True 23 0.487
++RESULT 87 {'object_count': 2} True 35 1.007
++RESULT 88 {'object_count': 2} True 25 0.507
++RESULT 89 {'object_count': 3} True 37 0.726
++RESULT 90 {'object_count': 2} True 32 0.393
++RESULT 91 {'object_count': 3} True 30 0.385
++RESULT 92 {'object_count': 2} True 25 0.298
++RESULT 93 {'object_count': 3} True 30 0.406

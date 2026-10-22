@@ -1,0 +1,47 @@
+diff --git a/approach.py b/approach.py
+index 9f65e6d..d6fc49a 100644
+--- a/approach.py
++++ b/approach.py
+@@ -50,12 +50,27 @@ class GeneratedApproach:
+         samples = self._objs(state, "sample")
+         stones = [s for s in samples if self._v(state, s, "is_soil") < 0.5]
+         soils = [s for s in samples if self._v(state, s, "is_soil") > 0.5]
+-        right_stones = [s for s in stones if self._v(state, s, "x") >= -0.05]
+-        left_soils = [s for s in soils if self._v(state, s, "x") <= 0.05]
+-        self.sample_names = {
+-            0: self._closest_name(state, right_stones or stones, self.homes[0]),
+-            1: self._closest_name(state, left_soils or soils, self.homes[1]),
+-        }
++        def feasible(items, idx):
++            # A sample near the wall can be reached from a stance at x=+/-0.43.
++            return [s for s in items if
++                    (self._v(state, s, "x") >= 0.18 if idx == 0
++                     else self._v(state, s, "x") <= -0.18)]
++        choices = []
++        for kinds in ((stones, soils), (soils, stones)):
++            pair = [feasible(kinds[i], i) for i in range(2)]
++            if pair[0] and pair[1]:
++                picked = [min(pair[i], key=lambda s: self._dist(
++                    self._xy(state, s), self.homes[i])) for i in range(2)]
++                score = sum(self._dist(self._xy(state, picked[i]), self.homes[i])
++                            for i in range(2))
++                choices.append((score, picked))
++        if choices:
++            picked = min(choices, key=lambda x: x[0])[1]
++        else:
++            # Defensive fallback for unusual generated layouts.
++            picked = [min(stones, key=lambda s: self._dist(self._xy(state, s), self.homes[0])),
++                      min(soils, key=lambda s: self._dist(self._xy(state, s), self.homes[1]))]
++        self.sample_names = {i: picked[i].name for i in range(2)}
+         self.phase = ["sample", "sample"]
+         self.targets = [None, None]
+         self.paths = [[], []]
+@@ -242,7 +257,7 @@ class GeneratedApproach:
+                 if analyzed:
+                     self.phase[i] = "images" if i == 0 else "send"
+                     self.targets[i] = None
+-                elif self._dist(positions[i], self._xy(state, sob)) <= 0.235:
++                elif self._dist(positions[i], self._xy(state, sob)) <= 0.2495:
+                     self._set_op(action, i, SAMPLE)
+                     continue
+                 else:

@@ -1,0 +1,174 @@
+diff --git a/probe_cluster_grasp.py b/probe_cluster_grasp.py
+new file mode 100644
+index 0000000..49e2b87
+--- /dev/null
++++ b/probe_cluster_grasp.py
+@@ -0,0 +1,28 @@
++from env_client import make_env
++from approach import ik
++from kinematics_fit import fk
++import numpy as np
++E=make_env()
++for yaw in [0,np.pi/4,3*np.pi/4,np.pi/2]:
++ for dx,dy in [(0,0),(.015,0),(-.015,0),(0,.015),(0,-.015)]:
++  s,_=E.reset(seed=2);ro=s.get_object_from_name('robot');objs=list(s.get_objects(E.observation_space.get_type('Kinematic3DCuboid')));ob=max([o for o in objs if 'obstruction' in o.name],key=lambda o:s.get(o,'pose_z'));p=np.array([s.get(ob,'pose_'+v) for v in 'xyz']);guess=np.array([0,.4,-np.pi,-1.8,0,-1.,yaw])
++  def move(q=None,base=None):
++   global s
++   for k in range(45):
++    a=np.zeros(11);a[-1]=1
++    if q is not None:a[3:10]=q-[s.get(ro,'joint_'+str(j)) for j in range(1,8)]
++    if base is not None:a[:2]=base-[s.get(ro,'pos_base_x'),s.get(ro,'pos_base_y')]
++    m=np.max(abs(a[:10]));a[:10]*=min(1,.12/max(m,1e-9));old=s;s,*_=E.step(a)
++    if m<1e-5:return True
++    if k>2 and all(abs(s.get(ro,'joint_'+str(j))-old.get(ro,'joint_'+str(j)))<1e-7 for j in range(1,8)) and base is None:return False
++   return False
++  q=ik(.55,.35,guess);move(q=q);ee,_=fk(np.array([s.get(ro,'joint_'+str(j)) for j in range(1,8)]));base=p[:2]-ee[:2]+[dx,dy];move(base=base)
++  success=False
++  for z in np.arange(.33,p[2]+.004,-.005):
++   q=ik(.55,z,guess);move(q=q)
++   a=np.zeros(11);a[-1]=-1;s,*_=E.step(a)
++   held=[o.name for o in objs if s.get(o,'grasp_active')>.5]
++   if held:
++    print('SUCCESS',yaw,dx,dy,'z',z,'held',held,'goal',ob.name,'goalpos',p,flush=True);success=True;break
++  if not success:print('FAIL',yaw,dx,dy,'ee',fk(np.array([s.get(ro,'joint_'+str(j)) for j in range(1,8)]))[0],'goalpos',p,flush=True)
++E.close()
+diff --git a/test_clear.log b/test_clear.log
+new file mode 100644
+index 0000000..42642bb
+--- /dev/null
++++ b/test_clear.log
+@@ -0,0 +1,134 @@
++0 0 phase raise base [-0.12, 0.0] joints [-0.261, -2.35, -0.948] grasp 0.0 block [0.336, 0.173, 0.1]
++0 8 phase align base [-0.27, 0.095] joints [0.287, -1.43, -1.425] grasp 0.0 block [0.336, 0.173, 0.1]
++0 11 phase descend base [-0.447, 0.208] joints [0.295, -1.483, -1.363] grasp 0.0 block [0.336, 0.173, 0.1]
++0 19 phase close base [-0.447, 0.208] joints [0.482, -1.815, -0.844] grasp 0.0 block [0.336, 0.173, 0.1]
++0 20 phase close base [-0.447, 0.208] joints [0.482, -1.815, -0.844] grasp 0.0 block [0.336, 0.173, 0.1]
++0 21 phase descend base [-0.447, 0.208] joints [0.482, -1.815, -0.844] grasp 0.0 block [0.336, 0.173, 0.1]
++0 23 phase close base [-0.447, 0.208] joints [0.491, -1.822, -0.829] grasp 1.0 block [0.336, 0.173, 0.1]
++0 24 phase lift base [-0.447, 0.208] joints [0.451, -1.788, -0.902] grasp 1.0 block [0.336, 0.173, 0.1]
++0 32 phase transfer base [-0.442, 0.058] joints [0.287, -1.43, -1.425] grasp 1.0 block [0.336, 0.173, 0.1]
++0 36 phase lower base [-0.426, -0.381] joints [0.295, -1.483, -1.363] grasp 1.0 block [0.336, 0.173, 0.1]
++0 40 phase lower base [-0.426, -0.381] joints [0.357, -1.663, -1.122] grasp 1.0 block [0.336, 0.173, 0.1]
++0 47 phase release base [-0.426, -0.381] joints [0.506, -1.832, -0.803] grasp 0.0 block [0.336, 0.173, 0.1]
++0 48 phase raise base [-0.426, -0.381] joints [0.453, -1.735, -0.953] grasp 0.0 block [0.336, 0.173, 0.1]
++0 53 phase align base [-0.431, -0.231] joints [0.287, -1.43, -1.425] grasp 0.0 block [0.336, 0.173, 0.1]
++0 58 phase descend base [-0.447, 0.247] joints [0.295, -1.483, -1.363] grasp 0.0 block [0.336, 0.173, 0.1]
++0 60 phase descend base [-0.447, 0.247] joints [0.329, -1.601, -1.212] grasp 0.0 block [0.336, 0.173, 0.1]
++0 67 phase close base [-0.447, 0.247] joints [0.492, -1.823, -0.827] grasp 0.0 block [0.336, 0.173, 0.1]
++0 69 phase descend base [-0.447, 0.247] joints [0.492, -1.823, -0.827] grasp 0.0 block [0.336, 0.173, 0.1]
++0 71 phase close base [-0.447, 0.247] joints [0.501, -1.829, -0.812] grasp 0.0 block [0.336, 0.173, 0.1]
++0 73 phase descend base [-0.447, 0.247] joints [0.501, -1.829, -0.812] grasp 0.0 block [0.336, 0.173, 0.1]
++0 75 phase close base [-0.447, 0.247] joints [0.509, -1.835, -0.798] grasp 1.0 block [0.336, 0.173, 0.1]
++0 76 phase lift base [-0.447, 0.247] joints [0.468, -1.803, -0.87] grasp 1.0 block [0.336, 0.173, 0.1]
++0 80 phase lift base [-0.447, 0.247] joints [0.342, -1.633, -1.167] grasp 1.0 block [0.336, 0.173, 0.1]
++0 85 phase transfer base [-0.326, 0.097] joints [0.287, -1.43, -1.425] grasp 1.0 block [0.336, 0.173, 0.1]
++0 89 phase lower base [-0.074, -0.217] joints [0.295, -1.483, -1.363] grasp 1.0 block [0.336, 0.173, 0.1]
++0 100 phase release base [-0.074, -0.217] joints [0.525, -1.845, -0.772] grasp 0.0 block [0.336, 0.173, 0.1]
++0 101 phase raise base [-0.074, -0.217] joints [0.47, -1.749, -0.922] grasp 0.0 block [0.336, 0.173, 0.1]
++0 106 phase align base [-0.128, -0.067] joints [0.287, -1.43, -1.425] grasp 0.0 block [0.336, 0.173, 0.1]
++0 109 phase descend base [-0.214, 0.172] joints [0.295, -1.483, -1.363] grasp 0.0 block [0.336, 0.173, 0.1]
++0 117 phase close base [-0.214, 0.172] joints [0.484, -1.817, -0.841] grasp 1.0 block [0.336, 0.173, 0.1]
++0 118 phase lift base [-0.214, 0.172] joints [0.445, -1.783, -0.914] grasp 1.0 block [0.336, 0.173, 0.125]
++0 120 phase lift base [-0.214, 0.172] joints [0.379, -1.701, -1.062] grasp 1.0 block [0.336, 0.173, 0.175]
++0 126 phase transfer base [-0.364, 0.219] joints [0.287, -1.43, -1.425] grasp 1.0 block [0.186, 0.22, 0.295]
++0 128 phase lower base [-0.406, 0.232] joints [0.295, -1.483, -1.363] grasp 1.0 block [0.144, 0.233, 0.275]
++0 138 phase release base [-0.406, 0.232] joints [0.466, -1.802, -0.873] grasp 0.0 block [0.144, 0.233, 0.111]
++RESULT 0 139 True False seconds 12.903784275054932
++1 0 phase raise base [-0.12, 0.0] joints [-0.261, -2.35, -0.948] grasp 0.0 block [0.138, 0.183, 0.1]
++1 8 phase align base [-0.131, -0.144] joints [0.287, -1.43, -1.425] grasp 0.0 block [0.138, 0.183, 0.1]
++1 9 phase descend base [-0.131, -0.144] joints [0.295, -1.483, -1.363] grasp 0.0 block [0.138, 0.183, 0.1]
++1 17 phase close base [-0.131, -0.144] joints [0.482, -1.815, -0.844] grasp 0.0 block [0.138, 0.183, 0.1]
++1 19 phase descend base [-0.131, -0.144] joints [0.482, -1.815, -0.844] grasp 0.0 block [0.138, 0.183, 0.1]
++1 20 phase descend base [-0.131, -0.144] joints [0.49, -1.822, -0.83] grasp 0.0 block [0.138, 0.183, 0.1]
++1 21 phase close base [-0.131, -0.144] joints [0.49, -1.822, -0.83] grasp 1.0 block [0.138, 0.183, 0.1]
++1 22 phase lift base [-0.131, -0.144] joints [0.451, -1.788, -0.902] grasp 1.0 block [0.138, 0.183, 0.1]
++1 30 phase transfer base [-0.108, 0.006] joints [0.287, -1.43, -1.425] grasp 1.0 block [0.138, 0.183, 0.1]
++1 33 phase lower base [-0.068, 0.268] joints [0.295, -1.483, -1.363] grasp 1.0 block [0.138, 0.183, 0.1]
++1 40 phase lower base [-0.068, 0.268] joints [0.43, -1.768, -0.943] grasp 1.0 block [0.138, 0.183, 0.1]
++1 44 phase release base [-0.068, 0.268] joints [0.506, -1.832, -0.804] grasp 0.0 block [0.138, 0.183, 0.1]
++1 45 phase raise base [-0.068, 0.268] joints [0.453, -1.735, -0.954] grasp 0.0 block [0.138, 0.183, 0.1]
++1 50 phase align base [-0.218, 0.23] joints [0.287, -1.43, -1.425] grasp 0.0 block [0.138, 0.183, 0.1]
++1 53 phase descend base [-0.412, 0.182] joints [0.295, -1.483, -1.363] grasp 0.0 block [0.138, 0.183, 0.1]
++1 60 phase descend base [-0.412, 0.182] joints [0.484, -1.817, -0.841] grasp 0.0 block [0.138, 0.183, 0.1]
++1 61 phase close base [-0.412, 0.182] joints [0.484, -1.817, -0.841] grasp 1.0 block [0.138, 0.183, 0.1]
++1 62 phase lift base [-0.412, 0.182] joints [0.445, -1.783, -0.914] grasp 1.0 block [0.138, 0.183, 0.125]
++1 70 phase transfer base [-0.265, 0.032] joints [0.287, -1.43, -1.425] grasp 1.0 block [0.285, 0.033, 0.295]
++1 73 phase lower base [-0.102, -0.134] joints [0.295, -1.483, -1.363] grasp 1.0 block [0.448, -0.132, 0.275]
++1 80 phase lower base [-0.102, -0.134] joints [0.43, -1.768, -0.943] grasp 1.0 block [0.448, -0.132, 0.135]
++1 83 phase release base [-0.102, -0.134] joints [0.466, -1.802, -0.873] grasp 0.0 block [0.448, -0.132, 0.111]
++RESULT 1 84 True False seconds 1.795173168182373
++2 0 phase raise base [-0.12, 0.0] joints [-0.261, -2.35, -0.948] grasp 0.0 block [0.189, -0.335, 0.1]
++2 8 phase align base [-0.27, 0.054] joints [0.287, -1.43, -1.425] grasp 0.0 block [0.189, -0.335, 0.1]
++2 10 phase descend base [-0.402, 0.101] joints [0.295, -1.483, -1.363] grasp 0.0 block [0.189, -0.335, 0.1]
++2 18 phase close base [-0.402, 0.101] joints [0.479, -1.813, -0.849] grasp 0.0 block [0.189, -0.335, 0.1]
++2 20 phase descend base [-0.402, 0.101] joints [0.479, -1.813, -0.849] grasp 0.0 block [0.189, -0.335, 0.1]
++2 22 phase close base [-0.402, 0.101] joints [0.488, -1.819, -0.835] grasp 0.0 block [0.189, -0.335, 0.1]
++2 24 phase descend base [-0.402, 0.101] joints [0.488, -1.819, -0.835] grasp 0.0 block [0.189, -0.335, 0.1]
++2 26 phase close base [-0.402, 0.101] joints [0.496, -1.825, -0.82] grasp 0.0 block [0.189, -0.335, 0.1]
++2 28 phase descend base [-0.402, 0.101] joints [0.496, -1.825, -0.82] grasp 0.0 block [0.189, -0.335, 0.1]
++2 30 phase close base [-0.402, 0.101] joints [0.504, -1.831, -0.806] grasp 0.0 block [0.189, -0.335, 0.1]
++2 32 phase descend base [-0.402, 0.101] joints [0.504, -1.831, -0.806] grasp 0.0 block [0.189, -0.335, 0.1]
++2 40 phase descend base [-0.402, 0.101] joints [0.504, -1.831, -0.806] grasp 0.0 block [0.189, -0.335, 0.1]
++2 60 phase descend base [-0.402, 0.101] joints [0.504, -1.831, -0.806] grasp 0.0 block [0.189, -0.335, 0.1]
++2 80 phase descend base [-0.402, 0.101] joints [0.504, -1.831, -0.806] grasp 0.0 block [0.189, -0.335, 0.1]
++2 100 phase descend base [-0.402, 0.101] joints [0.504, -1.831, -0.806] grasp 0.0 block [0.189, -0.335, 0.1]
++2 120 phase descend base [-0.402, 0.101] joints [0.504, -1.831, -0.806] grasp 0.0 block [0.189, -0.335, 0.1]
++2 140 phase descend base [-0.402, 0.101] joints [0.504, -1.831, -0.806] grasp 0.0 block [0.189, -0.335, 0.1]
++2 160 phase descend base [-0.402, 0.101] joints [0.504, -1.831, -0.806] grasp 0.0 block [0.189, -0.335, 0.1]
++2 180 phase descend base [-0.402, 0.101] joints [0.504, -1.831, -0.806] grasp 0.0 block [0.189, -0.335, 0.1]
++RESULT 2 200 False False seconds 1.362189769744873
++3 0 phase raise base [-0.12, 0.0] joints [-0.261, -2.35, -0.948] grasp 0.0 block [0.159, -0.082, 0.1]
++3 8 phase align base [-0.179, -0.15] joints [0.287, -1.43, -1.425] grasp 0.0 block [0.159, -0.082, 0.1]
++3 10 phase descend base [-0.23, -0.281] joints [0.295, -1.483, -1.363] grasp 0.0 block [0.159, -0.082, 0.1]
++3 18 phase close base [-0.23, -0.281] joints [0.461, -1.797, -0.883] grasp 1.0 block [0.159, -0.082, 0.1]
++3 19 phase lift base [-0.23, -0.281] joints [0.424, -1.761, -0.957] grasp 1.0 block [0.159, -0.082, 0.1]
++3 20 phase lift base [-0.23, -0.281] joints [0.391, -1.72, -1.031] grasp 1.0 block [0.159, -0.082, 0.1]
++3 27 phase transfer base [-0.143, -0.131] joints [0.287, -1.43, -1.425] grasp 1.0 block [0.159, -0.082, 0.1]
++3 29 phase lower base [-0.068, -0.001] joints [0.295, -1.483, -1.363] grasp 1.0 block [0.159, -0.082, 0.1]
++3 39 phase release base [-0.068, -0.001] joints [0.475, -1.81, -0.857] grasp 0.0 block [0.159, -0.082, 0.1]
++3 40 phase raise base [-0.068, -0.001] joints [0.425, -1.709, -1.007] grasp 0.0 block [0.159, -0.082, 0.1]
++3 44 phase align base [-0.218, -0.04] joints [0.287, -1.43, -1.425] grasp 0.0 block [0.159, -0.082, 0.1]
++3 47 phase descend base [-0.391, -0.084] joints [0.295, -1.483, -1.363] grasp 0.0 block [0.159, -0.082, 0.1]
++3 55 phase close base [-0.391, -0.084] joints [0.484, -1.817, -0.841] grasp 1.0 block [0.159, -0.082, 0.1]
++3 56 phase lift base [-0.391, -0.084] joints [0.445, -1.783, -0.914] grasp 1.0 block [0.159, -0.082, 0.125]
++3 60 phase lift base [-0.391, -0.084] joints [0.329, -1.601, -1.212] grasp 1.0 block [0.159, -0.082, 0.225]
++3 64 phase transfer base [-0.275, -0.234] joints [0.287, -1.43, -1.425] grasp 1.0 block [0.275, -0.232, 0.295]
++3 66 phase lower base [-0.221, -0.304] joints [0.295, -1.483, -1.363] grasp 1.0 block [0.329, -0.303, 0.275]
++3 76 phase release base [-0.221, -0.304] joints [0.466, -1.802, -0.873] grasp 0.0 block [0.329, -0.303, 0.111]
++RESULT 3 77 True False seconds 1.8733181953430176
++4 0 phase raise base [-0.12, 0.0] joints [-0.261, -2.35, -0.948] grasp 0.0 block [0.397, -0.242, 0.1]
++4 8 phase align base [-0.27, 0.076] joints [0.287, -1.43, -1.425] grasp 0.0 block [0.397, -0.242, 0.1]
++4 10 phase descend base [-0.347, 0.116] joints [0.295, -1.483, -1.363] grasp 0.0 block [0.397, -0.242, 0.1]
++4 18 phase close base [-0.347, 0.116] joints [0.477, -1.811, -0.854] grasp 0.0 block [0.397, -0.242, 0.1]
++4 20 phase descend base [-0.347, 0.116] joints [0.477, -1.811, -0.854] grasp 0.0 block [0.397, -0.242, 0.1]
++4 22 phase close base [-0.347, 0.116] joints [0.485, -1.817, -0.84] grasp 1.0 block [0.397, -0.242, 0.1]
++4 23 phase lift base [-0.347, 0.116] joints [0.446, -1.783, -0.913] grasp 1.0 block [0.397, -0.242, 0.1]
++4 31 phase transfer base [-0.343, 0.266] joints [0.287, -1.43, -1.425] grasp 1.0 block [0.397, -0.242, 0.1]
++4 33 phase lower base [-0.34, 0.375] joints [0.295, -1.483, -1.363] grasp 1.0 block [0.397, -0.242, 0.1]
++4 40 phase lower base [-0.34, 0.375] joints [0.43, -1.768, -0.943] grasp 1.0 block [0.397, -0.242, 0.1]
++4 44 phase release base [-0.34, 0.375] joints [0.5, -1.828, -0.814] grasp 0.0 block [0.397, -0.242, 0.1]
++4 45 phase raise base [-0.34, 0.375] joints [0.447, -1.73, -0.964] grasp 0.0 block [0.397, -0.242, 0.1]
++4 50 phase align base [-0.359, 0.225] joints [0.287, -1.43, -1.425] grasp 0.0 block [0.397, -0.242, 0.1]
++4 52 phase descend base [-0.377, 0.076] joints [0.295, -1.483, -1.363] grasp 0.0 block [0.397, -0.242, 0.1]
++4 60 phase descend base [-0.377, 0.076] joints [0.486, -1.818, -0.837] grasp 0.0 block [0.397, -0.242, 0.1]
++4 61 phase close base [-0.377, 0.076] joints [0.486, -1.818, -0.837] grasp 0.0 block [0.397, -0.242, 0.1]
++4 63 phase descend base [-0.377, 0.076] joints [0.486, -1.818, -0.837] grasp 0.0 block [0.397, -0.242, 0.1]
++4 65 phase close base [-0.377, 0.076] joints [0.495, -1.825, -0.822] grasp 0.0 block [0.397, -0.242, 0.1]
++4 67 phase descend base [-0.377, 0.076] joints [0.495, -1.825, -0.822] grasp 0.0 block [0.397, -0.242, 0.1]
++4 69 phase close base [-0.377, 0.076] joints [0.503, -1.831, -0.808] grasp 1.0 block [0.397, -0.242, 0.1]
++4 70 phase lift base [-0.377, 0.076] joints [0.462, -1.799, -0.88] grasp 1.0 block [0.397, -0.242, 0.1]
++4 79 phase transfer base [-0.227, 0.064] joints [0.287, -1.43, -1.425] grasp 1.0 block [0.397, -0.242, 0.1]
++4 80 phase transfer base [-0.077, 0.053] joints [0.287, -1.43, -1.425] grasp 1.0 block [0.397, -0.242, 0.1]
++4 82 phase lower base [-0.075, 0.052] joints [0.295, -1.483, -1.363] grasp 1.0 block [0.397, -0.242, 0.1]
++4 93 phase release base [-0.075, 0.052] joints [0.519, -1.841, -0.782] grasp 0.0 block [0.397, -0.242, 0.1]
++4 94 phase raise base [-0.075, 0.052] joints [0.465, -1.745, -0.932] grasp 0.0 block [0.397, -0.242, 0.1]
++4 99 phase align base [-0.114, -0.098] joints [0.287, -1.43, -1.425] grasp 0.0 block [0.397, -0.242, 0.1]
++4 100 phase align base [-0.153, -0.243] joints [0.287, -1.43, -1.425] grasp 0.0 block [0.397, -0.242, 0.1]
++4 101 phase descend base [-0.153, -0.243] joints [0.295, -1.483, -1.363] grasp 0.0 block [0.397, -0.242, 0.1]
++4 109 phase close base [-0.153, -0.243] joints [0.484, -1.817, -0.841] grasp 1.0 block [0.397, -0.242, 0.1]
++4 110 phase lift base [-0.153, -0.243] joints [0.445, -1.783, -0.914] grasp 1.0 block [0.397, -0.242, 0.125]
++4 118 phase transfer base [-0.258, -0.093] joints [0.287, -1.43, -1.425] grasp 1.0 block [0.292, -0.092, 0.295]
++4 120 phase transfer base [-0.377, 0.077] joints [0.287, -1.43, -1.425] grasp 1.0 block [0.173, 0.078, 0.295]
++4 121 phase lower base [-0.377, 0.077] joints [0.295, -1.483, -1.363] grasp 1.0 block [0.173, 0.078, 0.275]
++4 131 phase release base [-0.377, 0.077] joints [0.466, -1.802, -0.873] grasp 0.0 block [0.173, 0.078, 0.111]
++RESULT 4 132 True False seconds 2.4975874423980713

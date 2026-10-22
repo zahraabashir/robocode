@@ -1,0 +1,218 @@
+diff --git a/dbg2.py b/dbg2.py
+new file mode 100644
+index 0000000..c7f2cd8
+--- /dev/null
++++ b/dbg2.py
+@@ -0,0 +1,17 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++from kin import tool_fk, tool_ik, down_R
++seed=int(sys.argv[1]); T=int(sys.argv[2])
++env=make_env(); obs,info=env.reset(seed=seed)
++ap=GeneratedApproach(env.action_space,env.observation_space,{}); ap.reset(obs,info)
++for t in range(T):
++    a=ap.get_action(obs); obs,*_=env.step(a)
++q=ap._q(obs); base=ap._base(obs)
++print('q',np.round(q,3)); print('wp',ap.waypoints[:2], 'yaw',ap.wp_yaw)
++a=ap.get_action(obs); print('a',np.round(a,3))
++qt,ok=tool_ik(q,ap.waypoints[0],down_R(ap.wp_yaw),base,iters=100); print('ik ok',ok,np.round(qt,3))
++print('tool now',np.round(tool_fk(q,base),3))
++# try smaller steps
++for s in [0.5,0.25,0.1]:
++    a2=a.copy(); a2[3:10]*=s; o2,*_=env.step(a2); print('scale',s,'moved',not np.allclose(ap._q(o2),q,atol=1e-7))
+diff --git a/kin.py b/kin.py
+index 53f14cb..a00201a 100644
+--- a/kin.py
++++ b/kin.py
+@@ -21,75 +21,68 @@ JOINTS = [
+     _T((0, -0.10593, -0.00017505), (-H, 0, 0)),
+ ]
+ EE = _T((0, 0, -0.061525), (PI, 0, 0))
++MOUNT = (0.12, 0.0, -0.0052)
++TOOL = 0.12
++HOME = np.array([0.0, -0.35, -np.pi, -2.5, 0.0, -0.87, np.pi / 2])
+ 
+ def _rz(q):
+     c, s = np.cos(q), np.sin(q)
+     T = np.eye(4); T[0, 0] = c; T[0, 1] = -s; T[1, 0] = s; T[1, 1] = c; return T
+ 
+-def fk(q, base=(0, 0, 0), base_z=0.0, tool=0.0):
+-    """Return 4x4 world transform of end effector (+tool offset along EE z)."""
++def mount_base(base):
+     bx, by, br = base
+-    T = _rz(br); T[0, 3] = bx; T[1, 3] = by; T[2, 3] = base_z
++    c, s = np.cos(br), np.sin(br)
++    return (bx + c * MOUNT[0] - s * MOUNT[1], by + s * MOUNT[0] + c * MOUNT[1], br)
++
++def _chain(q, base):
++    """Returns tool transform and list of (axis, origin) of joints in world."""
++    bx, by, br = mount_base(base)
++    T = _rz(br); T[0, 3] = bx; T[1, 3] = by; T[2, 3] = MOUNT[2]
++    axes = []
+     for Tj, qj in zip(JOINTS, q):
+-        T = T @ Tj @ _rz(qj)
++        T = T @ Tj
++        axes.append((T[:3, 2].copy(), T[:3, 3].copy()))
++        T = T @ _rz(qj)
+     T = T @ EE
+-    if tool:
+-        Tt = np.eye(4); Tt[2, 3] = tool; T = T @ Tt
+-    return T
++    Tt = np.eye(4); Tt[2, 3] = TOOL
++    return T @ Tt, axes
+ 
+-def pose_err(T, p, R):
+-    ep = p - T[:3, 3]
+-    Re = R @ T[:3, :3].T
+-    # axis-angle of Re
+-    ang = np.arccos(np.clip((np.trace(Re) - 1) / 2, -1, 1))
+-    if ang < 1e-9:
+-        eo = np.zeros(3)
+-    else:
+-        v = np.array([Re[2, 1] - Re[1, 2], Re[0, 2] - Re[2, 0], Re[1, 0] - Re[0, 1]])
+-        s = np.sin(ang)
+-        eo = v / (2 * s) * ang if s > 1e-6 else np.zeros(3)
+-    return np.concatenate([ep, eo])
++def tool_fk(q, base):
++    return _chain(q, base)[0]
++
++def _rot_err(Rc, Rd):
++    Re = Rd @ Rc.T
++    v = 0.5 * np.array([Re[2, 1] - Re[1, 2], Re[0, 2] - Re[2, 0], Re[1, 0] - Re[0, 1]])
++    return v
+ 
+-def ik(q0, p, R, base, base_z=0.0, tool=0.0, iters=200, wo=0.3, tol=1e-4):
++def tool_ik(q0, p, R, base, iters=60, tol=1e-5, q_nom=None, k_null=0.3):
+     q = np.array(q0, dtype=float)
++    if q_nom is None:
++        q_nom = HOME
+     for it in range(iters):
+-        T = fk(q, base, base_z, tool)
+-        e = pose_err(T, p, R)
+-        e[3:] *= wo
+-        if np.linalg.norm(e) < tol:
++        T, axes = _chain(q, base)
++        e = np.concatenate([p - T[:3, 3], _rot_err(T[:3, :3], R)])
++        if np.linalg.norm(e[:3]) < tol and np.linalg.norm(e[3:]) < 1e-4:
+             return q, True
+         J = np.zeros((6, 7))
+-        h = 1e-6
+-        for j in range(7):
+-            dq = q.copy(); dq[j] += h
+-            e2 = pose_err(fk(dq, base, base_z, tool), p, R); e2[3:] *= wo
+-            J[:, j] = (e - e2) / h
+-        lam = 1e-3
+-        dq = J.T @ np.linalg.solve(J @ J.T + lam * np.eye(6), e)
+-        n = np.linalg.norm(dq)
+-        if n > 0.3: dq *= 0.3 / n
++        pt = T[:3, 3]
++        for j, (z, o) in enumerate(axes):
++            J[:3, j] = np.cross(z, pt - o)
++            J[3:, j] = z
++        JJt = J @ J.T + 1e-6 * np.eye(6)
++        Jp = J.T @ np.linalg.inv(JJt)
++        dq = Jp @ e
++        dn = (q_nom - q + np.pi) % (2 * np.pi) - np.pi
++        dq += (np.eye(7) - Jp @ J) @ (k_null * dn)
++        n = np.max(np.abs(dq))
++        if n > 0.3:
++            dq *= 0.3 / n
+         q = q + dq
+-    return q, False
++    T, _ = _chain(q, base)
++    ok = np.linalg.norm(p - T[:3, 3]) < 1e-3
++    return q, ok
+ 
+ def down_R(yaw):
+-    # EE z axis pointing down, x axis at yaw
+     c, s = np.cos(yaw), np.sin(yaw)
+     x = np.array([c, s, 0.0]); z = np.array([0, 0, -1.0]); y = np.cross(z, x)
+     return np.stack([x, y, z], axis=1)
+-
+-MOUNT = (0.12, 0.0, -0.0052)
+-TOOL = 0.12
+-
+-def tool_fk(q, base):
+-    bx, by, br = base
+-    c, s = np.cos(br), np.sin(br)
+-    b = (bx + c * MOUNT[0] - s * MOUNT[1], by + s * MOUNT[0] + c * MOUNT[1], br)
+-    return fk(q, b, MOUNT[2], TOOL)
+-
+-def mount_base(base):
+-    bx, by, br = base
+-    c, s = np.cos(br), np.sin(br)
+-    return (bx + c * MOUNT[0] - s * MOUNT[1], by + s * MOUNT[0] + c * MOUNT[1], br)
+-
+-def tool_ik(q0, p, R, base, **kw):
+-    return ik(q0, p, R, mount_base(base), MOUNT[2], TOOL, **kw)
+diff --git a/par_test.sh b/par_test.sh
+new file mode 100755
+index 0000000..e8fa170
+--- /dev/null
++++ b/par_test.sh
+@@ -0,0 +1,4 @@
++#!/bin/bash
++# usage: par_test.sh start end nproc
++S=$1; E=$2; P=${3:-8}
++seq $S $((E-1)) | xargs -P $P -I{} sh -c '/opt/robocode-strict/bin/python test_approach.py {} $(({}+1)) 2>&1 | head -1'
+diff --git a/res1.txt b/res1.txt
+new file mode 100644
+index 0000000..875b7af
+--- /dev/null
++++ b/res1.txt
+@@ -0,0 +1,40 @@
++seed 1: success=True steps=124 time=39.5s nobs=1 phase=open
++seed 3: success=True steps=112 time=34.0s nobs=2 phase=open
++seed 9: success=True steps=130 time=39.8s nobs=1 phase=open
++seed 7: success=True steps=118 time=35.5s nobs=2 phase=open
++seed 11: success=True steps=52 time=14.9s nobs=0 phase=open
++seed 0: success=True steps=184 time=55.1s nobs=2 phase=open
++seed 4: success=True steps=176 time=59.6s nobs=2 phase=open
++seed 8: success=True steps=181 time=60.3s nobs=2 phase=open
++seed 5: success=True steps=212 time=64.0s nobs=2 phase=open
++seed 14: success=True steps=50 time=14.8s nobs=0 phase=open
++seed 10: success=True steps=120 time=49.5s nobs=2 phase=open
++seed 12: success=True steps=125 time=45.0s nobs=1 phase=open
++seed 15: success=True steps=108 time=39.9s nobs=2 phase=open
++seed 16: success=True steps=122 time=35.7s nobs=1 phase=open
++seed 21: success=True steps=60 time=13.7s nobs=0 phase=open
++seed 19: success=True steps=108 time=35.0s nobs=1 phase=open
++seed 18: success=True steps=130 time=45.3s nobs=2 phase=open
++seed 13: success=True steps=216 time=73.6s nobs=2 phase=open
++seed 23: success=True steps=54 time=20.6s nobs=0 phase=open
++seed 24: success=True steps=62 time=23.1s nobs=1 phase=open
++seed 17: success=True steps=181 time=66.8s nobs=2 phase=open
++seed 22: success=True steps=113 time=41.2s nobs=2 phase=open
++seed 27: success=True steps=62 time=23.1s nobs=0 phase=open
++seed 29: success=True steps=47 time=17.0s nobs=2 phase=open
++seed 20: success=True steps=191 time=70.9s nobs=2 phase=open
++seed 30: success=True steps=63 time=21.6s nobs=0 phase=open
++seed 25: success=True steps=135 time=50.7s nobs=1 phase=open
++seed 6: success=False steps=1000 time=174.5s nobs=1 phase=open
++seed 34: success=True steps=62 time=20.2s nobs=0 phase=open
++seed 28: success=True steps=135 time=51.0s nobs=1 phase=open
++seed 35: success=True steps=67 time=21.1s nobs=0 phase=open
++seed 31: success=True steps=116 time=43.7s nobs=1 phase=open
++seed 37: success=True steps=58 time=14.5s nobs=0 phase=open
++seed 38: success=True steps=56 time=11.2s nobs=0 phase=open
++seed 32: success=True steps=173 time=46.2s nobs=2 phase=open
++seed 36: success=True steps=120 time=26.6s nobs=1 phase=open
++seed 33: success=True steps=170 time=45.5s nobs=2 phase=open
++seed 39: success=True steps=206 time=20.0s nobs=2 phase=open
++seed 2: success=False steps=1000 time=214.6s nobs=2 phase=to_place
++seed 26: success=False steps=1000 time=82.9s nobs=2 phase=to_place
+diff --git a/t_ik.py b/t_ik.py
+new file mode 100644
+index 0000000..fe9e0fe
+--- /dev/null
++++ b/t_ik.py
+@@ -0,0 +1,8 @@
++import numpy as np, time
++from kin import tool_fk, tool_ik, down_R, HOME
++base=(-0.12,0,0)
++q=HOME.copy(); t=time.time(); n=0
++for p in [(0.15,0.2,0.13),(0.45,-0.3,0.12),(0.3,0,0.3),(0.12,-0.35,0.12),(0.5,0.3,0.15)]:
++    qt,ok=tool_ik(q,np.array(p),down_R(0.3),base); n+=1
++    print(p,ok,np.round(qt,2), np.round(tool_fk(qt,base)[:3,3],4))
++print('time per ik',(time.time()-t)/n)

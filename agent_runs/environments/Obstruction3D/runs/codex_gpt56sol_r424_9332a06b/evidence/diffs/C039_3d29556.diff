@@ -1,0 +1,18 @@
+diff --git a/approach.py b/approach.py
+index 9528c35..dec98f2 100644
+--- a/approach.py
++++ b/approach.py
+@@ -103,9 +103,10 @@ class GeneratedApproach:
+                 d=.04*self.cal_sign; a += self.B[:,self.cal_i]*d; a[10]=-1.
+                 self.last_pos=feat; self.last_delta=d; return a
+         if self.mode=="release":
+-            if self.release_t<60:
+-                gx=self.release_x if self.object_name!="target_block" else self.dest[0]
+-                g=np.array([gx,self.dest[1],self.rest_z-.005])
++            if self.release_t<30:
++                # Lift the opening fingers away from the support; otherwise their
++                # tips can be pinched between a wide region and the held block.
++                g=np.array([self.release_x,self.dest[1],max(.20,pos[2]+.025)])
+                 er=np.r_[g-pos,-feat[3:]]
+                 u=np.linalg.solve(self.J.T@self.J+1e-5*np.eye(5),self.J.T@np.clip(er,-.03,.03))
+                 a += self.B@np.clip(u,-.05,.05)

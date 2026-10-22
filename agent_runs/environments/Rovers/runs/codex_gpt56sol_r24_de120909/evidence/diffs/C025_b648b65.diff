@@ -1,0 +1,17 @@
+diff --git a/approach.py b/approach.py
+index ec2e470..6fd51cb 100644
+--- a/approach.py
++++ b/approach.py
+@@ -281,6 +281,12 @@ class GeneratedApproach:
+                 if self.paths[i]:
+                     wp=self.paths[i][0]
+                     a[4*i]=max(-.2,min(.2,wp[0]-pos[0])); a[4*i+1]=max(-.2,min(.2,wp[1]-pos[1]))
++                if self.stalls[i]>=1:
++                    # One-step lateral escape from an unmodelled/underestimated
++                    # collision boundary, then the route is rebuilt next state.
++                    outward = (i==0 and pos[0]<1.5) or (i==1 and pos[0]>-1.5)
++                    a[4*i]=.2 if (i==0)==outward else -.2
++                    a[4*i+1]=0.0
+             a[4*i+3]=self.OPS[op]
+             moved=math.dist(pos,self.lastpos[i])>.03
+             self.stalls[i]=0 if moved or (abs(a[4*i])+abs(a[4*i+1])<.01) else self.stalls[i]+1

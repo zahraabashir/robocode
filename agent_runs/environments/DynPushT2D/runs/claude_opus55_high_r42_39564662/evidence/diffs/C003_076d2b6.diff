@@ -1,0 +1,291 @@
+diff --git a/approach.py b/approach.py
+index f059a65..b32c32b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -158,7 +158,20 @@ class GeneratedApproach:
+         if len(idx) == 0:
+             return None
+         pre = np.stack([wpx[idx], wpy[idx]], 1)
+-        tdist, pathf = self._plan_paths(pose, robot, pre)
++        # retreat if robot is close to the block
++        rlx = c * (robot[0] - pose[0]) + s * (robot[1] - pose[1])
++        rly = -s * (robot[0] - pose[0]) + c * (robot[1] - pose[1])
++        _, _, rnx, rny, rd = g.closest(np.array([rlx]), np.array([rly]))
++        retreat = None
++        if rd[0] < R_ROBOT + 0.03:
++            back = R_ROBOT + 0.035 - rd[0]
++            cand = robot + back * np.array([c * rnx[0] - s * rny[0], s * rnx[0] + c * rny[0]])
++            if LO < cand[0] < HI and LO < cand[1] < HI:
++                retreat = cand
++        start = robot if retreat is None else retreat
++        tdist, pathf = self._plan_paths(pose, start, pre)
++        if retreat is not None:
++            tdist = tdist + np.hypot(*(retreat - robot))
+         tdist = tdist + 0.045
+         # world inward normal
+         nwx = -(c * pts[idx, 2] - s * pts[idx, 3])
+@@ -201,6 +214,8 @@ class GeneratedApproach:
+             return None
+         n = int(best_n[j])
+         wp = pathf(ci[j])
++        if retreat is not None:
++            wp = [retreat] + wp
+         acts = []
+         cur = robot.copy()
+         for w in wp + [np.array([wcx[idx][ci[j]], wcy[idx][ci[j]]])]:
+diff --git a/dbg.py b/dbg.py
+new file mode 100644
+index 0000000..13fcf11
+--- /dev/null
++++ b/dbg.py
+@@ -0,0 +1,15 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++sd=int(sys.argv[1]); N=int(sys.argv[2]) if len(sys.argv)>2 else 1000
++env = make_env(); obs,info=env.reset(seed=sd)
++np.set_printoptions(precision=3, suppress=True)
++print('init', obs[0:3], obs[16:18], obs[29:32], obs[12:15])
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++for t in range(N):
++    q=len(ap.queue)
++    a=ap.get_action(obs)
++    if len(ap.queue)>=q and hasattr(ap,'dbg'): print(t, 'pose',obs[0:3],'robot',obs[16:18],'dbg',np.round(ap.dbg,3))
++    obs,r,term,trunc,info=env.step(a)
++    if term: print('solved',t); break
++print('final', obs[0:3])
+diff --git a/res_0.txt b/res_0.txt
+new file mode 100644
+index 0000000..5d88aea
+--- /dev/null
++++ b/res_0.txt
+@@ -0,0 +1,41 @@
++seed 0 ok=True steps=146 time=2.9s err=[ 0.006 -0.016 -0.012]
++seed 1 ok=True steps=158 time=2.2s err=[0.01  0.008 0.053]
++seed 2 ok=True steps=138 time=2.4s err=[ 0.002  0.006 -0.087]
++seed 3 ok=True steps=102 time=1.8s err=[-0.017 -0.02   0.061]
++seed 4 ok=True steps=108 time=1.7s err=[-0.007 -0.01  -0.078]
++seed 5 ok=True steps=141 time=2.8s err=[ 0.02  -0.006 -0.069]
++seed 6 ok=True steps=162 time=2.6s err=[ 0.007  0.021 -0.061]
++seed 7 ok=True steps=172 time=2.0s err=[ 0.004  0.015 -0.094]
++seed 8 ok=True steps=147 time=2.3s err=[-0.035 -0.007 -0.012]
++seed 9 ok=True steps=144 time=2.5s err=[ 0.007  0.002 -0.075]
++seed 10 ok=True steps=105 time=2.5s err=[ 0.015 -0.018  0.112]
++seed 11 ok=True steps=105 time=1.8s err=[ 0.011 -0.024  0.044]
++seed 12 ok=True steps=115 time=1.8s err=[0.018 0.016 0.094]
++seed 13 ok=True steps=126 time=2.0s err=[-0.019 -0.003 -0.071]
++seed 14 ok=True steps=146 time=1.7s err=[-0.009 -0.002  0.083]
++seed 15 ok=True steps=60 time=0.8s err=[-0.012 -0.001  0.078]
++seed 16 ok=True steps=133 time=2.7s err=[-0.007 -0.001  0.061]
++seed 17 ok=True steps=82 time=1.7s err=[ 0.012 -0.031  0.078]
++seed 18 ok=True steps=140 time=2.9s err=[-0.006  0.002  0.018]
++seed 19 ok=True steps=85 time=1.7s err=[ 0.021 -0.007  0.045]
++seed 20 ok=True steps=100 time=1.2s err=[ 0.002 -0.007 -0.061]
++seed 21 ok=True steps=160 time=3.1s err=[0.024 0.013 0.101]
++seed 22 ok=True steps=76 time=1.6s err=[ 0.015  0.018 -0.083]
++seed 23 ok=True steps=48 time=1.0s err=[-0.007 -0.013 -0.054]
++seed 24 ok=True steps=80 time=1.7s err=[-0.016  0.017 -0.017]
++seed 25 ok=True steps=119 time=3.2s err=[ 0.017 -0.011  0.071]
++seed 26 ok=True steps=139 time=2.5s err=[-0.012 -0.016  0.076]
++seed 27 ok=True steps=178 time=2.4s err=[ 0.002  0.009 -0.014]
++seed 28 ok=True steps=16 time=0.4s err=[ 0.023 -0.006 -0.073]
++seed 29 ok=True steps=144 time=2.4s err=[-0.005 -0.007  0.073]
++seed 30 ok=True steps=139 time=1.6s err=[ 0.032 -0.02   0.074]
++seed 31 ok=True steps=81 time=1.3s err=[-0.016  0.017  0.028]
++seed 32 ok=True steps=179 time=3.2s err=[-0.015 -0.001  0.081]
++seed 33 ok=True steps=168 time=2.8s err=[0.012 0.006 0.103]
++seed 34 ok=True steps=219 time=3.6s err=[-0.016  0.019  0.066]
++seed 35 ok=True steps=102 time=2.1s err=[-0.003 -0.009 -0.07 ]
++seed 36 ok=True steps=53 time=1.3s err=[ 0.023 -0.007  0.061]
++seed 37 ok=True steps=160 time=2.9s err=[-0.006 -0.009 -0.054]
++seed 38 ok=True steps=89 time=1.8s err=[ 0.008 -0.007  0.001]
++seed 39 ok=True steps=53 time=1.1s err=[-0.004  0.012 -0.04 ]
++success 1.0 40 40
+diff --git a/res_1.txt b/res_1.txt
+new file mode 100644
+index 0000000..547a2a4
+--- /dev/null
++++ b/res_1.txt
+@@ -0,0 +1,41 @@
++seed 40 ok=True steps=135 time=2.7s err=[-0.007  0.017  0.079]
++seed 41 ok=True steps=159 time=2.4s err=[-0.017 -0.009 -0.052]
++seed 42 ok=True steps=90 time=1.3s err=[ 0.005  0.002 -0.057]
++seed 43 ok=True steps=144 time=2.8s err=[-0.012  0.001 -0.037]
++seed 44 ok=True steps=212 time=3.9s err=[-0.014 -0.019  0.057]
++seed 45 ok=True steps=82 time=1.8s err=[ 0.008  0.015 -0.076]
++seed 46 ok=True steps=152 time=2.5s err=[-0.025  0.006 -0.058]
++seed 47 ok=True steps=182 time=3.4s err=[0.013 0.008 0.091]
++seed 48 ok=True steps=114 time=2.6s err=[ 0.001 -0.005  0.048]
++seed 49 ok=True steps=190 time=3.5s err=[-0.009  0.001  0.001]
++seed 50 ok=True steps=175 time=2.3s err=[ 0.002  0.014 -0.03 ]
++seed 51 ok=True steps=125 time=2.3s err=[0.021 0.01  0.089]
++seed 52 ok=True steps=174 time=1.9s err=[0.014 0.021 0.034]
++seed 53 ok=True steps=149 time=3.0s err=[-0.017  0.    -0.036]
++seed 54 ok=True steps=131 time=2.4s err=[0.015 0.023 0.071]
++seed 55 ok=True steps=210 time=4.1s err=[-0.008 -0.006  0.086]
++seed 56 ok=True steps=85 time=1.6s err=[ 0.006 -0.01   0.01 ]
++seed 57 ok=True steps=165 time=3.3s err=[-0.019  0.009  0.094]
++seed 58 ok=True steps=93 time=2.1s err=[-0.007 -0.009  0.032]
++seed 59 ok=True steps=120 time=2.3s err=[-0.023 -0.01  -0.084]
++seed 60 ok=True steps=224 time=3.8s err=[ 0.023  0.024 -0.077]
++seed 61 ok=True steps=124 time=1.7s err=[-0.013  0.01   0.05 ]
++seed 62 ok=True steps=64 time=1.4s err=[ 0.027 -0.009 -0.043]
++seed 63 ok=True steps=153 time=2.7s err=[-0.007 -0.016 -0.089]
++seed 64 ok=True steps=196 time=3.3s err=[ 0.019 -0.016  0.084]
++seed 65 ok=True steps=168 time=2.9s err=[-0.011 -0.01   0.023]
++seed 66 ok=True steps=113 time=2.1s err=[-0.001 -0.026  0.085]
++seed 67 ok=True steps=155 time=3.1s err=[0.013 0.021 0.024]
++seed 68 ok=True steps=78 time=1.8s err=[0.013 0.024 0.025]
++seed 69 ok=True steps=76 time=1.9s err=[ 0.028  0.007 -0.056]
++seed 70 ok=True steps=143 time=3.0s err=[ 0.001 -0.017 -0.045]
++seed 71 ok=True steps=224 time=4.2s err=[-0.016 -0.017  0.09 ]
++seed 72 ok=True steps=115 time=2.1s err=[-0.019  0.002  0.07 ]
++seed 73 ok=True steps=113 time=1.6s err=[-0.022  0.002 -0.089]
++seed 74 ok=True steps=92 time=1.4s err=[ 0.005  0.005 -0.087]
++seed 75 ok=True steps=145 time=2.1s err=[ 0.012  0.013 -0.094]
++seed 76 ok=True steps=98 time=1.3s err=[ 0.014 -0.022  0.088]
++seed 77 ok=True steps=133 time=1.1s err=[-0.013 -0.016 -0.099]
++seed 78 ok=True steps=140 time=1.4s err=[ 0.009 -0.007  0.042]
++seed 79 ok=True steps=173 time=1.5s err=[-0.006  0.002 -0.092]
++success 1.0 40 40
+diff --git a/res_2.txt b/res_2.txt
+new file mode 100644
+index 0000000..3f71021
+--- /dev/null
++++ b/res_2.txt
+@@ -0,0 +1,41 @@
++seed 80 ok=True steps=77 time=1.6s err=[0.006 0.004 0.032]
++seed 81 ok=True steps=152 time=2.5s err=[ 0.018 -0.004  0.011]
++seed 82 ok=True steps=200 time=4.3s err=[ 0.017 -0.009 -0.08 ]
++seed 83 ok=True steps=102 time=1.6s err=[-0.007 -0.009 -0.086]
++seed 84 ok=True steps=113 time=2.1s err=[-0.002  0.008  0.083]
++seed 85 ok=True steps=183 time=3.6s err=[-0.018  0.007  0.041]
++seed 86 ok=True steps=146 time=2.5s err=[-0.007  0.009 -0.087]
++seed 87 ok=True steps=98 time=1.8s err=[-0.003  0.022  0.041]
++seed 88 ok=True steps=175 time=3.9s err=[-0.018 -0.006 -0.092]
++seed 89 ok=True steps=48 time=0.9s err=[-0.018  0.018  0.009]
++seed 90 ok=True steps=122 time=1.3s err=[0.008 0.012 0.08 ]
++seed 91 ok=True steps=120 time=1.4s err=[ 0.018 -0.022 -0.083]
++seed 92 ok=True steps=160 time=3.2s err=[-0.01   0.    -0.078]
++seed 93 ok=True steps=103 time=1.6s err=[0.016 0.009 0.055]
++seed 94 ok=True steps=153 time=2.1s err=[0.019 0.025 0.044]
++seed 95 ok=True steps=60 time=1.1s err=[ 0.01  -0.006  0.084]
++seed 96 ok=True steps=145 time=2.9s err=[ 0.017 -0.011  0.084]
++seed 97 ok=True steps=107 time=2.1s err=[-0.018 -0.008 -0.094]
++seed 98 ok=True steps=96 time=2.0s err=[0.009 0.02  0.061]
++seed 99 ok=True steps=168 time=2.7s err=[ 0.008  0.02  -0.028]
++seed 100 ok=True steps=134 time=2.4s err=[ 0.008 -0.028  0.072]
++seed 101 ok=True steps=118 time=2.0s err=[-0.     0.022  0.079]
++seed 102 ok=True steps=91 time=1.8s err=[-0.018 -0.008 -0.073]
++seed 103 ok=True steps=220 time=4.1s err=[-0.022 -0.017 -0.051]
++seed 104 ok=True steps=61 time=1.1s err=[-0.031  0.019  0.091]
++seed 105 ok=True steps=138 time=2.7s err=[-0.016 -0.004  0.087]
++seed 106 ok=True steps=121 time=1.8s err=[ 0.006  0.013 -0.098]
++seed 107 ok=True steps=96 time=1.7s err=[ 0.006  0.019 -0.097]
++seed 108 ok=True steps=113 time=1.6s err=[ 0.002 -0.004  0.055]
++seed 109 ok=True steps=126 time=2.5s err=[ 0.001  0.002 -0.05 ]
++seed 110 ok=True steps=111 time=2.4s err=[-0.013 -0.    -0.081]
++seed 111 ok=True steps=210 time=3.3s err=[0.039 0.024 0.057]
++seed 112 ok=True steps=131 time=2.3s err=[ 0.029 -0.006 -0.099]
++seed 113 ok=True steps=101 time=2.1s err=[ 0.023 -0.003  0.083]
++seed 114 ok=True steps=190 time=4.0s err=[ 0.015  0.013 -0.019]
++seed 115 ok=True steps=139 time=2.7s err=[-0.     0.009 -0.078]
++seed 116 ok=True steps=181 time=2.9s err=[ 0.012 -0.001 -0.04 ]
++seed 117 ok=True steps=68 time=1.0s err=[-0.021  0.017  0.087]
++seed 118 ok=True steps=155 time=2.2s err=[-0.015 -0.006  0.059]
++seed 119 ok=True steps=177 time=2.5s err=[ 0.007  0.01  -0.105]
++success 1.0 40 40
+diff --git a/res_3.txt b/res_3.txt
+new file mode 100644
+index 0000000..eda9c5f
+--- /dev/null
++++ b/res_3.txt
+@@ -0,0 +1,41 @@
++seed 120 ok=True steps=97 time=1.9s err=[-0.024  0.011 -0.052]
++seed 121 ok=True steps=98 time=1.6s err=[0.018 0.01  0.086]
++seed 122 ok=True steps=150 time=2.6s err=[-0.017 -0.018 -0.028]
++seed 123 ok=True steps=178 time=3.3s err=[-0.009  0.012 -0.08 ]
++seed 124 ok=True steps=166 time=2.4s err=[0.008 0.007 0.081]
++seed 125 ok=True steps=77 time=1.5s err=[-0.018  0.011  0.07 ]
++seed 126 ok=True steps=159 time=2.4s err=[-0.007  0.005 -0.099]
++seed 127 ok=True steps=254 time=4.5s err=[ 0.018  0.009 -0.09 ]
++seed 128 ok=True steps=144 time=2.3s err=[-0.014 -0.014  0.066]
++seed 129 ok=True steps=68 time=1.6s err=[ 0.011  0.023 -0.058]
++seed 130 ok=True steps=197 time=3.6s err=[-0.022  0.025 -0.009]
++seed 131 ok=True steps=156 time=2.7s err=[0.003 0.006 0.027]
++seed 132 ok=True steps=149 time=2.3s err=[-0.016 -0.003  0.005]
++seed 133 ok=True steps=125 time=1.7s err=[-0.019  0.016 -0.051]
++seed 134 ok=True steps=153 time=3.0s err=[ 0.019 -0.004  0.083]
++seed 135 ok=True steps=109 time=2.2s err=[ 0.005 -0.021 -0.01 ]
++seed 136 ok=True steps=142 time=3.1s err=[-0.032 -0.003  0.055]
++seed 137 ok=True steps=72 time=1.4s err=[ 0.01   0.003 -0.067]
++seed 138 ok=True steps=171 time=3.4s err=[ 0.006 -0.012  0.034]
++seed 139 ok=True steps=102 time=1.9s err=[0.007 0.01  0.011]
++seed 140 ok=True steps=101 time=2.0s err=[-0.004  0.015 -0.082]
++seed 141 ok=True steps=92 time=2.0s err=[0.001 0.001 0.06 ]
++seed 142 ok=True steps=141 time=2.4s err=[ 0.016  0.014 -0.087]
++seed 143 ok=True steps=123 time=1.9s err=[-0.002  0.004  0.046]
++seed 144 ok=True steps=142 time=2.8s err=[-0.011 -0.014 -0.076]
++seed 145 ok=True steps=119 time=2.0s err=[0.01  0.002 0.047]
++seed 146 ok=True steps=83 time=1.2s err=[-0.016  0.019 -0.001]
++seed 147 ok=True steps=73 time=1.0s err=[ 0.006 -0.007  0.018]
++seed 148 ok=True steps=51 time=1.0s err=[ 0.003 -0.008 -0.054]
++seed 149 ok=True steps=87 time=1.5s err=[ 0.02   0.009 -0.02 ]
++seed 150 ok=True steps=79 time=1.3s err=[0.002 0.005 0.001]
++seed 151 ok=True steps=171 time=2.3s err=[-0.009  0.018 -0.045]
++seed 152 ok=True steps=89 time=1.6s err=[0.023 0.014 0.082]
++seed 153 ok=True steps=64 time=1.0s err=[-0.004 -0.021 -0.039]
++seed 154 ok=True steps=124 time=1.9s err=[ 0.017 -0.011 -0.023]
++seed 155 ok=True steps=134 time=2.7s err=[-0.011 -0.013  0.009]
++seed 156 ok=True steps=79 time=2.1s err=[-0.024  0.014  0.076]
++seed 157 ok=True steps=112 time=2.5s err=[ 0.013  0.02  -0.042]
++seed 158 ok=True steps=91 time=2.1s err=[ 0.008 -0.002 -0.077]
++seed 159 ok=True steps=155 time=2.0s err=[-0.026  0.004 -0.075]
++success 1.0 40 40
+diff --git a/res_4.txt b/res_4.txt
+new file mode 100644
+index 0000000..7ef8974
+--- /dev/null
++++ b/res_4.txt
+@@ -0,0 +1,41 @@
++seed 160 ok=True steps=103 time=1.9s err=[0.008 0.007 0.088]
++seed 161 ok=True steps=145 time=2.8s err=[-0.002  0.016 -0.082]
++seed 162 ok=True steps=87 time=1.5s err=[ 0.026  0.019 -0.015]
++seed 163 ok=True steps=157 time=3.3s err=[-0.007  0.026  0.089]
++seed 164 ok=True steps=50 time=0.7s err=[-0.005  0.008 -0.015]
++seed 165 ok=True steps=122 time=2.8s err=[0.006 0.    0.003]
++seed 166 ok=True steps=148 time=2.3s err=[-0.008  0.006 -0.068]
++seed 167 ok=True steps=64 time=1.0s err=[-0.021 -0.024 -0.073]
++seed 168 ok=True steps=178 time=3.4s err=[-0.003 -0.004 -0.009]
++seed 169 ok=True steps=148 time=2.7s err=[-0.022 -0.027  0.014]
++seed 170 ok=True steps=111 time=2.3s err=[ 0.001 -0.01  -0.048]
++seed 171 ok=True steps=99 time=1.8s err=[ 0.015 -0.004 -0.015]
++seed 172 ok=True steps=148 time=1.9s err=[ 0.003 -0.005  0.076]
++seed 173 ok=False steps=1000 time=22.2s err=[-0.043 -0.015 -1.469]
++seed 174 ok=True steps=112 time=1.7s err=[-0.006 -0.008 -0.074]
++seed 175 ok=True steps=82 time=1.9s err=[ 0.017  0.01  -0.007]
++seed 176 ok=True steps=126 time=2.2s err=[-0.026 -0.026  0.034]
++seed 177 ok=True steps=80 time=1.2s err=[-0.013 -0.    -0.053]
++seed 178 ok=True steps=153 time=3.1s err=[ 0.033  0.019 -0.065]
++seed 179 ok=True steps=230 time=3.6s err=[ 0.021 -0.015 -0.019]
++seed 180 ok=True steps=119 time=2.0s err=[-0.004  0.     0.039]
++seed 181 ok=True steps=177 time=2.7s err=[-0.005 -0.016 -0.037]
++seed 182 ok=True steps=179 time=3.0s err=[ 0.009 -0.024  0.042]
++seed 183 ok=True steps=164 time=2.8s err=[-0.008  0.022 -0.016]
++seed 184 ok=True steps=112 time=2.1s err=[-0.008  0.009 -0.075]
++seed 185 ok=True steps=82 time=1.7s err=[ 0.001  0.017 -0.017]
++seed 186 ok=True steps=59 time=1.2s err=[-0.016  0.007  0.012]
++seed 187 ok=True steps=114 time=2.4s err=[-0.011  0.016 -0.098]
++seed 188 ok=True steps=139 time=2.7s err=[-0.029  0.002  0.082]
++seed 189 ok=True steps=185 time=2.6s err=[0.015 0.018 0.007]
++seed 190 ok=True steps=109 time=1.7s err=[0.021 0.022 0.087]
++seed 191 ok=True steps=35 time=0.6s err=[-0.014 -0.025 -0.045]
++seed 192 ok=True steps=162 time=1.8s err=[-0.004 -0.013  0.09 ]
++seed 193 ok=True steps=185 time=2.1s err=[ 0.004  0.003 -0.074]
++seed 194 ok=True steps=145 time=1.4s err=[ 0.021  0.015 -0.096]
++seed 195 ok=True steps=102 time=1.0s err=[-0.011 -0.011  0.079]
++seed 196 ok=True steps=95 time=0.7s err=[0.001 0.012 0.048]
++seed 197 ok=True steps=114 time=0.5s err=[-0.015  0.025 -0.105]
++seed 198 ok=True steps=135 time=0.6s err=[ 0.008  0.01  -0.024]
++seed 199 ok=True steps=62 time=0.4s err=[-0.009 -0.01  -0.01 ]
++success 0.975 39 40

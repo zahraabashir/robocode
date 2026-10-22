@@ -1,0 +1,74 @@
+diff --git a/approach.py b/approach.py
+index 7939d33..8328960 100644
+--- a/approach.py
++++ b/approach.py
+@@ -1,5 +1,6 @@
+ """Push-T controller: model-based greedy push selection + visibility-graph navigation."""
+ import heapq
++import time
+ import math
+ 
+ import numpy as np
+@@ -164,6 +165,7 @@ class GeneratedApproach:
+         self.cost_mode = 0
+         self.M = 0
+         self.infl = R_ROBOT + 0.015
++        self.wall_margin = 0.01
+         self.H2 = 30
+         self.H = 40
+         self.replan_every = 8
+@@ -174,6 +176,7 @@ class GeneratedApproach:
+         s = np.asarray(state, dtype=float)
+         self.w, self.lh, self.lv = s[12], s[13], s[14]
+         self._cand_cache = {}
++        self.t0 = time.time()
+         self.model = TModel(self.w, self.lh, self.lv)
+         self.sim = VModel(self.w, self.lh, self.lv)
+         self.goal = s[29:32].copy()
+@@ -273,12 +276,22 @@ class GeneratedApproach:
+         bestc = np.full(N, c0)
+         H = H or self.H
+         act = DW * SP[:, None]
++        valid = np.ones(N, bool)
++        poly = self.model.poly
+         for k in range(1, H + 1):
+             cur, rob = self.sim.step(cur, rob, act)
++            # wall check: all T vertices must stay inside the arena
++            c, s_ = np.cos(cur[:, 2]), np.sin(cur[:, 2])
++            vx = cur[:, 0:1] + c[:, None] * poly[None, :, 0] - s_[:, None] * poly[None, :, 1]
++            vy = cur[:, 1:2] + s_[:, None] * poly[None, :, 0] + c[:, None] * poly[None, :, 1]
++            m_ = self.wall_margin
++            inside = ((vx.min(1) > m_) & (vx.max(1) < 5.0 - m_) & (vy.min(1) > m_) & (vy.max(1) < 5.0 - m_))
++            valid &= inside
+             cst = self.cost(cur)
+             done = self.in_goal(cur, 0.75)
+             cst = np.where(done, -self.goal_bonus, cst)
+             score = (c0 - cst) / (k + travel + self.overhead)
++            score = np.where(valid, score, -np.inf)
+             m = score > bestscore
+             bestscore[m] = score[m]
+             bestk[m] = k
+@@ -289,7 +302,11 @@ class GeneratedApproach:
+                     c=bestc, here=HERE, travel=travel, c0=c0)
+ 
+     def plan_push(self, pose, robot):
+-        E = self.eval_pushes(pose, robot)
++        el = time.time() - self.t0
++        if el > 35.0:
++            E = self.eval_pushes(pose, robot, coarse=True, H=20 if el > 45 else 30)
++        else:
++            E = self.eval_pushes(pose, robot)
+         order = np.argsort(-E["rate"])
+         best_i = int(order[0])
+         if self.M > 0:
+@@ -445,6 +462,10 @@ class GeneratedApproach:
+         robot = s[16:18].copy()
+         if self.model is None:
+             self.reset(state, {})
++        if self.last_cmd is not None and self.mode == "push":
++            moved = np.linalg.norm(robot - self.last_robot)
++            if moved < 0.3 * np.linalg.norm(self.last_cmd):
++                self.mode = "plan"
+         if self.last_cmd is not None and self.mode == "nav":
+             moved = np.linalg.norm(robot - self.last_robot)
+             if moved < 0.3 * np.linalg.norm(self.last_cmd) and np.linalg.norm(self.last_cmd) > 1e-3:

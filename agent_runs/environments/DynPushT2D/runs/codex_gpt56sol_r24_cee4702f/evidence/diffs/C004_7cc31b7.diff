@@ -1,0 +1,188 @@
+diff --git a/approach.py b/approach.py
+index e72d96e..4dad70d 100644
+--- a/approach.py
++++ b/approach.py
+@@ -26,5 +26,9 @@ class GeneratedApproach:
+         stand = obj - direction * 0.16
+         target = stand if np.linalg.norm(robot - stand) > 0.055 else obj + direction * 0.10
+         action = np.clip(target - robot, self.low, self.high)
++        # The robot has a Euclidean displacement cap in addition to Box bounds.
++        norm = float(np.linalg.norm(action))
++        if norm > 0.049:
++            action *= 0.049 / norm
+         self.step += 1
+         return action.astype(float)
+diff --git a/probe_dynamics.py b/probe_dynamics.py
+new file mode 100644
+index 0000000..90980b3
+--- /dev/null
++++ b/probe_dynamics.py
+@@ -0,0 +1,168 @@
++"""Small empirical probe for DynPushT2D dynamics (never imported by approach.py)."""
++
++import math
++
++import numpy as np
++
++from env_client import make_env
++
++
++def angle_wrap(x):
++    return (x + math.pi) % (2.0 * math.pi) - math.pi
++
++
++def reset_summary(seed):
++    env = make_env()
++    obs, _ = env.reset(seed=seed)
++    print(
++        "RESET",
++        seed,
++        "block",
++        np.round(obs[[0, 1, 2]], 5).tolist(),
++        "robot",
++        np.round(obs[[16, 17]], 5).tolist(),
++        "goal",
++        np.round(obs[[29, 30, 31]], 5).tolist(),
++        "dims",
++        np.round(obs[[12, 13, 14, 28]], 5).tolist(),
++        "max_steps",
++        env.max_steps,
++    )
++    env.close()
++
++
++def free_motion(seed):
++    """Move directly away from the block to avoid an accidental collision."""
++    env = make_env()
++    obs, _ = env.reset(seed=seed)
++    start = obs.copy()
++    away = obs[16:18] - obs[0:2]
++    axis = int(np.argmax(np.abs(away)))
++    act = np.zeros(2, dtype=np.float32)
++    act[axis] = 0.03 * (1.0 if away[axis] >= 0 else -1.0)
++    rows = []
++    for _ in range(3):
++        obs, _, _, _, _ = env.step(act)
++        rows.append((obs[16:18].copy(), obs[19:21].copy(), obs[0:2].copy()))
++    robot_d = [r[0] - start[16:18] for r in rows]
++    block_d = [r[2] - start[0:2] for r in rows]
++    print(
++        "FREE",
++        seed,
++        "action",
++        act.tolist(),
++        "robot_delta",
++        np.round(robot_d, 6).tolist(),
++        "reported_v",
++        np.round([r[1] for r in rows], 6).tolist(),
++        "block_delta",
++        np.round(block_d, 7).tolist(),
++    )
++    env.close()
++
++
++def ram_center(seed):
++    """Drive toward the block center and measure first contact and sustained push."""
++    env = make_env()
++    obs, _ = env.reset(seed=seed)
++    initial = obs.copy()
++    first_contact = None
++    samples = []
++    terminated_at = None
++    for step in range(1, 121):
++        vec = obs[0:2] - obs[16:18]
++        norm = float(np.linalg.norm(vec))
++        act = 0.05 * vec / max(norm, 1e-9)
++        obs, reward, term, trunc, _ = env.step(act.astype(np.float32))
++        bdisp = float(np.linalg.norm(obs[0:2] - initial[0:2]))
++        if first_contact is None and bdisp > 1e-5:
++            first_contact = (
++                step,
++                norm,
++                obs[16:18].copy(),
++                obs[0:2].copy(),
++                obs[3:6].copy(),
++            )
++        if first_contact is not None and step in {
++            first_contact[0],
++            first_contact[0] + 1,
++            first_contact[0] + 5,
++            first_contact[0] + 15,
++        }:
++            samples.append(
++                (
++                    step,
++                    obs[0:2] - initial[0:2],
++                    angle_wrap(float(obs[2] - initial[2])),
++                    obs[16:18].copy(),
++                )
++            )
++        if term or trunc:
++            terminated_at = (step, term, trunc, reward)
++            break
++    fc = None
++    if first_contact:
++        fc = (
++            first_contact[0],
++            round(first_contact[1], 5),
++            np.round(first_contact[2], 5).tolist(),
++            np.round(first_contact[3], 5).tolist(),
++            np.round(first_contact[4], 5).tolist(),
++        )
++    pretty_samples = [
++        (s, np.round(d, 5).tolist(), round(a, 5), np.round(r, 5).tolist())
++        for s, d, a, r in samples
++    ]
++    print("RAM", seed, "first", fc, "samples", pretty_samples, "stop", terminated_at)
++    env.close()
++
++
++def coast_after_push(seed):
++    """Reach contact, issue one push, then zeros to expose inertia/damping."""
++    env = make_env()
++    obs, _ = env.reset(seed=seed)
++    initial = obs.copy()
++    contacted = False
++    push_action = None
++    for _ in range(100):
++        vec = obs[0:2] - obs[16:18]
++        act = 0.05 * vec / max(float(np.linalg.norm(vec)), 1e-9)
++        obs, _, term, trunc, _ = env.step(act.astype(np.float32))
++        if np.linalg.norm(obs[0:2] - initial[0:2]) > 1e-5:
++            contacted = True
++            push_action = act.copy()
++            break
++        if term or trunc:
++            break
++    rows = []
++    if contacted:
++        for k in range(8):
++            obs, _, term, trunc, _ = env.step(np.zeros(2, dtype=np.float32))
++            rows.append((k + 1, obs[0:2].copy(), obs[3:6].copy(), obs[16:18].copy()))
++            if term or trunc:
++                break
++    print(
++        "COAST",
++        seed,
++        "contacted",
++        contacted,
++        "last_action",
++        None if push_action is None else np.round(push_action, 5).tolist(),
++        "rows",
++        [
++            (k, np.round(p, 5).tolist(), np.round(v, 5).tolist(), np.round(r, 5).tolist())
++            for k, p, v, r in rows
++        ],
++    )
++    env.close()
++
++
++if __name__ == "__main__":
++    env = make_env()
++    print("SPACES", env.observation_space.shape, env.action_space.low, env.action_space.high)
++    env.close()
++    for probe_seed in range(4):
++        reset_summary(probe_seed)
++        free_motion(probe_seed)
++        ram_center(probe_seed)
++    coast_after_push(0)

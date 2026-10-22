@@ -1,0 +1,25 @@
+diff --git a/probe_fine.py b/probe_fine.py
+new file mode 100644
+index 0000000..52faa98
+--- /dev/null
++++ b/probe_fine.py
+@@ -0,0 +1,19 @@
++from env_client import make_env
++from kin import *
++E=make_env();s,_=E.reset(seed=0)
++r=s.get_object_from_name('robot');b=s.get_object_from_name('target_block')
++fs=['joint_'+str(i) for i in range(1,8)]
++def vec(s):return np.array([s.get(r,f) for f in fs])
++x,y,z=[s.get(b,'pose_'+f) for f in 'xyz']
++for k in range(10):
++ a=np.zeros(11);a[3:10]=np.clip(ik(x+.12,.25)-vec(s),-.15,.15);a[1]=np.clip(y-.001-s.get(r,'pos_base_y'),-.15,.15);s,*_=E.step(a)
++for zt in np.arange(.23,.080,-.002):
++ q=ik(x+.12,zt)
++ a=np.zeros(11);a[3:10]=q-vec(s);a[10]=-1
++ old=s;s,*_=E.step(a)
++ if s.get(r,'grasp_active'):
++  print('GRASP',zt,vec(s),{f:s.get(r,f) for f in ['grasp_tf_x','grasp_tf_y','grasp_tf_z','grasp_tf_qx','grasp_tf_qy','grasp_tf_qz','grasp_tf_qw']});break
++ if np.linalg.norm(vec(s)-vec(old))<1e-7:print('blocked',zt);break
++else:print('no grasp')
++print('last',vec(s),fk(vec(s)))
++E.close()

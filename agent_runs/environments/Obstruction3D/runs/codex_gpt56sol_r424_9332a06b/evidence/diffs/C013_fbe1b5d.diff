@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 19aee16..f6dc902 100644
+--- a/approach.py
++++ b/approach.py
+@@ -62,7 +62,7 @@ class GeneratedApproach:
+             else: self.J[:,self.cal_i]=col; self.cal_sign=-1
+             self.last_delta=0.
+         if self.mode=="calibrate":
+-            if self.cal_i>=len(self.controls): self.mode="move"; self.move_count=0
++            if self.cal_i>=3: self.mode="move"; self.move_count=0
+             else:
+                 d=.04*self.cal_sign; a += self.B[:,self.cal_i]*d; a[10]=-1.
+                 self.last_pos=pos; self.last_delta=d; return a

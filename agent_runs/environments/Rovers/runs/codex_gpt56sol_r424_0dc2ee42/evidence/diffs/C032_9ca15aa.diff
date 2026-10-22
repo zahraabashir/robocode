@@ -1,0 +1,33 @@
+diff --git a/approach.py b/approach.py
+index 75f15d1..6257cf4 100644
+--- a/approach.py
++++ b/approach.py
+@@ -48,7 +48,7 @@ class GeneratedApproach:
+         # a reachable stance on their own side.
+         self.obstacles.append((0.0, 0.0, 0.18, 2.6))
+         self.lander_xy = self._xy(state, self._objs(state, "lander")[0])
+-        self.obstacles.append((self.lander_xy[0], self.lander_xy[1], 0.30, 0.22))
++        self.obstacles.append((self.lander_xy[0], self.lander_xy[1], 0.42, 0.30))
+         samples = self._objs(state, "sample")
+         stones = [s for s in samples if self._v(state, s, "is_soil") < 0.5]
+         soils = [s for s in samples if self._v(state, s, "is_soil") > 0.5]
+@@ -95,7 +95,7 @@ class GeneratedApproach:
+ 
+     def _blocked(self, p, extra=None, margin=0.20):
+         x, y = p
+-        if x < -2.25 or x > 2.25 or y < -2.25 or y > 2.25:
++        if x < -2.22 or x > 2.22 or y < -2.22 or y > 2.22:
+             return True
+         for ox, oy, hx, hy in self.obstacles:
+             if abs(x - ox) <= hx + margin and abs(y - oy) <= hy + margin:
+@@ -241,8 +241,8 @@ class GeneratedApproach:
+             x = 0.43
+         if idx == 1 and x > -0.43:
+             x = -0.43
+-        x = max(-2.25, min(2.25, x))
+-        y = max(-2.25, min(2.25, y))
++        x = max(-2.22, min(2.22, x))
++        y = max(-2.22, min(2.22, y))
+         return (x, y)
+ 
+     def _sample_goal(self, state, sample, idx, rover_pos):

@@ -1,0 +1,81 @@
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..deee1b8
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,16 @@
++# Black-box Obstruction2D policy
++
++`approach.py` contains `GeneratedApproach` and imports only the standard library and NumPy. It reads typed objects directly and makes no assumptions about the number or ordering of obstructions.
++
++The controller chooses a target placement, removes interfering obstructions, grasps from above, and carries the target to the surface. Planning accounts for the carried block, gripper, arm, base, room boundaries, and the future target pickup. Obstruction storage uses free floor gaps, with low elevated placements when necessary. Motion is checked through observed progress and grasp success through lifting. Planning uses bounded geometric candidate sets rather than a simulator or exhaustive action search.
++
++Run tests with the supplied interpreter:
++
++```sh
++/opt/robocode-strict/bin/python test_approach.py 0 1 2 3 4
++/opt/robocode-strict/bin/python test_batch.py 0 100
++/opt/robocode-strict/bin/python test_batch.py 0 100 3
++/opt/robocode-strict/bin/python test_regression.py
++```
++
++The optional third batch argument pins the obstruction count. Each test environment is a fresh live-server instance. The regression suite covers wall reach, narrow grasp clearances, gripper placement collisions, and storage that could obstruct a later pickup. Policy computation is timed separately from environment generation and remote stepping.
+diff --git a/sweep_300_700.log b/sweep_300_700.log
+index 4276ca6..3675dd6 100644
+--- a/sweep_300_700.log
++++ b/sweep_300_700.log
+@@ -289,3 +289,24 @@
+ 586 OK 54
+ 588 OK 44
+ 589 OK 31
++591 OK 24
++590 OK 86
++592 OK 27
++593 OK 62
++594 OK 74
++596 OK 62
++595 OK 120
++598 OK 52
++597 OK 83
++599 OK 53
++600 OK 50
++601 OK 30
++602 OK 21
++603 OK 20
++604 OK 18
++605 OK 26
++607 OK 58
++608 OK 34
++606 OK 93
++609 OK 62
++610 OK 35
+diff --git a/test_regression.py b/test_regression.py
+new file mode 100644
+index 0000000..579f864
+--- /dev/null
++++ b/test_regression.py
+@@ -0,0 +1,24 @@
++"""Reproduce the edge cases discovered during black-box exploration."""
++import hashlib
++import json
++import time
++from env_client import make_env
++from approach import GeneratedApproach
++
++cases=[(21,None),(31,None),(74,None),(151,None),(489,None),(42,3),(0,4),(1,4),(2,4),(3,4),(4,4),(5,4)]
++policy_hash=hashlib.sha256(open('approach.py','rb').read()).hexdigest()
++results=[]
++e=make_env()
++for seed,count in cases:
++    s,info=e.reset(seed=seed,options={'object_count':count} if count is not None else None)
++    policy=GeneratedApproach(e.action_space,e.observation_space,{})
++    tick=time.perf_counter();policy.reset(s,info);cpu=time.perf_counter()-tick
++    for step in range(e.max_steps):
++        tick=time.perf_counter();action=policy.get_action(s);cpu+=time.perf_counter()-tick
++        s,reward,done,truncated,info=e.step(action)
++        if done or truncated:break
++    result=dict(seed=seed,count=count,done=done,steps=step+1,policy_seconds=cpu,policy_hash=policy_hash)
++    results.append(result);print(result,flush=True)
++    json.dump(results,open('regression_results.json','w'),indent=2)
++e.close()
++assert all(r['done'] for r in results)

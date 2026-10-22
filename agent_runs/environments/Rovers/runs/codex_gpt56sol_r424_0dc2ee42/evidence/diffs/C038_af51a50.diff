@@ -1,0 +1,21 @@
+diff --git a/approach.py b/approach.py
+index 0009fb0..b5aa980 100644
+--- a/approach.py
++++ b/approach.py
+@@ -301,11 +301,13 @@ class GeneratedApproach:
+ 
+             if self.phase[i] == "sample":
+                 sob = self._sample_obj(state, i)
++                # Sampling selects a nearby sample internally. If two samples
++                # overlap, it may validly analyze the other queued type first.
++                if full:
++                    self._set_op(action, i, DROP)
++                    continue
+                 analyzed = sob is None or self._v(state, sob, "analyzed_rover%d" % i) > 0.5
+                 if analyzed:
+-                    if full:
+-                        self._set_op(action, i, DROP)
+-                        continue
+                     if sob is not None:
+                         self.sample_index[i] += 1
+                         self.targets[i] = None

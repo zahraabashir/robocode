@@ -1,0 +1,46 @@
+diff --git a/stats_final_latest.txt b/stats_final_latest.txt
+new file mode 100644
+index 0000000..9f32b6c
+--- /dev/null
++++ b/stats_final_latest.txt
+@@ -0,0 +1,4 @@
++{'seed': 0, 'n': 3, 'success': True, 'steps': 28, 'time': 0.196, 'bad': [0, 0, 0], 'ops': [3, 3, 2, 2, 2]}
++{'seed': 10, 'n': 3, 'success': True, 'steps': 22, 'time': 0.194, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
++{'seed': 20, 'n': 3, 'success': True, 'steps': 27, 'time': 0.266, 'bad': [0, 0, 0], 'ops': [4, 3, 2, 2, 2]}
++{'seed': 30, 'n': 1, 'success': True, 'steps': 34, 'time': 0.24, 'bad': [0, 0, 4], 'ops': [1, 1, 6, 2, 2]}
+diff --git a/stats_final_latest4.txt b/stats_final_latest4.txt
+new file mode 100644
+index 0000000..ca24e99
+--- /dev/null
++++ b/stats_final_latest4.txt
+@@ -0,0 +1,4 @@
++{'seed': 1200, 'n': 4, 'success': True, 'steps': 26, 'time': 0.164, 'bad': [0, 0, 0], 'ops': [5, 5, 4, 2, 2]}
++{'seed': 1210, 'n': 4, 'success': True, 'steps': 24, 'time': 0.253, 'bad': [0, 0, 0], 'ops': [5, 5, 4, 2, 2]}
++{'seed': 1220, 'n': 4, 'success': True, 'steps': 23, 'time': 0.201, 'bad': [0, 0, 0], 'ops': [5, 5, 3, 2, 2]}
++{'seed': 1230, 'n': 4, 'success': True, 'steps': 29, 'time': 0.261, 'bad': [0, 1, 0], 'ops': [5, 4, 4, 2, 2]}
+diff --git a/test_reuse.py b/test_reuse.py
+new file mode 100644
+index 0000000..d0017b9
+--- /dev/null
++++ b/test_reuse.py
+@@ -0,0 +1,20 @@
++"""Check repeated resets, variable object counts, and the action contract."""
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++
++env=make_env()
++policy=GeneratedApproach(env.action_space,env.observation_space,{})
++for seed,count in ((0,1),(89,3),(1212,4),(349,2)):
++ state,info=env.reset(seed=seed,options={'object_count':count})
++ policy.reset(state,info)
++ for step in range(200):
++  action=policy.get_action(state)
++  assert action.shape==(8,) and action.dtype==np.float32
++  assert np.isfinite(action).all()
++  assert (action>=env.action_space.low).all() and (action<=env.action_space.high).all()
++  state,_,terminated,truncated,_=env.step(action)
++  if terminated or truncated:break
++ assert terminated,(seed,count)
++ print('PASS',seed,count,step+1,flush=True)
++env.close()

@@ -1,0 +1,25 @@
+diff --git a/approach.py b/approach.py
+index eabaca3..3db40ed 100644
+--- a/approach.py
++++ b/approach.py
+@@ -22,6 +22,8 @@ class GeneratedApproach:
+         self.todo.append(target_name)  # retrieve it last for the actual placement
+         self.final_index = len(self.todo) - 1
+         xs = [state.get(state.get_object_from_name(n), "x") for n in state.get_object_names()]
++        self.initial_x = {n: state.get(state.get_object_from_name(n), "x")
++                          for n in state.get_object_names()}
+         self.park_base = max(xs) + 0.45
+         robot = state.get_objects(self.types["crv_robot"])[0]
+         self.safe_y = state.get(robot, "y")
+@@ -108,8 +110,9 @@ class GeneratedApproach:
+                 tx = ox
+             else:
+                 sx = state.get(surface, "x")
+-                direction = 1.0 if ox >= sx else -1.0
+-                tx = ox + direction * (0.25 + 0.08 * self.index)
++                origin_x = self.initial_x[obj.name]
++                direction = 1.0 if origin_x >= sx else -1.0
++                tx = origin_x + direction * (0.25 + 0.08 * self.index)
+                 # Empirically the circular base center is constrained here.
+                 tx = max(0.11, min(1.39, tx))
+             if abs(tx - rx) > 0.004:

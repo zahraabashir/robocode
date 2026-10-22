@@ -1,0 +1,23 @@
+diff --git a/approach.py b/approach.py
+index 4f7031b..b29244e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -32,7 +32,8 @@ class GeneratedApproach:
+         used = []
+         self.target_park = tx
+         if crowded:
+-            self.target_park = candidates[0]
++            outward = [x for x in candidates if (x - sx) * (tx - sx) > 0]
++            self.target_park = max(outward, key=lambda x: abs(x - sx)) if outward else candidates[0]
+             used.append((self.target_park, tw))
+         for o in obstacles:
+             ow = state.get(o, "width")
+@@ -122,7 +123,7 @@ class GeneratedApproach:
+                 self.attached = True
+             # A modest vertical park is enough to clear the ground while still
+             # leaving room above it for a later verified re-grasp.
+-            park_y = 0.45 if (obj.type.name == "target_block" and not is_target) else 0.35
++            park_y = 0.45 if (obj.type.name == "target_block" and not is_target) else 0.30
+             parked_high_enough = (not is_target and self.attached and oy >= park_y)
+             lift_limit = self.safe_y if is_target else 0.74
+             if ry < lift_limit and not parked_high_enough:

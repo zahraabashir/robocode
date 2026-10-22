@@ -1,0 +1,274 @@
+diff --git a/approach_v2.py b/approach_v2.py
+index 1d2c701..8f40652 100644
+--- a/approach_v2.py
++++ b/approach_v2.py
+@@ -119,7 +119,7 @@ class GeneratedApproach:
+                 best = np.clip(q, -JLIM, JLIM)
+         return best, False
+ 
+-    def _cart_path(self, q0, p_from, p_to, R, step=0.04, R_from=None):
++    def _cart_path(self, q0, p_from, p_to, R, step=0.04, R_from=None, stop_on_fail=False):
+         """IK waypoints along a straight line in tool position; orientation interpolated
+         from R_from (default: R) to R."""
+         p_from = np.asarray(p_from, float)
+@@ -138,6 +138,8 @@ class GeneratedApproach:
+             q, ok = self._ik(q, p, Ri)
+             allok &= ok
+             qs.append(q.copy())
++            if stop_on_fail and not ok:
++                return qs, q, False
+         return qs, q, allok
+ 
+     @staticmethod
+@@ -338,20 +340,24 @@ class GeneratedApproach:
+         above = np.array([gx, gy, max(zt, p0[2])])
+         start = np.array([p0[0], p0[1], max(p0[2], zt)])
+         best = None
+-        for y in [yaw, yaw + np.pi]:
++        for y, sof in [(yaw, True), (yaw + np.pi, True), (yaw, False)]:
++            if not sof and best is not None and best[0] < 100:
++                break
+             R = kin.topdown_R(y)
+             q = q0
+             plan = []
+             if p0[2] < zt - 0.005:
+                 qs, q, _ = self._cart_path(q, p0, start, T[:3, :3], step=0.015)
+                 plan += self._seg(qs)
+-            qs, q, ok1 = self._cart_path(q, start, above, R, step=0.04, R_from=T[:3, :3])
+-            plan += self._seg(qs)
+-            qs, q, ok2 = self._cart_path(q, above, np.array([gx, gy, zg]), R, step=0.015)
++            qs, q, ok1 = self._cart_path(q, start, above, R, step=0.04, R_from=T[:3, :3], stop_on_fail=sof)
+             plan += self._seg(qs)
++            ok2 = False
++            if ok1 or not sof:
++                qs, q, ok2 = self._cart_path(q, above, np.array([gx, gy, zg]), R, step=0.015, stop_on_fail=sof)
++                plan += self._seg(qs)
+             plan += [('grip', -1.0), ('check', 'grasp')]
+             c = self._plan_cost(q0, plan) + (0 if (ok1 and ok2) else 100)
+-            if best is None or c < best[0]:
++            if best is None or c < best[0] or (not sof and best[0] >= 100):
+                 best = (c, plan)
+         self.plan = best[1]
+ 
+diff --git a/kin.py b/kin.py
+index 4de5f7f..7740fdf 100644
+--- a/kin.py
++++ b/kin.py
+@@ -40,25 +40,33 @@ def fk(base, q, tool=None, base_z=None):
+     Tt = np.eye(4); Tt[2, 3] = tool
+     return T @ Tt
+ 
++_JR = [J[:3, :3].copy() for J in JOINTS]
++_JP = [J[:3, 3].copy() for J in JOINTS]
++_EER = EE[:3, :3].copy(); _EEP = EE[:3, 3].copy()
++
+ def fk_jac(base, q, tool=None, base_z=None):
+     tool = TOOL if tool is None else tool
+     base_z = BASE_Z if base_z is None else base_z
+-    T = np.eye(4)
+-    T[:3, :3] = rpy_mat(0, 0, base[2]); T[:3, 3] = [base[0], base[1], base_z]
+-    M = np.eye(4); M[0, 3] = MOUNT_X; T = T @ M
+-    axes = []; origins = []
+-    for J, qi in zip(JOINTS, q):
+-        T = T @ J
+-        axes.append(T[:3, 2].copy()); origins.append(T[:3, 3].copy())
+-        T = T @ rotz(qi)
+-    T = T @ EE
+-    Tt = np.eye(4); Tt[2, 3] = tool
+-    T = T @ Tt
+-    p = T[:3, 3]
+-    Jm = np.zeros((6, 7))
++    c0, s0 = np.cos(base[2]), np.sin(base[2])
++    R = np.array([[c0, -s0, 0.0], [s0, c0, 0.0], [0.0, 0.0, 1.0]])
++    p = np.array([base[0] + MOUNT_X * c0, base[1] + MOUNT_X * s0, base_z])
++    axes = np.empty((7, 3)); origins = np.empty((7, 3))
++    cq = np.cos(q); sq = np.sin(q)
+     for i in range(7):
+-        Jm[:3, i] = np.cross(axes[i], p - origins[i])
+-        Jm[3:, i] = axes[i]
++        p = p + R @ _JP[i]
++        R = R @ _JR[i]
++        axes[i] = R[:, 2]; origins[i] = p
++        c, s_ = cq[i], sq[i]
++        x = R[:, 0] * c + R[:, 1] * s_
++        y = -R[:, 0] * s_ + R[:, 1] * c
++        R = np.column_stack((x, y, R[:, 2]))
++    p = p + R @ _EEP
++    R = R @ _EER
++    p = p + R[:, 2] * tool
++    T = np.eye(4); T[:3, :3] = R; T[:3, 3] = p
++    Jm = np.empty((6, 7))
++    Jm[:3] = np.cross(axes, p - origins).T
++    Jm[3:] = axes.T
+     return T, Jm
+ 
+ def rot_err(Rc, Rt):
+diff --git a/prof.out b/prof.out
+index 178365c..3689feb 100644
+Binary files a/prof.out and b/prof.out differ
+diff --git a/r10v2.txt b/r10v2.txt
+index e69de29..bb2d5ea 100644
+--- a/r10v2.txt
++++ b/r10v2.txt
+@@ -0,0 +1,21 @@
++0 (True, 108, 10, 67.34670829772949)
++1 (True, 118, 10, 77.54825496673584)
++2 (True, 93, 10, 48.29496169090271)
++3 (True, 79, 10, 56.12954092025757)
++4 (True, 149, 10, 113.7067198753357)
++5 (True, 107, 10, 60.19983792304993)
++6 (True, 107, 10, 72.70078706741333)
++7 (True, 136, 10, 96.57177400588989)
++8 (True, 123, 10, 100.32531452178955)
++9 (True, 87, 10, 70.76278758049011)
++10 (True, 96, 10, 74.97967839241028)
++11 (True, 95, 10, 79.21565651893616)
++12 (True, 102, 10, 85.22674655914307)
++13 (True, 133, 10, 96.41449117660522)
++14 (True, 104, 10, 70.36861729621887)
++15 (True, 162, 10, 78.65981841087341)
++16 (True, 90, 10, 49.643895626068115)
++17 (True, 76, 10, 32.62133312225342)
++18 (True, 98, 10, 37.19398069381714)
++19 (True, 82, 10, 29.940195083618164)
++success 20 / 20 mean steps 107.25 max time 113.7067198753357
+diff --git a/r12.txt b/r12.txt
+new file mode 100644
+index 0000000..4bf8a43
+--- /dev/null
++++ b/r12.txt
+@@ -0,0 +1,21 @@
++300 (True, 115, 12, 81.14850687980652)
++301 (True, 88, 12, 64.5822856426239)
++302 (True, 114, 12, 85.81254434585571)
++303 (True, 81, 12, 52.839638233184814)
++304 (True, 110, 12, 87.20249605178833)
++305 (True, 125, 12, 95.99293088912964)
++306 (True, 104, 12, 63.38118505477905)
++307 (True, 126, 12, 93.74397993087769)
++308 (True, 97, 12, 78.29080271720886)
++309 (True, 57, 12, 49.033607959747314)
++310 (True, 111, 12, 83.51215243339539)
++311 (True, 92, 12, 68.35979056358337)
++312 (True, 326, 12, 129.26185965538025)
++313 (True, 96, 12, 67.20955419540405)
++314 (True, 85, 12, 52.939067125320435)
++315 (True, 122, 12, 73.23364591598511)
++316 (True, 73, 12, 51.60581183433533)
++317 (True, 104, 12, 50.959702491760254)
++318 (True, 149, 12, 41.87000894546509)
++319 (True, 102, 12, 30.127414226531982)
++success 20 / 20 mean steps 113.85 max time 129.26185965538025
+diff --git a/r15.txt b/r15.txt
+new file mode 100644
+index 0000000..8141ce4
+--- /dev/null
++++ b/r15.txt
+@@ -0,0 +1,17 @@
++300 (True, 137, 15, 92.13922357559204)
++301 (True, 88, 15, 66.16345858573914)
++302 (True, 126, 15, 80.64890599250793)
++303 (True, 81, 15, 41.766000270843506)
++304 (True, 117, 15, 70.7319004535675)
++305 (True, 147, 15, 106.49297714233398)
++306 (True, 104, 15, 59.91490602493286)
++307 (True, 126, 15, 91.23219919204712)
++308 (True, 110, 15, 83.98466873168945)
++309 (True, 64, 15, 58.519328594207764)
++310 (True, 130, 15, 77.43858695030212)
++311 (True, 94, 15, 59.47879433631897)
++312 (True, 339, 15, 92.68320178985596)
++313 (True, 96, 15, 44.86985516548157)
++314 (True, 115, 15, 49.378417015075684)
++315 (True, 139, 15, 44.1101233959198)
++success 16 / 16 mean steps 125.8125 max time 106.49297714233398
+diff --git a/rd3.txt b/rd3.txt
+new file mode 100644
+index 0000000..d8d6b6f
+--- /dev/null
++++ b/rd3.txt
+@@ -0,0 +1,71 @@
++202 (True, 18, 0, 27.73287272453308)
++204 (True, 49, 2, 61.287132024765015)
++205 (True, 27, 1, 36.66383147239685)
++206 (True, 29, 1, 47.65899419784546)
++208 (True, 29, 2, 38.839773416519165)
++209 (True, 51, 2, 65.3223819732666)
++215 (True, 44, 2, 43.45367407798767)
++216 (True, 27, 2, 25.484310150146484)
++217 (True, 42, 2, 43.442408323287964)
++218 (True, 26, 1, 23.96134901046753)
++220 (True, 51, 2, 49.786393880844116)
++221 (True, 28, 1, 23.406315565109253)
++222 (True, 29, 1, 24.481075286865234)
++223 (True, 34, 1, 28.300625324249268)
++224 (True, 44, 2, 40.41614127159119)
++225 (True, 50, 2, 54.274471282958984)
++226 (True, 40, 2, 36.43033766746521)
++227 (True, 31, 1, 23.912862539291382)
++228 (True, 31, 1, 30.22028660774231)
++229 (True, 27, 1, 29.45495843887329)
++230 (True, 27, 1, 34.24670696258545)
++231 (True, 17, 0, 23.85062050819397)
++232 (True, 33, 1, 37.69010400772095)
++234 (True, 32, 1, 29.700351238250732)
++235 (True, 31, 2, 29.42720675468445)
++236 (True, 31, 1, 28.88853120803833)
++237 (True, 52, 2, 54.30154061317444)
++239 (True, 41, 2, 32.954620361328125)
++240 (True, 26, 2, 20.426220655441284)
++241 (True, 30, 1, 30.38412642478943)
++242 (True, 28, 2, 23.499953031539917)
++243 (True, 43, 2, 48.63018822669983)
++244 (True, 38, 2, 41.15494132041931)
++245 (True, 44, 2, 49.27907991409302)
++246 (True, 30, 2, 33.075631618499756)
++248 (True, 26, 1, 28.241211891174316)
++249 (True, 53, 2, 68.17695212364197)
++250 (True, 39, 1, 43.90685176849365)
++251 (True, 20, 0, 24.087523698806763)
++252 (True, 29, 2, 28.337980031967163)
++253 (True, 28, 1, 30.466415882110596)
++256 (True, 37, 1, 33.45723795890808)
++257 (True, 30, 2, 27.7175076007843)
++258 (True, 28, 1, 33.932722330093384)
++260 (True, 52, 2, 57.85380721092224)
++262 (True, 45, 2, 42.90711164474487)
++263 (True, 38, 2, 37.807838678359985)
++265 (True, 36, 2, 38.05839800834656)
++267 (True, 34, 1, 29.96534299850464)
++268 (True, 46, 2, 41.60264539718628)
++269 (True, 35, 2, 42.413174867630005)
++270 (True, 34, 1, 44.13262891769409)
++271 (True, 49, 2, 59.34237480163574)
++273 (True, 19, 0, 22.78810453414917)
++274 (True, 31, 1, 34.58255100250244)
++275 (True, 20, 0, 24.821569442749023)
++276 (True, 34, 1, 40.61282253265381)
++277 (True, 23, 0, 30.57959008216858)
++278 (True, 33, 1, 35.073092460632324)
++280 (True, 39, 1, 47.199262380599976)
++281 (True, 31, 1, 31.54364252090454)
++282 (True, 49, 2, 56.83739113807678)
++283 (True, 17, 0, 22.39292550086975)
++285 (True, 55, 2, 68.52681922912598)
++286 (True, 16, 0, 20.953136444091797)
++287 (True, 39, 2, 48.93290042877197)
++289 (True, 46, 1, 51.6232705116272)
++291 (True, 22, 0, 21.177863836288452)
++292 (True, 38, 2, 37.84365892410278)
++295 (True, 18, 0, 20.1457040309906)
++success 100 / 100 mean steps 29.25 max time 68.52681922912598
+diff --git a/timing.py b/timing.py
+index 75e78fb..2856330 100644
+--- a/timing.py
++++ b/timing.py
+@@ -5,7 +5,7 @@ import os, importlib as _il
+ GeneratedApproach = _il.import_module(os.environ.get("APPROACH", "approach")).GeneratedApproach
+ tot=[]; 
+ for seed in range(int(sys.argv[1]), int(sys.argv[2])):
+-    env = make_env(); obs, info = env.reset(seed=seed)
++    env = make_env(); obs, info = env.reset(seed=seed, options=({'object_count': int(sys.argv[3])} if len(sys.argv)>3 else None))
+     ap = GeneratedApproach(env.action_space, env.observation_space, {})
+     t0=time.time(); ap.reset(obs, info); ct=time.time()-t0; mx=0
+     for t in range(1000):

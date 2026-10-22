@@ -1,0 +1,64 @@
+diff --git a/approach.py b/approach.py
+index cc17717..48f333b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -74,7 +74,8 @@ class GeneratedApproach:
+             center=(lo+hi)*.5
+             t=np.clip(np.sum((center-pts)*d,axis=1)/length2,0,1)
+             closest=pts+t[:,None]*d
+-            good &= np.linalg.norm(closest-center,axis=1)>.155
++            clearance=min(.155,float(np.linalg.norm(target-center))*.85)
++            good &= np.linalg.norm(closest-center,axis=1)>clearance
+         return good
+ 
+     def route(self, start, mask, other=None):
+@@ -129,7 +130,7 @@ class GeneratedApproach:
+         need=self.needed(s)
+         for k,o in enumerate(self.objectives):
+             if not self.have(s,k) and reserved!=('image',k):candidates.append(('image',k))
+-        if s.get(self.rovers[r],'store_full')<.5:
++        if True:
+             for k,o in enumerate(self.samples):
+                 soil=int(s.get(o,'is_soil'))
+                 if need[soil] and not (reserved and reserved[0]=='sample' and int(s.get(self.samples[reserved[1]],'is_soil'))==soil):candidates.append(('sample',k))
+diff --git a/inspect_seed.py b/inspect_seed.py
+new file mode 100644
+index 0000000..68d4e30
+--- /dev/null
++++ b/inspect_seed.py
+@@ -0,0 +1,10 @@
++import sys,numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++E=make_env();s,i=E.reset(seed=int(sys.argv[1]));A=GeneratedApproach(E.action_space,E.observation_space,{});A.reset(s,i)
++print('schedule',A.schedule)
++for o in A.objectives:
++ p=A.xy(s,o);print(o.name,p,'mask',np.sum(A.masks[('image',A.objectives.index(o))]))
++ for ob in A.objects(s,'obstacle'):
++  if np.linalg.norm(p-A.xy(s,ob))<.5:print('near',ob.name,A.xy(s,ob),s.get(ob,'half_x'),np.linalg.norm(p-A.xy(s,ob)))
++E.close()
+diff --git a/stats200.txt b/stats200.txt
+index 08a69da..0e82d05 100644
+--- a/stats200.txt
++++ b/stats200.txt
+@@ -9,3 +9,8 @@
+ {'seed': 270, 'n': 2, 'success': True, 'steps': 20, 'time': 0.143, 'bad': [0, 0, 0], 'ops': [2, 2, 3, 2, 2]}
+ {'seed': 280, 'n': 2, 'success': True, 'steps': 35, 'time': 0.206, 'bad': [0, 0, 0], 'ops': [2, 2, 4, 2, 2]}
+ {'seed': 290, 'n': 1, 'success': True, 'steps': 22, 'time': 0.137, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
++{'seed': 300, 'n': 1, 'success': True, 'steps': 23, 'time': 0.151, 'bad': [0, 0, 4], 'ops': [1, 1, 7, 2, 2]}
++{'seed': 310, 'n': 1, 'success': True, 'steps': 24, 'time': 0.17, 'bad': [0, 0, 7], 'ops': [1, 1, 9, 2, 2]}
++{'seed': 320, 'n': 1, 'success': True, 'steps': 35, 'time': 0.186, 'bad': [0, 0, 13], 'ops': [1, 1, 16, 2, 2]}
++{'seed': 330, 'n': 2, 'success': True, 'steps': 40, 'time': 0.269, 'bad': [0, 1, 0], 'ops': [3, 2, 4, 2, 2]}
++{'seed': 340, 'n': 1, 'success': True, 'steps': 26, 'time': 0.167, 'bad': [0, 0, 6], 'ops': [1, 1, 8, 2, 2]}
+diff --git a/stats_planned.txt b/stats_planned.txt
+new file mode 100644
+index 0000000..6bd506f
+--- /dev/null
++++ b/stats_planned.txt
+@@ -0,0 +1,6 @@
++{'seed': 0, 'n': 3, 'success': True, 'steps': 40, 'time': 0.233, 'bad': [0, 0, 0], 'ops': [3, 3, 3, 2, 2]}
++{'seed': 10, 'n': 3, 'success': True, 'steps': 23, 'time': 0.171, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
++{'seed': 20, 'n': 3, 'success': True, 'steps': 34, 'time': 0.204, 'bad': [0, 0, 0], 'ops': [3, 3, 2, 2, 2]}
++{'seed': 30, 'n': 1, 'success': True, 'steps': 27, 'time': 0.176, 'bad': [0, 0, 7], 'ops': [1, 1, 9, 2, 2]}
++{'seed': 40, 'n': 2, 'success': True, 'steps': 28, 'time': 0.206, 'bad': [2, 0, 0], 'ops': [2, 2, 4, 2, 2]}
++{'seed': 50, 'n': 3, 'success': True, 'steps': 39, 'time': 0.248, 'bad': [0, 0, 0], 'ops': [3, 3, 3, 2, 2]}

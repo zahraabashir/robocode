@@ -1,0 +1,935 @@
+{
+  "schema_version": 1,
+  "status": "prior manual analysis, migrated for review",
+  "events": {
+    "35": {
+      "title": "Agent claims vacuum lifting works on the target but not obstructions",
+      "status": "prior analyst description; inspect exact event"
+    },
+    "75": {
+      "title": "Policy edit before the first phase-controller revision",
+      "status": "prior analyst description; inspect exact event"
+    },
+    "77": {
+      "title": "Further policy and test-harness edits before R01",
+      "status": "prior analyst description; inspect exact event"
+    },
+    "155": {
+      "title": "Agent states competing explanations and seeks a visual check",
+      "status": "prior analyst description; inspect exact event"
+    },
+    "161": {
+      "title": "Search for scenes with no obstructions",
+      "status": "prior analyst description; inspect exact event"
+    },
+    "374": {
+      "title": "Explains why parking must preserve future pickup access",
+      "status": "prior analyst description; inspect exact event"
+    },
+    "392": {
+      "title": "Explains outer-first parking before R39",
+      "status": "prior analyst description; inspect exact event"
+    },
+    "401": {
+      "title": "Sweep reports an unresolved seed-85 failure",
+      "status": "prior analyst description; inspect exact event"
+    },
+    "404": {
+      "title": "Inspect reset options",
+      "status": "prior analyst description; inspect exact event"
+    },
+    "406": {
+      "title": "Inspect how to request object counts",
+      "status": "prior analyst description; inspect exact event"
+    },
+    "407": {
+      "title": "Agent connects count control with the task requirement",
+      "status": "prior analyst description; inspect exact event"
+    },
+    "409": {
+      "title": "Extends the test harness for pinned object counts",
+      "status": "prior analyst description; inspect exact event"
+    },
+    "411": {
+      "title": "Tests the expanded object-count conditions",
+      "status": "prior analyst description; inspect exact event"
+    },
+    "514": {
+      "title": "Explains a useful side effect and proposes skipping cleared blockers",
+      "status": "prior analyst description; inspect exact event"
+    }
+  },
+  "commits": {
+    "670d6a3f67570639f5110b2d2c6590347bc3fe13": {
+      "alias": "R01",
+      "title": "Implement feedback FSM for clearing and target placement",
+      "description": "Baseline stalls; explore manipulation \u2192 replace it with a controller that tracks movement phases and retries.",
+      "caveats": [
+        "Early controller redesign after an interrupted baseline test and extensive probes. The test harness also changes: the new harness enforces env.max_steps. It contains two recorded policy edit events (L75 and L77) before one commit; the intermediate pre-commit source is not reconstructed."
+      ],
+      "related_lines": [
+        12,
+        20,
+        22,
+        24,
+        26,
+        34,
+        35,
+        55,
+        66,
+        71,
+        73,
+        75,
+        77,
+        79
+      ],
+      "post_edit_test_lines": [
+        79,
+        88
+      ]
+    },
+    "55d3dab50b9384cb12ec258ecb24aa218841153b": {
+      "alias": "R02",
+      "title": "Use reset pose as reachable safe travel height",
+      "description": "Robot stays in the rise phase \u2192 use its initial height as the reachable travel height.",
+      "caveats": [],
+      "related_lines": [
+        79,
+        84,
+        88,
+        90,
+        92,
+        94
+      ],
+      "post_edit_test_lines": [
+        94,
+        99
+      ]
+    },
+    "98c6f0752efb322c7bcf1f6f351d8d1d9f09ef37": {
+      "alias": "R03",
+      "title": "Park all movable objects tallest-first before final placement",
+      "description": "Multi-object cases still fail \u2192 reorder rectangles tallest first and include an initial target-clearing pass.",
+      "caveats": [],
+      "related_lines": [
+        94,
+        99,
+        102,
+        104,
+        106
+      ],
+      "post_edit_test_lines": [
+        106
+      ]
+    },
+    "6d93a7d48faa104e1329e4bfaefa94efecba66e8": {
+      "alias": "R04",
+      "title": "Exclude static surface and park cleared objects vertically",
+      "description": "Printed task list includes the static surface and motion stalls \u2192 filter static objects and park vertically in place.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        106,
+        108,
+        110,
+        112
+      ],
+      "post_edit_test_lines": [
+        112
+      ]
+    },
+    "e727013d4d32a19467cdd4c7261b1df1a117e9c0": {
+      "alias": "R05",
+      "title": "Keep vacuum off during horizontal transit",
+      "description": "Target moves while the robot travels toward another object \u2192 turn vacuum off during horizontal alignment.",
+      "caveats": [],
+      "related_lines": [
+        112,
+        114,
+        116,
+        118
+      ],
+      "post_edit_test_lines": [
+        118
+      ]
+    },
+    "5a9cda57e55c37dceaa8c7ddd7ec4813ed4b1916": {
+      "alias": "R06",
+      "title": "Park cleared objects low enough for later regrasp",
+      "description": "Objects remain high and the target cannot be regrasped \u2192 stop preliminary lifts at a lower parking height.",
+      "caveats": [],
+      "related_lines": [
+        118,
+        120,
+        122,
+        124
+      ],
+      "post_edit_test_lines": [
+        124
+      ]
+    },
+    "f214f7da0b2fc28156025e7d0c4e852164646ce7": {
+      "alias": "R07",
+      "title": "Park obstructions laterally away from target surface",
+      "description": "Controller finishes but placement fails \u2192 move obstructions laterally away from the surface.",
+      "caveats": [],
+      "related_lines": [
+        124,
+        126,
+        128,
+        130
+      ],
+      "post_edit_test_lines": [
+        130,
+        132
+      ]
+    },
+    "dd0457e1ab7a6650cc3d3d9588c689fae71ca45b": {
+      "alias": "R08",
+      "title": "Only pre-park target when it blocks obstacle access",
+      "description": "Broader tests mostly fail \u2192 temporarily move the target only when the geometry is crowded.",
+      "caveats": [],
+      "related_lines": [
+        132,
+        136,
+        138,
+        140,
+        142,
+        144
+      ],
+      "post_edit_test_lines": [
+        144
+      ]
+    },
+    "3f73fd4d1be28fdc416adf4ded51401d96f74aae": {
+      "alias": "R09",
+      "title": "Fix moving-goal bug in obstruction carry phase",
+      "description": "Failure persists with a moving obstruction destination \u2192 calculate that destination from the initial object position.",
+      "caveats": [],
+      "related_lines": [
+        144,
+        146,
+        148,
+        150
+      ],
+      "post_edit_test_lines": [
+        150,
+        163
+      ]
+    },
+    "735b56a0e4dd843040001a7b0a134945b773f4c3": {
+      "alias": "R10",
+      "title": "Use lower carry height to match successful placement trajectory",
+      "description": "Program placement fails despite a successful hand-scripted placement probe \u2192 lower the carry-height threshold.",
+      "caveats": [],
+      "related_lines": [
+        150,
+        152,
+        154,
+        155,
+        157,
+        163,
+        165,
+        167,
+        169,
+        171,
+        173,
+        175,
+        177
+      ],
+      "post_edit_test_lines": [
+        177
+      ]
+    },
+    "b15ba765819745483cd25351bc231630e3c5f39b": {
+      "alias": "R11",
+      "title": "Bias final placement slightly inside successful support region",
+      "description": "Lower carry height does not solve seed 1 \u2192 add a small horizontal offset to final placement.",
+      "caveats": [],
+      "related_lines": [
+        177,
+        179,
+        181
+      ],
+      "post_edit_test_lines": [
+        181,
+        183
+      ]
+    },
+    "af4477f6256966431e7a90dc3f715263ad6b6895": {
+      "alias": "R12",
+      "title": "Use fine vertical steps so vacuum reaches contact",
+      "description": "Several grasp cases fail; a fine-step probe lifts them \u2192 reduce downward steps from 0.05 to 0.01.",
+      "caveats": [],
+      "related_lines": [
+        183,
+        185,
+        187,
+        189,
+        191,
+        193
+      ],
+      "post_edit_test_lines": [
+        193
+      ]
+    },
+    "9c6bdf4aadd4fb0898c37109aaacae340556bc9d": {
+      "alias": "R13",
+      "title": "Avoid overshooting ceiling during retreat",
+      "description": "Robot stalls in retreat below its requested height \u2192 cap the upward step at the remaining height.",
+      "caveats": [],
+      "related_lines": [
+        193,
+        195,
+        197,
+        199,
+        201
+      ],
+      "post_edit_test_lines": [
+        201
+      ]
+    },
+    "4f80855d9224b4217f437fe0af644a140c1f0ee2": {
+      "alias": "R14",
+      "title": "Park blockers away from target and handle travel bounds",
+      "description": "Target access and boundary cases remain \u2192 change parking direction and detect stalled horizontal carrying.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        201,
+        203,
+        205,
+        207
+      ],
+      "post_edit_test_lines": [
+        207
+      ]
+    },
+    "2d184c4bbc2637d77149742952c1c642ee1ec79f": {
+      "alias": "R15",
+      "title": "Vertically separate parked blockers and recover at walls",
+      "description": "Failures remain after new parking rule \u2192 vary parking heights and add stalled-alignment recovery.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        207,
+        209,
+        211,
+        213
+      ],
+      "post_edit_test_lines": [
+        213
+      ]
+    },
+    "0c006f7a4edc8218bdfe1b95ba5a08070d037461": {
+      "alias": "R16",
+      "title": "Park blockers far outside surface at low clearance height",
+      "description": "Objects still obstruct target movement \u2192 return to lower parking and move blockers farther away from the surface.",
+      "caveats": [],
+      "related_lines": [
+        213,
+        215,
+        217,
+        219,
+        221
+      ],
+      "post_edit_test_lines": [
+        221,
+        223
+      ]
+    },
+    "adf84aecab53f3d90cca1baf8247a94fa7adcbb5": {
+      "alias": "R17",
+      "title": "Add edge grasps and compensate carried-object offset",
+      "description": "Several target pickups remain blocked \u2192 expand grasp offsets and compensate for the object-to-gripper offset.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        221,
+        223,
+        225,
+        227,
+        229
+      ],
+      "post_edit_test_lines": [
+        229
+      ]
+    },
+    "b7ccec6239e077058e6424854f81fe21a464a3ec": {
+      "alias": "R18",
+      "title": "Allocate geometry-scored parking slots for blockers",
+      "description": "Multi-obstacle parking failures persist \u2192 rank candidate parking positions by geometric clearance.",
+      "caveats": [],
+      "related_lines": [
+        229,
+        231,
+        232,
+        234,
+        236
+      ],
+      "post_edit_test_lines": [
+        236
+      ]
+    },
+    "0f0c2eeeb0cb14ed5a0b116fa12a266aee349f56": {
+      "alias": "R19",
+      "title": "Reserve a remote slot for temporarily parked target",
+      "description": "Three regression cases still fail \u2192 reserve a remote parking position for the temporarily moved target.",
+      "caveats": [],
+      "related_lines": [
+        236,
+        238,
+        240,
+        242
+      ],
+      "post_edit_test_lines": [
+        242
+      ]
+    },
+    "71c469c4e314a5b175e8c23b683914de11a519e1": {
+      "alias": "R20",
+      "title": "Lift final target above all parked blockers",
+      "description": "Seed 3 stalls while carrying the final target \u2192 increase final target carry height.",
+      "caveats": [],
+      "related_lines": [
+        242,
+        244,
+        246,
+        248
+      ],
+      "post_edit_test_lines": [
+        248
+      ]
+    },
+    "2185ba3df73338fd65ddcaabaa8b2a357185bd32": {
+      "alias": "R21",
+      "title": "Keep parking slots away from side-wall dead zones",
+      "description": "Seed 5 fails after earlier fixes \u2192 move candidate parking positions away from side walls.",
+      "caveats": [],
+      "related_lines": [
+        248,
+        250,
+        252,
+        254
+      ],
+      "post_edit_test_lines": [
+        254
+      ]
+    },
+    "8e66f4e20a889c54882353ae942873737a9c3ce5": {
+      "alias": "R22",
+      "title": "Cap verification lift at reachable ceiling",
+      "description": "Seed 5 still stalls in lift \u2192 cap upward movement at the reachable ceiling.",
+      "caveats": [],
+      "related_lines": [
+        254,
+        256,
+        258,
+        260
+      ],
+      "post_edit_test_lines": [
+        260,
+        263
+      ]
+    },
+    "3098aabc1d599cbc0c86bdff512bbb9059d0ffd9": {
+      "alias": "R23",
+      "title": "Raise temporary target and maximize final carry clearance",
+      "description": "A broader sweep finds seeds 18 and 22 failing \u2192 raise temporary target parking and final carry height.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        261,
+        263,
+        265,
+        267,
+        269,
+        271
+      ],
+      "post_edit_test_lines": [
+        271
+      ]
+    },
+    "5075837dadc53f2b9aa222d14fab65556d3e1d3b": {
+      "alias": "R24",
+      "title": "Park crowded target outward and lower cleared blockers",
+      "description": "Both targeted cases still fail \u2192 choose an outward target slot and lower blocker parking.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        271,
+        273,
+        275,
+        277
+      ],
+      "post_edit_test_lines": [
+        277
+      ]
+    },
+    "0605fd3f07cdfae354f87870e72be0d05cfb4d0f": {
+      "alias": "R25",
+      "title": "Route blockers outward without crossing the surface cluster",
+      "description": "Seed 18 remains unresolved \u2192 restrict blocker parking to the same side of the surface.",
+      "caveats": [],
+      "related_lines": [
+        277,
+        279,
+        281,
+        283
+      ],
+      "post_edit_test_lines": [
+        283
+      ]
+    },
+    "f064af00582ce75b9fd14ff90c2d56e519faf1f5": {
+      "alias": "R26",
+      "title": "Carry blockers high then lower them into parking slots",
+      "description": "Seed 18 remains unresolved \u2192 carry blockers higher and add a separate lowering phase.",
+      "caveats": [],
+      "related_lines": [
+        283,
+        285,
+        287,
+        289
+      ],
+      "post_edit_test_lines": [
+        289
+      ]
+    },
+    "a4cb1dbb0987bec72cb037f5bffc942ae4fc26f3": {
+      "alias": "R27",
+      "title": "Accept maximum reachable blocker carry height",
+      "description": "Seed 18 and six baseline cases fail \u2192 allow a blocker lift to finish at the reachable ceiling.",
+      "caveats": [],
+      "related_lines": [
+        289,
+        291,
+        293
+      ],
+      "post_edit_test_lines": [
+        293
+      ]
+    },
+    "13fcd5838c87608d9c30898ed7dd2f6bfa8a00b7": {
+      "alias": "R28",
+      "title": "Restore reliable low blocker parking behavior",
+      "description": "The broad failures persist \u2192 undo the high-carry/lowering changes and restore low parking.",
+      "caveats": [
+        "Restores part of an earlier rule. A partial reversal is not necessarily a full Git revert or an exact return to an earlier complete program."
+      ],
+      "related_lines": [
+        293,
+        295,
+        297
+      ],
+      "post_edit_test_lines": [
+        297
+      ]
+    },
+    "04141a4c7d2ec421315e0c41837ad01b8093653e": {
+      "alias": "R29",
+      "title": "Choose globally clear parking slots over directional routing",
+      "description": "Three baseline failures remain \u2192 remove the same-side parking restriction.",
+      "caveats": [
+        "Restores part of an earlier rule. A partial reversal is not necessarily a full Git revert or an exact return to an earlier complete program."
+      ],
+      "related_lines": [
+        297,
+        299,
+        301
+      ],
+      "post_edit_test_lines": [
+        301
+      ]
+    },
+    "3f93ca0c4cd0d1c46cd0f0da2fc46554cfc0b38d": {
+      "alias": "R30",
+      "title": "Use globally safest temporary target slot",
+      "description": "Seed 10 remains unresolved \u2192 remove the outward-only target parking rule.",
+      "caveats": [
+        "Restores part of an earlier rule. A partial reversal is not necessarily a full Git revert or an exact return to an earlier complete program."
+      ],
+      "related_lines": [
+        301,
+        303,
+        305,
+        307
+      ],
+      "post_edit_test_lines": [
+        307,
+        311
+      ]
+    },
+    "990576d616dd3fe0c0742b7ac88631919d3b82a1": {
+      "alias": "R31",
+      "title": "Use denser nonoverlapping parking allocation",
+      "description": "Several clustered cases fail \u2192 reduce the spacing margin between parked objects.",
+      "caveats": [],
+      "related_lines": [
+        307,
+        311,
+        313,
+        315,
+        317
+      ],
+      "post_edit_test_lines": [
+        317
+      ]
+    },
+    "a11bd5f9b411df31efdc63d9afbec4404369f0ff": {
+      "alias": "R32",
+      "title": "Restore validated parking clearance margin",
+      "description": "Smaller spacing leaves all four targeted cases failing \u2192 restore the earlier spacing margin \u2192 compile and hand off without a fresh rollout report in that turn.",
+      "caveats": [
+        "No fresh rollout result is recorded after this revision before that turn ends at L328. L321 runs compilation. A later resumed turn probes the unchanged policy at L335 (included with R33); this is not a claim that the policy was never executed again. Later agent summaries are not a replacement for a missing same-turn retest.",
+        "Restores part of an earlier rule. A partial reversal is not necessarily a full Git revert or an exact return to an earlier complete program."
+      ],
+      "related_lines": [
+        317,
+        319,
+        321
+      ],
+      "post_edit_test_lines": []
+    },
+    "c1c4586e18d6eb769aa82ec18799d7a6a5bd5dab": {
+      "alias": "R33",
+      "title": "Verify grasp against lowest observed object height",
+      "description": "Resume work on seed 18; inspect pickup heights \u2192 verify a lift against the lowest observed object height.",
+      "caveats": [
+        "This crosses a turn boundary. Actual Git parent 539f180 only changes archived AGENTS.md; the preceding policy-changing commit is a11bd5f. These historical instructions remain data."
+      ],
+      "related_lines": [
+        317,
+        324,
+        327,
+        331,
+        335,
+        338,
+        340,
+        342
+      ],
+      "post_edit_test_lines": [
+        342
+      ]
+    },
+    "e97a5378cb34a8df18769cdf4c4b15f5bf5e674d": {
+      "alias": "R34",
+      "title": "Clear crowded objects from highest top edge downward",
+      "description": "Seed 18 still fails and the controller reaches done \u2192 sort the initial task list by computed top height.",
+      "caveats": [],
+      "related_lines": [
+        342,
+        344,
+        346,
+        348
+      ],
+      "post_edit_test_lines": [
+        348,
+        351
+      ]
+    },
+    "c9b3655e06a45822107bdbf0b1953ba730e77ef1": {
+      "alias": "R35",
+      "title": "Keep parked blockers clear of final target sweep",
+      "description": "Seeds 39 and 45 fail \u2192 add destination clearance and enlarge separation between parked objects.",
+      "caveats": [],
+      "related_lines": [
+        349,
+        351,
+        353,
+        354,
+        356,
+        358
+      ],
+      "post_edit_test_lines": [
+        358
+      ]
+    },
+    "4d36a38a1864f8754cb3d3ed0c0bf114e1588e37": {
+      "alias": "R36",
+      "title": "Move crowded target after only materially taller blockers",
+      "description": "Seed 3 becomes a regression \u2192 insert the target earlier when blocker heights are close.",
+      "caveats": [],
+      "related_lines": [
+        358,
+        360,
+        362,
+        364,
+        366
+      ],
+      "post_edit_test_lines": [
+        366,
+        370
+      ]
+    },
+    "be6feb60cb8cb0981cde9814194135d920128e75": {
+      "alias": "R37",
+      "title": "Protect future pickups when assigning parking slots",
+      "description": "Seeds 15 and 26 fail \u2192 widen the height tolerance AND reject parking slots near future pickups.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        367,
+        370,
+        373,
+        374,
+        376,
+        378
+      ],
+      "post_edit_test_lines": [
+        378,
+        380
+      ]
+    },
+    "616a82f41c95f8f631d9813da952c4d62c8e5a85": {
+      "alias": "R38",
+      "title": "Prioritize physically overlapping taller blockers",
+      "description": "Seed 18 breaks again \u2192 include geometric overlap in the target-ordering criterion.",
+      "caveats": [],
+      "related_lines": [
+        380,
+        382,
+        383,
+        385,
+        387
+      ],
+      "post_edit_test_lines": [
+        387,
+        389
+      ]
+    },
+    "dafcc2f32a2e25cb17d3c23d03a74a4c163e5fd3": {
+      "alias": "R39",
+      "title": "Allocate outer parking slots before inner ones",
+      "description": "Seed 59 fails \u2192 allocate farther-from-surface parking positions before inner positions.",
+      "caveats": [],
+      "related_lines": [
+        389,
+        391,
+        392,
+        394,
+        396
+      ],
+      "post_edit_test_lines": [
+        396,
+        401,
+        411
+      ]
+    },
+    "0e14ec7609b468597927230059f43346654fbc6d": {
+      "alias": "R40",
+      "title": "Choose least-conflicting fallback parking slots",
+      "description": "Pinned count-3 tests fail on seeds 1 and 3 \u2192 densify the parking grid and score fallback constraint violations.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        407,
+        411,
+        413,
+        415,
+        417
+      ],
+      "post_edit_test_lines": [
+        417
+      ]
+    },
+    "f87f63f3649fbf63ac884fb1b9fe168478b2930c": {
+      "alias": "R41",
+      "title": "Increase clearance around future pickup columns",
+      "description": "Count-3 seed 4 now fails \u2192 increase clearance around future pickup locations.",
+      "caveats": [],
+      "related_lines": [
+        417,
+        419,
+        421,
+        423
+      ],
+      "post_edit_test_lines": [
+        423,
+        426
+      ]
+    },
+    "6fc104f41b4160e0015842e8f62e768b6b985c9e": {
+      "alias": "R42",
+      "title": "Only relocate objects blocking the final placement footprint",
+      "description": "Count-4 testing fails on four of five seeds \u2192 only relocate objects near the final placement footprint.",
+      "caveats": [
+        "L426 also reports a count-5 environment reset error. That is not evidence of robot-policy failure at count 5."
+      ],
+      "related_lines": [
+        424,
+        426,
+        428,
+        430,
+        432,
+        433,
+        435,
+        437
+      ],
+      "post_edit_test_lines": [
+        437
+      ]
+    },
+    "c91cb8e9be2aec3700f91693fbc5d99f41f6e2a3": {
+      "alias": "R43",
+      "title": "Include blockers near the placement sweep envelope",
+      "description": "Filtering leaves baseline seed 6 and count-4 cases failing \u2192 widen the footprint used to select blockers.",
+      "caveats": [],
+      "related_lines": [
+        437,
+        439,
+        441
+      ],
+      "post_edit_test_lines": [
+        441
+      ]
+    },
+    "bb1c5eb0368c5961989b6f2880180b9c46a128b5": {
+      "alias": "R44",
+      "title": "Increase clearance from the final lowering corridor",
+      "description": "Count-4 seed 1 still fails \u2192 enlarge the clearance around the final lowering location.",
+      "caveats": [],
+      "related_lines": [
+        441,
+        443,
+        445,
+        447
+      ],
+      "post_edit_test_lines": [
+        447,
+        451
+      ]
+    },
+    "20d09c8656cf55177f2c3f77b7de178305af944c": {
+      "alias": "R45",
+      "title": "Stack blockers when no safe horizontal slot exists",
+      "description": "Seed 93 fails with crowded horizontal parking \u2192 add a vertical stacking fallback.",
+      "caveats": [],
+      "related_lines": [
+        451,
+        453,
+        454,
+        456,
+        458
+      ],
+      "post_edit_test_lines": [
+        458
+      ]
+    },
+    "5210b1a6485b9c8c862638b37ae5f2b56dff06fe": {
+      "alias": "R46",
+      "title": "Stack only outside target transit corridor",
+      "description": "Stacking fixes seed 93 but breaks count-4 cases \u2192 restrict stacking to outer columns and small blocker sets.",
+      "caveats": [
+        "Multiple code decisions change together. Outcome attribution to an individual component requires further checking."
+      ],
+      "related_lines": [
+        458,
+        460,
+        462,
+        464
+      ],
+      "post_edit_test_lines": [
+        464,
+        469
+      ]
+    },
+    "4868fc2a012627cd4879d4579300529e3b15d8dd": {
+      "alias": "R47",
+      "title": "Shorten recovery lift after failed grasps",
+      "description": "New count-4 failures appear \u2192 shorten the verification/recovery lift when no attachment is detected.",
+      "caveats": [],
+      "related_lines": [
+        465,
+        469,
+        471,
+        473,
+        475
+      ],
+      "post_edit_test_lines": [
+        475
+      ]
+    },
+    "7cfa55b4e6f9afeae4855f47dde1f5c2462a57a5": {
+      "alias": "R48",
+      "title": "Add tolerance to failed-grasp recovery height",
+      "description": "Count-4 seed 5 still fails \u2192 add a tolerance to the lift-height stopping condition.",
+      "caveats": [],
+      "related_lines": [
+        475,
+        477,
+        479,
+        481
+      ],
+      "post_edit_test_lines": [
+        481
+      ]
+    },
+    "af3dcdd680dad5766ccec9c50f3e6ae84ec4255b": {
+      "alias": "R49",
+      "title": "Recover when verification lift is collision-blocked",
+      "description": "Seed 5 remains stuck in lift \u2192 detect vertical stalls and enter recovery.",
+      "caveats": [],
+      "related_lines": [
+        481,
+        483,
+        485,
+        487,
+        489
+      ],
+      "post_edit_test_lines": [
+        489,
+        491,
+        493
+      ]
+    },
+    "05d09719879202800efd5443054cddd535fa8165": {
+      "alias": "R50",
+      "title": "Add boundary columns for dense blocker parking",
+      "description": "Count-4 seed 7 remains unresolved \u2192 add parking candidates near both boundaries.",
+      "caveats": [],
+      "related_lines": [
+        493,
+        495,
+        496,
+        498,
+        500
+      ],
+      "post_edit_test_lines": [
+        500,
+        502,
+        509,
+        511
+      ]
+    },
+    "4897e46269b5d9f885dd2a13e79b864e96a206f2": {
+      "alias": "R51",
+      "title": "Skip blockers already displaced from the goal",
+      "description": "Seed 53 fails after another object has displaced a blocker \u2192 recheck relevance and skip blockers already clear of the destination.",
+      "caveats": [
+        "Post-edit context includes final validation and stopping. L528 attempts a confidence-marker commit but returns nothing to commit; it is not a saved new policy revision."
+      ],
+      "related_lines": [
+        507,
+        511,
+        513,
+        514,
+        516,
+        518
+      ],
+      "post_edit_test_lines": [
+        518,
+        523
+      ]
+    }
+  },
+  "source": "Prior analysis migrated; automated summaries are not scientific labels."
+}

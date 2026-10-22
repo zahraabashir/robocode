@@ -1,0 +1,36 @@
+diff --git a/approach.py b/approach.py
+index 1c11df4..c75bbff 100644
+--- a/approach.py
++++ b/approach.py
+@@ -25,6 +25,7 @@ def _nsteps(path):
+ 
+ 
+ class GeneratedApproach:
++    FLOOR_BOX = dict(name="__floor__", x=-2.0, y=-2.0, w=6.0, h=2.0 + FLOOR)
+     def __init__(self, action_space, observation_space, primitives):
+         self.action_space = action_space
+         self.observation_space = observation_space
+@@ -83,13 +84,7 @@ class GeneratedApproach:
+         att = [(X - half, X + half, Y - go, Y)]
+         if carried is not None:
+             att.append((X + carried[0], X + carried[1], Y + carried[2], Y + carried[3]))
+-        # floor
+-        if np.any(Y - r < FLOOR + 0.002):
+-            return True
+-        for (x0, x1, y0, y1) in att:
+-            if np.any(y0 < FLOOR + 0.001):
+-                return True
+-        for o in obstacles:
++        for o in list(obstacles) + [self.FLOOR_BOX]:
+             m = margin_map.get(o["name"], default_margin)
+             ox0, ox1 = o["x"] - m, o["x"] + o["w"] + m
+             oy0, oy1 = o["y"] - m, o["y"] + o["h"] + m
+@@ -119,7 +114,7 @@ class GeneratedApproach:
+         m = 0.004
+         margin_map = {}
+         # obstacles in contact at endpoints get zero margin
+-        for o in obstacles:
++        for o in list(obstacles) + [self.FLOOR_BOX]:
+             for P in (A, B):
+                 if self._collides(np.array([P]), [o], carried, {}, m):
+                     margin_map[o["name"]] = 0.0

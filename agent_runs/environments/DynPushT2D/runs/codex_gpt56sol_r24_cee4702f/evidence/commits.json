@@ -1,0 +1,2808 @@
+[
+  {
+    "id": "C001",
+    "commit": "3a55000d50a578e4d66458a315fe18d7c656e83f",
+    "parents": [],
+    "date": "2026-09-09T08:23:32+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".gitignore",
+      "AGENTS.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_3a55000.diff",
+    "diff_sha256": "feac8a27fe926b46989b81758b91833750ad60e85e2f32a137f00dcfc489dae7",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "64e280702248a44d6781c642956d3ab514583499",
+    "parents": [
+      "3a55000d50a578e4d66458a315fe18d7c656e83f"
+    ],
+    "date": "2026-09-09T08:24:52+02:00",
+    "title": "Add baseline behind-object pushing policy and test harness",
+    "files": [
+      "approach.py",
+      "probe_strategy.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C002_64e2807.diff",
+    "diff_sha256": "22fdea2c6fad64e636384bc6e06241046dc45c5d886069e5f86cc16ddb1ef931",
+    "events": [
+      {
+        "event": "E0009",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "3fb8399f2933fbd52b5137a90a6280f0d3b083f03c831391c79a14a9cf244361",
+    "version": "evidence/versions/C002_64e2807_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "30211d83199d26a08cf3f97f809e0dc0ca355265",
+    "parents": [
+      "64e280702248a44d6781c642956d3ab514583499"
+    ],
+    "date": "2026-09-09T08:25:28+02:00",
+    "title": "add isolated reset and contact probing script",
+    "files": [
+      "explore_geometry.py"
+    ],
+    "file_roles": [
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C003_30211d8.diff",
+    "diff_sha256": "d203eff9d5cef653a994ca721325693e3dfdce30023b6b0fd7542be43a76a3ef",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C004",
+    "commit": "7cc31b73668228286bb7d18041a7e8908fde80f1",
+    "parents": [
+      "30211d83199d26a08cf3f97f809e0dc0ca355265"
+    ],
+    "date": "2026-09-09T08:25:29+02:00",
+    "title": "Respect robot Euclidean displacement limit",
+    "files": [
+      "approach.py",
+      "probe_dynamics.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C004_7cc31b7.diff",
+    "diff_sha256": "a98bf11981ce8a7689d2b58ea7ad9fe39dcfeed1d76d5a64035c43f32e0cbb86",
+    "events": [
+      {
+        "event": "E0017",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "7edad90a3655adbbb3fe0e854404a1ef05ecec1359c7b5fdb0031623b06c3fbf",
+    "version": "evidence/versions/C004_7cc31b7_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "937d66d0ab7a87bcda9b8aac36a7be1d8eb09f19",
+    "parents": [
+      "7cc31b73668228286bb7d18041a7e8908fde80f1"
+    ],
+    "date": "2026-09-09T08:26:02+02:00",
+    "title": "Keep dynamics probes inside strict action norm",
+    "files": [
+      "probe_dynamics.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C005_937d66d.diff",
+    "diff_sha256": "8d14551df0b03e72234f153e2b66368a7b9f0bf5eee6f98f8497cf58ad1a8a3d",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C006",
+    "commit": "06760904bcfd29387e1062b9f9da5b09918ef1bd",
+    "parents": [
+      "937d66d0ab7a87bcda9b8aac36a7be1d8eb09f19"
+    ],
+    "date": "2026-09-09T08:26:36+02:00",
+    "title": "add isolated heuristic T-block strategy experiments",
+    "files": [
+      "candidate_strategy.py",
+      "test_candidate_strategy.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C006_0676090.diff",
+    "diff_sha256": "855d60a4d9ffdd5c85371e0fd9fbff171d79815a6d0773f7f4198a436a5fca51",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C007",
+    "commit": "0d015e9834c02f991666c36eb49445093a8faf27",
+    "parents": [
+      "06760904bcfd29387e1062b9f9da5b09918ef1bd"
+    ],
+    "date": "2026-09-09T08:26:49+02:00",
+    "title": "print failing candidate actions for strict harness debugging",
+    "files": [
+      "test_candidate_strategy.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C007_0d015e9.diff",
+    "diff_sha256": "7de383dd5dbc79e23acee3c0d1e5618f7d513b702b2791c1263a36c8d12c8e65",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C008",
+    "commit": "aec5753c685e074fc609de5686c7b36264c28278",
+    "parents": [
+      "0d015e9834c02f991666c36eb49445093a8faf27"
+    ],
+    "date": "2026-09-09T08:27:03+02:00",
+    "title": "Report local-frame contact coordinates in dynamics probe",
+    "files": [
+      "probe_dynamics.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C008_aec5753.diff",
+    "diff_sha256": "b5aa9817f86fa4ca36df7c1d72eb5f3e436ed1ee1142a905d833a2342a7ba168",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C009",
+    "commit": "139de8447713be3b13375f5c869d3a7f7f60509f",
+    "parents": [
+      "aec5753c685e074fc609de5686c7b36264c28278"
+    ],
+    "date": "2026-09-09T08:27:05+02:00",
+    "title": "respect hidden radial action displacement limit",
+    "files": [
+      "candidate_strategy.py"
+    ],
+    "file_roles": [
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C009_139de84.diff",
+    "diff_sha256": "94db7a98beb01c53a6cfc08969c5f1d21aec4636d01ae5ebd1bae97314e8b7a9",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C010",
+    "commit": "587c5c3909f4d50fddeec7b4929fccff2c9e7e6c",
+    "parents": [
+      "139de8447713be3b13375f5c869d3a7f7f60509f"
+    ],
+    "date": "2026-09-09T08:27:13+02:00",
+    "title": "Use persistent staged contact for center pushes",
+    "files": [
+      "approach.py",
+      "explore_geometry.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C010_587c5c3.diff",
+    "diff_sha256": "db44447d229ba320679f2f4256ca2324145152d6f42f296b90728135a89889f6",
+    "events": [
+      {
+        "event": "E0030",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1ce47ad441b2e4f1c4cced5de816e3996f81c2c9ab59cfdbcec4b5f600e6aad4",
+    "version": "evidence/versions/C010_587c5c3_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C011",
+    "commit": "6c1883497288a803121dba460f2f55f5b473f03d",
+    "parents": [
+      "587c5c3909f4d50fddeec7b4929fccff2c9e7e6c"
+    ],
+    "date": "2026-09-09T08:27:30+02:00",
+    "title": "log candidate trajectories for controller diagnosis",
+    "files": [
+      "test_candidate_strategy.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C011_6c18834.diff",
+    "diff_sha256": "f4b28afb7686f63c77d222a9f18322bb1c5d685e3441f461daf927cc1b5f6e9d",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C012",
+    "commit": "a7d8ac7b6c499449ab3abd823e6c1ceb5680cab1",
+    "parents": [
+      "6c1883497288a803121dba460f2f55f5b473f03d"
+    ],
+    "date": "2026-09-09T08:27:55+02:00",
+    "title": "Probe tangential rotation control after contact",
+    "files": [
+      "probe_dynamics.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C012_a7d8ac7.diff",
+    "diff_sha256": "bb4b1db6ede514e4a484915028d4f8d0bbd35ca2afa0c2e6328d7484e0b8ceac",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C013",
+    "commit": "8d291ba744be2fae3afbfcc7de9a8b3da144e560",
+    "parents": [
+      "a7d8ac7b6c499449ab3abd823e6c1ceb5680cab1"
+    ],
+    "date": "2026-09-09T08:28:07+02:00",
+    "title": "Add stem-tip rotation strokes and COM-aligned translation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C013_8d291ba.diff",
+    "diff_sha256": "ef017557cfe26c16974082a5512d62549d62833f121c7c02f6afd84c5b27a27d",
+    "events": [
+      {
+        "event": "E0034",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a895111fefb07b98bc661d0dd840e35934a69144408fc1c5a620c6f9c33a31f6",
+    "version": "evidence/versions/C013_8d291ba_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C014",
+    "commit": "ac1accf0c2087cfad250299b612753824fcc06dd",
+    "parents": [
+      "8d291ba744be2fae3afbfcc7de9a8b3da144e560"
+    ],
+    "date": "2026-09-09T08:28:13+02:00",
+    "title": "shorten rotation bursts and handle arena-edge setup paths",
+    "files": [
+      "candidate_strategy.py"
+    ],
+    "file_roles": [
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C014_ac1accf.diff",
+    "diff_sha256": "a769b9d9569bfd95e7be6596ae270773de1ef97b1815468c00f750793ae53547",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C015",
+    "commit": "f6f942e9838001d28a22b025c5f28cba68f32d5e",
+    "parents": [
+      "ac1accf0c2087cfad250299b612753824fcc06dd"
+    ],
+    "date": "2026-09-09T08:28:29+02:00",
+    "title": "Add concise mode trajectory diagnostics",
+    "files": [
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C015_f6f942e.diff",
+    "diff_sha256": "83fb9bd0ca4ea84881197b4cd01886c08fd2bd626390839687d9dcef0aec31a8",
+    "events": [
+      {
+        "event": "E0038",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C016",
+    "commit": "7c95c0c0ee9cb8fe918b697886c7b9a37f6694b5",
+    "parents": [
+      "f6f942e9838001d28a22b025c5f28cba68f32d5e"
+    ],
+    "date": "2026-09-09T08:29:06+02:00",
+    "title": "Interleave pose correction and keep staging targets reachable",
+    "files": [
+      "approach.py",
+      "candidate_strategy.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C016_7c95c0c.diff",
+    "diff_sha256": "0fdf798d464baefd845d9fb66f948320072ccb2cf5c0b5a8d61d8fd4fd5f1f46",
+    "events": [
+      {
+        "event": "E0042",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "0174eca49debd557311d9c30540a9da65823828625d9fb3c0c1201529559a93b",
+    "version": "evidence/versions/C016_7c95c0c_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C017",
+    "commit": "00a41508709fa172f306183bfa5a2323d9015c6c",
+    "parents": [
+      "7c95c0c0ee9cb8fe918b697886c7b9a37f6694b5"
+    ],
+    "date": "2026-09-09T08:29:43+02:00",
+    "title": "Select accessible T endpoint for rotation contacts",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C017_00a4150.diff",
+    "diff_sha256": "1463e86105101c458863587622a71aa49dc34e08a2a329167c59de618f402fc6",
+    "events": [
+      {
+        "event": "E0046",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "16fb4e0463ad524bcfa395e0ce53c305542f5ff3a698902a03488fb19b161ea0",
+    "version": "evidence/versions/C017_00a4150_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C018",
+    "commit": "149554c75e0f3d79234d27728ec51dc81e0a10fa",
+    "parents": [
+      "00a41508709fa172f306183bfa5a2323d9015c6c"
+    ],
+    "date": "2026-09-09T08:30:14+02:00",
+    "title": "avoid accidental contact during polar staging",
+    "files": [
+      "candidate_strategy.py"
+    ],
+    "file_roles": [
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C018_149554c.diff",
+    "diff_sha256": "c0ad197b6e32b7f36ea125108fd37f310b01945a6f2e2d54d4392325ab4875e0",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C019",
+    "commit": "f1d882cbb01e9c61ccdc8a4c239b01793eccb3d1",
+    "parents": [
+      "149554c75e0f3d79234d27728ec51dc81e0a10fa"
+    ],
+    "date": "2026-09-09T08:30:57+02:00",
+    "title": "stage low-impulse rotation strokes directly at contact",
+    "files": [
+      "candidate_strategy.py"
+    ],
+    "file_roles": [
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C019_f1d882c.diff",
+    "diff_sha256": "d6273076b7f1c9c33cf47bfc26d79fa77fa99719283d8c4af2e2a72e6430d381",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C020",
+    "commit": "5f07c8605dfc9d58e6491c47557bd53d1b9fedb6",
+    "parents": [
+      "f1d882cbb01e9c61ccdc8a4c239b01793eccb3d1"
+    ],
+    "date": "2026-09-09T08:33:48+02:00",
+    "title": "Replace controller with bounded stem rotation and COM translation strokes",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C020_5f07c86.diff",
+    "diff_sha256": "0afaeccc9a82392a400bf5c3824c44fcb09d8b9d896805ce3c8c6bafa83e9cdd",
+    "events": [
+      {
+        "event": "E0057",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "5aeb6c6f4ff7919399c1fd383bb817d7cd5eb3ec9521fcfeea29a9ad9e59f161",
+    "version": "evidence/versions/C020_5f07c86_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C021",
+    "commit": "2bd31ab3280068205dcdbd8afcb97852c1e39939",
+    "parents": [
+      "5f07c8605dfc9d58e6491c47557bd53d1b9fedb6"
+    ],
+    "date": "2026-09-09T08:35:11+02:00",
+    "title": "Route translation setup around T geometry and clamp arena targets",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C021_2bd31ab.diff",
+    "diff_sha256": "756a5eb76695b4ec5c6334824e3cf28e899cc251c2994f222e695d8aaa21a49b",
+    "events": [
+      {
+        "event": "E0061",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "b9120759a85a0f22f9cb75285c9380e55eb79a2eaf5d044116f9ccb9bce7dcbb",
+    "version": "evidence/versions/C021_2bd31ab_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C022",
+    "commit": "88b437b8fa1488f66f5e2da2efe76c59e3b85397",
+    "parents": [
+      "2bd31ab3280068205dcdbd8afcb97852c1e39939"
+    ],
+    "date": "2026-09-09T08:35:39+02:00",
+    "title": "Allow translation strokes to reach the asymmetric outline",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C022_88b437b.diff",
+    "diff_sha256": "2243be14121a8d082eb8c8ce2007f84bd1721fe3480aef518a62fd899b480b4f",
+    "events": [
+      {
+        "event": "E0065",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6aa866930b97933e3bc0077436b65bcec4955ebf54b0a9b71f11649e4b7a1259",
+    "version": "evidence/versions/C022_88b437b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C023",
+    "commit": "3db79a00542e31f7b39a2a78a7f8a90b77b95350",
+    "parents": [
+      "88b437b8fa1488f66f5e2da2efe76c59e3b85397"
+    ],
+    "date": "2026-09-09T08:37:20+02:00",
+    "title": "Add fast geometry-aware A-star contact navigation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C023_3db79a0.diff",
+    "diff_sha256": "13a9abfbe89cd3de6076c0bcc02f388b32ebcd86c97ebcd5a764b5eacd3a31d6",
+    "events": [
+      {
+        "event": "E0069",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "37d76f665237f042e4948df4bdcbb7c7d8834f9adb36c806ce165837d92e3240",
+    "version": "evidence/versions/C023_3db79a0_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C024",
+    "commit": "e1fedceb6ff8e7e658465114f1be5fccfeceb600",
+    "parents": [
+      "3db79a00542e31f7b39a2a78a7f8a90b77b95350"
+    ],
+    "date": "2026-09-09T08:37:42+02:00",
+    "title": "Trace contact-navigation state transitions",
+    "files": [
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C024_e1fedce.diff",
+    "diff_sha256": "4ab311ee3c893c267c2dcf048e88095d2bf89192c10ab8d09685fb15da0f0a47",
+    "events": [
+      {
+        "event": "E0073",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C025",
+    "commit": "3bdeac403a24413c21af61a6dfc5d7869ab4a5cf",
+    "parents": [
+      "e1fedceb6ff8e7e658465114f1be5fccfeceb600"
+    ],
+    "date": "2026-09-09T08:38:05+02:00",
+    "title": "Increase trajectory sampling around navigation collisions",
+    "files": [
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C025_3bdeac4.diff",
+    "diff_sha256": "6ac3cee1ce8244e4281519299ae97d24b1e733b1897e074a5c11f31063b02fca",
+    "events": [
+      {
+        "event": "E0077",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C026",
+    "commit": "d523a1c726f1cd73d257b8bed7242a5a6587fa50",
+    "parents": [
+      "3bdeac403a24413c21af61a6dfc5d7869ab4a5cf"
+    ],
+    "date": "2026-09-09T08:38:30+02:00",
+    "title": "Abort and replan stale routes on accidental contact",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C026_d523a1c.diff",
+    "diff_sha256": "34542ff7f8bd63ce196b866c5919e8de3c9dfd48ee9a435d967acb0209b1a7ce",
+    "events": [
+      {
+        "event": "E0081",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "ce9e5a39307a06f4f0899172c1c548ba13c80926c877875f3b4950f218c7fae5",
+    "version": "evidence/versions/C026_d523a1c_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C027",
+    "commit": "a91a6fd310bd36f6dfe70cc9d0502f8993f9d301",
+    "parents": [
+      "d523a1c726f1cd73d257b8bed7242a5a6587fa50"
+    ],
+    "date": "2026-09-09T08:39:01+02:00",
+    "title": "Maintain stable COM contact for efficient translation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C027_a91a6fd.diff",
+    "diff_sha256": "28291ef4b505f8c648e48a6b5c5029e727375ea53177ca85a09040f3358d8c2c",
+    "events": [
+      {
+        "event": "E0085",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "4846a9af325b142a9dd20f1dd64d69b21603ce353fa34881ea979dfa6b8cd181",
+    "version": "evidence/versions/C027_a91a6fd_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C028",
+    "commit": "9e7ff36b0cca333943ec1dbcbfa8008e8f077af6",
+    "parents": [
+      "a91a6fd310bd36f6dfe70cc9d0502f8993f9d301"
+    ],
+    "date": "2026-09-09T08:40:29+02:00",
+    "title": "Release at target and correct angle wrap branch",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C028_9e7ff36.diff",
+    "diff_sha256": "3e91f375c4a40fc2177dbf490066f5a1913d22fcbda191c5f55afc90b68197e2",
+    "events": [
+      {
+        "event": "E0092",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "642391304b23801f7d7d91d6f81a5768a01706ac9816039ebe0b6f962cfc7319",
+    "version": "evidence/versions/C028_9e7ff36_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C029",
+    "commit": "5bc8cf8e74eb517fa7f8d5a6a1d48e3edb595ba7",
+    "parents": [
+      "9e7ff36b0cca333943ec1dbcbfa8008e8f077af6"
+    ],
+    "date": "2026-09-09T08:41:58+02:00",
+    "title": "Adapt rotation lever near boundaries and prevent diagonal corner cuts",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C029_5bc8cf8.diff",
+    "diff_sha256": "0787a4092ac4fe133b6a57c85b7fee6fb1fd275f54695ffeffd28383097c6bb1",
+    "events": [
+      {
+        "event": "E0100",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "924e9c9bacda7eaf77647d3f038c80cdfb4a9ec4c8921a56601c80a0bafd7473",
+    "version": "evidence/versions/C029_5bc8cf8_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C030",
+    "commit": "f6a93145912731742207c66269ccb593958e32d5",
+    "parents": [
+      "5bc8cf8e74eb517fa7f8d5a6a1d48e3edb595ba7"
+    ],
+    "date": "2026-09-09T08:42:57+02:00",
+    "title": "Adapt translation contact line to cancel observed torque",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C030_f6a9314.diff",
+    "diff_sha256": "e924c041f775f512a1eb25813fa6745d7d972196e242904a2d7eeff6a8f3dea6",
+    "events": [
+      {
+        "event": "E0106",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "0205b7c478a32ae4c1ec0941db60b28a61c9585578c20efac6851bcef2f98a9a",
+    "version": "evidence/versions/C030_f6a9314_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C031",
+    "commit": "ba6c6b83af99bcbe596ba94aa89bc618a2ab99f5",
+    "parents": [
+      "f6a93145912731742207c66269ccb593958e32d5"
+    ],
+    "date": "2026-09-09T08:43:53+02:00",
+    "title": "Permit translation-first recovery near arena boundaries",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C031_ba6c6b8.diff",
+    "diff_sha256": "92c16fd74747c49c36459f8506ee1d36596255bada2ef56b90220da06d6e83e4",
+    "events": [
+      {
+        "event": "E0112",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "d12093a2f139ce78955d09374f66c0431a8412b8e3ef07b4a0e79dcecb5682a6",
+    "version": "evidence/versions/C031_ba6c6b8_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C032",
+    "commit": "5cd4926a0960646e84c8990b1c066d98cd62d2e1",
+    "parents": [
+      "ba6c6b83af99bcbe596ba94aa89bc618a2ab99f5"
+    ],
+    "date": "2026-09-09T08:44:48+02:00",
+    "title": "Accelerate rotation strokes away from boundaries",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C032_5cd4926.diff",
+    "diff_sha256": "4dabc49936ad4a880e60f0c27ce81ae8c5778cfecbb6939b8c1d2a40d10962cc",
+    "events": [
+      {
+        "event": "E0118",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "4ad56e079243e051615352ef8cf238a2a8ee85b808d50c0c41ed11460f1269ff",
+    "version": "evidence/versions/C032_5cd4926_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C033",
+    "commit": "7c3e2087fb02f92e63a19ca3b6a749cbd9f17880",
+    "parents": [
+      "5cd4926a0960646e84c8990b1c066d98cd62d2e1"
+    ],
+    "date": "2026-09-09T08:45:43+02:00",
+    "title": "Tune online torque cancellation and final orientation precision",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C033_7c3e208.diff",
+    "diff_sha256": "8d90df08f2349df44d124383392cb8aab12bcb196e3ac4027fa5f4201aa4d733",
+    "events": [
+      {
+        "event": "E0124",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "83a96499cc90e354d9ecdd9abbaf6f4cb2ef8e521ed31aefa8631a02a1be98a0",
+    "version": "evidence/versions/C033_7c3e208_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C034",
+    "commit": "c03b231cf2f2bbab84b02a71dade607cfa7b27b2",
+    "parents": [
+      "7c3e2087fb02f92e63a19ca3b6a749cbd9f17880"
+    ],
+    "date": "2026-09-09T08:46:15+02:00",
+    "title": "Restore stable conservative torque adaptation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C034_c03b231.diff",
+    "diff_sha256": "dd04ed79cc50f257bbc240e820b979709feeaa854d8a8af173892bb56671a709",
+    "events": [
+      {
+        "event": "E0128",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "4ad56e079243e051615352ef8cf238a2a8ee85b808d50c0c41ed11460f1269ff",
+    "version": "evidence/versions/C034_c03b231_approach.py",
+    "same_policy_as_earlier": [
+      "C032"
+    ]
+  },
+  {
+    "id": "C035",
+    "commit": "8091315c4168dab5667a681955828ada2091c6a2",
+    "parents": [
+      "c03b231cf2f2bbab84b02a71dade607cfa7b27b2"
+    ],
+    "date": "2026-09-09T08:46:59+02:00",
+    "title": "Preserve contact room with earlier boundary recovery",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C035_8091315.diff",
+    "diff_sha256": "e98708fbd87e24022e75f10668434f28afd0840625d9e062f216aece93cb4b32",
+    "events": [
+      {
+        "event": "E0134",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "9fce76b8e90cc92a0755a2a6d013d2a5fc84da632a7af40e43639d4174e268fb",
+    "version": "evidence/versions/C035_8091315_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C036",
+    "commit": "08cf5b12c689540ee3c6e6a7e76e0f17e75a3e1f",
+    "parents": [
+      "8091315c4168dab5667a681955828ada2091c6a2"
+    ],
+    "date": "2026-09-09T08:48:21+02:00",
+    "title": "Use longer efficient rotation strokes in open space",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C036_08cf5b1.diff",
+    "diff_sha256": "dc64025165112fa879fb4965fd28ec3234156fb004be1c7dd7c44cf3aa0fa831",
+    "events": [
+      {
+        "event": "E0142",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "d0784729d40364fbaab639471341c06ac0601e57ef56e44cadda328524649dbc",
+    "version": "evidence/versions/C036_08cf5b1_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C037",
+    "commit": "e070c507b45db2f9d15ad664eff5039c59d338c2",
+    "parents": [
+      "08cf5b12c689540ee3c6e6a7e76e0f17e75a3e1f"
+    ],
+    "date": "2026-09-09T08:48:43+02:00",
+    "title": "Balance open-space rotation speed and stability",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C037_e070c50.diff",
+    "diff_sha256": "8c85773f33f1532d3a345d4714744e5173cf51ef2155c996f7de86f1060a13e7",
+    "events": [
+      {
+        "event": "E0146",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "41f03e864692b00362332d5a4979b982a18955b307a985a807cb3baf531a8b3a",
+    "version": "evidence/versions/C037_e070c50_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C038",
+    "commit": "ea5935166af01a57a9d705ac397650e989deec7e",
+    "parents": [
+      "e070c507b45db2f9d15ad664eff5039c59d338c2"
+    ],
+    "date": "2026-09-09T08:49:27+02:00",
+    "title": "Favor reliable bounded rotation strokes across poses",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C038_ea59351.diff",
+    "diff_sha256": "dc059f92c94bfc5c82bf3cc998ce9ca8ce2fde31e2072abbb006e7a8c9df6b05",
+    "events": [
+      {
+        "event": "E0152",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "2fd903508008cba2968bf3cab04e8ae1c37712e9667e7d58cd2c9cc66fffc1d7",
+    "version": "evidence/versions/C038_ea59351_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C039",
+    "commit": "34dd135bddc230f5ed750b2a2f55c27b8d8c9887",
+    "parents": [
+      "ea5935166af01a57a9d705ac397650e989deec7e"
+    ],
+    "date": "2026-09-09T08:50:13+02:00",
+    "title": "Adapt rotation stroke length in edge approach zones",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C039_34dd135.diff",
+    "diff_sha256": "c5ba29a3828c84663d6de6fd0e1145dcb2c4b42c92ef287e3c18297cbc9d9b18",
+    "events": [
+      {
+        "event": "E0158",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "5e67305ccc00e8b7024b12cadb0cca6f30eafe2d767f1fb9a991cf6153129aff",
+    "version": "evidence/versions/C039_34dd135_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C040",
+    "commit": "de55505f1bb9ad41a0516e8ba093db63ddb0bf0c",
+    "parents": [
+      "34dd135bddc230f5ed750b2a2f55c27b8d8c9887"
+    ],
+    "date": "2026-09-09T08:51:38+02:00",
+    "title": "Interleave recovery translation when rotation drifts away from goal",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C040_de55505.diff",
+    "diff_sha256": "d8e6a082abcf603199ec09533867cd9fdeb57fd7272586462f013b159118e390",
+    "events": [
+      {
+        "event": "E0166",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "7e63dd1ac158798942a1fed7aa869c55e6c585522917337df0273ae9503db00d",
+    "version": "evidence/versions/C040_de55505_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C041",
+    "commit": "afe60d7c47239d2ec2b302d26056c1beee3f274c",
+    "parents": [
+      "de55505f1bb9ad41a0516e8ba093db63ddb0bf0c"
+    ],
+    "date": "2026-09-09T08:51:57+02:00",
+    "title": "Prioritize final orientation once position is close",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C041_afe60d7.diff",
+    "diff_sha256": "36f94c621b570c62fe2f6f36d1e6d9068f1a0bf17e691c91139e55ecb9a43225",
+    "events": [
+      {
+        "event": "E0170",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "cb07af88bb2068e1c52b1d186de12b28bb56f62a0305c653d48c2940ebf4c3fe",
+    "version": "evidence/versions/C041_afe60d7_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C042",
+    "commit": "c3d1145345e09786e849c26383afa36ceee733f4",
+    "parents": [
+      "afe60d7c47239d2ec2b302d26056c1beee3f274c"
+    ],
+    "date": "2026-09-09T08:52:21+02:00",
+    "title": "Clear forced translation after reaching positional target",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C042_c3d1145.diff",
+    "diff_sha256": "9d70a8938873cca951e713238ce8c9e65e756705394c184f01a3167ca4c1abf1",
+    "events": [
+      {
+        "event": "E0176",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "15c8e00b8e6f0cd6657e279050946f16544b2fd42390e82d0ec94210b4c03284",
+    "version": "evidence/versions/C042_c3d1145_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C043",
+    "commit": "869a6eb6407952aceee654855f31558d895fd475",
+    "parents": [
+      "c3d1145345e09786e849c26383afa36ceee733f4"
+    ],
+    "date": "2026-09-09T08:53:07+02:00",
+    "title": "Accelerate long-distance COM pushes while retaining precision",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C043_869a6eb.diff",
+    "diff_sha256": "6b0537da4e8ac4e933929793e00e7086781a64829187802220975f3eb2cef301",
+    "events": [
+      {
+        "event": "E0182",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "8064dc70181ed9f06c5787054d66abbc03b44c123a11f32f628cb7bb1d5d8fc5",
+    "version": "evidence/versions/C043_869a6eb_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C044",
+    "commit": "451cb27a227cb39a2c657075c7d060311c9e5d2a",
+    "parents": [
+      "869a6eb6407952aceee654855f31558d895fd475"
+    ],
+    "date": "2026-09-09T08:54:54+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C044_451cb27.diff",
+    "diff_sha256": "2a86684afff328eba1401c5e77c645f74e2738d271558517059e9ddfa925a03d",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C045",
+    "commit": "860fb75a1e66158dce0d4cf5a67e19907d728eae",
+    "parents": [
+      "451cb27a227cb39a2c657075c7d060311c9e5d2a"
+    ],
+    "date": "2026-09-09T08:56:06+02:00",
+    "title": "Learn contact offset from short torque-limited pushes",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C045_860fb75.diff",
+    "diff_sha256": "fc6b68d258a2ce8835e2366712f526eab256e83720f3fb2c19a3ac00fa420570",
+    "events": [
+      {
+        "event": "E0206",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "9ca64514f78f4a168cf54a37e9c7e4b932df2b2f543f9c4cf3264a88c584b667",
+    "version": "evidence/versions/C045_860fb75_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C046",
+    "commit": "3cdb148b6d48e3853a81f2906e48512bb1736272",
+    "parents": [
+      "860fb75a1e66158dce0d4cf5a67e19907d728eae"
+    ],
+    "date": "2026-09-09T08:58:51+02:00",
+    "title": "Limit short-stroke torque learning to final alignment",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C046_3cdb148.diff",
+    "diff_sha256": "a90a28b41efa0b43dfa51a47a573d7586b1af4611375c5d30f124e2455f76243",
+    "events": [
+      {
+        "event": "E0222",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "20592334cf98a3590104d0892d2b660f456cb5416619757ed1786668291beb8a",
+    "version": "evidence/versions/C046_3cdb148_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C047",
+    "commit": "88325fb1673b4ad3e4f85ee9e0a82b51e480e1bf",
+    "parents": [
+      "3cdb148b6d48e3853a81f2906e48512bb1736272"
+    ],
+    "date": "2026-09-09T08:59:46+02:00",
+    "title": "Extend recovery pushes to amortize contact navigation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C047_88325fb.diff",
+    "diff_sha256": "4ceb063b9a1d57ae68e38a3d30edba0520139def7309bd4fce7d055bd26af59d",
+    "events": [
+      {
+        "event": "E0232",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "b2bd4bfb8f6eed5756088854053001ded00c173800b6792fc01b8f1d5e44c470",
+    "version": "evidence/versions/C047_88325fb_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C048",
+    "commit": "fb12fbd266014bf0a11c60334d24794654675f9e",
+    "parents": [
+      "88325fb1673b4ad3e4f85ee9e0a82b51e480e1bf"
+    ],
+    "date": "2026-09-09T09:00:15+02:00",
+    "title": "Carry boundary recovery through a meaningful translation stroke",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C048_fb12fbd.diff",
+    "diff_sha256": "c4c17424d83633cc8f8a97ad9eb1b77b2af915dde04702965188ced2111ca138",
+    "events": [
+      {
+        "event": "E0238",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "72378c0679960b00309d4e626a0c42535b1d5de820f1588b924d5fe4309017a6",
+    "version": "evidence/versions/C048_fb12fbd_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C049",
+    "commit": "c768c44bfa5f13d2a257ea0fca5f1a3c4b1dada8",
+    "parents": [
+      "fb12fbd266014bf0a11c60334d24794654675f9e"
+    ],
+    "date": "2026-09-09T09:01:07+02:00",
+    "title": "Retreat straight backward to prevent destructive recontact",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C049_c768c44.diff",
+    "diff_sha256": "8430413e21b58f380950a52e3ca409b4b3054a4b18189948d145f5a716ff50db",
+    "events": [
+      {
+        "event": "E0247",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1fbab91e3109918d15576d9d08a4ab5678e25b4490c548238826cf73c6534b7c",
+    "version": "evidence/versions/C049_c768c44_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C050",
+    "commit": "c083d05863968ac12cb0efdcea6e089f8c523d95",
+    "parents": [
+      "c768c44bfa5f13d2a257ea0fca5f1a3c4b1dada8"
+    ],
+    "date": "2026-09-09T09:03:35+02:00",
+    "title": "Use cap-end torque when distal stem contact is crowded",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C050_c083d05.diff",
+    "diff_sha256": "8b052b034a0f16f13d9d63c986b3d7834c6b0ecfba7312133680b6b844a120d0",
+    "events": [
+      {
+        "event": "E0263",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "57e189aef900048d5a552bc4457877e8701895e86b3688ce3170fd20ef6cf5b9",
+    "version": "evidence/versions/C050_c083d05_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C051",
+    "commit": "5edfcb4e1919cd7bd8c4031e3c90283c525c196c",
+    "parents": [
+      "c083d05863968ac12cb0efdcea6e089f8c523d95"
+    ],
+    "date": "2026-09-09T09:04:36+02:00",
+    "title": "Restrict cap torque to favorable CCW wall cases",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C051_5edfcb4.diff",
+    "diff_sha256": "065e6d2e93aabe22b6d579648f5e93d3edc50afa83447f259325fca1bda37eda",
+    "events": [
+      {
+        "event": "E0271",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "c3b55332c7209ff86312d9bc4c6f5755e5b702d3eda96eaf49805172e5e726fc",
+    "version": "evidence/versions/C051_5edfcb4_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C052",
+    "commit": "b8dfac8c28cff4db0dae9b3f94978427ac4ea099",
+    "parents": [
+      "5edfcb4e1919cd7bd8c4031e3c90283c525c196c"
+    ],
+    "date": "2026-09-09T09:05:13+02:00",
+    "title": "Persist effective cap contact after CCW wall activation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C052_b8dfac8.diff",
+    "diff_sha256": "ef7abac3fb656d6f51b9f11923a64c1c897ebb1603cb79aecdf77c58c83da0ef",
+    "events": [
+      {
+        "event": "E0277",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "9ec8a580dc3d664a8188baffba6beffae16bb91399d70667ff0cdcc3b3a5e25a",
+    "version": "evidence/versions/C052_b8dfac8_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C053",
+    "commit": "63c97a2fa48e0b388c9e341d768b372ee7f58bab",
+    "parents": [
+      "b8dfac8c28cff4db0dae9b3f94978427ac4ea099"
+    ],
+    "date": "2026-09-09T09:05:46+02:00",
+    "title": "Reuse activated cap contact for bidirectional corrections",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C053_63c97a2.diff",
+    "diff_sha256": "b6cf0a27cdea1c4d9722d9b1d3c37c054283e29d6a6fc16f15251bf407f90db8",
+    "events": [
+      {
+        "event": "E0283",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "632b731a05bce23c4f0815510bbf16fbe667c3bb5e0b4b676931e0d8b3298d24",
+    "version": "evidence/versions/C053_63c97a2_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C054",
+    "commit": "b3e226e49b8647a9827c985233b18917857fbf9b",
+    "parents": [
+      "63c97a2fa48e0b388c9e341d768b372ee7f58bab"
+    ],
+    "date": "2026-09-09T09:06:42+02:00",
+    "title": "Activate cap torque for CCW rotations near horizontal walls",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C054_b3e226e.diff",
+    "diff_sha256": "d1cabe32b274b7e4d71f2d47b5874b8ccafb6442342d4e3f4dcc881e7380cc28",
+    "events": [
+      {
+        "event": "E0291",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "25151cd75d3e736abeee123a172f597d441bba3eda71d8590d12ea02a4a5d3c9",
+    "version": "evidence/versions/C054_b3e226e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C055",
+    "commit": "d1c4230591e884aa938f0bbcd15b5b687d32f00d",
+    "parents": [
+      "b3e226e49b8647a9827c985233b18917857fbf9b"
+    ],
+    "date": "2026-09-09T09:07:13+02:00",
+    "title": "Accelerate large residual rotations in open space",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C055_d1c4230.diff",
+    "diff_sha256": "0f7157365ade6cab8e91868b2d9c439afe1846cda0c035ded593cca3a1d99334",
+    "events": [
+      {
+        "event": "E0297",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "08fe7bb55a4b314019f443d8e19a8fb7ef7b363491e12141ee54f311ff940550",
+    "version": "evidence/versions/C055_d1c4230_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C056",
+    "commit": "39a5bcbf6ede4a5d69a9f75f2d8acd1d63e64ba6",
+    "parents": [
+      "d1c4230591e884aa938f0bbcd15b5b687d32f00d"
+    ],
+    "date": "2026-09-09T09:08:26+02:00",
+    "title": "Restore conservative rotation activation after held-out failures",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C056_39a5bcb.diff",
+    "diff_sha256": "4ce3da841fe65ac28849e236bfc768fafe497e8b2fcdd5f435ce4a2df73bc4fe",
+    "events": [
+      {
+        "event": "E0305",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "632b731a05bce23c4f0815510bbf16fbe667c3bb5e0b4b676931e0d8b3298d24",
+    "version": "evidence/versions/C056_39a5bcb_approach.py",
+    "same_policy_as_earlier": [
+      "C053"
+    ]
+  },
+  {
+    "id": "C057",
+    "commit": "4abcf8efb909152855bcb7b8400013a7e0c4c572",
+    "parents": [
+      "39a5bcbf6ede4a5d69a9f75f2d8acd1d63e64ba6"
+    ],
+    "date": "2026-09-09T09:09:26+02:00",
+    "title": "Choose rotation contact that also advances toward goal",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C057_4abcf8e.diff",
+    "diff_sha256": "57df647644fca6a176ae3c60e277d124e55a5c1e14efe75fcff8462c3891011a",
+    "events": [
+      {
+        "event": "E0314",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1f14b0977ad43acdd6c14860ed957ae4e569ab5ec7606b1d613e775e05d590cc",
+    "version": "evidence/versions/C057_4abcf8e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C058",
+    "commit": "dc01eb936305e953e6410973e5e0eb92dbc99381",
+    "parents": [
+      "4abcf8efb909152855bcb7b8400013a7e0c4c572"
+    ],
+    "date": "2026-09-09T09:10:53+02:00",
+    "title": "Switch torque contacts only for meaningful position progress",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C058_dc01eb9.diff",
+    "diff_sha256": "059be1ac82e32d1a3cd8e6c79f447e540581f4e7b580cf5b76bd9845d5759572",
+    "events": [
+      {
+        "event": "E0324",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "4e13dbe08fd6935ee0372dbc6caa09e57d15caaa736428cdaeb9d18b15991eba",
+    "version": "evidence/versions/C058_dc01eb9_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C059",
+    "commit": "7c40b651904a9bd63888e5930d720b612dbbd13f",
+    "parents": [
+      "dc01eb936305e953e6410973e5e0eb92dbc99381"
+    ],
+    "date": "2026-09-09T09:11:25+02:00",
+    "title": "Tune rotation contact progress threshold",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C059_7c40b65.diff",
+    "diff_sha256": "3e6afca426df57ce266c00e1d71ad13532f3ffa9dd97e5f5387bc78b85798a26",
+    "events": [
+      {
+        "event": "E0330",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a27bc9a461890c6a31005dd801b911475607fee728b2197eb688135d9c818c28",
+    "version": "evidence/versions/C059_7c40b65_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C060",
+    "commit": "e57d51fef9a6ee197610699685013df6bbb61fd9",
+    "parents": [
+      "7c40b651904a9bd63888e5930d720b612dbbd13f"
+    ],
+    "date": "2026-09-09T09:11:48+02:00",
+    "title": "Restore best validated contact selection threshold",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C060_e57d51f.diff",
+    "diff_sha256": "c2b234eb8a94346d5d48e2a485bc59c9638e53477c3c28964505e086e351ebf2",
+    "events": [
+      {
+        "event": "E0336",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "4e13dbe08fd6935ee0372dbc6caa09e57d15caaa736428cdaeb9d18b15991eba",
+    "version": "evidence/versions/C060_e57d51f_approach.py",
+    "same_policy_as_earlier": [
+      "C058"
+    ]
+  },
+  {
+    "id": "C061",
+    "commit": "ab1562e92357e2214afdc2df4cfc4b3a105b39bd",
+    "parents": [
+      "e57d51fef9a6ee197610699685013df6bbb61fd9"
+    ],
+    "date": "2026-09-09T09:12:26+02:00",
+    "title": "Increase final translation speed within safe release margin",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C061_ab1562e.diff",
+    "diff_sha256": "299e97868c8735255d9faecc5effd5210537c6ff7cea02e53c6902c2090118cd",
+    "events": [
+      {
+        "event": "E0342",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "95aa07f506f73d02c9ae650f30f25f378e338acbafdef749c39bb7c42f0884dc",
+    "version": "evidence/versions/C061_ab1562e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C062",
+    "commit": "3db2f59ad5697179ba73d6345578e9eee4d4212a",
+    "parents": [
+      "ab1562e92357e2214afdc2df4cfc4b3a105b39bd"
+    ],
+    "date": "2026-09-09T09:15:00+02:00",
+    "title": "Keep forced recovery displacement bounded",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C062_3db2f59.diff",
+    "diff_sha256": "5d39b72d869430ee9208f9125d58edbe9ffee788028cd340605080a2cae7ab2b",
+    "events": [
+      {
+        "event": "E0364",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "3206fec55e76c7b96f802d0ed299dc41a504159b79a4d1e8e3930ff1a7064dd3",
+    "version": "evidence/versions/C062_3db2f59_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C063",
+    "commit": "8bd11dfef76a056c4d5dbb87497bbec6a95faab2",
+    "parents": [
+      "3db2f59ad5697179ba73d6345578e9eee4d4212a"
+    ],
+    "date": "2026-09-09T09:15:43+02:00",
+    "title": "Amortize bounded recovery contact over useful distance",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C063_8bd11df.diff",
+    "diff_sha256": "5cb3eaa1ee177bbefefa8f32b1bb522d94661d41cc94b830f1d0c8c511fdb8d8",
+    "events": [
+      {
+        "event": "E0370",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "9efc92f05cfacddd8b4daeb823b4ee73d7196674cba2b83d23906a416aa68143",
+    "version": "evidence/versions/C063_8bd11df_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C064",
+    "commit": "c5ab694aa1b9a802cc64d3b8c6b1d33986d3d12a",
+    "parents": [
+      "8bd11dfef76a056c4d5dbb87497bbec6a95faab2"
+    ],
+    "date": "2026-09-09T09:16:14+02:00",
+    "title": "Use longer goal-directed recovery strokes",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C064_c5ab694.diff",
+    "diff_sha256": "be3f266e5b3e4d81a49f21554b4ce7e42c52c93c4e1b2fa4e4656fcb4670a302",
+    "events": [
+      {
+        "event": "E0376",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "d541bd86883f7be601c6451ebbd8f046ef583f0f1b58517867323aa3ecfd457e",
+    "version": "evidence/versions/C064_c5ab694_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C065",
+    "commit": "47f8a11905c53f94b442187454849ef3dce742a5",
+    "parents": [
+      "c5ab694aa1b9a802cc64d3b8c6b1d33986d3d12a"
+    ],
+    "date": "2026-09-09T09:17:09+02:00",
+    "title": "Use transformed T footprint for boundary recovery",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C065_47f8a11.diff",
+    "diff_sha256": "173e7420bdc9caf3d640193ff329cfa5dd1bb63fc549ee8207d877b011fef0ae",
+    "events": [
+      {
+        "event": "E0382",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "878787dd55bd2807777a72e777b9253c987a2b50b69041d1dd5933f978584349",
+    "version": "evidence/versions/C065_47f8a11_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C066",
+    "commit": "09d0ca9db6096dfb15174a4f123cbdfd2d56a057",
+    "parents": [
+      "47f8a11905c53f94b442187454849ef3dce742a5"
+    ],
+    "date": "2026-09-09T09:17:57+02:00",
+    "title": "Restore validated center-based recovery thresholds",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C066_09d0ca9.diff",
+    "diff_sha256": "48133b3cf4a18bba1f5b749d3b2c9b49d2486c33e45e823ea9485709ba4a1913",
+    "events": [
+      {
+        "event": "E0388",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "d541bd86883f7be601c6451ebbd8f046ef583f0f1b58517867323aa3ecfd457e",
+    "version": "evidence/versions/C066_09d0ca9_approach.py",
+    "same_policy_as_earlier": [
+      "C064"
+    ]
+  },
+  {
+    "id": "C067",
+    "commit": "3d77208780cf2c0b6927bed7e2f9ee491144cb5f",
+    "parents": [
+      "09d0ca9db6096dfb15174a4f123cbdfd2d56a057"
+    ],
+    "date": "2026-09-09T09:18:58+02:00",
+    "title": "Shorten straight retreat after contact separation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C067_3d77208.diff",
+    "diff_sha256": "c95cb6bac03124602fa03074f8255c58f5961d02dc843fc1cfb532be892e5910",
+    "events": [
+      {
+        "event": "E0398",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "dd17d1fac41ab06f2cdf5244abb04c74f665ada88c072d4b906be70fdd448333",
+    "version": "evidence/versions/C067_3d77208_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C068",
+    "commit": "98e64bb8cc1696c92919bdc3618bf2c14d160e1b",
+    "parents": [
+      "3d77208780cf2c0b6927bed7e2f9ee491144cb5f"
+    ],
+    "date": "2026-09-09T09:19:41+02:00",
+    "title": "Use direct final contact setup near positional goal",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C068_98e64bb.diff",
+    "diff_sha256": "4518a9e08b509abb7d9b5d6a4703b697db038e0ca13a6d43fa201368afa03bfd",
+    "events": [
+      {
+        "event": "E0404",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "570579644ccba2ef95bdd94d93feb03da5b97432adf1ccd61ec0c12ecf16207d",
+    "version": "evidence/versions/C068_98e64bb_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C069",
+    "commit": "b7bbb822f69212ac36bbeccf9e7f237a3edc8d37",
+    "parents": [
+      "98e64bb8cc1696c92919bdc3618bf2c14d160e1b"
+    ],
+    "date": "2026-09-09T09:21:05+02:00",
+    "title": "Continue useful incidental contact during translation setup",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C069_b7bbb82.diff",
+    "diff_sha256": "291ee1dd401d0a983d45d657950c90e0d2bf325167e87ad2dcdbcddea698cb94",
+    "events": [
+      {
+        "event": "E0417",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "77b6af0d702d6affcd86e8a45a1b8207554651e3a4af7b95fa5b6a81043c6f5e",
+    "version": "evidence/versions/C069_b7bbb82_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C070",
+    "commit": "4574f1b7af9ad0c34f8ed29726d1301f6de88917",
+    "parents": [
+      "b7bbb822f69212ac36bbeccf9e7f237a3edc8d37"
+    ],
+    "date": "2026-09-09T09:21:36+02:00",
+    "title": "Limit incidental-contact continuation to final approach",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C070_4574f1b.diff",
+    "diff_sha256": "7c0e9bd6198c918e31e8df097766cce53bd624212bafa9598fa33937435f88a2",
+    "events": [
+      {
+        "event": "E0423",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "fac73b207761c7cdeca36c92b1b7782dbcefb974cd1dd0204e496d7a27f85ffb",
+    "version": "evidence/versions/C070_4574f1b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C071",
+    "commit": "1edc02f2726e33284c0d7c5adc202c02fb643d8d",
+    "parents": [
+      "4574f1b7af9ad0c34f8ed29726d1301f6de88917"
+    ],
+    "date": "2026-09-09T09:22:06+02:00",
+    "title": "Tighten opportunistic final-contact continuation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C071_1edc02f.diff",
+    "diff_sha256": "2771de30fb8fbc0af36a9871a42a6b69ecd24809644a3bcf3b136c8eb3d28e69",
+    "events": [
+      {
+        "event": "E0429",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "06b4e3509565ceb194ab2b9456b99956d41686d3c2905d9c4629fa6e109feff6",
+    "version": "evidence/versions/C071_1edc02f_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C072",
+    "commit": "c6a707e93f3919e40ab6c9dc8897f64299fe0c64",
+    "parents": [
+      "1edc02f2726e33284c0d7c5adc202c02fb643d8d"
+    ],
+    "date": "2026-09-09T09:22:42+02:00",
+    "title": "Remove unsafe incidental-contact continuation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C072_c6a707e.diff",
+    "diff_sha256": "2ced96afcd679f9c464179ef16815c563d13d3b7682ec0c2104590e5f39564e1",
+    "events": [
+      {
+        "event": "E0435",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "03757eb566ddcfa282d2e5b594a8259375921ade1787db0b62b4ef4f4f14ea52",
+    "version": "evidence/versions/C072_c6a707e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C073",
+    "commit": "f76f1781b9d028e5ba33d8d23f238bcd341494c2",
+    "parents": [
+      "c6a707e93f3919e40ab6c9dc8897f64299fe0c64"
+    ],
+    "date": "2026-09-09T09:23:53+02:00",
+    "title": "Use direct rotation setup at final position",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C073_f76f178.diff",
+    "diff_sha256": "103f6265ec9b81457e1f7ae05bcb429db239f7768d4153a7bfb8a8438b35a1b2",
+    "events": [
+      {
+        "event": "E0447",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "4040d75d17dbdbc512e3be884a35c37d83fb8c865a2b139a36ed27739405a8ff",
+    "version": "evidence/versions/C073_f76f178_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C074",
+    "commit": "f20ffb6312668550c1e2cf2e7f32f3ef7f036f1b",
+    "parents": [
+      "f76f1781b9d028e5ba33d8d23f238bcd341494c2"
+    ],
+    "date": "2026-09-09T09:24:19+02:00",
+    "title": "Restore planned final rotation approach",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C074_f20ffb6.diff",
+    "diff_sha256": "9e0d199db2f9a0fc096b67419455030cca987eca01656fded63534096f08c733",
+    "events": [
+      {
+        "event": "E0453",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "03757eb566ddcfa282d2e5b594a8259375921ade1787db0b62b4ef4f4f14ea52",
+    "version": "evidence/versions/C074_f20ffb6_approach.py",
+    "same_policy_as_earlier": [
+      "C072"
+    ]
+  },
+  {
+    "id": "C075",
+    "commit": "1c7f1008a670dbfd03570a2aca017b1c05e7c025",
+    "parents": [
+      "f20ffb6312668550c1e2cf2e7f32f3ef7f036f1b"
+    ],
+    "date": "2026-09-09T09:24:44+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C075_1c7f100.diff",
+    "diff_sha256": "f6fea2bd986690376e4fd5c26be40e37ca289e322b9c7274b9cc41997eb08432",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C076",
+    "commit": "1c8a0e6b6f9517ff059688b5c58c108dfbaabc36",
+    "parents": [
+      "1c7f1008a670dbfd03570a2aca017b1c05e7c025"
+    ],
+    "date": "2026-09-09T09:25:27+02:00",
+    "title": "Align planned and runtime translation staging targets",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C076_1c8a0e6.diff",
+    "diff_sha256": "386b0940a3fb948c8b3b9e08a7c42ff07826fc5362198898f4be39d2ad4d9fe0",
+    "events": [
+      {
+        "event": "E0468",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "f612af87ff2fcefacd094f71b5e0f9892c44480191e51d98f59f748baa98c0b0",
+    "version": "evidence/versions/C076_1c8a0e6_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C077",
+    "commit": "77f29bd95fea7291457ef0126cdf07930c4de354",
+    "parents": [
+      "1c8a0e6b6f9517ff059688b5c58c108dfbaabc36"
+    ],
+    "date": "2026-09-09T09:26:38+02:00",
+    "title": "Reverse immediately when translation stroke expires",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C077_77f29bd.diff",
+    "diff_sha256": "074cc90d393be8b0b37389705e2ac9fac3c39bb62a9bbc6e111929104c019a73",
+    "events": [
+      {
+        "event": "E0476",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a2b42d511210cfcc532f72d1de9412c155590b1435bd588d6dbf7bb9a9a3dd03",
+    "version": "evidence/versions/C077_77f29bd_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C078",
+    "commit": "4063195103a988b29324549a425e2b6901e9bca5",
+    "parents": [
+      "77f29bd95fea7291457ef0126cdf07930c4de354"
+    ],
+    "date": "2026-09-09T09:27:08+02:00",
+    "title": "Restore validated final stroke follow-through",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C078_4063195.diff",
+    "diff_sha256": "095335ab6ec0487ae91f16d2c83c3990631e1939482ec44e1185e7be90e6b318",
+    "events": [
+      {
+        "event": "E0482",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "dec549491fdf3252f74842c94a8b2d40a9f42bf42a61d380a9c32c35864e9680",
+    "version": "evidence/versions/C078_4063195_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C079",
+    "commit": "de2487e5d3c89130ce3f53d91e4125851f3c6d7f",
+    "parents": [
+      "4063195103a988b29324549a425e2b6901e9bca5"
+    ],
+    "date": "2026-09-09T09:27:58+02:00",
+    "title": "Begin rotation retreat without an extra torque step",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C079_de2487e.diff",
+    "diff_sha256": "d8f91f07c104a39c1bf9237a1051ee41d4c21af5cc538a3ed154f214ec6e9d48",
+    "events": [
+      {
+        "event": "E0488",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "8b7458944ba56847dffd3ab553484276267bf62d8c853d902372bd10b3c4b7d2",
+    "version": "evidence/versions/C079_de2487e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C080",
+    "commit": "6aeb0f9cdd1f7f56371c7c9610b886bc356e6f52",
+    "parents": [
+      "de2487e5d3c89130ce3f53d91e4125851f3c6d7f"
+    ],
+    "date": "2026-09-09T09:28:26+02:00",
+    "title": "Keep empirically validated rotation follow-through",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C080_6aeb0f9.diff",
+    "diff_sha256": "1b6f678d3cce635b01759cfb5e503fbd94b8ebca5b9cb2b6cf4e486e7d95b395",
+    "events": [
+      {
+        "event": "E0494",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "dec549491fdf3252f74842c94a8b2d40a9f42bf42a61d380a9c32c35864e9680",
+    "version": "evidence/versions/C080_6aeb0f9_approach.py",
+    "same_policy_as_earlier": [
+      "C078"
+    ]
+  },
+  {
+    "id": "C081",
+    "commit": "6923450058217280acd3f03fce2807f2675eeb23",
+    "parents": [
+      "6aeb0f9cdd1f7f56371c7c9610b886bc356e6f52"
+    ],
+    "date": "2026-09-09T09:29:32+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C081_6923450.diff",
+    "diff_sha256": "0a3b9a45d586d01a58f39f316df6e5c16d826d0515baa56d7052c725a6ac9d70",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C082",
+    "commit": "676681812668a84c9c7d05ad1ad6132864b4ff5e",
+    "parents": [
+      "6923450058217280acd3f03fce2807f2675eeb23"
+    ],
+    "date": "2026-09-09T09:30:15+02:00",
+    "title": "Tighten direct final-contact shortcut",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C082_6766818.diff",
+    "diff_sha256": "c4a344676bfe981b9198bea389c52b6b66f6d7f9e9539d931b88477474ba2dea",
+    "events": [
+      {
+        "event": "E0514",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "70b0e11ed082f3a4c9eabebec8b0cd875fbde428b62e91f68e4c4861220d96a4",
+    "version": "evidence/versions/C082_6766818_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C083",
+    "commit": "4c017c70403d6888a1e6a47880fe38583187678a",
+    "parents": [
+      "676681812668a84c9c7d05ad1ad6132864b4ff5e"
+    ],
+    "date": "2026-09-09T09:30:53+02:00",
+    "title": "Restore validated final-contact distance",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C083_4c017c7.diff",
+    "diff_sha256": "aabb94d1c8f2377a270d9c9cbcc6d1272c67a14a9d776f57de1a6a78c6df2de9",
+    "events": [
+      {
+        "event": "E0520",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "dec549491fdf3252f74842c94a8b2d40a9f42bf42a61d380a9c32c35864e9680",
+    "version": "evidence/versions/C083_4c017c7_approach.py",
+    "same_policy_as_earlier": [
+      "C078",
+      "C080"
+    ]
+  },
+  {
+    "id": "C084",
+    "commit": "5a4bc815b96c515d6a66d86b5dfbcd959f759b03",
+    "parents": [
+      "4c017c70403d6888a1e6a47880fe38583187678a"
+    ],
+    "date": "2026-09-09T09:31:03+02:00",
+    "title": "Reduce unnecessary near-tolerance rotation cycles",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C084_5a4bc81.diff",
+    "diff_sha256": "a6bfe63a084676e5e470c5297e8d83e176f79842863cb5c9610c7640b1ff9336",
+    "events": [
+      {
+        "event": "E0524",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "ee3236059693abdd44c9fe0f198ca0c8508ee925a34d830260fba5e9fdd77147",
+    "version": "evidence/versions/C084_5a4bc81_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C085",
+    "commit": "6bfc26e0f56d461a6afe0148b2286916e6eb2559",
+    "parents": [
+      "5a4bc815b96c515d6a66d86b5dfbcd959f759b03"
+    ],
+    "date": "2026-09-09T09:31:42+02:00",
+    "title": "Restore conservative orientation correction threshold",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C085_6bfc26e.diff",
+    "diff_sha256": "fa75ee33b3b75cb245c9a781efa17f35bd9fbc3a8e063a405295ef5c84076fa4",
+    "events": [
+      {
+        "event": "E0530",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "dec549491fdf3252f74842c94a8b2d40a9f42bf42a61d380a9c32c35864e9680",
+    "version": "evidence/versions/C085_6bfc26e_approach.py",
+    "same_policy_as_earlier": [
+      "C078",
+      "C080",
+      "C083"
+    ]
+  },
+  {
+    "id": "C086",
+    "commit": "389102449ee3ebe52abbd04c8d0f81f4307461c2",
+    "parents": [
+      "6bfc26e0f56d461a6afe0148b2286916e6eb2559"
+    ],
+    "date": "2026-09-09T09:33:00+02:00",
+    "title": "Keep nontrivial obstacle routes during final approach",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C086_3891024.diff",
+    "diff_sha256": "a47ad06f7929fe50ee2f6401c4f586eed922488e45fcc3293a2b8e87711688bf",
+    "events": [
+      {
+        "event": "E0539",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "5a2970526c1e8411727a1dc1a897d8da4758d516bac6a4aa15e5f26d9e668863",
+    "version": "evidence/versions/C086_3891024_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C087",
+    "commit": "37b79db24804ffdaba5beab5fb9f81ebd500add7",
+    "parents": [
+      "389102449ee3ebe52abbd04c8d0f81f4307461c2"
+    ],
+    "date": "2026-09-09T09:33:32+02:00",
+    "title": "Retain higher-scoring direct final approach",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C087_37b79db.diff",
+    "diff_sha256": "458dae9d7e0795bf4795e34cbdc11edb3000ae77d91a0480916646f2dec88a85",
+    "events": [
+      {
+        "event": "E0545",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "dec549491fdf3252f74842c94a8b2d40a9f42bf42a61d380a9c32c35864e9680",
+    "version": "evidence/versions/C087_37b79db_approach.py",
+    "same_policy_as_earlier": [
+      "C078",
+      "C080",
+      "C083",
+      "C085"
+    ]
+  },
+  {
+    "id": "C088",
+    "commit": "97642a09b90c407db509adc6ad7ab6d7e3be486d",
+    "parents": [
+      "37b79db24804ffdaba5beab5fb9f81ebd500add7"
+    ],
+    "date": "2026-09-09T09:34:26+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C088_97642a0.diff",
+    "diff_sha256": "748957b34cb54bf4bfff41577153536a06c44e2cfc53af99b0fe1139190b3cf6",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C089",
+    "commit": "e848b3aeae9df192b4c0e096c3ef9f1f31ef3544",
+    "parents": [
+      "97642a09b90c407db509adc6ad7ab6d7e3be486d"
+    ],
+    "date": "2026-09-09T09:36:25+02:00",
+    "title": "Test direct late-stage rotation setup",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C089_e848b3a.diff",
+    "diff_sha256": "c2dc4e43d5da333df9546a10acde4bd3442b9bba8c21703482b9338372c7ef18",
+    "events": [
+      {
+        "event": "E0569",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "346d7d19b690c68409a826b88db5e72653278bacc0cbb15cff5a11fb5425ee98",
+    "version": "evidence/versions/C089_e848b3a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C090",
+    "commit": "498959a5cf61bf0412d8101f89268bc419edad03",
+    "parents": [
+      "e848b3aeae9df192b4c0e096c3ef9f1f31ef3544"
+    ],
+    "date": "2026-09-09T09:36:58+02:00",
+    "title": "Restore safe planned rotation setup",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C090_498959a.diff",
+    "diff_sha256": "9f0aa9f6d63c9909124adff6ba23b3110d4a85585651b47e2b43ddce22f13358",
+    "events": [
+      {
+        "event": "E0575",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "dec549491fdf3252f74842c94a8b2d40a9f42bf42a61d380a9c32c35864e9680",
+    "version": "evidence/versions/C090_498959a_approach.py",
+    "same_policy_as_earlier": [
+      "C078",
+      "C080",
+      "C083",
+      "C085",
+      "C087"
+    ]
+  },
+  {
+    "id": "C091",
+    "commit": "6732cff03f01cca1077cea7a4433c71406c4c633",
+    "parents": [
+      "498959a5cf61bf0412d8101f89268bc419edad03"
+    ],
+    "date": "2026-09-09T09:37:50+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C091_6732cff.diff",
+    "diff_sha256": "cbf7f40f2620c6a242576cd3bde7d8227b0823ab3a212d47bb716cc14b95dc17",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C092",
+    "commit": "e206af941b25c1ab1530cc71e9a3f68255482c96",
+    "parents": [
+      "6732cff03f01cca1077cea7a4433c71406c4c633"
+    ],
+    "date": "2026-09-09T09:39:05+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C092_e206af9.diff",
+    "diff_sha256": "d203afa183d03e4a6a89e2ed2f4435731210407e9bdd518a9f33a38c0e74d2bb",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C093",
+    "commit": "d99bdea0d3f5d0b082e4cbdef2476a9d52862262",
+    "parents": [
+      "e206af941b25c1ab1530cc71e9a3f68255482c96"
+    ],
+    "date": "2026-09-09T09:39:59+02:00",
+    "title": "Test faster long-distance translation strokes",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C093_d99bdea.diff",
+    "diff_sha256": "01a1386c9a80484ca6c8644b9d2a4d2150ca1092d0b8e264039bdcc3fd44f212",
+    "events": [
+      {
+        "event": "E0607",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a01eef97237a07ffae48918be909c7f77522435b14b1ae6c2d6924483a560683",
+    "version": "evidence/versions/C093_d99bdea_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C094",
+    "commit": "90333d013b517d768f8ca1cc70adc67b640397b8",
+    "parents": [
+      "d99bdea0d3f5d0b082e4cbdef2476a9d52862262"
+    ],
+    "date": "2026-09-09T09:40:50+02:00",
+    "title": "Restore stable long-distance translation speed",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C094_90333d0.diff",
+    "diff_sha256": "abe3ff644c8749498723c68f506d83d5b0128df38e3d3ca8fa24bd6b7f802c23",
+    "events": [
+      {
+        "event": "E0615",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "dec549491fdf3252f74842c94a8b2d40a9f42bf42a61d380a9c32c35864e9680",
+    "version": "evidence/versions/C094_90333d0_approach.py",
+    "same_policy_as_earlier": [
+      "C078",
+      "C080",
+      "C083",
+      "C085",
+      "C087",
+      "C090"
+    ]
+  },
+  {
+    "id": "C095",
+    "commit": "548345d5bd1f80739a3f6b22f28b7fce940c6571",
+    "parents": [
+      "90333d013b517d768f8ca1cc70adc67b640397b8"
+    ],
+    "date": "2026-09-09T09:41:26+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C095_548345d.diff",
+    "diff_sha256": "0169cd0fbf36de72560508ab56839916b8346cc02c9e6a030ef1917addfd0824",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C096",
+    "commit": "f6c33d6681a8c5ca9f490fd46e4d41490d245705",
+    "parents": [
+      "548345d5bd1f80739a3f6b22f28b7fce940c6571"
+    ],
+    "date": "2026-09-09T09:42:52+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C096_f6c33d6.diff",
+    "diff_sha256": "0f1948266ec2b7794fe8b3fdc379f182e1d3c46bb68cb23f8bc8b83dc9d62915",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C097",
+    "commit": "3414e2337e9fad27b4553c398fab99fe3db6faa0",
+    "parents": [
+      "f6c33d6681a8c5ca9f490fd46e4d41490d245705"
+    ],
+    "date": "2026-09-09T09:44:24+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C097_3414e23.diff",
+    "diff_sha256": "43f444702aa31262468e999db2986d3fb3949da17892eb0ce5e904f7d4bd39f3",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C098",
+    "commit": "a54cb35202a19b7687c4c62d6ea267338e454311",
+    "parents": [
+      "3414e2337e9fad27b4553c398fab99fe3db6faa0"
+    ],
+    "date": "2026-09-09T09:44:56+02:00",
+    "title": "Try slightly earlier direct final approach",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C098_a54cb35.diff",
+    "diff_sha256": "9fca95becdae30ee856fb3a1a15d09b20b43fba8d7c31331908c0cc6ad1fd901",
+    "events": [
+      {
+        "event": "E0663",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "d6b53403aaf0c45da2f8a88c59fc538a28080e2c8380b17f2749f4af27ca7ebf",
+    "version": "evidence/versions/C098_a54cb35_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C099",
+    "commit": "27c77f7441b23c8aed60f52f35aabf0b9c5b5e52",
+    "parents": [
+      "a54cb35202a19b7687c4c62d6ea267338e454311"
+    ],
+    "date": "2026-09-09T09:45:15+02:00",
+    "title": "Restore validated direct approach cutoff",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C099_27c77f7.diff",
+    "diff_sha256": "6508d3578b19f61a3ad1c5cbc1b31cb6ba08469ad5ec480b2d9e1408102f191c",
+    "events": [
+      {
+        "event": "E0670",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "dec549491fdf3252f74842c94a8b2d40a9f42bf42a61d380a9c32c35864e9680",
+    "version": "evidence/versions/C099_27c77f7_approach.py",
+    "same_policy_as_earlier": [
+      "C078",
+      "C080",
+      "C083",
+      "C085",
+      "C087",
+      "C090",
+      "C094"
+    ]
+  },
+  {
+    "id": "C100",
+    "commit": "b1237798fdff6bc525235402407f1978b14e67c7",
+    "parents": [
+      "27c77f7441b23c8aed60f52f35aabf0b9c5b5e52"
+    ],
+    "date": "2026-09-09T09:45:21+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C100_b123779.diff",
+    "diff_sha256": "c82d4a50c240e47e38de9693dd6a4ec0841ac36b24f26ec47790cb0416114741",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C101",
+    "commit": "8d393fab872a58905d18f6be091023eb043d0e9b",
+    "parents": [
+      "b1237798fdff6bc525235402407f1978b14e67c7"
+    ],
+    "date": "2026-09-09T09:46:33+02:00",
+    "title": "Avoid marginal rotation cycles near episode horizon",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C101_8d393fa.diff",
+    "diff_sha256": "726cc09fc6a41e968f8bd79dceb77942d32990ae45388a1878668d151efe0681",
+    "events": [
+      {
+        "event": "E0687",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "bbb8eb0f7a1ed73548c38a2a9344f6197794c43386701f3a54c8cc7cc846b50d",
+    "version": "evidence/versions/C101_8d393fa_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C102",
+    "commit": "636532f067ca4e498ff0270c6264adf0da2ebc56",
+    "parents": [
+      "8d393fab872a58905d18f6be091023eb043d0e9b"
+    ],
+    "date": "2026-09-09T09:46:57+02:00",
+    "title": "Restore strict rotation threshold after horizon test",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C102_636532f.diff",
+    "diff_sha256": "20f2b4346a21e3acb0d4e186c3c0de785c239321efbd68c9080d1116439d8fb9",
+    "events": [
+      {
+        "event": "E0694",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "dec549491fdf3252f74842c94a8b2d40a9f42bf42a61d380a9c32c35864e9680",
+    "version": "evidence/versions/C102_636532f_approach.py",
+    "same_policy_as_earlier": [
+      "C078",
+      "C080",
+      "C083",
+      "C085",
+      "C087",
+      "C090",
+      "C094",
+      "C099"
+    ]
+  },
+  {
+    "id": "C103",
+    "commit": "98f39c080cf09842957cadb474478c1c6484399d",
+    "parents": [
+      "636532f067ca4e498ff0270c6264adf0da2ebc56"
+    ],
+    "date": "2026-09-09T09:47:03+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C103_98f39c0.diff",
+    "diff_sha256": "8a847681501cbb7bc0551a8350f6fdddda4976961cdff320aef2f0f7eac58e5a",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C104",
+    "commit": "2e6c1435aea66c93b69acebf9287d8b6fdc3316d",
+    "parents": [
+      "98f39c080cf09842957cadb474478c1c6484399d"
+    ],
+    "date": "2026-09-09T09:48:06+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C104_2e6c143.diff",
+    "diff_sha256": "4aac215b5849314448ebb8ebef17f1e7d40d992179d707efd1d65181d74e043a",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C105",
+    "commit": "93c667493203a26bb0a71cc75f227e20505cc265",
+    "parents": [
+      "2e6c1435aea66c93b69acebf9287d8b6fdc3316d"
+    ],
+    "date": "2026-09-09T09:49:01+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C105_93c6674.diff",
+    "diff_sha256": "2f4c499c8105d0eb879e4d830428a77f4e309ab1faf15aadd601a1e8d2491531",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C106",
+    "commit": "dbadd615237b51fdda645851287f467f79912b1e",
+    "parents": [
+      "93c667493203a26bb0a71cc75f227e20505cc265"
+    ],
+    "date": "2026-09-09T09:49:35+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C106_dbadd61.diff",
+    "diff_sha256": "b6dde280f94de019ee8ece8363e96d3f85da3c2214e0e82c50101fe2c801fe04",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C107",
+    "commit": "9d5823d4676feb0893a726a3323b452e6247c8b6",
+    "parents": [
+      "dbadd615237b51fdda645851287f467f79912b1e"
+    ],
+    "date": "2026-09-09T09:50:12+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C107_9d5823d.diff",
+    "diff_sha256": "1590ef01fe03d5d7f67b3e6507b7ae89a3365b582e92a45fa6a57dbd42487918",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C108",
+    "commit": "0f71f90121f2d57194000494ba69236aa7768777",
+    "parents": [
+      "9d5823d4676feb0893a726a3323b452e6247c8b6"
+    ],
+    "date": "2026-09-09T09:50:53+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C108_0f71f90.diff",
+    "diff_sha256": "b55fe9fb5760f256f18973b0b31834627864f9fe46cc37effce3996126b093f1",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C109",
+    "commit": "e2c17471031a6b8cbc2622843797ebc16a185cfa",
+    "parents": [
+      "0f71f90121f2d57194000494ba69236aa7768777"
+    ],
+    "date": "2026-09-09T09:51:26+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C109_e2c1747.diff",
+    "diff_sha256": "6827109aa8c870eefe3b5e20afd0841a9360d53b31cea436a2277aaca7f549c5",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C110",
+    "commit": "362deb8cdce6f9c1fab43a01cf91aff2eabc6d40",
+    "parents": [
+      "e2c17471031a6b8cbc2622843797ebc16a185cfa"
+    ],
+    "date": "2026-09-09T09:51:54+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C110_362deb8.diff",
+    "diff_sha256": "7baaa558f13614219031a8e3431de61a1b326d6f5927cc7d580f4ec5d661d76e",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C111",
+    "commit": "47dea9d34800e0ab5751c3e0a5b8bf2438d4d7ea",
+    "parents": [
+      "362deb8cdce6f9c1fab43a01cf91aff2eabc6d40"
+    ],
+    "date": "2026-09-09T09:52:24+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      "AGENTS.md"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C111_47dea9d.diff",
+    "diff_sha256": "f2fc2ae147acb3b311c8c7dbfca0e554e340116d7e9e4846ac95dd82c1e02442",
+    "events": [],
+    "annotation": {}
+  }
+]

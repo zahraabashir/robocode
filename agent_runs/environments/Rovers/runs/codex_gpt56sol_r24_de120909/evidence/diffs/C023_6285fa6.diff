@@ -1,0 +1,26 @@
+diff --git a/approach.py b/approach.py
+index 3b30b1b..6d48354 100644
+--- a/approach.py
++++ b/approach.py
+@@ -48,7 +48,9 @@ class GeneratedApproach:
+                 # corner are not drive-reachable; prefer either of the other two.
+                 trapped = owner==1 and math.dist((x,y),lq)<.60
+                 edge = abs(x)>2.20 or abs(y)>2.20
+-                choices.append((int(trapped or edge),math.dist(self.home[owner],(x,y)),owner,o.name))
++                pillars=self._rects(state)[5:]  # skip wall, four mounds
++                pinched=any(math.dist((x,y),(r[0],r[1]))<.34 for r in pillars)
++                choices.append((int(trapped or edge or pinched),math.dist(self.home[owner],(x,y)),owner,o.name))
+             if choices:
+                 _,_,owner,name=min(choices)
+                 self.sample_jobs[owner][soil]=name
+@@ -241,7 +243,9 @@ class GeneratedApproach:
+             r=state.get_object_from_name(self.names[i]); pos=(state.get(r,"x"),state.get(r,"y"))
+             if self.last_motion[i] is not None and math.dist(pos,self.lastpos[i])<.0005:
+                 bx,by=self.last_motion[i]
+-                self.extra_rects[i].append((bx,by,.07,.07))
++                if not any(math.dist((bx,by),(r[0],r[1]))<.08 for r in self.extra_rects[i]):
++                    self.extra_rects[i].append((bx,by,.07,.07))
++                    self.extra_rects[i]=self.extra_rects[i][-12:]
+                 self.paths[i]=[]; self.targets[i]=None
+             rects=base_rects+self.extra_rects[i]
+             if self.last_ops[i]=="send":

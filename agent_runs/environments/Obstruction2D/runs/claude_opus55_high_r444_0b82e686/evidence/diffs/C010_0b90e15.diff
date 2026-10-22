@@ -1,0 +1,16 @@
+diff --git a/approach.py b/approach.py
+index 8864fb7..b7ff0dd 100644
+--- a/approach.py
++++ b/approach.py
+@@ -288,8 +288,9 @@ class GeneratedApproach:
+                 if nxt is not None:
+                     obst_n = [o for o in obst2 if not (o[0] == nxt["x"] and o[2] == nxt["top"])]
+                     cost += self._steps(rx, ty, ngx, ngty, bparts0, obst_n)
+-                    if next_name == "target_block":
+-                        cost += self._steps(ngx, ngty, px, pty, pparts, obst_n)
++                if blk is not None and self.place_c is not None:
++                    obst_b = [o for o in obst2 if not (o[0] == blk["x"] and o[2] == blk["top"])]
++                    cost += self._steps(bgx, bgty, px, pty, pparts, obst_b)
+                 cost += 1e-3 * abs(c - held["cx"])
+                 if best is None or cost < best[0]:
+                     best = (cost, c, bot)

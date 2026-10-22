@@ -1,0 +1,46 @@
+diff --git a/approach.py b/approach.py
+index 9b89149..050d383 100644
+--- a/approach.py
++++ b/approach.py
+@@ -85,6 +85,8 @@ class GeneratedApproach:
+ 
+     # ----------------------------------------------------------------- reset
+     def reset(self, state, info):
++        self.xs = np.arange(0.0, WORLD_X[1] + 1e-9, 0.005)
++        self.dxs = 0.005
+         self.phase = 'plan'
+         self.task = None
+         self.held = None
+@@ -142,10 +144,13 @@ class GeneratedApproach:
+         best = None
+         others = [(n, o) for n, o in rects.items()
+                   if o['type'] != 'target_surface' and n != blk['name']]
++        PA = self._profile(self.xs, rects, None)
+         for gi, gx in enumerate(gxs):
+             gy = blk['y1'] + ARM_MAX + r['gw'] + self.grasp_eps
+             held = dict(name=blk['name'], dx0=blk['x0'] - gx, dx1=blk['x1'] - gx,
+                         dy0=blk['y0'] - gy, dy1=blk['y1'] - gy)
++            cA = self._est(r['x'], r['y'], gx, gy, PA)
++            PB = self._profile(self.xs, {n: o for n, o in others}, held)
+             bottom = surf['y1'] + BOTTOM_OFF
+             ry = bottom - held['dy0']
+             res = []
+@@ -158,7 +163,7 @@ class GeneratedApproach:
+                     need = self._clear_y_at(rx, {name: o}, held, ARM_MAX)
+                     if need > ry - 1e-4:
+                         blockers.append(name)
+-                cost = abs(px - centre) * 0.1 + 0.001 * gi
++                cost = cA + self._est(gx, gy, rx, ry, PB) + abs(px - centre) * 0.1 + 0.001 * gi
+                 res.append((len(blockers), cost, rx, ry, blockers))
+             if not res:
+                 continue
+@@ -214,8 +219,7 @@ class GeneratedApproach:
+ 
+     def _drop_spot(self, o, rects, surf, blk):
+         r = self.r
+-        self.xs = xs = np.arange(0.0, WORLD_X[1] + 1e-9, 0.005)
+-        self.dxs = 0.005
++        xs = self.xs
+         gx = self._grasp_x(o, rects)
+         gy = o['y1'] + ARM_MAX + r['gw'] + self.grasp_eps
+         held = self._mk_held(o, gx, gy)

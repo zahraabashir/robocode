@@ -1,0 +1,27 @@
+diff --git a/approach.py b/approach.py
+index 3cf27cc..f1393bf 100644
+--- a/approach.py
++++ b/approach.py
+@@ -144,8 +144,9 @@ class GeneratedApproach:
+             # the fingers entirely, so release without Cartesian motion.
+             a[10]=1.; self.release_t+=1; return a
+         clearance=.19
++        drop_z=self.rest_z+.005 if self.object_name=="target_block" else self.rest_z+.04
+         goals=[np.array([pos[0],pos[1],clearance]),np.array([self.dest[0],self.dest[1],clearance]),
+-               np.array([self.dest[0],self.dest[1],self.rest_z+.005])]
++               np.array([self.dest[0],self.dest[1],drop_z])]
+         goal=goals[self.waypoint]; poserr=goal-pos
+         err=np.r_[poserr, -feat[3:]]
+         if self.waypoint==1:
+@@ -155,7 +156,10 @@ class GeneratedApproach:
+         tol=.012 if self.waypoint<2 else .004
+         arrived=(np.linalg.norm(poserr)<tol)
+         if self.waypoint==2:
+-            arrived=(np.linalg.norm(poserr[:2])<.004 and pos[2]<self.rest_z+.012)
++            if self.object_name=="target_block":
++                arrived=(np.linalg.norm(poserr[:2])<.004 and pos[2]<self.rest_z+.012)
++            else:
++                arrived=np.linalg.norm(poserr)<.006
+         if arrived and np.linalg.norm(feat[3:])<.025:
+             self.waypoint+=1
+             # The last waypoint seats the object before opening the fingers.

@@ -1,0 +1,47 @@
+"""Small black-box probes for rover state geometry and action semantics."""
+from env_client import make_env
+import numpy as np
+
+
+def snapshot(state, env):
+    out = {}
+    for typ in env.observation_space.types:
+        vals = []
+        for obj in state.get_objects(typ):
+            fs = env.observation_space.type_features[typ]
+            vals.append((obj.name, {f: float(state.get(obj, f)) for f in fs}))
+        out[typ.name] = vals
+    return out
+
+
+def main():
+    for seed in range(8):
+        env = make_env()
+        s, info = env.reset(seed=seed)
+        d = snapshot(s, env)
+        print("SEED", seed, "max", env.max_steps)
+        for typ in ("rover", "lander", "objective", "sample", "obstacle"):
+            print(typ, d[typ])
+        env.close()
+
+    # Raw action scaling and heading behavior from a fresh seed.
+    env = make_env()
+    s, _ = env.reset(seed=0)
+    rt = env.observation_space.get_type("rover")
+    rs = list(s.get_objects(rt))
+    print("MOTION INITIAL", [(o.name, float(s.get(o,"x")), float(s.get(o,"y")), float(s.get(o,"theta"))) for o in rs])
+    tests = [
+        np.array([1,0,0,0, 0,0,0,0], np.float32),
+        np.array([0,1,0,0, 0,0,0,0], np.float32),
+        np.array([0,0,1,0, 0,0,0,0], np.float32),
+        np.array([1,1,1,0, 0,0,0,0], np.float32),
+        np.array([-1,-1,-1,0, 0,0,0,0], np.float32),
+    ]
+    for a in tests:
+        s, r, term, trunc, info = env.step(a)
+        print("ACT", a.tolist(), [(o.name, float(s.get(o,"x")), float(s.get(o,"y")), float(s.get(o,"theta"))) for o in rs], r, term, trunc)
+    env.close()
+
+
+if __name__ == "__main__":
+    main()

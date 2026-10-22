@@ -1,0 +1,24 @@
+diff --git a/approach.py b/approach.py
+index d1d1bce..46bc284 100644
+--- a/approach.py
++++ b/approach.py
+@@ -29,6 +29,10 @@ class GeneratedApproach:
+                                            abs(x - sx) - sw / 2), reverse=True)
+         self.parking = {}
+         used = []
++        self.target_park = tx
++        if crowded:
++            self.target_park = candidates[0]
++            used.append((self.target_park, tw))
+         for o in obstacles:
+             ow = state.get(o, "width")
+             valid = [x for x in candidates if all(abs(x - px) > (ow + pw) / 2 + 0.04
+@@ -139,7 +143,7 @@ class GeneratedApproach:
+             if is_target:
+                 desired_obj_x = state.get(surface, "x") + 0.008
+             elif obj.type.name == "target_block":
+-                desired_obj_x = self.initial_x[obj.name]
++                desired_obj_x = self.target_park
+             else:
+                 desired_obj_x = self.parking[obj.name]
+             tx = desired_obj_x - self.grasp_dx

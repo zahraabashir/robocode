@@ -1,0 +1,32 @@
+diff --git a/debug_policy.py b/debug_policy.py
+new file mode 100644
+index 0000000..7e2f161
+--- /dev/null
++++ b/debug_policy.py
+@@ -0,0 +1,13 @@
++from env_client import make_env
++from approach import GeneratedApproach
++from kin import fk
++import sys,numpy as np
++seed=int(sys.argv[1]) if len(sys.argv)>1 else 0
++E=make_env();s,i=E.reset(seed=seed);p=GeneratedApproach(E.action_space,E.observation_space,{});p.reset(s,i)
++for t in range(180):
++ a=p.get_action(s);s,rew,te,tr,inf=E.step(a)
++ if t%10==0 or te:
++  r=p.robot;q=np.array([s.get(r,'joint_'+str(k)) for k in range(1,8)]);m,_=fk(q);m+=np.array([s.get(r,'pos_base_x')+.12,s.get(r,'pos_base_y'),0])
++  print(t,p.phase,p.obj,'pos',p.pos(s,p.obj).round(4),'model',m.round(4),'a',a.round(4),'stall',p.stall,flush=True)
++ if te:print('SUCCESS');break
++E.close()
+diff --git a/probe_dispose.out b/probe_dispose.out
+index b585229..52e39ea 100644
+--- a/probe_dispose.out
++++ b/probe_dispose.out
+@@ -1,4 +1,4 @@
+-GRASP blocktop 0.0 0.10499999999999982
+-GRASP table 0.0 0.10499999999999982
+-GRASP offtable075 0.0 0.10499999999999982
+-GRASP offtablezero 0.0 0.10499999999999982
++GRASP blocktop 1.0 0.14499999999999985 [ 0.     0.494 -3.142 -1.871  0.    -0.777  0.   ] [0.42  0.001 0.145] -0.4365674555301666 0.2470032125711441
++DROP blocktop desired 0.33598166704177856 0.17328143119812012 0.1360547717884183 actual [0.33598169684410095, 0.17328104376792908, 0.13605476915836334] held 1.0
++GRASP table 1.0 0.14499999999999985 [ 0.     0.494 -3.142 -1.871  0.    -0.777  0.   ] [0.42  0.001 0.145] -0.4365674555301666 0.2470032125711441
++DROP table desired 0.4 -0.25 0.08605476992577314 actual [0.40000003576278687, -0.24999986588954926, 0.08605478703975677] held 0.0

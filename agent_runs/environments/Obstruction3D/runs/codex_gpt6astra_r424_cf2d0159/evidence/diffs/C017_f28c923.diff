@@ -1,0 +1,63 @@
+diff --git a/probe_raster.log b/probe_raster.log
+index 252d2ae..21e5d3d 100644
+--- a/probe_raster.log
++++ b/probe_raster.log
+@@ -6,3 +6,9 @@ INIT 0.3 [0.33598167 0.17328143 0.1       ] [ 0.          0.86133325 -3.14159265
+ FAIL 0.3
+ INIT 0.24 [0.33598167 0.17328143 0.1       ] [ 0.          0.92014468 -3.14159265 -1.08472889  0.         -1.13671908
+   1.57079633]
++FAIL 0.24
++INIT 0.33 [0.33598167 0.17328143 0.1       ] [ 0.          0.83945906 -3.14159265 -0.95056624  0.         -1.35156736
++  1.57079633]
++FAIL 0.33
++INIT 0.36 [0.33598167 0.17328143 0.1       ] [ 0.          0.82350159 -3.14159265 -0.88556226  0.         -1.43252879
++  1.57079633]
+diff --git a/probe_raster2.py b/probe_raster2.py
+new file mode 100644
+index 0000000..fe14e46
+--- /dev/null
++++ b/probe_raster2.py
+@@ -0,0 +1,29 @@
++from env_client import make_env
++from probe_fk import fk
++from scipy.optimize import least_squares
++import numpy as np
++q0=np.array([0,-.35,-np.pi,-2.5,0,-.87,np.pi/2])
++def solve(x,z):
++ def fun(v):
++  q=q0.copy();q[[1,3,5]]=v;p,r=fk(q);return np.r_[5*(p[[0,2]]-[x,z]),r[:,2]-[0,0,-1]]
++ v=least_squares(fun,q0[[1,3,5]],max_nfev=100).x;q=q0.copy();q[[1,3,5]]=v;return q
++e=make_env()
++for z in [.27,.3,.24,.33,.36,.39,.42]:
++ s,_=e.reset(seed=0,options={'object_count':0});o=s.get_object_from_name('target_block');ro=s.get_object_from_name('robot');target=np.array([s.get(o,'pose_'+v) for v in 'xyz']);q=solve(.62,z)
++ print('INIT',z,target,q,flush=True)
++ for t in range(60):
++  cur=np.array([s.get(ro,'joint_'+str(j)) for j in range(1,8)]);a=np.zeros(11);a[:2]=np.clip([-.8-s.get(ro,'pos_base_x'),-.6-s.get(ro,'pos_base_y')],-.1,.1)
++  if t>10:a[3:10]=np.clip(q-cur,-.04,.04)
++  s,r,term,tr,i=e.step(a)
++ print('ACTUAL_Q', [s.get(ro,'joint_'+str(j)) for j in range(1,8)],flush=True)
++ for ix,dx in enumerate(np.arange(-.15,.151,.03)):
++  ys=np.arange(-.15,.151,.03)
++  if ix%2:ys=ys[::-1]
++  for dy in ys:
++   for t in range(10):
++    a=np.zeros(11);a[:2]=np.clip([target[0]-.62+dx-s.get(ro,'pos_base_x'),target[1]-.001+dy-s.get(ro,'pos_base_y')],-.1,.1);s,r,term,tr,i=e.step(a)
++   a=np.zeros(11);a[-1]=-1;s,r,term,tr,i=e.step(a)
++   if s.get(ro,'grasp_active'):
++    print('SUCCESS',z,dx,dy,{f:s.get(ro,f) for f in s.type_features[ro.type]},flush=True);e.close();quit()
++ print('FAIL',z,flush=True)
++e.close()
+diff --git a/probe_yaw.log b/probe_yaw.log
+new file mode 100644
+index 0000000..8f07d6a
+--- /dev/null
++++ b/probe_yaw.log
+@@ -0,0 +1,8 @@
++FAIL 2 0 tip [0.5        0.00099992 0.11000001]
++FAIL 2 3.141592653589793 tip [0.49999998 0.00099992 0.11000001]
++FAIL 2 -1.5707963267948966 tip [0.5        0.00099992 0.11000001]
++FAIL 2 1.5707963267948966 tip [0.49999999 0.00100004 0.11000001]
++FAIL 0 0 tip [0.49999999 0.00100004 0.11000001]
++FAIL 0 3.141592653589793 tip [0.50000005 0.00100004 0.11000004]
++FAIL 0 -1.5707963267948966 tip [0.49999999 0.00100004 0.11000001]
++FAIL 0 1.5707963267948966 tip [0.49999998 0.00099992 0.11000001]

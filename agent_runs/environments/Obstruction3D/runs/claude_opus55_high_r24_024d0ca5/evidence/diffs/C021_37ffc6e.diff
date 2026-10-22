@@ -1,0 +1,429 @@
+diff --git a/approach.py b/approach.py
+index 83fd918..62fd63f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -131,6 +131,7 @@ class GeneratedApproach:
+         self.fails = {}
+         self.blk_moves = {}
+         self.stuck = 0
++        self.micro = 0
+         self.descent_len = 0
+         self.release_tries = 0
+         self.grasp_attempt = 0
+@@ -469,10 +470,19 @@ class GeneratedApproach:
+         if ph == 'to_place':
+             if self._grasped_name(state) is None:
+                 return self._on_released(state)
++            if self.micro > 0:
++                a = self._micro_up(state)
++                if a is not None:
++                    return a
+             if self.blocked:
+                 self.stuck += 1
+                 if len(self.qpath) <= self.descent_len:
+                     self.qpath = []
++                elif self.stuck >= 2 and self.micro == 0 and self._held_low(state):
++                    self.micro = 1
++                    a = self._micro_up(state)
++                    if a is not None:
++                        return a
+                 elif self.stuck >= 3:
+                     self._plan_place(state, replan=True)
+             a = self._track(state)
+@@ -535,6 +545,35 @@ class GeneratedApproach:
+                     self.tasks.insert(0, (n, 'clear'))
+         self._start_task(state)
+ 
++    def _held_low(self, state):
++        g = self._grasped_name(state)
++        if g is None:
++            return False
++        p, _, h = self._pose(state, g)
++        top = self.table_z
++        for n in self.names:
++            if n == g:
++                continue
++            c, hh, b, t = self._box(state, n)
++            if np.linalg.norm(c[:2] - p[:2]) < 0.1:
++                top = max(top, t)
++        return p[2] - h[2] < top + 0.01
++
++    def _micro_up(self, state):
++        # tiny straight-up steps: large moves get rejected when the held object is wedged
++        if (self.micro > 1 and self.blocked) or self.micro > 60 or not self._held_low(state):
++            self.micro = 0
++            self._plan_place(state, replan=False)
++            return None
++        self.micro += 1
++        x = self._x(state)
++        T = wb_fk(x)
++        yaw = np.arctan2(T[1, 0], T[0, 0])
++        xn, ok = self._ik(x, T[:3, 3] + np.array([0, 0, 0.0045]), down_R(yaw))
++        a = self._noop()
++        a[:10] = np.clip(xn - x, -STEP, STEP)
++        return a
++
+     def _plan_place(self, state, replan=False):
+         name = self.cur_obj
+         p, qo, h = self._pose(state, name)
+diff --git a/dbg_jd.py b/dbg_jd.py
+index 6517da5..d2ce510 100644
+--- a/dbg_jd.py
++++ b/dbg_jd.py
+@@ -7,6 +7,6 @@ env=make_env(); obs,info=env.reset(seed=int(sys.argv[1]),options={'object_count'
+ ap=GeneratedApproach(env.action_space,env.observation_space,{}); ap.reset(obs,info)
+ for t in range(int(sys.argv[2])):
+     a=ap.get_action(obs); obs,*_=env.step(a)
+-q=ap._q(obs); print('q',np.round(q,2))
++q=ap._x(obs); print('q',np.round(q,2))
+ for i,qp in enumerate(ap.qpath[:30]):
+-    T=tool_fk(qp,ap._base(obs)); print(i,np.round(T[:3,3],3),round(float(np.arctan2(T[1,0],T[0,0])),2),np.round(qp-q,2)); q=qp
++    from kin import wb_fk; T=wb_fk(qp); print(i,np.round(T[:3,3],3),round(float(np.arctan2(T[1,0],T[0,0])),2),np.round(qp-q,2)); q=qp
+diff --git a/probe_c6.py b/probe_c6.py
+new file mode 100644
+index 0000000..51929a6
+--- /dev/null
++++ b/probe_c6.py
+@@ -0,0 +1,28 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++from kin import tool_fk, tool_ik, down_R, wb_ik2, wb_fk
++seed=int(sys.argv[1]); T=int(sys.argv[2]); cnt=int(sys.argv[3])
++def replay():
++    env=make_env(); obs,info=env.reset(seed=seed,options={'object_count':cnt})
++    ap=GeneratedApproach(env.action_space,env.observation_space,{}); ap.reset(obs,info)
++    for t in range(T):
++        a=ap.get_action(obs); obs,*_=env.step(a)
++    return env,obs,ap
++env,obs,ap=replay()
++x=ap._x(obs); Tt=wb_fk(x); yaw=np.arctan2(Tt[1,0],Tt[0,0])
++print('x',np.round(x,3),'tool',np.round(Tt[:3,3],3),'yaw',round(yaw,2), 'held', ap._grasped_name(obs))
++for n in ap.names:
++    c,hh,b,t=ap._box(obs,n); print(' ',n,np.round(c,3),np.round(hh,3),round(b,3),round(t,3))
++tests=[('arm up 5mm',None,(0,0,0.005)),('wb up 5mm','wb',(0,0,0.005)),('base -x 1cm','bx',None),('base -y 1cm','by-',None),('base +y 1cm','by+',None),('arm +x5mm',None,(0.005,0,0)),('arm -x5mm',None,(-0.005,0,0)),('arm +y5mm',None,(0,0.005,0)),('arm -y5mm',None,(0,-0.005,0))]
++for name,mode,d in tests:
++    env.close(); env,obs,ap=replay()
++    a=np.zeros(11,dtype=np.float32)
++    if mode=='bx': a[0]=-0.01
++    elif mode=='by-': a[1]=-0.01
++    elif mode=='by+': a[1]=0.01
++    elif mode=='wb':
++        xn,ok=wb_ik2(x,Tt[:3,3]+np.array(d),down_R(yaw),k_null=0.05,bx_max=-0.09); a[0:10]=np.clip(xn-x,-0.2,0.2)
++    else:
++        q,ok=tool_ik(x[3:],Tt[:3,3]+np.array(d),down_R(yaw),tuple(x[:3])); a[3:10]=np.clip(q-x[3:],-0.2,0.2)
++    obs2,*_=env.step(a); print(name,'moved',not np.allclose(ap._x(obs2),x))
+diff --git a/probe_up.py b/probe_up.py
+new file mode 100644
+index 0000000..70961f8
+--- /dev/null
++++ b/probe_up.py
+@@ -0,0 +1,30 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++from kin import tool_fk, tool_ik, down_R, wb_ik2, wb_fk
++seed=int(sys.argv[1]); T=int(sys.argv[2]); cnt=int(sys.argv[3])
++def replay():
++    env=make_env(); obs,info=env.reset(seed=seed,options={'object_count':cnt})
++    ap=GeneratedApproach(env.action_space,env.observation_space,{}); ap.reset(obs,info)
++    for t in range(T):
++        a=ap.get_action(obs); obs,*_=env.step(a)
++    return env,obs,ap
++env,obs,ap=replay()
++x=ap._x(obs); Tt=wb_fk(x); yaw=np.arctan2(Tt[1,0],Tt[0,0])
++print('x',np.round(x,3),'tool',np.round(Tt[:3,3],3),'yaw',round(yaw,2), 'held', ap._grasped_name(obs))
++for n in ap.names:
++    c,hh,b,t=ap._box(obs,n); print(' ',n,np.round(c,3),np.round(hh,3),round(b,3),round(t,3))
++tests=[('wb up 1cm','wb',(0,0,0.01)),('wb up 2cm','wb',(0,0,0.02)),('wb up 3cm','wb',(0,0,0.03)),('wb up 5cm','wb',(0,0,0.05)),('policy',None,None)]
++for name,mode,d in tests:
++    env.close(); env,obs,ap=replay()
++    a=np.zeros(11,dtype=np.float32)
++    if mode=='bx': a[0]=-0.01
++    elif mode=='by-': a[1]=-0.01
++    elif mode=='by+': a[1]=0.01
++    elif mode=='wb':
++        xn,ok=wb_ik2(x,Tt[:3,3]+np.array(d),down_R(yaw),k_null=0.05,bx_max=-0.09); a[0:10]=np.clip(xn-x,-0.2,0.2)
++    elif mode is None and d is None:
++        a=ap.get_action(obs); print(np.round(a,3))
++    else:
++        q,ok=tool_ik(x[3:],Tt[:3,3]+np.array(d),down_R(yaw),tuple(x[:3])); a[3:10]=np.clip(q-x[3:],-0.2,0.2)
++    obs2,*_=env.step(a); print(name,'moved',not np.allclose(ap._x(obs2),x))
+diff --git a/probe_up2.py b/probe_up2.py
+new file mode 100644
+index 0000000..d121d97
+--- /dev/null
++++ b/probe_up2.py
+@@ -0,0 +1,12 @@
++import sys, numpy as np
++exec(open('probe_c6.py').read().split('tests=')[0])
++def up(obs,dz,wb):
++    x=ap._x(obs); Tt=wb_fk(x); a=np.zeros(11,dtype=np.float32)
++    if wb: xn,ok=wb_ik2(x,Tt[:3,3]+np.array([0,0,dz]),down_R(yaw),k_null=0.05,bx_max=-0.09); a[0:10]=np.clip(xn-x,-0.2,0.2)
++    else: q,ok=tool_ik(x[3:],Tt[:3,3]+np.array([0,0,dz]),down_R(yaw),tuple(x[:3])); a[3:10]=np.clip(q-x[3:],-0.2,0.2)
++    o2,*_=env.step(a); return o2
++for dz,wb in [(0.01,False),(0.007,False),(0.005,False)]:
++    env.close(); env,obs,ap=replay()
++    for k in range(8):
++        o2=up(obs,dz,wb); mv=not np.allclose(ap._x(o2),ap._x(obs)); obs=o2
++        print(dz,wb,k,mv,np.round(wb_fk(ap._x(obs))[:3,3],3))
+diff --git a/res_c1.txt b/res_c1.txt
+new file mode 100644
+index 0000000..354ead0
+--- /dev/null
++++ b/res_c1.txt
+@@ -0,0 +1,30 @@
++seed 3: success=True steps=8 time=4.9s ptime=0.1s nobs=1 phase=to_place
++seed 10: success=True steps=16 time=36.1s ptime=0.1s nobs=1 phase=to_place
++seed 2: success=True steps=17 time=43.2s ptime=0.2s nobs=1 phase=to_place
++seed 0: success=True steps=15 time=25.7s ptime=0.2s nobs=1 phase=to_place
++seed 7: success=True steps=17 time=29.4s ptime=0.2s nobs=1 phase=to_place
++seed 9: success=True steps=16 time=33.2s ptime=0.2s nobs=1 phase=to_place
++seed 4: success=True steps=25 time=42.9s ptime=0.3s nobs=1 phase=to_place
++seed 11: success=True steps=17 time=20.8s ptime=0.2s nobs=1 phase=to_place
++seed 6: success=True steps=20 time=39.1s ptime=0.2s nobs=1 phase=to_place
++seed 1: success=True steps=19 time=36.1s ptime=0.2s nobs=1 phase=to_place
++seed 8: success=True steps=18 time=29.0s ptime=0.2s nobs=1 phase=to_place
++seed 5: success=True steps=30 time=59.3s ptime=0.3s nobs=1 phase=to_place
++seed 12: success=True steps=16 time=42.2s ptime=0.2s nobs=1 phase=to_place
++seed 13: success=True steps=15 time=40.7s ptime=0.1s nobs=1 phase=to_place
++seed 18: success=True steps=8 time=21.8s ptime=0.1s nobs=1 phase=to_place
++seed 15: success=True steps=16 time=41.3s ptime=0.2s nobs=1 phase=to_place
++seed 21: success=True steps=9 time=22.1s ptime=0.1s nobs=1 phase=to_place
++seed 14: success=True steps=17 time=47.2s ptime=0.2s nobs=1 phase=to_place
++seed 17: success=True steps=16 time=38.4s ptime=0.2s nobs=1 phase=to_place
++seed 19: success=True steps=15 time=36.6s ptime=0.3s nobs=1 phase=to_place
++seed 16: success=True steps=17 time=45.8s ptime=0.2s nobs=1 phase=to_place
++seed 24: success=True steps=10 time=20.7s ptime=0.1s nobs=1 phase=to_place
++seed 22: success=True steps=16 time=30.7s ptime=0.3s nobs=1 phase=to_place
++seed 20: success=True steps=17 time=37.1s ptime=0.2s nobs=1 phase=to_place
++seed 23: success=True steps=17 time=25.5s ptime=0.3s nobs=1 phase=to_place
++seed 29: success=True steps=7 time=2.9s ptime=0.1s nobs=1 phase=to_place
++seed 25: success=True steps=20 time=16.8s ptime=0.2s nobs=1 phase=to_place
++seed 26: success=True steps=20 time=14.7s ptime=0.3s nobs=1 phase=to_place
++seed 27: success=True steps=19 time=10.3s ptime=0.3s nobs=1 phase=to_place
++seed 28: success=True steps=30 time=7.5s ptime=0.4s nobs=1 phase=to_place
+diff --git a/res_c4f.txt b/res_c4f.txt
+new file mode 100644
+index 0000000..fdea7a0
+--- /dev/null
++++ b/res_c4f.txt
+@@ -0,0 +1,40 @@
++seed 47: success=True steps=15 time=35.2s ptime=0.2s nobs=4 phase=to_place
++seed 43: success=True steps=25 time=48.3s ptime=0.4s nobs=4 phase=to_place
++seed 48: success=True steps=28 time=37.7s ptime=0.3s nobs=4 phase=to_place
++seed 44: success=True steps=33 time=48.2s ptime=0.5s nobs=4 phase=to_place
++seed 46: success=True steps=33 time=38.2s ptime=0.5s nobs=4 phase=to_place
++seed 45: success=True steps=42 time=72.5s ptime=0.8s nobs=4 phase=to_place
++seed 42: success=True steps=38 time=79.0s ptime=0.6s nobs=4 phase=to_place
++seed 51: success=True steps=39 time=45.5s ptime=0.7s nobs=4 phase=to_place
++seed 49: success=True steps=47 time=64.6s ptime=0.9s nobs=4 phase=to_place
++seed 40: success=True steps=47 time=70.9s ptime=1.0s nobs=4 phase=to_place
++seed 50: success=True steps=47 time=61.1s ptime=0.9s nobs=4 phase=to_place
++seed 41: success=True steps=67 time=98.0s ptime=1.0s nobs=4 phase=to_place
++seed 54: success=True steps=36 time=52.7s ptime=0.6s nobs=4 phase=to_place
++seed 52: success=True steps=54 time=73.6s ptime=0.7s nobs=4 phase=to_place
++seed 58: success=True steps=29 time=41.3s ptime=0.6s nobs=4 phase=to_place
++seed 55: success=True steps=38 time=63.1s ptime=0.7s nobs=4 phase=to_place
++seed 57: success=True steps=38 time=52.5s ptime=0.7s nobs=4 phase=to_place
++seed 53: success=True steps=46 time=74.7s ptime=0.7s nobs=4 phase=to_place
++seed 56: success=True steps=39 time=66.6s ptime=0.7s nobs=4 phase=to_place
++seed 59: success=True steps=34 time=58.8s ptime=0.7s nobs=4 phase=to_place
++seed 60: success=True steps=29 time=51.7s ptime=0.6s nobs=4 phase=to_place
++seed 64: success=True steps=26 time=44.4s ptime=0.5s nobs=4 phase=to_place
++seed 63: success=True steps=30 time=53.2s ptime=0.4s nobs=4 phase=to_place
++seed 69: success=True steps=26 time=29.2s ptime=0.6s nobs=4 phase=to_place
++seed 62: success=True steps=57 time=75.9s ptime=0.8s nobs=4 phase=to_place
++seed 65: success=True steps=36 time=54.8s ptime=0.8s nobs=4 phase=to_place
++seed 68: success=True steps=34 time=47.2s ptime=0.6s nobs=4 phase=to_place
++seed 61: success=True steps=58 time=85.7s ptime=0.9s nobs=4 phase=to_place
++seed 66: success=True steps=43 time=68.0s ptime=0.6s nobs=4 phase=to_place
++seed 67: success=True steps=40 time=61.5s ptime=1.0s nobs=4 phase=to_place
++seed 70: success=True steps=36 time=46.3s ptime=0.6s nobs=4 phase=to_place
++seed 72: success=True steps=41 time=44.8s ptime=0.8s nobs=4 phase=to_place
++seed 73: success=True steps=25 time=31.6s ptime=0.5s nobs=4 phase=to_place
++seed 71: success=True steps=48 time=48.4s ptime=0.8s nobs=4 phase=to_place
++seed 79: success=True steps=25 time=9.5s ptime=0.3s nobs=4 phase=to_place
++seed 78: success=True steps=33 time=14.4s ptime=0.5s nobs=4 phase=to_place
++seed 74: success=True steps=42 time=33.7s ptime=0.7s nobs=4 phase=to_place
++seed 76: success=True steps=48 time=21.8s ptime=0.9s nobs=4 phase=to_place
++seed 77: success=True steps=66 time=22.7s ptime=1.1s nobs=4 phase=to_place
++seed 75: success=True steps=104 time=33.2s ptime=1.3s nobs=4 phase=to_place
+diff --git a/res_c6.txt b/res_c6.txt
+new file mode 100644
+index 0000000..32105b2
+--- /dev/null
++++ b/res_c6.txt
+@@ -0,0 +1,20 @@
++seed 10: success=True steps=42 time=46.0s ptime=0.8s nobs=6 phase=to_place
++seed 2: success=True steps=35 time=23.8s ptime=0.8s nobs=6 phase=to_place
++seed 3: success=True steps=42 time=39.3s ptime=1.0s nobs=6 phase=to_place
++seed 11: success=True steps=63 time=77.1s ptime=1.5s nobs=6 phase=to_place
++seed 8: success=True steps=60 time=58.1s ptime=1.4s nobs=6 phase=to_place
++seed 7: success=True steps=54 time=61.3s ptime=1.2s nobs=6 phase=to_place
++seed 9: success=True steps=50 time=49.1s ptime=1.3s nobs=6 phase=to_place
++seed 0: success=True steps=71 time=95.0s ptime=1.2s nobs=6 phase=to_place
++seed 1: success=True steps=67 time=67.5s ptime=1.4s nobs=6 phase=to_place
++seed 6: success=True steps=69 time=67.7s ptime=1.6s nobs=6 phase=to_place
++seed 14: success=True steps=38 time=38.8s ptime=0.9s nobs=6 phase=to_place
++seed 12: success=True steps=55 time=54.4s ptime=1.3s nobs=6 phase=to_place
++seed 16: success=True steps=44 time=29.8s ptime=0.9s nobs=6 phase=to_place
++seed 13: success=True steps=63 time=55.1s ptime=1.2s nobs=6 phase=to_place
++seed 5: success=True steps=110 time=106.8s ptime=2.0s nobs=6 phase=to_place
++seed 15: success=True steps=60 time=41.2s ptime=1.2s nobs=6 phase=to_place
++seed 18: success=True steps=49 time=28.5s ptime=1.1s nobs=6 phase=to_place
++seed 17: success=True steps=49 time=31.4s ptime=1.2s nobs=6 phase=to_place
++seed 19: success=True steps=47 time=20.5s ptime=1.1s nobs=6 phase=to_place
++seed 4: success=False steps=1000 time=134.0s ptime=27.1s nobs=6 phase=to_place
+diff --git a/res_d8.txt b/res_d8.txt
+new file mode 100644
+index 0000000..3fec1a2
+--- /dev/null
++++ b/res_d8.txt
+@@ -0,0 +1,100 @@
++seed 11: success=True steps=8 time=21.0s ptime=0.1s nobs=0 phase=to_place
++seed 9: success=True steps=16 time=32.4s ptime=0.3s nobs=1 phase=to_place
++seed 7: success=True steps=17 time=30.1s ptime=0.3s nobs=2 phase=to_place
++seed 1: success=True steps=19 time=25.4s ptime=0.2s nobs=1 phase=to_place
++seed 6: success=True steps=20 time=25.3s ptime=0.3s nobs=1 phase=to_place
++seed 10: success=True steps=16 time=20.6s ptime=0.2s nobs=2 phase=to_place
++seed 3: success=True steps=20 time=35.7s ptime=0.3s nobs=2 phase=to_place
++seed 12: success=True steps=16 time=16.4s ptime=0.3s nobs=1 phase=to_place
++seed 14: success=True steps=8 time=13.7s ptime=0.0s nobs=0 phase=to_place
++seed 8: success=True steps=26 time=47.2s ptime=0.4s nobs=2 phase=to_place
++seed 0: success=True steps=26 time=36.8s ptime=0.4s nobs=2 phase=to_place
++seed 2: success=True steps=25 time=37.6s ptime=0.5s nobs=2 phase=to_place
++seed 5: success=True steps=37 time=70.5s ptime=0.7s nobs=2 phase=to_place
++seed 4: success=True steps=41 time=58.3s ptime=0.6s nobs=2 phase=to_place
++seed 15: success=True steps=16 time=37.2s ptime=0.2s nobs=2 phase=to_place
++seed 16: success=True steps=17 time=33.5s ptime=0.2s nobs=1 phase=to_place
++seed 21: success=True steps=9 time=19.2s ptime=0.1s nobs=0 phase=to_place
++seed 19: success=True steps=15 time=27.1s ptime=0.3s nobs=1 phase=to_place
++seed 13: success=True steps=23 time=49.0s ptime=0.3s nobs=2 phase=to_place
++seed 23: success=True steps=8 time=16.5s ptime=0.1s nobs=0 phase=to_place
++seed 18: success=True steps=18 time=37.8s ptime=0.3s nobs=2 phase=to_place
++seed 24: success=True steps=10 time=16.5s ptime=0.1s nobs=1 phase=to_place
++seed 17: success=True steps=24 time=49.4s ptime=0.4s nobs=2 phase=to_place
++seed 22: success=True steps=17 time=43.8s ptime=0.3s nobs=2 phase=to_place
++seed 29: success=True steps=7 time=19.3s ptime=0.1s nobs=2 phase=to_place
++seed 27: success=True steps=10 time=29.5s ptime=0.1s nobs=0 phase=to_place
++seed 30: success=True steps=10 time=27.9s ptime=0.1s nobs=0 phase=to_place
++seed 34: success=True steps=9 time=15.8s ptime=0.1s nobs=0 phase=to_place
++seed 26: success=True steps=20 time=45.6s ptime=0.3s nobs=2 phase=to_place
++seed 25: success=True steps=20 time=48.0s ptime=0.3s nobs=1 phase=to_place
++seed 20: success=True steps=28 time=69.2s ptime=0.3s nobs=2 phase=to_place
++seed 31: success=True steps=17 time=30.4s ptime=0.4s nobs=1 phase=to_place
++seed 35: success=True steps=10 time=19.5s ptime=0.1s nobs=0 phase=to_place
++seed 37: success=True steps=9 time=17.4s ptime=0.2s nobs=0 phase=to_place
++seed 36: success=True steps=15 time=28.4s ptime=0.2s nobs=1 phase=to_place
++seed 38: success=True steps=8 time=21.0s ptime=0.1s nobs=0 phase=to_place
++seed 32: success=True steps=25 time=52.9s ptime=0.4s nobs=2 phase=to_place
++seed 28: success=True steps=30 time=66.7s ptime=0.4s nobs=1 phase=to_place
++seed 33: success=True steps=24 time=56.4s ptime=0.4s nobs=2 phase=to_place
++seed 42: success=True steps=10 time=24.4s ptime=0.1s nobs=0 phase=to_place
++seed 40: success=True steps=15 time=41.9s ptime=0.2s nobs=1 phase=to_place
++seed 47: success=True steps=7 time=16.7s ptime=0.1s nobs=0 phase=to_place
++seed 48: success=True steps=7 time=13.6s ptime=0.1s nobs=0 phase=to_place
++seed 49: success=True steps=9 time=16.8s ptime=0.1s nobs=0 phase=to_place
++seed 41: success=True steps=21 time=47.5s ptime=0.4s nobs=1 phase=to_place
++seed 39: success=True steps=26 time=59.4s ptime=0.3s nobs=2 phase=to_place
++seed 43: success=True steps=18 time=43.5s ptime=0.2s nobs=1 phase=to_place
++seed 46: success=True steps=15 time=34.4s ptime=0.2s nobs=1 phase=to_place
++seed 54: success=True steps=9 time=18.7s ptime=0.1s nobs=0 phase=to_place
++seed 44: success=True steps=19 time=56.3s ptime=0.3s nobs=2 phase=to_place
++seed 51: success=True steps=16 time=36.4s ptime=0.2s nobs=1 phase=to_place
++seed 57: success=True steps=8 time=18.5s ptime=0.1s nobs=0 phase=to_place
++seed 58: success=True steps=10 time=21.9s ptime=0.1s nobs=1 phase=to_place
++seed 50: success=True steps=27 time=57.3s ptime=0.4s nobs=2 phase=to_place
++seed 56: success=True steps=16 time=33.5s ptime=0.3s nobs=1 phase=to_place
++seed 60: success=True steps=9 time=16.8s ptime=0.0s nobs=0 phase=to_place
++seed 52: success=True steps=25 time=54.6s ptime=0.7s nobs=2 phase=to_place
++seed 45: success=True steps=36 time=89.6s ptime=0.6s nobs=2 phase=to_place
++seed 62: success=True steps=15 time=29.7s ptime=0.2s nobs=1 phase=to_place
++seed 61: success=True steps=18 time=39.4s ptime=0.2s nobs=1 phase=to_place
++seed 55: success=True steps=29 time=65.4s ptime=0.4s nobs=2 phase=to_place
++seed 68: success=True steps=8 time=11.1s ptime=0.1s nobs=1 phase=to_place
++seed 53: success=True steps=33 time=75.4s ptime=0.4s nobs=2 phase=to_place
++seed 63: success=True steps=18 time=35.1s ptime=0.3s nobs=1 phase=to_place
++seed 59: success=True steps=27 time=54.7s ptime=0.5s nobs=2 phase=to_place
++seed 65: success=True steps=11 time=24.7s ptime=0.1s nobs=0 phase=to_place
++seed 64: success=True steps=17 time=37.8s ptime=0.2s nobs=1 phase=to_place
++seed 69: success=True steps=8 time=17.7s ptime=0.1s nobs=0 phase=to_place
++seed 74: success=True steps=7 time=17.3s ptime=0.1s nobs=0 phase=to_place
++seed 66: success=True steps=22 time=48.7s ptime=0.3s nobs=2 phase=to_place
++seed 67: success=True steps=26 time=52.8s ptime=0.4s nobs=2 phase=to_place
++seed 70: success=True steps=20 time=40.5s ptime=0.3s nobs=1 phase=to_place
++seed 77: success=True steps=8 time=19.5s ptime=0.1s nobs=0 phase=to_place
++seed 79: success=True steps=7 time=12.4s ptime=0.1s nobs=0 phase=to_place
++seed 81: success=True steps=9 time=13.2s ptime=0.1s nobs=0 phase=to_place
++seed 75: success=True steps=17 time=36.0s ptime=0.2s nobs=1 phase=to_place
++seed 73: success=True steps=25 time=51.0s ptime=0.4s nobs=2 phase=to_place
++seed 76: success=True steps=19 time=37.4s ptime=0.3s nobs=1 phase=to_place
++seed 72: success=True steps=27 time=61.5s ptime=0.3s nobs=2 phase=to_place
++seed 71: success=True steps=35 time=68.7s ptime=0.5s nobs=2 phase=to_place
++seed 80: success=True steps=22 time=37.8s ptime=0.3s nobs=2 phase=to_place
++seed 83: success=True steps=17 time=30.1s ptime=0.2s nobs=2 phase=to_place
++seed 78: success=True steps=34 time=48.3s ptime=0.3s nobs=2 phase=to_place
++seed 84: success=True steps=24 time=29.7s ptime=0.2s nobs=1 phase=to_place
++seed 88: success=True steps=17 time=20.9s ptime=0.2s nobs=1 phase=to_place
++seed 85: success=True steps=23 time=43.3s ptime=0.5s nobs=2 phase=to_place
++seed 87: success=True steps=24 time=35.1s ptime=0.3s nobs=1 phase=to_place
++seed 86: success=True steps=23 time=40.4s ptime=0.3s nobs=2 phase=to_place
++seed 90: success=True steps=15 time=20.7s ptime=0.4s nobs=1 phase=to_place
++seed 82: success=True steps=42 time=60.6s ptime=0.5s nobs=2 phase=to_place
++seed 94: success=True steps=9 time=19.0s ptime=0.1s nobs=0 phase=to_place
++seed 91: success=True steps=18 time=29.1s ptime=0.5s nobs=2 phase=to_place
++seed 92: success=True steps=16 time=25.7s ptime=0.2s nobs=1 phase=to_place
++seed 89: success=True steps=26 time=38.9s ptime=0.5s nobs=2 phase=to_place
++seed 97: success=True steps=9 time=6.8s ptime=0.1s nobs=0 phase=to_place
++seed 95: success=True steps=16 time=17.6s ptime=0.2s nobs=1 phase=to_place
++seed 98: success=True steps=24 time=5.3s ptime=0.4s nobs=1 phase=to_place
++seed 96: success=True steps=28 time=17.7s ptime=0.5s nobs=2 phase=to_place
++seed 93: success=True steps=38 time=29.5s ptime=0.4s nobs=2 phase=to_place
++seed 99: success=True steps=31 time=6.2s ptime=0.4s nobs=2 phase=to_place
+diff --git a/snap/approach.py b/snap/approach.py
+index e410e51..83fd918 100644
+--- a/snap/approach.py
++++ b/snap/approach.py
+@@ -87,7 +87,7 @@ class GeneratedApproach:
+ 
+     def _ik(self, xc, pt, R):
+         if WB:
+-            return wb_ik2(xc, pt, R, iters=40)
++            return wb_ik2(xc, pt, R, iters=40, k_null=0.05, bx_max=-0.09)
+         q, ok = tool_ik(xc[3:], pt, R, tuple(xc[:3]), iters=40)
+         return np.concatenate([xc[:3], q]), ok
+ 
+diff --git a/snap/test_approach.py b/snap/test_approach.py
+index d238650..afc13cc 100644
+--- a/snap/test_approach.py
++++ b/snap/test_approach.py
+@@ -12,22 +12,25 @@ def run(seed, verbose=False, max_steps=None, count=None):
+     ms = max_steps or env.max_steps
+     steps = 0
+     term = False
++    pt = 0.0
+     for steps in range(1, ms + 1):
++        t1 = time.time()
+         a = ap.get_action(obs)
++        pt += time.time() - t1
+         obs, r, term, trunc, info = env.step(a)
+         if term or trunc:
+             break
+     dt = time.time() - t0
+     nobs = len([n for n in obs.get_object_names() if n.startswith('obstruction')])
+     env.close()
+-    return term, steps, dt, nobs, ap.phase
++    return term, steps, dt, nobs, ap.phase, pt
+ 
+ if __name__ == '__main__':
+     seeds = range(int(sys.argv[1]), int(sys.argv[2]))
+     count = int(sys.argv[3]) if len(sys.argv) > 3 else None
+     ok = 0
+     for s in seeds:
+-        term, steps, dt, n, ph = run(s, count=count)
++        term, steps, dt, n, ph, pt = run(s, count=count)
+         ok += term
+-        print(f'seed {s}: success={term} steps={steps} time={dt:.1f}s nobs={n} phase={ph}', flush=True)
++        print(f'seed {s}: success={term} steps={steps} time={dt:.1f}s ptime={pt:.1f}s nobs={n} phase={ph}', flush=True)
+     print(f'{ok}/{len(seeds)}')

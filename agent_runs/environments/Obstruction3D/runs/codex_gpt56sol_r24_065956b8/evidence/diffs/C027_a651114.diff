@@ -1,0 +1,45 @@
+diff --git a/approach.py b/approach.py
+index f0621b2..179c3a3 100644
+--- a/approach.py
++++ b/approach.py
+@@ -159,7 +159,7 @@ class GeneratedApproach:
+             # collision checking. Joint 4 positive is a reliable vertical escape.
+             if self.phase_steps <= 4:
+                 action = self._act_to(q, q)
+-                action[6] = .18
++                action[4] = -.12
+                 return action
+             hover = self.destination.copy()
+             hover[2] = max(.27, self.destination[2] + .16)
+@@ -168,16 +168,27 @@ class GeneratedApproach:
+ 
+         if self.phase == "transfer":
+             if np.max(np.abs(self.goal_q-q)) < .012 or self.phase_steps > 40:
+-                # Feedback from the grasped object's observed pose cancels the
+-                # unknown attachment transform and yields precise placement.
+-                self._set_goal_for_object_delta(state, self.destination)
++                # Short Cartesian-like descent segments avoid a joint-space
++                # interpolation arc that can sweep the object into the table.
++                self.descent_z = [self.destination[2]+d for d in (.10, .055, .025, 0)]
++                self.descent_index = 0
++                waypoint = self.destination.copy()
++                waypoint[2] = self.descent_z[0]
++                self._set_goal_for_object_delta(state, waypoint)
+                 self.phase, self.phase_steps = "lower", 0
+             else:
+                 return self._act_to(q, self.goal_q)
+ 
+         if self.phase == "lower":
+             if np.max(np.abs(self.goal_q-q)) < .012 or self.phase_steps > 35:
+-                self.phase, self.phase_steps = "release", 0
++                self.descent_index += 1
++                if self.descent_index >= len(self.descent_z):
++                    self.phase, self.phase_steps = "release", 0
++                else:
++                    waypoint = self.destination.copy()
++                    waypoint[2] = self.descent_z[self.descent_index]
++                    self._set_goal_for_object_delta(state, waypoint)
++                    self.phase_steps = 0
+             else:
+                 return self._act_to(q, self.goal_q)
+ 

@@ -1,0 +1,24 @@
+diff --git a/approach.py b/approach.py
+index 0db84ac..eabaca3 100644
+--- a/approach.py
++++ b/approach.py
+@@ -10,11 +10,15 @@ class GeneratedApproach:
+ 
+     def reset(self, state, info):
+         rects = state.get_objects(self.types["rectangle"])
+-        # Park every movable rectangle, tallest first.  Including the target in
+-        # this clearing pass matters when it physically shields a shorter object.
+-        self.todo = [o.name for o in rects if state.get(o, "static") < 0.5]
+-        self.todo.sort(key=lambda n: -state.get(state.get_object_from_name(n), "height"))
+         target_name = state.get_objects(self.types["target_block"])[0].name
++        target = state.get_object_from_name(target_name)
++        obstacles = [o for o in rects if o.type.name == "rectangle" and state.get(o, "static") < 0.5]
++        obstacles.sort(key=lambda o: -state.get(o, "height"))
++        # Temporarily lift the target only when it crowds an obstacle's access.
++        tx, tw = state.get(target, "x"), state.get(target, "width")
++        crowded = any(abs(tx - state.get(o, "x")) <
++                      0.5 * (tw + state.get(o, "width")) + 0.14 for o in obstacles)
++        self.todo = ([target_name] if crowded else []) + [o.name for o in obstacles]
+         self.todo.append(target_name)  # retrieve it last for the actual placement
+         self.final_index = len(self.todo) - 1
+         xs = [state.get(state.get_object_from_name(n), "x") for n in state.get_object_names()]

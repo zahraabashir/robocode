@@ -1,0 +1,295 @@
+diff --git a/approach.py b/approach.py
+index 436c962..c68fabe 100644
+--- a/approach.py
++++ b/approach.py
+@@ -116,6 +116,7 @@ class GeneratedApproach:
+         self.last_a = None
+         self.blocked = False
+         self.look = STEP
++        self.fails = {}
+         self.stuck = 0
+         self.descent_len = 0
+         self.release_tries = 0
+@@ -145,27 +146,73 @@ class GeneratedApproach:
+             if top < tip_z - 0.002:
+                 continue
+             for fc, fh in fbs:
+-                clear = min(clear, _gap(fc, fh, c, hh))
++                g = _gap(fc, fh, c, hh)
++                if g < clear:
++                    clear = g
++                    self._blocker = n
+         return clear
+ 
+     def _choose_yaw(self, state, name, kind, attempt):
++        sc = self._yaw_scores(state, name, kind)
++        c = sc[attempt % len(sc)]
++        self.grasp_z = c[3]
++        return c[1]
++
++    def _yaw_scores(self, state, name, kind):
++        """Sorted [(clearance score, yaw, blocker, grasp z)] for grasp candidates."""
+         p, q, h = self._pose(state, name)
+         oy = _yaw_of_quat(q)
+-        gz = self._grasp_z(p, h)
++        lo = p[2] - h[2] + 0.045
++        hi = p[2] + h[2] + 0.032
++        gzs = [self._grasp_z(p, h)]
++        if hi - 0.004 > gzs[0] + 0.004:
++            gzs.append(hi - 0.004)
+         cands = [oy, oy + np.pi / 2, oy + np.pi / 4, oy - np.pi / 4]
+         scored = []
+-        for i, y in enumerate(cands):
+-            y = _wrap(2 * y) / 2  # modulo pi
+-            c = self._finger_clearance(state, p[:2], y, gz - FINGER_DOWN, exclude=(name,))
+-            if kind == 'goal':
+-                rp, rh = self.region
+-                surf = rp[2] + rh[2]
+-                tip = surf + 0.001 + (gz - (p[2] - h[2])) - FINGER_DOWN
+-                c = min(c, self._finger_clearance(state, rp[:2], y, tip,
+-                                                  exclude=(name, 'target_region')))
+-            scored.append((min(c, 0.02) - 0.001 * i, y))
++        for j, gz in enumerate(gzs):
++            for i, y in enumerate(cands):
++                y = _wrap(2 * y) / 2  # modulo pi
++                self._blocker = None
++                c = self._finger_clearance(state, p[:2], y, gz - FINGER_DOWN, exclude=(name,))
++                blk = self._blocker
++                if kind == 'goal':
++                    rp, rh = self.region
++                    surf = rp[2] + rh[2]
++                    tip = surf + 0.001 + (gz - (p[2] - h[2])) - FINGER_DOWN
++                    c = min(c, self._finger_clearance(state, rp[:2], y, tip,
++                                                      exclude=(name, 'target_region')))
++                scored.append((min(c, 0.02) - 0.001 * i - 0.004 * j, y, blk, gz))
+         scored.sort(key=lambda t: -t[0])
+-        return scored[attempt % len(scored)][1]
++        return scored
++
++    def _select_task(self, state):
++        """Reorder tasks so the front one is graspable; add blockers if needed."""
++        for _ in range(len(self.names)):
++            name, kind = self.tasks[0]
++            f = self.fails.get(name, 0)
++            sc = self._yaw_scores(state, name, kind)
++            if sc[0][0] > 0.002 and f < 4:
++                return
++            # try another pending clear task that is more graspable
++            best = None
++            for t in self.tasks:
++                if t[1] != 'clear' or t[0] == name:
++                    continue
++                s2 = self._yaw_scores(state, t[0], 'clear')[0][0] - 0.01 * self.fails.get(t[0], 0)
++                if best is None or s2 > best[0]:
++                    best = (s2, t)
++            if best is not None and best[0] > max(0.002, sc[0][0] - 0.01 * f):
++                self.tasks.remove(best[1])
++                self.tasks.insert(0, best[1])
++                continue
++            # add the obstruction blocking the fingers as a new task
++            blk = sc[0][2]
++            if (blk is not None and blk.startswith('obstruction')
++                    and all(t[0] != blk for t in self.tasks)
++                    and self._yaw_scores(state, blk, 'clear')[0][0] > 0.002):
++                self.tasks.insert(0, (blk, 'clear'))
++                continue
++            return
+ 
+     def _grasp_z(self, p, h):
+         lo = p[2] - h[2] + 0.045
+@@ -211,11 +258,15 @@ class GeneratedApproach:
+         if not self.tasks:
+             self.phase = 'done'
+             return
++        try:
++            self._select_task(state)
++        except Exception:
++            pass
+         name, kind = self.tasks[0]
+         p, q, h = self._pose(state, name)
+         self.cur_obj = name
+-        self.grasp_yaw = self._choose_yaw(state, name, kind, self.grasp_attempt)
+-        gz = self._grasp_z(p, h)
++        self.grasp_yaw = self._choose_yaw(state, name, kind, self.fails.get(name, 0))
++        gz = self.grasp_z
+         zt = self._transit_z(state)
+         tool = self._tool(state)[:3, 3]
+         wps = []
+@@ -348,6 +399,7 @@ class GeneratedApproach:
+             g = self._grasped_name(state)
+             if g is None:
+                 self.grasp_attempt += 1
++                self.fails[self.cur_obj] = self.fails.get(self.cur_obj, 0) + 1
+                 self.total_fail += 1
+                 self._start_task(state)
+                 return self._track(state) if self.qpath else self._noop()
+diff --git a/dbg_pos.py b/dbg_pos.py
+index ac157c1..8696c1f 100644
+--- a/dbg_pos.py
++++ b/dbg_pos.py
+@@ -1,7 +1,8 @@
+ import sys, numpy as np
+ from env_client import make_env
+ from approach import GeneratedApproach, _yaw_of_quat as yq
+-env=make_env(); obs,info=env.reset(seed=int(sys.argv[1]))
++cnt=int(sys.argv[2]) if len(sys.argv)>2 else None
++env=make_env(); obs,info=env.reset(seed=int(sys.argv[1]),options={"object_count":cnt} if cnt else None)
+ ap=GeneratedApproach(env.action_space,env.observation_space,{}); ap.reset(obs,info)
+ for n in ap.names: print(n,np.round(ap._pose(obs,n)[0],3),np.round(ap._pose(obs,n)[2],3), round(float(np.degrees(yq(ap._pose(obs,n)[1]))),1))
+ print('yaw',ap.grasp_yaw,'q0',np.round(ap._q(obs),2))
+diff --git a/prof.out b/prof.out
+new file mode 100644
+index 0000000..f2d5183
+Binary files /dev/null and b/prof.out differ
+diff --git a/res_c4.txt b/res_c4.txt
+new file mode 100644
+index 0000000..721b5ff
+--- /dev/null
++++ b/res_c4.txt
+@@ -0,0 +1,40 @@
++seed 3: success=True steps=64 time=41.9s nobs=4 phase=open
++seed 1: success=True steps=74 time=38.6s nobs=4 phase=open
++seed 0: success=True steps=85 time=63.3s nobs=4 phase=open
++seed 9: success=True steps=87 time=78.2s nobs=4 phase=open
++seed 8: success=True steps=93 time=73.8s nobs=4 phase=open
++seed 6: success=True steps=91 time=64.4s nobs=4 phase=open
++seed 2: success=True steps=98 time=70.4s nobs=4 phase=open
++seed 14: success=True steps=45 time=29.1s nobs=4 phase=open
++seed 10: success=True steps=78 time=64.1s nobs=4 phase=open
++seed 4: success=True steps=146 time=129.0s nobs=4 phase=open
++seed 5: success=True steps=155 time=123.8s nobs=4 phase=open
++seed 16: success=True steps=50 time=31.6s nobs=4 phase=open
++seed 13: success=True steps=98 time=73.0s nobs=4 phase=open
++seed 15: success=True steps=98 time=78.2s nobs=4 phase=open
++seed 18: success=True steps=55 time=41.1s nobs=4 phase=open
++seed 17: success=True steps=74 time=63.3s nobs=4 phase=open
++seed 19: success=True steps=75 time=65.8s nobs=4 phase=open
++seed 22: success=True steps=51 time=41.8s nobs=4 phase=open
++seed 20: success=True steps=84 time=66.8s nobs=4 phase=open
++seed 25: success=True steps=57 time=45.5s nobs=4 phase=open
++seed 23: success=True steps=112 time=83.6s nobs=4 phase=open
++seed 27: success=True steps=93 time=56.7s nobs=4 phase=open
++seed 26: success=True steps=92 time=60.7s nobs=4 phase=open
++seed 28: success=True steps=105 time=73.5s nobs=4 phase=open
++seed 29: success=True steps=66 time=51.1s nobs=4 phase=open
++seed 30: success=True steps=85 time=66.0s nobs=4 phase=open
++seed 32: success=True steps=86 time=59.6s nobs=4 phase=open
++seed 33: success=True steps=85 time=59.6s nobs=4 phase=open
++seed 34: success=True steps=84 time=57.8s nobs=4 phase=open
++seed 35: success=True steps=62 time=45.3s nobs=4 phase=open
++seed 37: success=True steps=83 time=51.0s nobs=4 phase=open
++seed 39: success=True steps=84 time=40.9s nobs=4 phase=open
++seed 12: success=False steps=1000 time=458.8s nobs=4 phase=to_grasp
++seed 11: success=False steps=1000 time=476.1s nobs=4 phase=to_grasp
++seed 7: success=False steps=1000 time=543.0s nobs=4 phase=to_grasp
++seed 24: success=False steps=1000 time=444.3s nobs=4 phase=to_grasp
++seed 21: success=False steps=1000 time=492.2s nobs=4 phase=to_grasp
++seed 31: success=False steps=1000 time=364.3s nobs=4 phase=to_grasp
++seed 36: success=False steps=1000 time=300.9s nobs=4 phase=to_grasp
++seed 38: success=False steps=1000 time=277.3s nobs=4 phase=close
+diff --git a/res_new2.txt b/res_new2.txt
+new file mode 100644
+index 0000000..284f269
+--- /dev/null
++++ b/res_new2.txt
+@@ -0,0 +1,100 @@
++seed 9: success=True steps=25 time=16.8s nobs=1 phase=open
++seed 0: success=True steps=43 time=38.7s nobs=2 phase=open
++seed 1: success=True steps=45 time=28.4s nobs=1 phase=open
++seed 5: success=True steps=51 time=46.8s nobs=2 phase=open
++seed 3: success=True steps=49 time=44.8s nobs=2 phase=open
++seed 10: success=True steps=36 time=28.2s nobs=2 phase=open
++seed 4: success=True steps=59 time=59.0s nobs=2 phase=open
++seed 11: success=True steps=25 time=20.6s nobs=0 phase=open
++seed 6: success=True steps=60 time=55.6s nobs=1 phase=open
++seed 14: success=True steps=14 time=5.9s nobs=0 phase=open
++seed 7: success=True steps=61 time=46.8s nobs=2 phase=open
++seed 8: success=True steps=68 time=66.1s nobs=2 phase=open
++seed 2: success=True steps=75 time=87.2s nobs=2 phase=open
++seed 16: success=True steps=36 time=27.8s nobs=1 phase=open
++seed 12: success=True steps=48 time=46.1s nobs=1 phase=open
++seed 15: success=True steps=38 time=44.7s nobs=2 phase=open
++seed 21: success=True steps=30 time=21.8s nobs=0 phase=open
++seed 18: success=True steps=46 time=41.8s nobs=2 phase=open
++seed 13: success=True steps=70 time=72.2s nobs=2 phase=open
++seed 24: success=True steps=25 time=21.7s nobs=1 phase=open
++seed 17: success=True steps=60 time=63.2s nobs=2 phase=open
++seed 19: success=True steps=60 time=54.4s nobs=1 phase=open
++seed 22: success=True steps=39 time=43.3s nobs=2 phase=open
++seed 20: success=True steps=66 time=64.4s nobs=2 phase=open
++seed 23: success=True steps=39 time=42.2s nobs=0 phase=open
++seed 26: success=True steps=37 time=41.0s nobs=2 phase=open
++seed 27: success=True steps=48 time=39.1s nobs=0 phase=open
++seed 30: success=True steps=31 time=26.1s nobs=0 phase=open
++seed 34: success=True steps=18 time=10.7s nobs=0 phase=open
++seed 29: success=True steps=30 time=32.0s nobs=2 phase=open
++seed 25: success=True steps=54 time=64.8s nobs=1 phase=open
++seed 35: success=True steps=21 time=21.6s nobs=0 phase=open
++seed 31: success=True steps=43 time=42.8s nobs=1 phase=open
++seed 32: success=True steps=47 time=48.7s nobs=2 phase=open
++seed 38: success=True steps=21 time=22.4s nobs=0 phase=open
++seed 37: success=True steps=22 time=26.7s nobs=0 phase=open
++seed 33: success=True steps=50 time=54.8s nobs=2 phase=open
++seed 28: success=True steps=65 time=80.4s nobs=1 phase=open
++seed 36: success=True steps=36 time=48.1s nobs=1 phase=open
++seed 42: success=True steps=20 time=25.7s nobs=0 phase=open
++seed 47: success=True steps=16 time=12.6s nobs=0 phase=open
++seed 41: success=True steps=32 time=39.8s nobs=1 phase=open
++seed 40: success=True steps=42 time=47.5s nobs=1 phase=open
++seed 48: success=True steps=19 time=12.1s nobs=0 phase=open
++seed 43: success=True steps=35 time=32.9s nobs=1 phase=open
++seed 39: success=True steps=53 time=58.7s nobs=2 phase=open
++seed 49: success=True steps=17 time=19.3s nobs=0 phase=open
++seed 46: success=True steps=33 time=41.9s nobs=1 phase=open
++seed 44: success=True steps=42 time=55.0s nobs=2 phase=open
++seed 54: success=True steps=20 time=20.8s nobs=0 phase=open
++seed 57: success=True steps=20 time=12.8s nobs=0 phase=open
++seed 51: success=True steps=37 time=38.0s nobs=1 phase=open
++seed 45: success=True steps=62 time=73.3s nobs=2 phase=open
++seed 56: success=True steps=35 time=31.8s nobs=1 phase=open
++seed 60: success=True steps=17 time=16.7s nobs=0 phase=open
++seed 58: success=True steps=35 time=34.2s nobs=1 phase=open
++seed 53: success=True steps=48 time=60.0s nobs=2 phase=open
++seed 50: success=True steps=57 time=68.4s nobs=2 phase=open
++seed 62: success=True steps=36 time=27.0s nobs=1 phase=open
++seed 52: success=True steps=74 time=67.6s nobs=2 phase=open
++seed 55: success=True steps=69 time=65.7s nobs=2 phase=open
++seed 61: success=True steps=41 time=33.8s nobs=1 phase=open
++seed 64: success=True steps=31 time=27.4s nobs=1 phase=open
++seed 63: success=True steps=39 time=34.7s nobs=1 phase=open
++seed 69: success=True steps=17 time=15.3s nobs=0 phase=open
++seed 65: success=True steps=37 time=35.9s nobs=0 phase=open
++seed 68: success=True steps=24 time=28.0s nobs=1 phase=open
++seed 74: success=True steps=16 time=12.5s nobs=0 phase=open
++seed 59: success=True steps=82 time=87.5s nobs=2 phase=open
++seed 67: success=True steps=52 time=52.6s nobs=2 phase=open
++seed 70: success=True steps=42 time=42.6s nobs=1 phase=open
++seed 75: success=True steps=28 time=24.6s nobs=1 phase=open
++seed 66: success=True steps=66 time=62.9s nobs=2 phase=open
++seed 77: success=True steps=23 time=19.8s nobs=0 phase=open
++seed 73: success=True steps=48 time=49.0s nobs=2 phase=open
++seed 79: success=True steps=29 time=21.5s nobs=0 phase=open
++seed 71: success=True steps=64 time=66.7s nobs=2 phase=open
++seed 76: success=True steps=50 time=41.7s nobs=1 phase=open
++seed 81: success=True steps=25 time=18.9s nobs=0 phase=open
++seed 78: success=True steps=44 time=38.6s nobs=2 phase=open
++seed 72: success=True steps=70 time=76.0s nobs=2 phase=open
++seed 84: success=True steps=35 time=24.8s nobs=1 phase=open
++seed 82: success=True steps=51 time=38.2s nobs=2 phase=open
++seed 80: success=True steps=53 time=49.1s nobs=2 phase=open
++seed 83: success=True steps=44 time=40.1s nobs=2 phase=open
++seed 88: success=True steps=36 time=25.3s nobs=1 phase=open
++seed 85: success=True steps=56 time=44.4s nobs=2 phase=open
++seed 90: success=True steps=41 time=28.1s nobs=1 phase=open
++seed 87: success=True steps=51 time=39.9s nobs=1 phase=open
++seed 86: success=True steps=57 time=48.7s nobs=2 phase=open
++seed 94: success=True steps=24 time=18.4s nobs=0 phase=open
++seed 91: success=True steps=41 time=36.0s nobs=2 phase=open
++seed 89: success=True steps=54 time=45.6s nobs=2 phase=open
++seed 92: success=True steps=43 time=31.1s nobs=1 phase=open
++seed 97: success=True steps=32 time=10.7s nobs=0 phase=open
++seed 93: success=True steps=58 time=33.9s nobs=2 phase=open
++seed 95: success=True steps=58 time=25.1s nobs=1 phase=open
++seed 98: success=True steps=47 time=10.3s nobs=1 phase=open
++seed 96: success=True steps=59 time=19.9s nobs=2 phase=open
++seed 99: success=True steps=53 time=10.6s nobs=2 phase=open

@@ -1,0 +1,60 @@
+diff --git a/approach.py b/approach.py
+index a958bc9..ad1517f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -275,7 +275,7 @@ class GeneratedApproach:
+             reg = self._task_region(r, (t[0] if t[0] == "obj" else "samp", t[1]))
+             if not reg.any():
+                 reg = self.obj_vis[(r, t[1])] if t[0] == "obj" else self.samp_reg[t[1]] & self.free_r[r]
+-            cands = self._candidates(reg, 8)
++            cands = self._candidates(reg, 14)
+             # add cells closest to start
+             Fstart = None
+             for c in cands:
+diff --git a/real_batch1.txt b/real_batch1.txt
+new file mode 100644
+index 0000000..117e000
+--- /dev/null
++++ b/real_batch1.txt
+@@ -0,0 +1,41 @@
++0 3 25 True 25 3.16
++1 2 20 True 20 2.81
++2 3 21 True 21 2.32
++3 3 23 True 23 2.78
++4 3 22 True 22 3.03
++5 3 25 True 25 3.17
++6 2 21 True 21 3.15
++7 3 24 True 24 3.49
++8 3 22 True 22 2.75
++9 2 23 True 23 2.32
++10 3 22 True 22 3.06
++11 1 19 True 19 3.37
++12 2 23 True 23 2.29
++13 3 25 True 25 2.51
++14 1 30 True 30 4.09
++15 3 25 True 25 2.81
++16 2 21 True 21 2.65
++17 3 22 True 22 3.32
++18 3 23 True 23 3.0
++19 2 25 True 25 2.47
++20 3 27 True 27 2.78
++21 1 20 True 20 1.25
++22 3 23 True 23 2.42
++23 1 18 True 18 2.4
++24 2 20 True 20 2.39
++25 2 20 True 20 2.56
++26 3 23 True 23 2.67
++27 1 22 True 22 1.08
++28 2 23 True 23 2.82
++29 3 22 True 22 2.99
++30 1 21 True 21 2.2
++31 2 25 True 25 2.71
++32 3 20 True 20 2.29
++33 3 24 True 24 3.38
++34 1 20 True 20 3.02
++35 1 19 True 19 2.4
++36 2 21 True 21 1.95
++37 1 19 True 19 2.67
++38 1 21 True 21 2.41
++39 3 24 True 24 3.29
++TOTAL 893 fails 0 maxplan 4.09

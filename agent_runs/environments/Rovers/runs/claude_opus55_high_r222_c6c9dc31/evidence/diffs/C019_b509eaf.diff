@@ -1,0 +1,23 @@
+diff --git a/approach.py b/approach.py
+index 25a3fda..6482434 100644
+--- a/approach.py
++++ b/approach.py
+@@ -326,6 +326,18 @@ class GeneratedApproach:
+         # send region
+         lx, ly = g(w.lander, "x"), g(w.lander, "y")
+         send = (np.hypot(CX - lx, CY - ly) <= LANDER_RANGE) & free
++        # samples lying on/near the lander occlude sends from some directions (empirical)
++        Dl = np.hypot(CX - lx, CY - ly)
++        bear = np.degrees(np.arctan2(CY - ly, CX - lx))
++        for sm in w.samples:
++            sx, sy = g(sm, "x"), g(sm, "y")
++            off = math.hypot(sx - lx, sy - ly)
++            if off <= 0.065:
++                send &= ~(((bear >= -7) & (bear <= 34) & (Dl >= 1.5)) |
++                          ((bear >= 83) & (bear <= 109) & (Dl >= 0.55)))
++            if off <= 0.14:
++                between = (sx - lx) * (CX - lx) + (sy - ly) * (CY - ly) > 0
++                send &= ~(between & (seg_point_dist(CX, CY, lx, ly, sx, sy) < 0.045))
+         for (px, py, phx, phy) in pillars:
+             send &= seg_point_dist(CX, CY, lx, ly, px, py) > PILLAR_LOS_STRICT
+         for (bx, by, sector) in self.bad_send[r]:

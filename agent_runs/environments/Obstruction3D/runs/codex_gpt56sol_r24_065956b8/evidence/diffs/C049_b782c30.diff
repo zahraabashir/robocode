@@ -1,0 +1,15 @@
+diff --git a/approach.py b/approach.py
+index 6cd3f38..f8e968d 100644
+--- a/approach.py
++++ b/approach.py
+@@ -95,7 +95,9 @@ class GeneratedApproach:
+                 side = -.34 if ry >= 0 else .34
+                 if i % 2:
+                     side = -side
+-                px = .13 + .12*(i % 4)
++                # Mid/far-x parking is reachable with a near-vertical arm; the
++                # near-left corner can force the wrist through the tabletop.
++                px = (.25, .25, .40, .40, .13, .13)[i % 6]
+                 py = side - np.sign(side)*.07*(i // 8)
+                 self.park_spots[self.object] = (px, py)
+             px, py = self.park_spots[self.object]

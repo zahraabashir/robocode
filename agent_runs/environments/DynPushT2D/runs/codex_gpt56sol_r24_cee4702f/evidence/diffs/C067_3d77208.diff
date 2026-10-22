@@ -1,0 +1,12 @@
+diff --git a/approach.py b/approach.py
+index 3d51f31..c0d2f35 100644
+--- a/approach.py
++++ b/approach.py
+@@ -260,6 +260,6 @@ class GeneratedApproach:
+         # Break contact along the exact reverse push direction. Recomputing a
+         # COM-relative far point after the T rotates can route through the T.
+         self.retreat_count += 1
+-        if self.retreat_count >= 12:
++        if self.retreat_count >= 8:
+             self.mode = "choose"
+         return self._safe(-self.push_dir, 0.035)

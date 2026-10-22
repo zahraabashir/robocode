@@ -1,0 +1,37 @@
+diff --git a/approach.py b/approach.py
+index c4bd8a1..16200b2 100644
+--- a/approach.py
++++ b/approach.py
+@@ -52,10 +52,8 @@ class GeneratedApproach:
+                 qq=q.copy(); qq[5]+=d; self.pick_poses.append((qq,.196424,bx))
+         if name=="target_block": self.dest=self.region[:2].copy(); self.rest_z=.110
+         else:
+-            # Carry blockers beyond a side edge and release in free space. This
+-            # avoids trapping the fingers between a small block and the table.
+-            k=self.task_i; self.dest=np.array([x,-.50 if k%2==0 else .50])
+-            self.rest_z=.18
++            k=self.task_i; self.dest=np.array([.16+.07*(k%4),-.36 if k%2==0 else .36])
++            self.rest_z=.075+self._v(state,name,"half_extent_z")
+     def _held(self,s): return self._v(s,self.object_name,"grasp_active")>.5
+     def _feat(self,s):
+         o=self.object_name
+@@ -123,6 +121,11 @@ class GeneratedApproach:
+                 d=.04*self.cal_sign; a += self.B[:,self.cal_i]*d; a[10]=-1.
+                 self.last_pos=feat; self.last_delta=d; return a
+         if self.mode=="release":
++            if self.object_name!="target_block" and self.release_t<60:
++                g=np.array([self.release_x,self.dest[1],self.rest_z-.005])
++                er=np.r_[g-pos,-feat[3:]]
++                u=np.linalg.solve(self.J.T@self.J+1e-5*np.eye(5),self.J.T@np.clip(er,-.03,.03))
++                a += self.B@np.clip(u,-.05,.05)
+             a[10]=1.; self.release_t+=1; return a
+         clearance=.19
+         goals=[np.array([pos[0],pos[1],clearance]),np.array([self.dest[0],self.dest[1],clearance]),
+@@ -141,7 +144,6 @@ class GeneratedApproach:
+             self.waypoint+=1
+             # The last waypoint seats the object before opening the fingers.
+             if self.waypoint>=3: self.mode="release"; self.release_t=0; self.release_x=pos[0]
+-            elif self.waypoint==1 and self.dest[0]>self.start_x+.03: self.mode="reserve"
+             else: self._start_calibration(state)
+             a[10]=-1.; return a
+         u=np.linalg.solve(self.J.T@self.J+1e-5*np.eye(5),self.J.T@np.clip(err,-.06,.06))

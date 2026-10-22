@@ -1,0 +1,22 @@
+diff --git a/approach.py b/approach.py
+index 8953f95..c88fb43 100644
+--- a/approach.py
++++ b/approach.py
+@@ -68,7 +68,7 @@ class GeneratedApproach:
+             valid = [x for x in candidates
+                      if abs(x - sx) > goal_clearance
+                      and all(abs(x - state.get(q, "x")) >
+-                             (ow + state.get(q, "width")) / 2 + 0.08 for q in future)
++                             (ow + state.get(q, "width")) / 2 + 0.14 for q in future)
+                      and all(abs(x - px) > (ow + pw) / 2 + 0.12
+                              for px, pw in used)]
+             if valid:
+@@ -79,7 +79,7 @@ class GeneratedApproach:
+                 def slot_slack(x):
+                     margins = [abs(x - sx) - goal_clearance]
+                     margins += [abs(x - state.get(q, "x")) -
+-                                ((ow + state.get(q, "width")) / 2 + 0.08)
++                                ((ow + state.get(q, "width")) / 2 + 0.14)
+                                 for q in future]
+                     margins += [abs(x - qx) - ((ow + qw) / 2 + 0.12)
+                                 for qx, qw in used]

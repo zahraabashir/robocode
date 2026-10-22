@@ -1,0 +1,12 @@
+diff --git a/approach.py b/approach.py
+index c66a49e..87c0c51 100644
+--- a/approach.py
++++ b/approach.py
+@@ -124,6 +124,7 @@ class GeneratedApproach:
+                 far0 = obj + self._world(np.array([side*(width*.5+.34), self.rot_y]), theta)
+                 self.nav = self._plan(robot, far0, obj, theta, width, lh, lv)
+             elif pd > 0.018:
++                self.force_move = self.force_move or boundary_recover
+                 self.push_dir = dp / max(pd, 1e-9)
+                 self.mode = "move_far"
+                 com0 = obj + self._world(np.array([0.0, -0.36*lv]), theta)

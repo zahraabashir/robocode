@@ -1,0 +1,45 @@
+diff --git a/approach.py b/approach.py
+index e6506f5..659eedc 100644
+--- a/approach.py
++++ b/approach.py
+@@ -168,6 +168,10 @@ class GeneratedApproach:
+         self.wall_margin = 0.01
+         self.stuck_rate = 1e-3
+         self.stage = 0
++        self.spacing = 0.06
++        self.angs = (-0.5, -0.25, 0.0, 0.25, 0.5)
++        self.la_mode = 1
++        self.rbar = 0.03
+         self.pre_clear = 0.035
+         self.final_infl = R_ROBOT + 0.008
+         self.sub_clear = 1.0
+@@ -249,7 +253,7 @@ class GeneratedApproach:
+         if coarse:
+             st, dr = self.local_candidates(0.12, (-0.4, 0.0, 0.4))
+         else:
+-            st, dr = self.local_candidates(0.06, (-0.5, -0.25, 0.0, 0.25, 0.5))
++            st, dr = self.local_candidates(self.spacing, self.angs)
+         return to_world(st, pose), to_world(dr, (0, 0, pose[2]))
+ 
+     def eval_pushes(self, pose, robot, coarse=False, H=None):
+@@ -346,11 +350,15 @@ class GeneratedApproach:
+                     T = T1
+                 else:
+                     E2 = self.eval_pushes(E["pose"][i], E["rob"][i], coarse=True, H=self.H2)
+-                    j = int(np.argmax(E2["rate"]))
+-                    r2 = E2["rate"][j]
+-                    if r2 <= 0:
+-                        continue
+-                    T = T1 + (E2["c0"] + self.goal_bonus) / r2
++                    if self.la_mode == 0:
++                        j = int(np.argmax(E2["rate"]))
++                        r2 = E2["rate"][j]
++                        if r2 <= 0:
++                            continue
++                        T = T1 + (E2["c0"] + self.goal_bonus) / r2
++                    else:
++                        T2 = E2["travel"] + E2["k"] + np.maximum(E2["c"], 0) / self.rbar
++                        T = T1 + min(T2.min(), E2["c0"] / self.rbar)
+                 if T < best_T:
+                     best_T = T
+                     best_i = int(i)

@@ -1,0 +1,37 @@
+diff --git a/approach.py b/approach.py
+index d2beb3c..06e44f9 100644
+--- a/approach.py
++++ b/approach.py
+@@ -70,6 +70,14 @@ class GeneratedApproach:
+                 self.phase, self.stalled = "descend", 0
+                 self.last_robot_y, self.pick_y = ry, oy
+             else:
++                if self.last_robot_x is not None and abs(rx - self.last_robot_x) < 0.001:
++                    self.stalled += 1
++                else:
++                    self.stalled = 0
++                self.last_robot_x = rx
++                if self.stalled >= 3:
++                    self.retry = min(4, self.retry + 1)
++                    self.stalled = 0
+                 # Keep suction off in transit: a previously parked object may
+                 # touch the gripper as it passes underneath.
+                 return self._action(dx=self._clip(tx - rx, 0.05), vac=0.0)
+@@ -90,7 +98,8 @@ class GeneratedApproach:
+                 self.attached = True
+             # A modest vertical park is enough to clear the ground while still
+             # leaving room above it for a later verified re-grasp.
+-            parked_high_enough = (not is_target and self.attached and oy >= 0.35)
++            park_y = 0.35 if obj.type.name == "target_block" else max(0.38, 0.55 - 0.10 * self.index)
++            parked_high_enough = (not is_target and self.attached and oy >= park_y)
+             if ry < 0.74 and not parked_high_enough:
+                 return self._action(dy=0.05, vac=1.0)
+             if not self.attached:
+@@ -151,6 +160,7 @@ class GeneratedApproach:
+                 return self._action(dy=min(0.05, self.safe_y - ry))
+             self.index += 1
+             self.retry, self.attached, self.release_wait = 0, False, 0
++            self.last_robot_x = None
+             self.phase = "align" if self.index < len(self.todo) else "done"
+             return self._action()
+         return self._action()

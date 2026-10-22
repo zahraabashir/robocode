@@ -1,0 +1,59 @@
+diff --git a/approach.py b/approach.py
+index b9d5ddd..37a107b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -83,7 +83,8 @@ class GeneratedApproach:
+         return abs(ox-rx) < rhx+ohx+.006 and abs(oy-ry) < rhy+ohy+.006
+ 
+     def _choose_task(self, state):
+-        blockers = sorted(n for n in state.get_object_names() if self._blocking(state, n))
++        blockers = sorted((n for n in state.get_object_names() if self._blocking(state, n)),
++                          key=lambda n: -self._xyz(state, n)[2])
+         if blockers:
+             self.object = blockers[0]
+             # Use rows opposite the goal. Staggering x prevents a pile even
+@@ -165,6 +166,7 @@ class GeneratedApproach:
+             if held is not None:
+                 self.object = held  # handle a neighboring obstruction gracefully
+                 self.carry_rotation = _fk(q)[:3, :3].copy()
++                self.lift_start_z = self._xyz(state, held)[2]
+                 self.phase, self.phase_steps = "lift", 0
+             elif self.phase_steps > 5:
+                 # Retry through a collision-safe overhead approach.
+@@ -179,10 +181,18 @@ class GeneratedApproach:
+         if self.phase == "lift":
+             # At table height a simultaneous Cartesian move may be rejected by
+             # collision checking. Joint 4 positive is a reliable vertical escape.
+-            if self.phase_steps <= 4:
++            if self._xyz(state, held)[2] < self.lift_start_z + .10 and self.phase_steps <= 4:
+                 action = self._act_to(q, q)
+                 action[4] = -.12
+                 return action
++            if self._xyz(state, held)[2] < self.lift_start_z + .10 and self.phase_steps <= 9:
++                action = self._act_to(q, q)
++                action[6] = .10
++                return action
++            if self._xyz(state, held)[2] < self.lift_start_z + .10 and self.phase_steps <= 15:
++                action = self._act_to(q, q)
++                action[4], action[6] = -.06, .06
++                return action
+             hover = self.destination.copy()
+             hover[2] = max(.27, self.destination[2] + .16)
+             self._set_goal_for_object_delta(state, hover)
+@@ -220,8 +230,15 @@ class GeneratedApproach:
+                 if self.object == "target_block":
+                     # Keep open and let physics settle/termination register.
+                     return self._act_to(q, q, 1.0)
+-                self.phase, self.phase_steps = "choose", 0
++                self.phase, self.phase_steps = "retract", 0
+                 self.carry_rotation = None
+             return self._act_to(q, q, 1.0)
+ 
++        if self.phase == "retract":
++            if self.phase_steps <= 5:
++                action = self._act_to(q, q, 1.0)
++                action[4] = -.12
++                return action
++            self.phase, self.phase_steps = "choose", 0
++
+         return self._act_to(q, q, 1.0)

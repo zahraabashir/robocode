@@ -1,0 +1,32 @@
+import numpy as np
+from env_client import make_env
+
+
+def rover_xy(obs, env, i=0):
+    typ = next(t for t in env.observation_space.types if t.name == "rover")
+    rover = sorted(obs.get_objects(typ), key=lambda o: o.name)[i]
+    return tuple(float(obs.get(rover, f)) for f in ("x", "y", "theta"))
+
+
+def run(seed, commands):
+    env = make_env()
+    obs, _ = env.reset(seed=seed)
+    print("start", rover_xy(obs, env))
+    for label, delta, n in commands:
+        for k in range(n):
+            act = np.zeros(8, dtype=np.float32)
+            act[0:2] = delta
+            old = rover_xy(obs, env)
+            obs, _, term, trunc, _ = env.step(act)
+            new = rover_xy(obs, env)
+            if new[:2] == old[:2] or k == n - 1:
+                print(label, k + 1, old, "->", new, "reject", new[:2] == old[:2])
+            if term or trunc:
+                break
+    env.close()
+
+
+run(0, [("north", (0, .2), 22), ("west", (-.2, 0), 18), ("south", (0, -.2), 22)])
+run(1, [("west", (-.2, 0), 18), ("north", (0, .2), 22), ("east", (.2, 0), 22)])
+for south_steps in range(0, 4):
+    run(20 + south_steps, [("south-gap", (0, -.2), south_steps), ("cross-west", (-.2, 0), 7)])

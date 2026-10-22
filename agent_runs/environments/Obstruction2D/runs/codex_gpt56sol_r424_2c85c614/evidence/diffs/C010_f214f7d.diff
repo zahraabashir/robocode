@@ -1,0 +1,23 @@
+diff --git a/approach.py b/approach.py
+index 86b23ab..0db84ac 100644
+--- a/approach.py
++++ b/approach.py
+@@ -98,8 +98,16 @@ class GeneratedApproach:
+                 return self._action()
+             self.phase = "carry"
+         if self.phase == "carry":
+-            # Parking vertically in place avoids unknown horizontal world bounds.
+-            tx = state.get(surface, "x") if is_target else ox
++            if is_target:
++                tx = state.get(surface, "x")
++            elif obj.type.name == "target_block":
++                tx = ox
++            else:
++                sx = state.get(surface, "x")
++                direction = 1.0 if ox >= sx else -1.0
++                tx = ox + direction * (0.25 + 0.08 * self.index)
++                # Empirically the circular base center is constrained here.
++                tx = max(0.11, min(1.39, tx))
+             if abs(tx - rx) > 0.004:
+                 return self._action(dx=self._clip(tx - rx, 0.05), vac=1.0)
+             self.phase = "lower" if is_target else "release"

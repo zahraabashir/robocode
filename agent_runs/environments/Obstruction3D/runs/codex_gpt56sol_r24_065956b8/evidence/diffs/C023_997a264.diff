@@ -1,0 +1,23 @@
+diff --git a/probe_grasp.py b/probe_grasp.py
+index fdd70a4..6f645d5 100644
+--- a/probe_grasp.py
++++ b/probe_grasp.py
+@@ -183,10 +183,18 @@ def exact_sequence(seed=0):
+     close = np.zeros(11, dtype=np.float32)
+     close[10] = -1.0
+     actions.append(("close", close))
++    for _ in range(4):
++        lift = np.zeros(11, dtype=np.float32)
++        lift[4] = -0.1
++        actions.append(("lift_q2", lift))
+     carry = np.zeros(11, dtype=np.float32)
+     carry[0] = np.clip(region[0] - block0[0], -0.2, 0.2)
+     carry[1] = np.clip(region[1] - block0[1], -0.2, 0.2)
+     actions.append(("carry", carry))
++    for _ in range(4):
++        lower = np.zeros(11, dtype=np.float32)
++        lower[4] = 0.1
++        actions.append(("lower_q2", lower))
+     release = np.zeros(11, dtype=np.float32)
+     release[10] = 1.0
+     actions.append(("release", release))

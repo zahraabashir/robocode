@@ -1,0 +1,47 @@
+diff --git a/approach.py b/approach.py
+index 0f5f3c1..a4da837 100644
+--- a/approach.py
++++ b/approach.py
+@@ -32,6 +32,25 @@ class GeneratedApproach:
+                          np.clip(-math.pi/2-s.get(r,'theta'),-.19634954,.19634954),
+                          np.clip(.2-s.get(r,'arm_joint'),-.1,.1),vac],dtype=np.float32)
+ 
++    def grasp_position(self, s, obj, preferred):
++        x,y,w,h=self.rect(s,obj)
++        others=[self.rect(s,o) for o in s.get_objects(self.ot) if o!=obj]
++        candidates=[preferred,x+w/2,x+.005,x+w-.005,.101,1.517]
++        for ox,oy,ow,oh in others:
++            candidates.extend([ox-.041,ox+ow+.041])
++        valid=[]
++        for cx in candidates:
++            if not .101<=cx<=1.517 or cx+.035<x+.006 or cx-.035>x+w-.006:continue
++            cy=y+h+.206
++            collision=False
++            for ox,oy,ow,oh in others:
++                dx=max(ox-cx,0,cx-ox-ow);dy=max(oy-cy,0,cy-oy-oh)
++                if dx*dx+dy*dy<.101**2:collision=True;break
++                if ox<cx+.04 and ox+ow>cx-.04 and oy<y+h+.02 and oy+oh>y+h-.005:
++                    collision=True;break
++            if not collision:valid.append(cx)
++        return min(valid,key=lambda cx:abs(cx-preferred)) if valid else float(np.clip(preferred,.101,1.517))
++
+     def storage(self, s, x, w, h):
+         others=[(o,self.rect(s,o)) for o in s.get_objects(self.ot) if o!=self.obj]
+         low=max(.005,.101+self.offsetx)
+@@ -89,7 +108,7 @@ class GeneratedApproach:
+             if self.phase == 'above':
+                 if ry<self.emptyheight-.001: return self.action(s,y=self.emptyheight)
+                 grasp_shift=min(0,1.516-(self.destx+w/2)) if self.obj==self.block else 0
+-                grasp_x=float(np.clip(x+w/2+grasp_shift,.101,1.517))
++                grasp_x=self.grasp_position(s,self.obj,x+w/2+grasp_shift)
+                 if abs(rx-grasp_x)>.001: return self.action(s,x=grasp_x,y=self.emptyheight)
+                 self.phase='down'; self.n=0; self.last_down=None
+             if self.phase == 'down':
+diff --git a/results_0_1_4.json b/results_0_1_4.json
+new file mode 100644
+index 0000000..4465fdb
+--- /dev/null
++++ b/results_0_1_4.json
+@@ -0,0 +1 @@
++[{"seed": 0, "count": 4, "done": true, "steps": 74, "seconds": 0.368}]
+\ No newline at end of file

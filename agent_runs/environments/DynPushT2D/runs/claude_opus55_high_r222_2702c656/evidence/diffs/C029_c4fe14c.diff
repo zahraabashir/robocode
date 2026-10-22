@@ -1,0 +1,43 @@
+diff --git a/approach.py b/approach.py
+index 0f917ac..cd87c30 100644
+--- a/approach.py
++++ b/approach.py
+@@ -110,7 +110,8 @@ class GeneratedApproach:
+         self.rot_chunk = 1.2
+         self.kpush = 20.0
+         self.obl = 0.0
+-        self.extra_rot = 'mt'
++        self.extra_rot = 'mte'
++        self.geo_cor = False
+         self.use_rate = True
+         self.tk = 0.6
+         self.rot_end = math.radians(1.0)
+@@ -137,6 +138,19 @@ class GeneratedApproach:
+         self.retreat_dir = None
+ 
+     # ------------------------------------------------------------ primitives
++    def cor_geo(self, name, B, cl):
++        Lh, Lv, w = B.Lh, B.Lv, B.w
++        sg = 1.0 if name.endswith('+') or name in ('Rsl', 'Rslm') else -1.0
++        if name.startswith('Rtopm'):
++            return np.array([-sg * (-0.4 * Lh + 1.1 * Lv + 1.2 * w - 0.27), cl[1]])
++        if name.startswith('Rtop'):
++            return np.array([-sg * (-0.22 * Lh + 0.63 * Lv + 0.5 * w - 0.2), cl[1]])
++        if name in ('Rsl', 'Rsr'):
++            return np.array([sg * (0.02 + 0.07 * Lh + 0.12 * Lv), 0.02 + 0.21 * Lh - 0.27 * Lv - 0.74 * w])
++        if name in ('Rslm', 'Rsrm'):
++            return np.array([sg * (0.02 + 0.07 * Lh + 0.24 * Lv), 0.03 + 0.22 * Lh - 0.15 * Lv - 0.9 * w])
++        return cl
++
+     def primitives_list(self, B):
+         w, Lh, Lv, yc = B.w, B.Lh, B.Lv, B.yc
+         a = Lh / 2 - 0.04
+@@ -245,6 +259,8 @@ class GeneratedApproach:
+                 if not self.reachable(B, p, n):
+                     continue
+                 cl = np.array(COR[name])
++                if self.geo_cor:
++                    cl = self.cor_geo(name, B, cl)
+                 cw = B.to_world(cl)
+                 arm = float(np.linalg.norm(p - cl))
+                 if self.use_rate:

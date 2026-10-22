@@ -1,0 +1,30 @@
+diff --git a/approach.py b/approach.py
+index f8aed93..1162f66 100644
+--- a/approach.py
++++ b/approach.py
+@@ -13,11 +13,11 @@ NI, NJ = 41, 91  # x: 0.25..2.25 (per side), y: -2.25..2.25
+ SEL = {"sample": -5 / 6, "calibrate": -0.5, "image": -1 / 6, "noop": 0.0,
+        "send": 0.5, "drop": 5 / 6}
+ CAM_OFF = (-0.087, -0.0125)
+-OBJ_RANGE = 1.93
+-OBJ_RANGE_EXEC = 1.975
+-LANDER_RANGE = 3.82
+-LANDER_RANGE_EXEC = 3.88
+-SAMPLE_RANGE = 0.22
++OBJ_RANGE = 1.97
++OBJ_RANGE_EXEC = 1.99
++LANDER_RANGE = 3.95
++LANDER_RANGE_EXEC = 3.975
++SAMPLE_RANGE = 0.24
+ SAMPLE_RANGE_EXEC = 0.245
+ HOME_RANGE = 0.15
+ PILLAR_INFL_X = 0.21
+@@ -243,7 +243,7 @@ class GeneratedApproach:
+             oh = self.home[self.other[rn]]
+             lx, ly = self.lander
+             m = np.hypot(cx - lx, cy - ly) <= LANDER_RANGE
+-            m &= self._los_clear(cx, cy, lx, ly, 0.08, [(oh[0], oh[1], ROVER_BLOCK_R + 0.05)])
++            m &= self._los_clear(cx, cy, lx, ly, 0.03, [(oh[0], oh[1], ROVER_BLOCK_R + 0.05)])
+             reg["send"] = m
+             hxy = self.home[rn]
+             reg["home"] = np.hypot(px - hxy[0], py - hxy[1]) <= HOME_RANGE

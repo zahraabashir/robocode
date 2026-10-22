@@ -1,0 +1,16 @@
+diff --git a/approach.py b/approach.py
+index c2627c9..ceefa4a 100644
+--- a/approach.py
++++ b/approach.py
+@@ -258,7 +258,10 @@ class GeneratedApproach:
+     def _sample_goal(self, state, sample, idx, rover_pos):
+         sx, sy = self._xy(state, sample)
+         candidates = []
+-        for radius in (0.0, 0.20, 0.24):
++        edge_needed = (abs(sx) < 0.43 or abs(sx) > 2.22 or
++                       abs(sy) > 2.22 or self._blocked((sx, sy)))
++        radii = (0.0, 0.18, 0.24) if edge_needed else (0.0, 0.18)
++        for radius in radii:
+             count = 1 if radius == 0 else 16
+             for k in range(count):
+                 angle = 2.0 * math.pi * k / count

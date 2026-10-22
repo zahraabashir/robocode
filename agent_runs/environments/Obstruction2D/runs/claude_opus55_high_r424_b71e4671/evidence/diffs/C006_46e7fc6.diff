@@ -1,0 +1,133 @@
+diff --git a/approach.py b/approach.py
+index 8a08531..f574aae 100644
+--- a/approach.py
++++ b/approach.py
+@@ -66,8 +66,13 @@ class GeneratedApproach:
+     def _assembly(self, held_rel=None):
+         """Boxes (x0, x1, bottom_offset) relative to robot position."""
+         gh = self.gh / 2.0
+-        boxes = [(-self.base_r, self.base_r, -self.base_r),
+-                 (-gh, gh, -(self.arm + self.gw))]
++        rb = self.base_r
++        boxes = [(-gh, gh, -(self.arm + self.gw))]
++        edges = np.linspace(0.0, rb, 6)
++        for a, b in zip(edges[:-1], edges[1:]):
++            off = -np.sqrt(max(rb * rb - a * a, 0.0))
++            boxes.append((a, b, off))
++            boxes.append((-b, -a, off))
+         if held_rel is not None:
+             boxes.append(held_rel)
+         return boxes
+@@ -139,6 +144,22 @@ class GeneratedApproach:
+         opts = [c] + list(np.linspace(lo, hi, 9))
+         return sorted(set(float(v) for v in opts), key=lambda v: abs(v - c))
+ 
++    def _place_any(self, br, d, lefts, obstacles):
++        """Is there any feasible final placement given obstacles?"""
++        bw = br[1] - br[0]
++        held = self._held_rel(br, d)
++        ok = np.ones(len(lefts), dtype=bool)
++        for q in obstacles:
++            ok &= ~((lefts + bw > q[0] - 0.003) & (lefts < q[1] + 0.003))
++        X = lefts - held[0]
++        ty = PLACE_BOT - held[2]
++        ok &= (X >= XMIN) & (X <= XMAX)
++        if ty > YMAX:
++            return False
++        req = self._safe(X, self._assembly(held), obstacles)
++        ok &= req <= ty + 1e-6
++        return bool(ok.any())
++
+     def _held_rel(self, r, d):
+         rx, ry = self._pick_pose(r, d)
+         return (r[0] - rx, r[1] - rx, r[2] - ry)
+@@ -178,7 +199,8 @@ class GeneratedApproach:
+         lefts = np.arange(sx0 + e, sx1 - bw - e + 1e-9, 0.004)
+         if len(lefts) == 0:
+             lefts = np.array([(sx0 + sx1) / 2 - bw / 2])
+-        for n in R:
++        for i, n in enumerate(R):
++            pending = set(R[i + 1:])
+             r = cur[n]
+             others = [(q[0], q[1], q[3]) for m, q in cur.items() if m != n] + [block_obs]
+             dl = [v for v in self._d_options(r) if self._pick_ok(r, v, others)]
+@@ -209,8 +231,10 @@ class GeneratedApproach:
+                     continue
+                 dpose = (tx, ty)
+                 nob = (left, left + w, DROP_BOT + h)
+-                obs_after = [(q[0], q[1], q[3]) for m, q in cur.items() if m != n] + [nob]
+-                if not any(self._pick_ok(br, v, obs_after) for v in bd_opts[:5]):
++                obs_after = [(q[0], q[1], q[3]) for m, q in cur.items()
++                             if m != n and m not in pending] + [nob]
++                if not any(self._pick_ok(br, v, obs_after) and
++                           self._place_any(br, v, lefts, obs_after) for v in bd_opts):
+                     continue
+                 c2 = self._leg_cost(pick, dpose, boxes_h, others)
+                 c3 = abs(tx - (br[0] + br[1]) / 2) / STEP
+@@ -218,6 +242,7 @@ class GeneratedApproach:
+                 if bestd is None or sc < bestd[0]:
+                     bestd = (sc, dpose, left, c2)
+             if bestd is None:
++                self._why = ("nodrop", n)
+                 return None
+             _, dpose, left, c2 = bestd
+             cost += c1 + c2
+@@ -251,6 +276,7 @@ class GeneratedApproach:
+                 if bestp is None or sc < bestp[0]:
+                     bestp = (sc, float(d), pick, (tx, ty))
+         if bestp is None:
++            self._why = ("noplace",)
+             return None
+         sc, d, pick, ppose = bestp
+         cost += sc
+diff --git a/dbg2.py b/dbg2.py
+new file mode 100644
+index 0000000..c242e95
+--- /dev/null
++++ b/dbg2.py
+@@ -0,0 +1,17 @@
++import sys, numpy as np
++from env_client import make_env
++import approach as A
++env=make_env(); obs,info=env.reset(seed=int(sys.argv[1]))
++ap=A.GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++robot, block, surface, obst = ap._parse(obs)
++sr=A._rect(obs,surface); br=A._rect(obs,block)
++orects={o.name:A._rect(obs,o) for o in obst}
++print("surf",sr[:2],"block",br)
++orig=ap._place_any
++def pa(br_,d,lefts,obstacles):
++    r=orig(br_,d,lefts,obstacles); print("place_any d",d,"obst",np.round(obstacles,3).tolist(),"->",r); return r
++ap._place_any=pa
++start=(A._g(obs,robot,'x'),A._g(obs,robot,'y'))
++R=tuple(sys.argv[2].split(','))
++print(ap._plan_subset(start,R,orects,br,(sr[0],sr[1]),ap._assembly()), ap._why)
++env.close()
+diff --git a/dbgplan.py b/dbgplan.py
+new file mode 100644
+index 0000000..acbd99f
+--- /dev/null
++++ b/dbgplan.py
+@@ -0,0 +1,22 @@
++import sys, itertools
++from env_client import make_env
++import approach as A
++env=make_env(); obs,info=env.reset(seed=int(sys.argv[1]))
++ap=A.GeneratedApproach(env.action_space, env.observation_space, {})
++ap.reset(obs, info)
++print("legs", ap.legs)
++robot, block, surface, obst = ap._parse(obs)
++sr=A._rect(obs,surface); br=A._rect(obs,block)
++orects={o.name:A._rect(obs,o) for o in obst}
++start=(A._g(obs,robot,'x'),A._g(obs,robot,'y'))
++for k in range(len(orects)+1):
++    for R in itertools.permutations(orects,k):
++        print(R, ap._plan_subset(start,R,orects,br,(sr[0],sr[1]),ap._assembly()), getattr(ap,"_why",None))
++env.close()
++# instrument
++import numpy as np
++R=('obstruction0','obstruction1')
++n='obstruction0'; r=orects[n]
++others=[(q[0],q[1],q[3]) for m,q in orects.items() if m!=n]+[(br[0],br[1],br[3])]
++print("dopts", ap._d_options(r), [ap._pick_ok(r,v,others) for v in ap._d_options(r)])
++print("block dopts", [ap._pick_ok(br,v,[(q[0],q[1],q[3]) for q in orects.values()]) for v in ap._d_options(br)])

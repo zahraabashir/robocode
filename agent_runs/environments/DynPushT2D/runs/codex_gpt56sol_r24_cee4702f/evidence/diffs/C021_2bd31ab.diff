@@ -1,0 +1,50 @@
+diff --git a/approach.py b/approach.py
+index d169e4b..4aeab0d 100644
+--- a/approach.py
++++ b/approach.py
+@@ -15,6 +15,7 @@ class GeneratedApproach:
+         self.turn_sign = 1.0
+         self.push_dir = np.array([1.0, 0.0])
+         self.start_pose = np.zeros(3)
++        self.nav = []
+ 
+     @staticmethod
+     def _angle(x):
+@@ -48,6 +49,23 @@ class GeneratedApproach:
+             elif pd > 0.018:
+                 self.push_dir = dp / max(pd, 1e-9)
+                 self.mode = "move_far"
++                # Route around the cap instead of crossing the T when moving
++                # from a rotation contact to the translation staging side.
++                c, sn = math.cos(theta), math.sin(theta)
++                rel = robot - obj
++                local_robot = np.array([c*rel[0] + sn*rel[1],
++                                        -sn*rel[0] + c*rel[1]])
++                com0 = obj + self._world(np.array([0.0, -0.36*lv]), theta)
++                far0 = np.clip(com0 - self.push_dir*0.82, 0.105, 4.895)
++                frel = far0 - obj
++                far_local = np.array([c*frel[0] + sn*frel[1],
++                                      -sn*frel[0] + c*frel[1]])
++                side0 = 1.0 if local_robot[0] >= 0 else -1.0
++                self.nav = [obj + self._world(np.array([side0*0.76,
++                            min(0.30, max(-0.72*lv, local_robot[1]))]), theta),
++                            obj + self._world(np.array([side0*0.76, 0.30]), theta),
++                            obj + self._world(np.array([far_local[0], 0.30]), theta)]
++                self.nav = [np.clip(p, 0.105, 4.895) for p in self.nav]
+             else:
+                 return np.zeros(2, dtype=float)
+             self.count = 0
+@@ -85,8 +103,12 @@ class GeneratedApproach:
+ 
+         # The effective COM lies down the stem from the reported junction.
+         com = obj + self._world(np.array([0.0, -0.36 * lv]), theta)
+-        far = com - self.push_dir * 0.82
++        far = np.clip(com - self.push_dir * 0.82, 0.105, 4.895)
+         if self.mode == "move_far":
++            while self.nav and np.linalg.norm(robot - self.nav[0]) < 0.045:
++                self.nav.pop(0)
++            if self.nav:
++                return self._safe(self.nav[0] - robot)
+             if np.linalg.norm(robot - far) < 0.035:
+                 self.mode = "move_push"
+                 self.count = 0

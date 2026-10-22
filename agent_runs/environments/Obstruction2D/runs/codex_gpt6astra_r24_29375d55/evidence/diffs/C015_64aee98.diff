@@ -1,0 +1,116 @@
+diff --git a/approach.py b/approach.py
+index 5449220..26c3893 100644
+--- a/approach.py
++++ b/approach.py
+@@ -46,8 +46,12 @@ class GeneratedApproach:
+         return bad
+ 
+     def offsets(self,x,px,w):
+-        low=max(.1002-x,.1002-px,-.034)
+-        high=min(1.5178-x,1.5178-px,w+.034)
++        low=max(.1002-x,.1002-px,-.022)
++        high=min(1.5178-x,1.5178-px,w+.022)
++        if low>high:
++            # Near a wall, retain at least 1 mm of gripper overlap.
++            low=max(.1002-x,.1002-px,-.034)
++            high=min(1.5178-x,1.5178-px,w+.034)
+         if low>high:return []
+         return sorted(set([max(low,min(high,w/2))]+[float(z) for z in np.linspace(low,high,7)]),key=lambda z:abs(z-w/2))
+ 
+diff --git a/final_count4.jsonl b/final_count4.jsonl
+index c9193db..381692a 100644
+--- a/final_count4.jsonl
++++ b/final_count4.jsonl
+@@ -80,3 +80,20 @@
+ {"seed": 79, "count": 4, "success": true, "steps": 63, "policy_seconds": 0.0114, "elapsed": 0.494}
+ {"seed": 80, "count": 4, "success": true, "steps": 153, "policy_seconds": 0.0427, "elapsed": 1.427}
+ {"seed": 81, "count": 4, "success": true, "steps": 78, "policy_seconds": 0.0131, "elapsed": 0.56}
++{"seed": 82, "count": 4, "success": true, "steps": 69, "policy_seconds": 0.0101, "elapsed": 0.79}
++{"seed": 83, "count": 4, "success": true, "steps": 140, "policy_seconds": 0.0218, "elapsed": 2.074}
++{"seed": 84, "count": 4, "success": true, "steps": 65, "policy_seconds": 0.0149, "elapsed": 0.808}
++{"seed": 85, "count": 4, "success": true, "steps": 126, "policy_seconds": 0.0252, "elapsed": 1.396}
++{"seed": 86, "count": 4, "success": true, "steps": 86, "policy_seconds": 0.0217, "elapsed": 0.718}
++{"seed": 87, "count": 4, "success": true, "steps": 98, "policy_seconds": 0.0204, "elapsed": 0.843}
++{"seed": 88, "count": 4, "success": true, "steps": 110, "policy_seconds": 0.0206, "elapsed": 0.766}
++{"seed": 89, "count": 4, "success": true, "steps": 98, "policy_seconds": 0.0204, "elapsed": 0.777}
++{"seed": 90, "count": 4, "success": true, "steps": 57, "policy_seconds": 0.0144, "elapsed": 0.415}
++{"seed": 91, "count": 4, "success": true, "steps": 102, "policy_seconds": 0.0185, "elapsed": 0.758}
++{"seed": 92, "count": 4, "success": true, "steps": 82, "policy_seconds": 0.0159, "elapsed": 0.516}
++{"seed": 93, "count": 4, "success": true, "steps": 100, "policy_seconds": 0.0146, "elapsed": 0.318}
++{"seed": 94, "count": 4, "success": true, "steps": 68, "policy_seconds": 0.014, "elapsed": 0.208}
++{"seed": 95, "count": 4, "success": true, "steps": 87, "policy_seconds": 0.029, "elapsed": 0.301}
++{"seed": 96, "count": 4, "success": true, "steps": 59, "policy_seconds": 0.011, "elapsed": 0.183}
++{"seed": 97, "count": 4, "success": true, "steps": 147, "policy_seconds": 0.0273, "elapsed": 0.44}
++{"seed": 98, "count": 4, "success": true, "steps": 105, "policy_seconds": 0.0226, "elapsed": 0.328}
+diff --git a/final_defaults.jsonl b/final_defaults.jsonl
+index 54b1323..d48fcd2 100644
+--- a/final_defaults.jsonl
++++ b/final_defaults.jsonl
+@@ -434,3 +434,67 @@
+ {"seed": 433, "count": null, "success": true, "steps": 32, "policy_seconds": 0.0008, "elapsed": 0.138}
+ {"seed": 434, "count": null, "success": true, "steps": 28, "policy_seconds": 0.0018, "elapsed": 0.165}
+ {"seed": 435, "count": null, "success": true, "steps": 52, "policy_seconds": 0.0055, "elapsed": 0.31}
++{"seed": 436, "count": null, "success": true, "steps": 80, "policy_seconds": 0.0187, "elapsed": 0.867}
++{"seed": 437, "count": null, "success": true, "steps": 61, "policy_seconds": 0.0051, "elapsed": 0.4}
++{"seed": 438, "count": null, "success": true, "steps": 49, "policy_seconds": 0.0099, "elapsed": 0.554}
++{"seed": 439, "count": null, "success": true, "steps": 35, "policy_seconds": 0.0014, "elapsed": 0.355}
++{"seed": 440, "count": null, "success": true, "steps": 21, "policy_seconds": 0.0007, "elapsed": 0.171}
++{"seed": 441, "count": null, "success": true, "steps": 72, "policy_seconds": 0.0057, "elapsed": 0.739}
++{"seed": 442, "count": null, "success": true, "steps": 20, "policy_seconds": 0.001, "elapsed": 0.164}
++{"seed": 443, "count": null, "success": true, "steps": 38, "policy_seconds": 0.001, "elapsed": 0.206}
++{"seed": 444, "count": null, "success": true, "steps": 57, "policy_seconds": 0.0071, "elapsed": 0.671}
++{"seed": 445, "count": null, "success": true, "steps": 27, "policy_seconds": 0.0008, "elapsed": 0.155}
++{"seed": 446, "count": null, "success": true, "steps": 50, "policy_seconds": 0.0013, "elapsed": 0.418}
++{"seed": 447, "count": null, "success": true, "steps": 57, "policy_seconds": 0.004, "elapsed": 0.415}
++{"seed": 448, "count": null, "success": true, "steps": 60, "policy_seconds": 0.0083, "elapsed": 0.513}
++{"seed": 449, "count": null, "success": true, "steps": 71, "policy_seconds": 0.0081, "elapsed": 0.605}
++{"seed": 450, "count": null, "success": true, "steps": 29, "policy_seconds": 0.001, "elapsed": 0.27}
++{"seed": 451, "count": null, "success": true, "steps": 19, "policy_seconds": 0.0014, "elapsed": 0.205}
++{"seed": 452, "count": null, "success": true, "steps": 37, "policy_seconds": 0.0014, "elapsed": 0.272}
++{"seed": 453, "count": null, "success": true, "steps": 92, "policy_seconds": 0.0133, "elapsed": 0.937}
++{"seed": 454, "count": null, "success": true, "steps": 40, "policy_seconds": 0.0015, "elapsed": 0.316}
++{"seed": 455, "count": null, "success": true, "steps": 71, "policy_seconds": 0.0074, "elapsed": 0.809}
++{"seed": 456, "count": null, "success": true, "steps": 58, "policy_seconds": 0.005, "elapsed": 0.422}
++{"seed": 457, "count": null, "success": true, "steps": 28, "policy_seconds": 0.0009, "elapsed": 0.188}
++{"seed": 458, "count": null, "success": true, "steps": 42, "policy_seconds": 0.0011, "elapsed": 0.28}
++{"seed": 459, "count": null, "success": true, "steps": 51, "policy_seconds": 0.0052, "elapsed": 0.423}
++{"seed": 460, "count": null, "success": true, "steps": 31, "policy_seconds": 0.001, "elapsed": 0.236}
++{"seed": 461, "count": null, "success": true, "steps": 36, "policy_seconds": 0.0019, "elapsed": 0.31}
++{"seed": 462, "count": null, "success": true, "steps": 75, "policy_seconds": 0.0054, "elapsed": 0.509}
++{"seed": 463, "count": null, "success": true, "steps": 76, "policy_seconds": 0.0107, "elapsed": 0.583}
++{"seed": 464, "count": null, "success": true, "steps": 24, "policy_seconds": 0.0007, "elapsed": 0.112}
++{"seed": 465, "count": null, "success": true, "steps": 31, "policy_seconds": 0.0009, "elapsed": 0.154}
++{"seed": 466, "count": null, "success": true, "steps": 76, "policy_seconds": 0.0062, "elapsed": 0.357}
++{"seed": 467, "count": null, "success": true, "steps": 25, "policy_seconds": 0.0007, "elapsed": 0.104}
++{"seed": 468, "count": null, "success": true, "steps": 54, "policy_seconds": 0.0014, "elapsed": 0.308}
++{"seed": 469, "count": null, "success": true, "steps": 18, "policy_seconds": 0.0006, "elapsed": 0.099}
++{"seed": 470, "count": null, "success": true, "steps": 61, "policy_seconds": 0.0069, "elapsed": 0.527}
++{"seed": 471, "count": null, "success": true, "steps": 32, "policy_seconds": 0.0009, "elapsed": 0.162}
++{"seed": 472, "count": null, "success": true, "steps": 35, "policy_seconds": 0.0011, "elapsed": 0.194}
++{"seed": 473, "count": null, "success": true, "steps": 23, "policy_seconds": 0.0007, "elapsed": 0.08}
++{"seed": 474, "count": null, "success": true, "steps": 24, "policy_seconds": 0.0007, "elapsed": 0.097}
++{"seed": 475, "count": null, "success": true, "steps": 78, "policy_seconds": 0.0075, "elapsed": 0.4}
++{"seed": 476, "count": null, "success": true, "steps": 93, "policy_seconds": 0.0125, "elapsed": 0.781}
++{"seed": 477, "count": null, "success": true, "steps": 63, "policy_seconds": 0.0053, "elapsed": 0.409}
++{"seed": 478, "count": null, "success": true, "steps": 15, "policy_seconds": 0.0005, "elapsed": 0.063}
++{"seed": 479, "count": null, "success": true, "steps": 55, "policy_seconds": 0.0022, "elapsed": 0.283}
++{"seed": 480, "count": null, "success": true, "steps": 102, "policy_seconds": 0.0116, "elapsed": 0.681}
++{"seed": 481, "count": null, "success": true, "steps": 25, "policy_seconds": 0.0011, "elapsed": 0.153}
++{"seed": 482, "count": null, "success": true, "steps": 22, "policy_seconds": 0.0007, "elapsed": 0.11}
++{"seed": 483, "count": null, "success": true, "steps": 24, "policy_seconds": 0.0007, "elapsed": 0.098}
++{"seed": 484, "count": null, "success": true, "steps": 88, "policy_seconds": 0.0152, "elapsed": 0.65}
++{"seed": 485, "count": null, "success": true, "steps": 40, "policy_seconds": 0.0109, "elapsed": 0.212}
++{"seed": 486, "count": null, "success": true, "steps": 27, "policy_seconds": 0.0011, "elapsed": 0.159}
++{"seed": 487, "count": null, "success": true, "steps": 27, "policy_seconds": 0.0012, "elapsed": 0.153}
++{"seed": 488, "count": null, "success": true, "steps": 135, "policy_seconds": 0.014, "elapsed": 1.047}
++{"seed": 489, "count": null, "success": true, "steps": 80, "policy_seconds": 0.0164, "elapsed": 0.511}
++{"seed": 490, "count": null, "success": true, "steps": 70, "policy_seconds": 0.0061, "elapsed": 0.433}
++{"seed": 491, "count": null, "success": true, "steps": 58, "policy_seconds": 0.0053, "elapsed": 0.393}
++{"seed": 492, "count": null, "success": true, "steps": 77, "policy_seconds": 0.008, "elapsed": 0.472}
++{"seed": 493, "count": null, "success": true, "steps": 64, "policy_seconds": 0.0092, "elapsed": 0.365}
++{"seed": 494, "count": null, "success": true, "steps": 51, "policy_seconds": 0.0066, "elapsed": 0.386}
++{"seed": 495, "count": null, "success": true, "steps": 26, "policy_seconds": 0.0007, "elapsed": 0.124}
++{"seed": 496, "count": null, "success": true, "steps": 31, "policy_seconds": 0.0009, "elapsed": 0.167}
++{"seed": 497, "count": null, "success": true, "steps": 21, "policy_seconds": 0.0007, "elapsed": 0.099}
++{"seed": 498, "count": null, "success": true, "steps": 59, "policy_seconds": 0.0061, "elapsed": 0.372}
++{"seed": 499, "count": null, "success": true, "steps": 111, "policy_seconds": 0.0132, "elapsed": 0.72}

@@ -1,0 +1,250 @@
+diff --git a/approach.py b/approach.py
+index b7ff0dd..8943dfd 100644
+--- a/approach.py
++++ b/approach.py
+@@ -224,7 +224,7 @@ class GeneratedApproach:
+         peak = min(peak, H - 0.1)
+         return max(abs(x1 - x0), (peak - y0) + (peak - y1)) / MAXD
+ 
+-    def _drop_spot(self, robot, objs, held, g, next_name, strict=True):
++    def _drop_spot(self, robot, objs, held, g, next_name, remaining=(), strict=True, staging=False):
+         """Choose (object center x, object bottom y) drop pose for held obstruction."""
+         lo, hi = self._xlim(robot)
+         w = held["w"]
+@@ -238,10 +238,18 @@ class GeneratedApproach:
+             bw = blk["w"]
+             reserved.append((self.place_c - bw / 2 - 0.01, self.place_c + bw / 2 + 0.01))
+         future = []
+-        for n in self.blockers:
+-            if n in others and n not in self.done:
++        for n in remaining:
++            if n in others:
+                 gx, gty = self._grasp_x(robot, others[n], others)
+                 future.append((gx, gty))
++        if staging:
++            blk = None
++            bw = held["w"]
++            reserved = [(self.place_c - bw / 2 - 0.01, self.place_c + bw / 2 + 0.01)]
++            pdepth = robot["maxarm"] + robot["gw"] + held["h"]
++            spparts = self._parts(robot, held, -self.block_g - bw / 2, pdepth)
++            spx = self.place_c + self.block_g
++            spty = FLOOR + PLACE_GAP + pdepth
+         # next pick pose
+         nxt = others.get(next_name)
+         if nxt is not None:
+@@ -291,6 +299,13 @@ class GeneratedApproach:
+                 if blk is not None and self.place_c is not None:
+                     obst_b = [o for o in obst2 if not (o[0] == blk["x"] and o[2] == blk["top"])]
+                     cost += self._steps(bgx, bgty, px, pty, pparts, obst_b)
++                if staging:
++                    # later: re-grasp block at (c + block_g) and carry to placement
++                    sgx = c + self.block_g
++                    sgty = bot + held["h"] + robot["maxarm"] + robot["gw"] + GRASP_GAP
++                    if sgx < lo or sgx > hi:
++                        continue
++                    cost += self._steps(sgx, sgty, spx, spty, spparts, obst2)
+                 cost += 1e-3 * abs(c - held["cx"])
+                 if best is None or cost < best[0]:
+                     best = (cost, c, bot)
+@@ -339,9 +354,11 @@ class GeneratedApproach:
+         for _ in range(6):
+             if self.mode == "pick":
+                 if self.cur is None:
+-                    self.cur = self._next_target(robot, objs)
++                    self.kind, self.cur = self._next_task(robot, objs)
+                 obj = objs[self.cur]
+                 prefer = self.block_g if self.cur == "target_block" else 0.0
++                if self.cur == "target_block" and self.kind == "stage":
++                    prefer = self.stage_g
+                 gx, gty = self._grasp_x(robot, obj, objs, prefer)
+                 parts = self._parts(robot)
+                 obst = self._obst(objs, exclude=(obj["name"],))
+@@ -367,13 +384,16 @@ class GeneratedApproach:
+                     continue
+                 self.g_actual = robot["x"] - obj["cx"]
+                 self.depth = robot["y"] - obj["y"]
+-                if self.cur == "target_block":
++                if self.kind == "place":
+                     self.drop = self.place_c
++                    self.drop_bot = FLOOR + PLACE_GAP
+                 else:
+-                    nxt = self._peek_next(robot, objs, exclude=self.cur)
+-                    d = self._drop_spot(robot, objs, obj, self.g_actual, nxt)
++                    rem = [n for n in self.remaining if n != self.cur]
++                    nxt = rem[0] if rem else "target_block"
++                    stg = self.kind == "stage"
++                    d = self._drop_spot(robot, objs, obj, self.g_actual, nxt, rem, staging=stg)
+                     if d is None:
+-                        d = self._drop_spot(robot, objs, obj, self.g_actual, nxt, strict=False)
++                        d = self._drop_spot(robot, objs, obj, self.g_actual, nxt, rem, strict=False, staging=stg)
+                     if d is None:
+                         d = (self._air_spot(robot, objs, obj, self.g_actual),
+                              H - robot["r"] - 1e-3 - self.depth)
+@@ -388,9 +408,7 @@ class GeneratedApproach:
+                 parts = self._parts(robot, obj, obj["x"] - robot["x"], robot["y"] - obj["y"])
+                 obst = self._obst(objs, exclude=(obj["name"],))
+                 tx = self.drop + (robot["x"] - obj["cx"])
+-                ty = robot["y"] - obj["y"] + FLOOR + PLACE_GAP
+-                if self.cur != "target_block":
+-                    ty = robot["y"] - obj["y"] + self.drop_bot
++                ty = robot["y"] - obj["y"] + self.drop_bot
+                 act, arrived = self._move(robot, tx, ty, parts, obst, 1.0)
+                 # detect failed grasp: object not following
+                 if abs(robot["y"] - obj["y"] - self.depth) > 5e-3:
+@@ -400,7 +418,7 @@ class GeneratedApproach:
+                     lands = (abs(robot["x"] + float(act[0]) - tx) < 1e-5
+                              and abs(robot["y"] + float(act[1]) - ty) < 3e-5
+                              and abs(float(act[2])) < 1e-4 and abs(float(act[3])) < 1e-4)
+-                    if lands and self.cur != "target_block":
++                    if lands and self.kind != "place":
+                         act[4] = 0.0
+                         self.mode = "pick"
+                         self.cur = None
+@@ -412,47 +430,107 @@ class GeneratedApproach:
+                 return self._act(0, 0, 0, 0, 0.0)
+         return self._act(0, 0, 0, 0, robot["vac"])
+ 
+-    def _remaining_blockers(self, objs):
+-        return [n for n in self.blockers if n in objs and self._still_blocks(objs[n], objs)]
+-
+-    def _still_blocks(self, o, objs):
++    def _blockers_now(self, robot, objs):
+         blk = objs["target_block"]
+         bw = blk["w"]
+-        c = self.place_c
+-        if o["x"] < c + bw / 2 + 0.003 and o["x"] + o["w"] > c - bw / 2 - 0.003:
+-            return True
+-        return False if o.get("_moved") else True
++        c, g = self.place_c, self.block_g
++        depth = robot["maxarm"] + robot["gw"] + blk["h"]
++        parts = self._parts(robot, blk, -g - bw / 2, depth)
++        ty = FLOOR + PLACE_GAP + depth
++        res = []
++        for n, o in objs.items():
++            if n == "target_block":
++                continue
++            if o["x"] < c + bw / 2 + 0.003 and o["x"] + o["w"] > c - bw / 2 - 0.003:
++                res.append(n)
++            elif self._req(c + g, parts, [(o["x"], o["x"] + o["w"], o["top"])]) > ty + 1e-6:
++                res.append(n)
++        return res
+ 
+-    def _next_target(self, robot, objs):
+-        rem = [n for n in self.blockers if n in objs and n not in self.done]
+-        goals = rem if rem else ["target_block"]
+-        goals = sorted(goals, key=lambda n: abs(objs[n]["cx"] - robot["x"]))
+-        infeasible = []
+-        for n in goals:
+-            pref = self.block_g if n == "target_block" else 0.0
+-            ok, gx, ty = self._grasp_ok(robot, objs[n], objs, pref)
+-            if ok:
+-                if n != "target_block":
+-                    self.done.add(n)
+-                return n
+-            infeasible.append((n, gx, ty))
+-        # nothing directly graspable: move an obstacle that blocks a goal's grasp
+-        for n, gx, ty in infeasible:
+-            for v in self._violators(robot, objs[n], objs, gx, ty):
+-                if v == "target_block":
+-                    continue
+-                ok, _, _ = self._grasp_ok(robot, objs[v], objs)
+-                if ok:
+-                    self.done.add(v)
+-                    return v
+-        n = goals[0]
+-        if n != "target_block":
+-            self.done.add(n)
+-        return n
++    def _simulate(self, robot, objs, tasks):
++        """Estimate step cost of executing tasks [(kind, name)] from current state."""
++        objs = {n: dict(o) for n, o in objs.items()}
++        x, y = robot["x"], robot["y"]
++        cost = 0.0
++        first_info = None
++        names = [n for k, n in tasks if k == "remove"]
++        for i, (kind, name) in enumerate(tasks):
++            obj = objs[name]
++            if name == "target_block":
++                prefer = self.block_g
++            else:
++                prefer = 0.0
++            ok, gx, gty = self._grasp_ok(robot, obj, objs, prefer)
++            if not ok:
++                cost += 1000.0
++            cost += self._steps(x, y, gx, gty, self._parts(robot), self._obst(objs, exclude=(name,)))
++            g = gx - obj["cx"]
++            depth = gty - obj["y"]
++            rsim = dict(robot)
++            rsim["x"], rsim["y"] = gx, gty
++            if kind == "place":
++                c, bot = self.place_c, FLOOR + PLACE_GAP
++            else:
++                rem = names[names.index(name) + 1:] if (kind == "remove" and name in names) else list(names)
++                nxt = rem[0] if rem else "target_block"
++                d = self._drop_spot(rsim, objs, obj, g, nxt, rem, staging=(kind == "stage"))
++                if d is None:
++                    d = self._drop_spot(rsim, objs, obj, g, nxt, rem, strict=False, staging=(kind == "stage"))
++                if d is None:
++                    return cost + 5000.0
++                c, bot = d
++            tx, ty = c + g, bot + depth
++            parts = self._parts(robot, obj, obj["x"] - gx, depth)
++            cost += self._steps(gx, gty, tx, ty, parts, self._obst(objs, exclude=(name,)))
++            obj["x"] = c - obj["w"] / 2
++            obj["cx"] = c
++            obj["y"] = bot
++            obj["top"] = bot + obj["h"]
++            x, y = tx, ty
++            cost += 1.0
++        return cost
+ 
+-    def _peek_next(self, robot, objs, exclude):
+-        rem = [n for n in self.blockers if n in objs and n not in self.done and n != exclude]
+-        if rem:
+-            rem.sort(key=lambda n: abs(objs[n]["cx"] - robot["x"]))
+-            return rem[0]
+-        return "target_block"
++    def _next_task(self, robot, objs):
++        import itertools
++        blockers = self._blockers_now(robot, objs)
++        if not blockers:
++            self.remaining = []
++            return ("place", "target_block")
++        if len(blockers) <= 3:
++            orders = list(itertools.permutations(blockers))
++        else:
++            orders = [tuple(sorted(blockers, key=lambda n: abs(objs[n]["cx"] - robot["x"]))),
++                      tuple(sorted(blockers, key=lambda n: objs[n]["cx"])),
++                      tuple(sorted(blockers, key=lambda n: -objs[n]["cx"]))]
++        best = None
++        for order in orders:
++            base = [("remove", n) for n in order] + [("place", "target_block")]
++            for stage in (False, True):
++                tasks = ([("stage", "target_block")] if stage else []) + base
++                c = self._simulate(robot, objs, tasks)
++                if best is None or c < best[0] - 1e-9:
++                    best = (c, tasks, order)
++        cost, tasks, order = best
++        self.remaining = list(order)
++        self.stage_g = self.block_g
++        if cost >= 1000.0:
++            # some grasp infeasible: clear an obstacle blocking a grasp
++            for n in list(order) + ["target_block"]:
++                pref = self.block_g if n == "target_block" else 0.0
++                ok, gx, ty = self._grasp_ok(robot, objs[n], objs, pref)
++                if ok:
++                    if n in order:
++                        self.remaining = [m for m in order if m != n]
++                        return ("remove", n)
++                    continue
++                for v in self._violators(robot, objs[n], objs, gx, ty):
++                    if v == "target_block":
++                        continue
++                    ok2, _, _ = self._grasp_ok(robot, objs[v], objs)
++                    if ok2:
++                        self.remaining = list(order)
++                        return ("remove", v)
++        kind, name = tasks[0]
++        if kind == "remove":
++            self.remaining = [m for m in order if m != name]
++        return (kind, name)

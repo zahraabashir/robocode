@@ -1,0 +1,73 @@
+{
+  "sheet_row": 123,
+  "experiment_id": "obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b0dab54",
+  "environment": "obstruction2d_generalized",
+  "seed": 424,
+  "output_dir": "/data01/mmerler/robocode/outputs/astra/astra-high-20usd-cache-fixed-2026-09-19/obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b0dab54/2026-09-21_22-22-01/replicate_424",
+  "run_dir": "/data01/mmerler/robocode/outputs/astra/astra-high-20usd-cache-fixed-2026-09-19/obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b0dab54/2026-09-21_22-22-01",
+  "evidence": "/data01/mmerler/robocode/outputs/astra/queue/runs/123-9871464a74d7",
+  "argv": [
+    "/data01/mmerler/robocode/.venv/bin/python",
+    "experiments/run_experiment.py",
+    "-m",
+    "environment=obstruction2d_generalized",
+    "approach=agentic",
+    "primitive_level=none",
+    "approach.blackbox=true",
+    "approach.blackbox_strict=true",
+    "approach/backend=codex_gpt6",
+    "eval_timeout=60",
+    "approach.backend.reasoning_effort=high",
+    "approach.container_backend=apptainer",
+    "approach.max_budget_usd=20.0",
+    "max_steps=1000",
+    "num_eval_tasks=100",
+    "experiment_id=obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b0dab54",
+    "replicate_seed=424",
+    "eval_seed=792075",
+    "hydra.sweep.dir=/data01/mmerler/robocode/outputs/astra/astra-high-20usd-cache-fixed-2026-09-19/obstruction2d_generalized__agentic__none__blackbox__strict__codex_gpt6__timeout_60s__7b0dab54/2026-09-21_22-22-01",
+    "hydra.sweep.subdir=replicate_${replicate_seed}"
+  ],
+  "session": "astra-q-9871464a74d7",
+  "token": "9871464a74d7",
+  "created": 1790022131.1796818,
+  "base_note": "Astra high; $20 cap; strict black box. Claim before launching.",
+  "status": "launched",
+  "git_sha": "a8e0579f1e191f23a95e1df70367b4e588523768",
+  "quality_audit": {
+    "checked_at": 1790025040.5598445,
+    "complete": true,
+    "issues": [],
+    "review": [],
+    "responses": 294,
+    "tokens": {
+      "input_tokens": 14336405,
+      "cached_input_tokens": 14063360,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 56744,
+      "reasoning_output_tokens": 24134,
+      "total_tokens": 14393149
+    },
+    "cache_fraction": 0.980954430347078,
+    "estimated_cost_usd": 19.63101,
+    "network_signals": [
+      {
+        "call_id": "call_DH176fC6CvJN99LAaiWMvBOO",
+        "tool": "exec",
+        "matches": [
+          "text(await tools.exec_command({cmd:\"rg -n 'timeout|socket' env_client.py | head -15 && ps -eo pid,etime,args | rg 'test_batch' | head\",max_output_tokens:700}"
+        ],
+        "output": "[{'type': 'input_text', 'text': 'Script completed\\nWall time 0.1 seconds\\nOutput:\\n'}, {'type': 'input_text', 'text': '{\"chunk_id\":\"ec3422\",\"wall_time_seconds\":0.000006693,\"exit_code\":0,\"original_token_count\":123,\"output\":\"35:import socket\\\\n469:        self._sock = socket.create_connection((meta[\\\\\"host\\\\\"], meta[\\\\\"port\\\\\"]))\\\\n690:            # makefile() wraps a dup of the socket; close it too so the buffered\\\\n   1481       02:46 /opt/robocode-strict/bin/python test_batch.py 0 100\\\\n   1611       02:22 /opt/robocode-strict/bin/python test_batch.py 0 30 3\\\\n   1971       00:00 /bin/bash -c rg -n \\'timeout|socket\\' env_client.py | head -15 && ps -eo pid,etime,args | rg \\'test_batch\\' | head\\\\n   1975       00:00 rg test_batch\\\\n\"}'}]"
+      }
+    ],
+    "packages": [
+      "numpy"
+    ],
+    "timeouts": 0,
+    "accepted": true
+  },
+  "last_quality_check": 1790025040.5696065,
+  "phase": "done",
+  "last_sync": 1790024979.3043692,
+  "last_upload_try": 1790025040.5696106
+}

@@ -1,0 +1,14 @@
+diff --git a/approach.py b/approach.py
+index 46bc284..acb24ec 100644
+--- a/approach.py
++++ b/approach.py
+@@ -123,7 +123,8 @@ class GeneratedApproach:
+             # leaving room above it for a later verified re-grasp.
+             park_y = 0.35
+             parked_high_enough = (not is_target and self.attached and oy >= park_y)
+-            if ry < 0.74 and not parked_high_enough:
++            lift_limit = self.safe_y - 0.025 if is_target else 0.74
++            if ry < lift_limit and not parked_high_enough:
+                 return self._action(dy=0.05, vac=1.0)
+             if not self.attached:
+                 self.retry += 1

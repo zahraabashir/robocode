@@ -1,0 +1,85 @@
+diff --git a/approach.py b/approach.py
+index 1162f66..ae3bc41 100644
+--- a/approach.py
++++ b/approach.py
+@@ -254,6 +254,7 @@ class GeneratedApproach:
+         self.targets = {rn: None for rn in self.rnames}
+         self.last_pos = {}
+         self._bw_cache = {}
++        self.forced = {}
+         self._pred = {}
+         self.bad_points = []
+         self.cmd = {}
+@@ -651,6 +652,53 @@ class GeneratedApproach:
+             return None
+         return n
+ 
++    def _other_at(self, rn, k):
++        tr = self._pred.get(self.other[rn])
++        if not tr:
++            o = self.rover_objs[self.other[rn]]
++            return None
++        return tr[min(k, len(tr) - 1)]
++
++    def _img_ok(self, state, rn, k, px, py, other_xy):
++        vis = self._visible_objs(rn, px, py, other_xy)
++        needed = [(d, j) for (d, j) in vis
++                  if state.get(self.objectives[j], "have_image_%s" % rn) < 0.5]
++        return bool(needed) and needed[0][1] == k
++
++    def _lookahead(self, state, rn, rem, cur, x, y, other_now):
++        """Try to perform rem[0]'s op while already moving toward rem[1:]."""
++        task = rem[0]
++        tgt2 = self._target(state, rn, rem[1:], cur, other_now)
++        if tgt2 is None:
++            return None
++        p1 = self._next_pos(rn, x, y, tgt2)
++        if abs(p1[0] - x) < 1e-6 and abs(p1[1] - y) < 1e-6:
++            return None
++        o1 = self._other_at(rn, 1) or other_now
++        if task == "send":
++            if self._unsent(state, rn) and self._lander_visible(rn, p1[0], p1[1], o1):
++                ro = self.rover_objs[rn]
++                if state.get(ro, "store_full") > 0.5 and not self._unsent(state, rn):
++                    return None
++                return p1, "send"
++            return None
++        k = task[1]
++        calibrated = state.get(self.rover_objs[rn], "calibrated") > 0.5
++        if calibrated:
++            if self._img_ok(state, rn, k, p1[0], p1[1], o1):
++                return p1, "image"
++            return None
++        # need calibrate now (at p1) and image at p2
++        if not self._visible_objs(rn, p1[0], p1[1], o1):
++            return None
++        S = self.sides[rn]
++        c1 = S.node_of(p1[0], p1[1])
++        p2 = self._next_pos(rn, p1[0], p1[1], tgt2)
++        o2 = self._other_at(rn, 2) or other_now
++        if self._img_ok(state, rn, k, p2[0], p2[1], o2):
++            return p1, "calibrate"
++        return None
++
+     def get_action(self, state):
+         g = state.get
+         self.step_count += 1
+@@ -703,12 +751,17 @@ class GeneratedApproach:
+                 nexts[rn] = (x, y)
+             else:
+                 nexts[rn] = self._next_pos(rn, x, y, tgt)
++            self.forced[rn] = None
++            if len(rem) > 1 and (task == "send" or task[0] == "O"):
++                alt = self._lookahead(state, rn, rem, cur, x, y, (ox, oy))
++                if alt is not None:
++                    nexts[rn], self.forced[rn] = alt
+             self.last_pos[rn] = (x, y)
+         for ri, rn in enumerate(self.rnames):
+             x, y, th = poses[rn]
+             nx, ny = nexts[rn]
+             other = self.other[rn]
+-            op = self._choose_op(state, rn, tasks[rn], nx, ny, nexts[other])
++            op = self.forced.get(rn) or self._choose_op(state, rn, tasks[rn], nx, ny, nexts[other])
+             hth = self.home[rn][2]
+             dth = math.atan2(math.sin(hth - th), math.cos(hth - th))
+             act[4 * ri + 0] = np.clip(nx - x, -0.2, 0.2)

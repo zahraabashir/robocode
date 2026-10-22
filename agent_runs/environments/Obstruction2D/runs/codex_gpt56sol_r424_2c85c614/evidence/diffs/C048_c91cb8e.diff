@@ -1,0 +1,15 @@
+diff --git a/approach.py b/approach.py
+index 945dc26..8d3b6a3 100644
+--- a/approach.py
++++ b/approach.py
+@@ -24,7 +24,9 @@ class GeneratedApproach:
+             angle = state.get(o, "theta")
+             hx = 0.5 * (abs(math.cos(angle)) * state.get(o, "width") +
+                         abs(math.sin(angle)) * state.get(o, "height"))
+-            return abs(state.get(o, "x") - sx) < target_hx + hx + 0.025
++            # Include near-edge objects because the gripper/base sweep has a
++            # wider collision envelope than the block footprint itself.
++            return abs(state.get(o, "x") - sx) < target_hx + hx + 0.12
+         obstacles = [o for o in all_obstacles if blocks_goal(o)]
+         obstacles.sort(key=lambda o: -state.get(o, "height"))
+         # Temporarily lift the target only when it crowds an obstacle's access.

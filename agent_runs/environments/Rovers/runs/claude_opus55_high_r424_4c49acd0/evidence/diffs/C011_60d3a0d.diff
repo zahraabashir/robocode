@@ -1,0 +1,1359 @@
+diff --git a/approach.py b/approach.py
+index 7d864e9..974200b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -246,7 +246,7 @@ class GeneratedApproach:
+                     continue
+                 t2x, t2y = self.obj_pos[o2]
+                 d2 = np.hypot(GX + ox - t2x, GY + oy - t2y)
+-                reg &= ~(self.obj_vis[(r, o2)] & (d2 < dme))
++                reg &= ~((d2 <= TRUE_OBJ + 0.03) & (d2 < dme + 0.03))
+             return reg
+         return self.samp_reg[name] & self.free_r[self.rovers[0] if False else r]
+ 
+@@ -464,7 +464,7 @@ class GeneratedApproach:
+                 vis = self._visible_objs(r, x, y, th)
+                 if ro["calibrated"] > 0.5 and vis:
+                     ro["calibrated"] = 0.0
+-                    for dd, on in vis:
++                    for dd, on in self._inrange_objs(r, x, y, th):
+                         ob = [o for n, o in d2["objective"] if n == on][0]
+                         if ob["have_image_" + r] < 0.5:
+                             ob["have_image_" + r] = 1.0
+@@ -536,6 +536,18 @@ class GeneratedApproach:
+         res.sort()
+         return res
+ 
++    def _inrange_objs(self, r, x, y, theta):
++        ox, oy = sense_offset(theta)
++        ex, ey = x + ox, y + oy
++        res = []
++        for o in self.objs:
++            tx, ty = self.obj_pos[o]
++            dd = math.hypot(ex - tx, ey - ty)
++            if dd <= TRUE_OBJ + 0.03:
++                res.append((dd, o))
++        res.sort()
++        return res
++
+     def _lander_visible(self, r, x, y, theta, other):
+         ox, oy = sense_offset(theta)
+         ex, ey = x + ox, y + oy
+@@ -871,7 +883,8 @@ class GeneratedApproach:
+                 sx, sy, _ = self.samples[t[1]]
+                 if not store_full and math.hypot(px - sx, py - sy) <= 0.24:
+                     return mdx, mdy, "sample"
+-        if cal and notheld and notheld[0] in need_imgs:
++        inr = [o for dd, o in self._inrange_objs(r, px, py, th) if o not in held]
++        if cal and notheld and inr and inr[0] == notheld[0] and notheld[0] in need_imgs:
+             return mdx, mdy, "image"
+         if store_full:
+             return mdx, mdy, "drop"
+diff --git a/approach_rot.py b/approach_rot.py
+new file mode 100644
+index 0000000..44b0ffb
+--- /dev/null
++++ b/approach_rot.py
+@@ -0,0 +1,882 @@
++"""Rovers approach: grid planner + Held-Karp task assignment + DP-field execution."""
++import itertools
++import math
++
++import numpy as np
++from scipy.ndimage import minimum_filter
++
++RES = 0.05
++LIM = 2.25
++N = int(round(2 * LIM / RES)) + 1  # 91
++COORDS = -LIM + RES * np.arange(N)
++GX, GY = np.meshgrid(COORDS, COORDS, indexing="ij")  # [i,j] -> x=COORDS[i], y=COORDS[j]
++STEP_CELLS = 4  # 0.2 / 0.05
++
++SEL = {"sample": -5 / 6, "calibrate": -0.5, "image": -1 / 6, "noop": 0.0,
++       "send": 0.5, "drop": 5 / 6}
++
++# geometry margins
++WALL_X = 0.25
++MOUND_CLEAR = 0.19
++PILLAR_CLEAR = 0.165
++LANDER_CLEAR = 0.76
++OBJ_RANGE = 1.975
++LANDER_RANGE = 3.965
++LOS_PILLAR = 0.085
++LOS_ROVER = 0.24
++SAMPLE_RANGE = 0.24
++TRUE_OBJ = 1.99
++TRUE_LANDER = 3.98
++TRUE_PILLAR = 0.075
++TRUE_ROVER = 0.24
++SENSE_BACK = 0.087
++SENSE_RIGHT = 0.012
++INF = 1e9
++
++
++def _val(s, o, f):
++    return float(s.get(o, f))
++
++
++def parse(state):
++    d = {"objective": [], "sample": [], "obstacle": [], "rover": {}, "lander": None}
++    for name in state.get_object_names():
++        o = state.get_object_from_name(name)
++        t = o.type.name
++        if t == "rover":
++            d["rover"][name] = {f: _val(state, o, f) for f in
++                                ("x", "y", "theta", "store_full", "calibrated", "at_home")}
++        elif t == "lander":
++            d["lander"] = (_val(state, o, "x"), _val(state, o, "y"))
++        elif t == "objective":
++            d["objective"].append((name, {f: _val(state, o, f) for f in
++                                          ("x", "y", "z", "have_image_rover0", "have_image_rover1",
++                                           "received_image")}))
++        elif t == "sample":
++            d["sample"].append((name, {f: _val(state, o, f) for f in
++                                       ("x", "y", "z", "is_soil", "analyzed_rover0",
++                                        "analyzed_rover1", "received_analysis")}))
++        elif t == "obstacle":
++            d["obstacle"].append((name, {f: _val(state, o, f) for f in
++                                         ("x", "y", "z", "half_x", "half_y", "half_z")}))
++    d["objective"].sort(key=lambda t: t[0])
++    d["sample"].sort(key=lambda t: t[0])
++    return d
++
++
++def sense_offset(theta):
++    # sensing point = base + R(theta) @ (-0.087, -0.012)
++    c, s = math.cos(theta), math.sin(theta)
++    return (-SENSE_BACK * c + SENSE_RIGHT * s, -SENSE_BACK * s - SENSE_RIGHT * c)
++
++
++def seg_dist_grid(ex, ey, tx, ty, px, py):
++    """Distance from point (px,py) to segments (ex,ey)->(tx,ty); ex,ey arrays."""
++    dx = tx - ex
++    dy = ty - ey
++    L2 = dx * dx + dy * dy + 1e-12
++    t = ((px - ex) * dx + (py - ey) * dy) / L2
++    t = np.clip(t, 0.0, 1.0)
++    qx = ex + t * dx - px
++    qy = ey + t * dy - py
++    return np.sqrt(qx * qx + qy * qy)
++
++
++def bfs_field(free, init):
++    """Min steps field: D(x) = min over y within Chebyshev-4 of D(y)+1, restricted to free."""
++    D = np.where(free, init, INF)
++    for _ in range(400):
++        nb = minimum_filter(D, size=2 * STEP_CELLS + 1, mode="constant", cval=INF) + 1.0
++        nb[~free] = INF
++        D2 = np.minimum(D, nb)
++        if np.array_equal(D2, D):
++            break
++        D = D2
++    return D
++
++
++def to_cell(x, y):
++    i = int(round((x + LIM) / RES))
++    j = int(round((y + LIM) / RES))
++    return min(max(i, 0), N - 1), min(max(j, 0), N - 1)
++
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.action_space = action_space
++        self._predicting = False
++        self._pred_cache = None
++        self.bad_cells = {"rover0": set(), "rover1": set()}
++        self._last = None
++        self.topk = 12
++        self.observation_space = observation_space
++
++    # ------------------------------------------------------------------ setup
++    def reset(self, state, info):
++        d = parse(state)
++        self.d0 = d
++        self.rovers = ["rover0", "rover1"]
++        self.home = {r: (d["rover"][r]["x"], d["rover"][r]["y"], d["rover"][r]["theta"])
++                     for r in self.rovers}
++        self.lander = d["lander"]
++        self.mounds = []
++        self.pillars = []
++        for _, ob in d["obstacle"]:
++            if ob["half_x"] > 0.1:
++                self.mounds.append(ob)
++            else:
++                self.pillars.append(ob)
++        self.objs = [n for n, _ in d["objective"]]
++        self.obj_pos = {n: (o["x"], o["y"]) for n, o in d["objective"]}
++        self.samples = {n: (o["x"], o["y"], o["is_soil"] > 0.5) for n, o in d["sample"]}
++        self._build_free()
++        self.sense = {r: sense_offset(-math.pi/2) for r in self.rovers}
++        self.side = {r: (1 if self.home[r][0] > 0 else -1) for r in self.rovers}
++        self.free_r = {r: self.free & ((GX * self.side[r]) > 0) for r in self.rovers}
++        self._build_regions()
++        self._plan()
++        self.stage_fields = {}
++        self.t = 0
++        self._pred_cache = None
++        self._last = None
++        self.bad_cells = {r: set() for r in self.rovers}
++
++    def _build_free(self):
++        free = np.ones((N, N), dtype=bool)
++        free &= np.abs(GX) >= WALL_X
++        for m in self.mounds:
++            dx = np.maximum(np.abs(GX - m["x"]) - m["half_x"], 0)
++            dy = np.maximum(np.abs(GY - m["y"]) - m["half_y"], 0)
++            free &= np.sqrt(dx * dx + dy * dy) >= MOUND_CLEAR
++        for p in self.pillars:
++            ax = np.maximum(np.abs(GX - p["x"]) - 0.1, 0)
++            ay = np.maximum(np.abs(GY - p["y"]) - 0.1, 0)
++            free &= np.hypot(ax, ay) >= PILLAR_CLEAR
++        lx, ly = self.lander
++        free &= np.hypot(GX - lx, GY - ly) >= LANDER_CLEAR
++        self.free = free
++
++    def _vis_mask(self, r, tx, ty, rng, other_rover=None):
++        ox, oy = self.sense[r]
++        ex = GX + ox
++        ey = GY + oy
++        m = np.hypot(ex - tx, ey - ty) <= rng
++        for p in self.pillars:
++            m &= seg_dist_grid(ex, ey, tx, ty, p["x"], p["y"]) > LOS_PILLAR
++        if other_rover is not None:
++            m &= seg_dist_grid(ex, ey, tx, ty, other_rover[0], other_rover[1]) > LOS_ROVER
++        return m
++
++    def _build_regions(self):
++        self.obj_vis = {}
++        self.send_reg = {}
++        for r in self.rovers:
++            fr = self.free_r[r]
++            for o in self.objs:
++                tx, ty = self.obj_pos[o]
++                self.obj_vis[(r, o)] = self._vis_mask(r, tx, ty, OBJ_RANGE) & fr
++            other = [q for q in self.rovers if q != r][0]
++            oh = self.home[other]
++            self.send_reg[r] = self._vis_mask(r, self.lander[0], self.lander[1], LANDER_RANGE) & fr
++        self.samp_reg = {}
++        for s, (sx, sy, _) in self.samples.items():
++            self.samp_reg[s] = (np.hypot(GX - sx, GY - sy) <= SAMPLE_RANGE) & self.free
++        # home & send-then-home fields
++        self.V_home = {}
++        self.V_send = {}
++        Vh0 = {}
++        self.home_mask = {}
++        lsign = 1 if self.lander[0] > 0 else -1
++        self.blocked_rover = None
++        for r in self.rovers:
++            if self.side[r] != lsign:
++                self.blocked_rover = r
++        for r in self.rovers:
++            hx, hy, _ = self.home[r]
++            init = np.full((N, N), INF)
++            hm = (np.hypot(GX - hx, GY - hy) <= 0.235) & self.free_r[r]
++            hi, hj = to_cell(hx, hy)
++            hm[hi, hj] = True
++            init[hm] = 0.0
++            Vh0[r] = (bfs_field(self.free_r[r], init), hm)
++        for r in self.rovers:
++            q = [o for o in self.rovers if o != r][0]
++            Vh, hm = Vh0[r]
++            # choose home cells for r that do not occlude q's sends near q's home
++            Vq = Vh0[q][0]
++            near = self.send_reg[q] & (Vq <= 8)
++            if near.any():
++                ox, oy = self.sense[q]
++                ex = GX[near] + ox
++                ey = GY[near] + oy
++                w = 1.0 / (1.0 + Vq[near])
++                cells = np.argwhere(hm)
++                scores = []
++                hx, hy, _ = self.home[r]
++                for ci, cj in cells:
++                    blk = seg_dist_grid(ex, ey, self.lander[0], self.lander[1],
++                                        COORDS[ci], COORDS[cj]) <= LOS_ROVER
++                    scores.append(float((w * blk).sum()))
++                scores = np.array(scores)
++                good = scores <= scores.min() + 1e-9
++                hm2 = np.zeros_like(hm)
++                for (ci, cj), g in zip(cells, good):
++                    if g:
++                        hm2[ci, cj] = True
++                if scores.min() < scores.max():
++                    init = np.where(hm2, 0.0, INF)
++                    Vh = bfs_field(self.free_r[r], init)
++                    hm = hm2
++            self.home_mask[r] = hm
++            self.V_home[r] = Vh
++            init2 = np.where(self.send_reg[r], Vh, INF)
++            self.V_send[r] = bfs_field(self.free_r[r], init2)
++
++    # -------------------------------------------------------------- planning
++    def _task_region(self, r, task, held=()):
++        kind, name = task
++        if kind == "obj":
++            reg = self.obj_vis[(r, name)].copy()
++            # prefer cells where this objective is the nearest visible non-held one
++            ox, oy = self.sense[r]
++            tx, ty = self.obj_pos[name]
++            dme = np.hypot(GX + ox - tx, GY + oy - ty)
++            for o2 in self.objs:
++                if o2 == name or o2 in held:
++                    continue
++                t2x, t2y = self.obj_pos[o2]
++                d2 = np.hypot(GX + ox - t2x, GY + oy - t2y)
++                reg &= ~(self.obj_vis[(r, o2)] & (d2 < dme))
++            return reg
++        return self.samp_reg[name] & self.free_r[self.rovers[0] if False else r]
++
++    def _candidates(self, reg, k=8):
++        idx = np.argwhere(reg)
++        if len(idx) == 0:
++            return []
++        if len(idx) <= k:
++            return [tuple(x) for x in idx]
++        pts = idx.astype(float)
++        chosen = [len(idx) // 2]
++        dmin = np.linalg.norm(pts - pts[chosen[0]], axis=1)
++        while len(chosen) < k:
++            nxt = int(np.argmax(dmin))
++            chosen.append(nxt)
++            dmin = np.minimum(dmin, np.linalg.norm(pts - pts[nxt], axis=1))
++        return [tuple(idx[c]) for c in chosen]
++
++    def _point_field(self, r, cell):
++        init = np.full((N, N), INF)
++        init[cell] = 0.0
++        return bfs_field(self.free_r[r], init)
++
++    def _rover_tasks(self, r):
++        tasks = []
++        for o in self.objs:
++            if self.obj_vis[(r, o)].any():
++                tasks.append(("obj", o))
++        for s, (sx, sy, soil) in self.samples.items():
++            if sx * self.side[r] > 0 and (self.samp_reg[s] & self.free_r[r]).any():
++                tasks.append(("stone" if not soil else "soil", s))
++        return tasks
++
++    def _held_karp(self, r, tasks):
++        """Return dict: frozenset(task idx) -> (cost, order list)."""
++        hx, hy, _ = self.home[r]
++        start = to_cell(hx, hy)
++        nodes = []  # (task_idx, cell)
++        for ti, t in enumerate(tasks):
++            reg = self._task_region(r, (t[0] if t[0] == "obj" else "samp", t[1]))
++            if not reg.any():
++                reg = self.obj_vis[(r, t[1])] if t[0] == "obj" else self.samp_reg[t[1]] & self.free_r[r]
++            cands = self._candidates(reg, 14)
++            # add cells closest to start
++            Fstart = None
++            for c in cands:
++                nodes.append((ti, c))
++        fields = [self._point_field(r, c) for _, c in nodes]
++        nn = len(nodes)
++        dist = np.full((nn, nn), INF)
++        for a in range(nn):
++            for b in range(nn):
++                dist[a, b] = fields[b][nodes[a][1]]
++        dstart = np.array([fields[b][start] for b in range(nn)])
++        dend = np.array([self.V_send[r][nodes[a][1]] for a in range(nn)])
++        T = len(tasks)
++        kinds = [t[0] for t in tasks]
++        # DP over masks
++        best = {}
++        for a in range(nn):
++            m = 1 << nodes[a][0]
++            v = dstart[a]
++            key = (m, a)
++            if v < best.get(key, (INF,))[0]:
++                best[key] = (v, None)
++        masks = sorted(set(k[0] for k in best))
++        by_mask = {}
++        for (m, a), v in best.items():
++            by_mask.setdefault(m, {})[a] = v
++        results = {0: (self.V_send[r][start], [])}
++        order_masks = sorted(range(1 << T), key=lambda m: bin(m).count("1"))
++        valid = {}
++        for m in order_masks:
++            ns = sum(1 for i in range(T) if m >> i & 1 and kinds[i] == "stone")
++            nl = sum(1 for i in range(T) if m >> i & 1 and kinds[i] == "soil")
++            valid[m] = ns <= 1 and nl <= 1
++        for m in order_masks:
++            if m == 0 or not valid[m] or m not in by_mask:
++                continue
++            ent = by_mask[m]
++            # finalize
++            bestfin = INF
++            bestA = None
++            for a, (v, _) in ent.items():
++                f = v + dend[a]
++                if f < bestfin:
++                    bestfin, bestA = f, a
++            if bestA is not None and bestfin < INF:
++                # reconstruct order
++                order = []
++                mm, aa = m, bestA
++                while aa is not None:
++                    order.append(nodes[aa])
++                    prev = by_mask[mm][aa][1]
++                    mm = mm & ~(1 << nodes[aa][0])
++                    aa = prev
++                results[m] = (bestfin, [tasks[ti] for ti, _ in reversed(order)])
++            for a, (v, _) in ent.items():
++                for b in range(nn):
++                    tb = nodes[b][0]
++                    if m >> tb & 1:
++                        continue
++                    m2 = m | (1 << tb)
++                    if not valid[m2]:
++                        continue
++                    nv = v + dist[a, b]
++                    cur = by_mask.setdefault(m2, {})
++                    if b not in cur or nv < cur[b][0]:
++                        cur[b] = (nv, a)
++        return results
++
++    def _plan(self):
++        tasks = {r: self._rover_tasks(r) for r in self.rovers}
++        hk = {r: self._held_karp(r, tasks[r]) for r in self.rovers}
++        objs = self.objs
++        r0, r1 = self.rovers
++        cands = []
++        for m0, (c0, ord0) in hk[r0].items():
++            s0 = set(t for t in ord0)
++            for m1, (c1, ord1) in hk[r1].items():
++                s1 = set(t for t in ord1)
++                if s0 & s1:
++                    continue
++                allt = s0 | s1
++                ok = all(("obj", o) in allt for o in objs)
++                ok = ok and any(t[0] == "stone" for t in allt) and any(t[0] == "soil" for t in allt)
++                if not ok:
++                    continue
++                cost = max(c0, c1) + 0.01 * (c0 + c1)
++                cands.append((cost, tuple(ord0), tuple(ord1)))
++        cands.sort(key=lambda c: c[0])
++        self._field_cache = {}
++        best = None
++        for cost, ord0, ord1 in cands[:self.topk]:
++            fields = {r0: self._get_stage_fields(r0, ord0), r1: self._get_stage_fields(r1, ord1)}
++            self.fields = fields
++            steps = self._simulate(self.d0)
++            key = (steps, cost)
++            if best is None or key < best[0]:
++                best = (key, fields, {r0: list(ord0), r1: list(ord1)})
++        if best is None:
++            self.orders = {r: [] for r in self.rovers}
++            self.fields = {r: self._layer_fields(r, []) for r in self.rovers}
++            self.plan_cost = INF
++        else:
++            self.fields = best[1]
++            self.orders = best[2]
++            self.plan_cost = best[0][0]
++
++    def _get_stage_fields(self, r, order):
++        key = (r, tuple(order))
++        if key not in self._field_cache:
++            self._field_cache[key] = self._layer_fields(r, list(order))
++        return self._field_cache[key]
++
++    # ------------------------------------------------------------ model sim
++    def _free_pt(self, r, x, y):
++        if abs(x) > 2.27 or abs(y) > 2.27 or abs(x) < 0.228:
++            return False
++        for m in self.mounds:
++            dx = max(abs(x - m["x"]) - m["half_x"], 0)
++            dy = max(abs(y - m["y"]) - m["half_y"], 0)
++            if math.hypot(dx, dy) < 0.178:
++                return False
++        for p in self.pillars:
++            if math.hypot(max(abs(x - p["x"]) - 0.1, 0), max(abs(y - p["y"]) - 0.1, 0)) < 0.15:
++                return False
++        if math.hypot(x - self.lander[0], y - self.lander[1]) < 0.72:
++            return False
++        return True
++
++    def _goal(self, d):
++        if not all(o["received_image"] > 0.5 for _, o in d["objective"]):
++            return False
++        st = any(s["received_analysis"] > 0.5 and s["is_soil"] < 0.5 for _, s in d["sample"])
++        so = any(s["received_analysis"] > 0.5 and s["is_soil"] > 0.5 for _, s in d["sample"])
++        if not (st and so):
++            return False
++        for r in self.rovers:
++            ro = d["rover"][r]
++            if ro["store_full"] > 0.5 or ro["at_home"] < 0.5:
++                return False
++        return True
++
++    def _model_step(self, d, act):
++        import copy
++        d2 = copy.deepcopy(d)
++        for k, r in enumerate(self.rovers):
++            ro = d2["rover"][r]
++            dx = float(np.clip(act[4 * k], -0.2, 0.2))
++            dy = float(np.clip(act[4 * k + 1], -0.2, 0.2))
++            nx, ny = ro["x"] + dx, ro["y"] + dy
++            if self._free_pt(r, nx, ny):
++                ro["x"], ro["y"] = nx, ny
++        for k, r in enumerate(self.rovers):
++            ro = d2["rover"][r]
++            other = d2["rover"][[q for q in self.rovers if q != r][0]]
++            sel = float(act[4 * k + 3])
++            band = min(int((sel + 1.0) * 3.0), 5)
++            x, y, th = ro["x"], ro["y"], ro["theta"]
++            if band == 0:
++                if ro["store_full"] < 0.5:
++                    bestd, bn = 0.25, None
++                    for n, sm in d2["sample"]:
++                        dd = math.hypot(sm["x"] - x, sm["y"] - y)
++                        if dd <= bestd:
++                            bestd, bn = dd, sm
++                    if bn is not None:
++                        bn["analyzed_" + r] = 1.0
++                        ro["store_full"] = 1.0
++            elif band == 1:
++                if self._visible_objs(r, x, y, th):
++                    ro["calibrated"] = 1.0
++            elif band == 2:
++                vis = self._visible_objs(r, x, y, th)
++                if ro["calibrated"] > 0.5 and vis:
++                    ro["calibrated"] = 0.0
++                    for dd, on in vis:
++                        ob = [o for n, o in d2["objective"] if n == on][0]
++                        if ob["have_image_" + r] < 0.5:
++                            ob["have_image_" + r] = 1.0
++                            break
++            elif band == 4:
++                if self._lander_visible(r, x, y, th, (other["x"], other["y"])):
++                    for _, o in d2["objective"]:
++                        if o["have_image_" + r] > 0.5:
++                            o["received_image"] = 1.0
++                    for _, sm in d2["sample"]:
++                        if sm["analyzed_" + r] > 0.5:
++                            sm["received_analysis"] = 1.0
++            elif band == 5:
++                ro["store_full"] = 0.0
++        for r in self.rovers:
++            ro = d2["rover"][r]
++            hx, hy, hth = self.home[r]
++            dth = abs((ro["theta"] - hth + math.pi) % (2 * math.pi) - math.pi)
++            ro["at_home"] = 1.0 if (math.hypot(ro["x"] - hx, ro["y"] - hy) < 0.25 and dth < 0.4) else 0.0
++        return d2
++
++    def _simulate(self, d, max_steps=150):
++        self._pred_cache = None
++        for t in range(max_steps):
++            act = self._policy(d)
++            d = self._model_step(d, act)
++            d["_t"] = t + 1
++            if self._goal(d):
++                return t + 1
++        return max_steps + 100
++
++    def _stage_fields(self, r, order):
++        """fields[i] = cost-to-go when tasks order[i:] remain (then send+home)."""
++        k = len(order)
++        fields = [None] * (k + 1)
++        regs = [None] * k
++        fields[k] = self.V_send[r]
++        for i in range(k - 1, -1, -1):
++            t = order[i]
++            held = tuple(o for kk, o in order[:i] if kk == "obj")
++            if t[0] == "obj":
++                reg = self._task_region(r, ("obj", t[1]), held)
++                if not reg.any():
++                    reg = self.obj_vis[(r, t[1])]
++            else:
++                reg = self.samp_reg[t[1]] & self.free_r[r]
++            regs[i] = reg
++            init = np.where(reg, fields[i + 1], INF)
++            fields[i] = bfs_field(self.free_r[r], init)
++        return {"fields": fields, "regs": regs, "order": order}
++
++    # -------------------------------------------------------------- execution
++    def _visible_objs(self, r, x, y, theta):
++        ox, oy = sense_offset(-math.pi/2)
++        ex, ey = x + ox, y + oy
++        res = []
++        for o in self.objs:
++            tx, ty = self.obj_pos[o]
++            dd = math.hypot(ex - tx, ey - ty)
++            if dd > TRUE_OBJ:
++                continue
++            ok = True
++            for p in self.pillars:
++                if float(seg_dist_grid(ex, ey, tx, ty, p["x"], p["y"])) <= TRUE_PILLAR:
++                    ok = False
++                    break
++            if ok:
++                res.append((dd, o))
++        res.sort()
++        return res
++
++    def _lander_visible(self, r, x, y, theta, other):
++        ox, oy = sense_offset(-math.pi/2)
++        ex, ey = x + ox, y + oy
++        tx, ty = self.lander
++        if math.hypot(ex - tx, ey - ty) > TRUE_LANDER:
++            return False
++        for p in self.pillars:
++            if float(seg_dist_grid(ex, ey, tx, ty, p["x"], p["y"])) <= TRUE_PILLAR:
++                return False
++        if other is not None and float(seg_dist_grid(ex, ey, tx, ty, other[0], other[1])) <= TRUE_ROVER:
++            return False
++        return True
++
++    def _task_done(self, d, r, t):
++        if t[0] == "obj":
++            for n, o in d["objective"]:
++                if n == t[1]:
++                    return o["have_image_" + r] > 0.5 or o["received_image"] > 0.5
++            return True
++        for n, s in d["sample"]:
++            if n == t[1]:
++                if s["analyzed_" + r] > 0.5:
++                    return True
++        # any analysis of the same kind already done by anyone counts
++        soil = t[0] == "soil"
++        for n, s in d["sample"]:
++            if (s["is_soil"] > 0.5) == soil and (s["analyzed_rover0"] > 0.5 or s["analyzed_rover1"] > 0.5):
++                return True
++        return False
++
++    def get_action(self, state):
++        d = parse(state)
++        d["_t"] = self.t
++        # stuck detection: commanded move rejected -> mark target cell bad
++        if self._last is not None:
++            for k, r in enumerate(self.rovers):
++                px, py, cdx, cdy = self._last[r]
++                ro = d["rover"][r]
++                if (abs(cdx) > 1e-6 or abs(cdy) > 1e-6) and abs(ro["x"] - px) < 1e-6 and abs(ro["y"] - py) < 1e-6:
++                    self.bad_cells[r].add(to_cell(px + cdx, py + cdy))
++        act = self._policy(d)
++        self._last = {r: (d["rover"][r]["x"], d["rover"][r]["y"], float(act[4 * k]), float(act[4 * k + 1]))
++                      for k, r in enumerate(self.rovers)}
++        self.t += 1
++        return act
++
++    def _predict_other(self, d, r, H=45):
++        """Predict positions of the other rover after each of the next H steps."""
++        other = [q for q in self.rovers if q != r][0]
++        key = (d.get("_t", 0), other, round(d["rover"][other]["x"], 3), round(d["rover"][other]["y"], 3))
++        c = self._pred_cache
++        if c is not None:
++            t0, traj = c
++            k = d.get("_t", 0) - t0
++            if 0 <= k < len(traj) and abs(traj[k][0] - d["rover"][other]["x"]) < 1e-6 and \
++                    abs(traj[k][1] - d["rover"][other]["y"]) < 1e-6 and \
++                    len(traj) - k > H // 2:
++                return traj[k + 1:]
++        prev = self._predicting
++        self._predicting = True
++        dd = d
++        traj = [(d["rover"][other]["x"], d["rover"][other]["y"])]
++        for kk in range(H + 25):
++            act = self._policy(dd)
++            dd = self._model_step(dd, act)
++            dd["_t"] = d.get("_t", 0) + kk + 1
++            traj.append((dd["rover"][other]["x"], dd["rover"][other]["y"]))
++        self._predicting = prev
++        self._pred_cache = (d.get("_t", 0), traj)
++        return traj[1:]
++
++    def _final_send_target(self, d, r, H=45):
++        ro = d["rover"][r]
++        x, y = ro["x"], ro["y"]
++        a = to_cell(x, y)
++        Fa = self._point_field(r, a)
++        pred = self._predict_other(d, r, H)
++        ox, oy = self.sense[r]
++        ex = GX + ox
++        ey = GY + oy
++        tx, ty = self.lander
++        best = None
++        Vh = self.V_home[r]
++        base = self.send_reg[r] & (Fa < INF)
++        for k in range(0, H):
++            if k >= len(pred):
++                break
++            if best is not None and k >= best[0]:
++                break
++            reach = base & (Fa <= k + 1)
++            if not reach.any():
++                continue
++            px, py = pred[k]
++            ok = reach & (seg_dist_grid(ex, ey, tx, ty, px, py) > LOS_ROVER)
++            if not ok.any():
++                continue
++            tot = np.where(ok, Vh + (k + 1), INF)
++            idx = np.unravel_index(np.argmin(tot), tot.shape)
++            v = tot[idx]
++            if best is None or v < best[0]:
++                best = (v, k, idx)
++        if best is None:
++            return None
++        _, k, idx = best
++        Fp = self._point_field(r, idx)
++        # cost-to-go: reach idx then home; encode as field
++        return np.where(Fp < INF, Fp, INF)
++
++    def _policy(self, d):
++        act = np.zeros(8, dtype=np.float32)
++        for k, r in enumerate(self.rovers):
++            other = [q for q in self.rovers if q != r][0]
++            ro = d["rover"][r]
++            orv = d["rover"][other]
++            dx, dy, op = self._rover_action(d, r, ro, (orv["x"], orv["y"]))
++            act[4 * k + 0] = dx
++            act[4 * k + 1] = dy
++            act[4 * k + 2] = 0.0
++            act[4 * k + 3] = SEL[op]
++        return act
++
++    def _layer_solve(self, free, H0, home=None):
++        M = H0.copy()
++        G = None
++        for _ in range(400):
++            G = minimum_filter(M, size=2 * STEP_CELLS + 1, mode="constant", cval=INF) + 1.0
++            G[~free] = INF
++            if home is not None:
++                G[home] = 0.0
++            M2 = np.minimum(H0, G)
++            if np.array_equal(M2, M):
++                break
++            M = M2
++        return G
++
++    def _layer_fields(self, r, order):
++        order = list(order)
++        k = len(order)
++        free = self.free_r[r]
++        U = np.zeros((N, N), dtype=bool)
++        for o in self.objs:
++            U |= self.obj_vis[(r, o)]
++        regs = []
++        for i, t in enumerate(order):
++            if t[0] == "obj":
++                held = tuple(o for kk, o in order[:i] if kk == "obj")
++                reg = self._task_region(r, ("obj", t[1]), held)
++                if not reg.any():
++                    reg = self.obj_vis[(r, t[1])]
++            else:
++                reg = self.samp_reg[t[1]] & free
++            regs.append(reg)
++        S = self.send_reg[r]
++        hx, hy, _ = self.home[r]
++        home = self.home_mask[r]
++        G = {}
++        INFA = np.full((N, N), INF)
++        for i in range(k, -1, -1):
++            sents = [1, 0] if i == k else [0]
++            for sent in sents:
++                for full in (0, 1):
++                    for cal in (1, 0):
++                        H0 = INFA.copy()
++                        if cal == 0:
++                            H0 = np.where(U, np.minimum(H0, G[(i, 1, full, sent)]), H0)
++                        if full == 1:
++                            H0 = np.minimum(H0, G[(i, cal, 0, sent)])
++                        if i < k:
++                            nxt_sent = 0
++                            t = order[i]
++                            if t[0] == "obj" and cal == 1:
++                                H0 = np.where(regs[i], np.minimum(H0, G[(i + 1, 0, full, nxt_sent)]), H0)
++                            if t[0] != "obj" and full == 0:
++                                H0 = np.where(regs[i], np.minimum(H0, G[(i + 1, cal, 1, nxt_sent)]), H0)
++                        if i == k and sent == 0:
++                            H0 = np.where(S, np.minimum(H0, G[(i, cal, full, 1)]), H0)
++                        term = (i == k and sent == 1 and full == 0)
++                        G[(i, cal, full, sent)] = self._layer_solve(free, H0, home if term else None)
++        if k == 0:
++            for full in (0, 1):
++                for cal in (0, 1):
++                    G[(0, cal, full, 0)] = G[(0, cal, full, 1)]
++        return {"G": G, "regs": regs, "U": U, "order": order}
++
++    def _rover_action(self, d, r, ro, other_xy):
++        plan = self.fields[r]
++        order = plan["order"]
++        k = len(order)
++        stage = 0
++        while stage < k and self._task_done(d, r, order[stage]):
++            stage += 1
++        pending = False
++        for n, o in d["objective"]:
++            if o["have_image_" + r] > 0.5 and o["received_image"] < 0.5:
++                pending = True
++        for n, sm in d["sample"]:
++            if sm["analyzed_" + r] > 0.5 and sm["received_analysis"] < 0.5:
++                pending = True
++        x, y, th = ro["x"], ro["y"], ro["theta"]
++        cal = 1 if ro["calibrated"] > 0.5 else 0
++        full = 1 if ro["store_full"] > 0.5 else 0
++        if stage == k and pending and not self._predicting and r == self.blocked_rover:
++            return self._rover_action_old(d, r, ro, other_xy)
++        sent = 1 if (stage == k and not pending) else 0
++        G = plan["G"]
++        i, j = to_cell(x, y)
++        i0, i1 = max(i - STEP_CELLS, 0), min(i + STEP_CELLS, N - 1)
++        j0, j1 = max(j - STEP_CELLS, 0), min(j + STEP_CELLS, N - 1)
++        win = (slice(i0, i1 + 1), slice(j0, j1 + 1))
++        opts = [(G[(stage, cal, full, sent)][win], "noop")]
++        if cal == 0:
++            opts.append((np.where(plan["U"][win], G[(stage, 1, full, sent)][win], INF), "calibrate"))
++        if full == 1:
++            opts.append((G[(stage, cal, 0, sent)][win], "drop"))
++        if stage < k:
++            t = order[stage]
++            reg = plan["regs"][stage][win]
++            if t[0] == "obj" and cal == 1:
++                opts.append((np.where(reg, G[(stage + 1, 0, full, 0)][win], INF), "image"))
++            if t[0] != "obj" and full == 0:
++                opts.append((np.where(reg, G[(stage + 1, cal, 1, 0)][win], INF), "sample"))
++        if stage == k and sent == 0:
++            opts.append((np.where(self.send_reg[r][win], G[(stage, cal, full, 1)][win], INF), "send"))
++        ii, jj = np.meshgrid(np.arange(i0, i1 + 1), np.arange(j0, j1 + 1), indexing="ij")
++        mv = np.maximum(np.abs(ii - i), np.abs(jj - j)) * 1e-3 + np.hypot(ii - i, jj - j) * 1e-4
++        if self.bad_cells[r] and not self._predicting:
++            for (bi, bj) in self.bad_cells[r]:
++                if i0 <= bi <= i1 and j0 <= bj <= j1:
++                    mv[bi - i0, bj - j0] += INF
++        best = None
++        for arr, opname in opts:
++            sc = arr + mv + (2e-3 if opname == "noop" else 0.0)
++            idx = np.unravel_index(np.argmin(sc), sc.shape)
++            v = sc[idx]
++            if best is None or v < best[0]:
++                best = (v, idx, opname)
++        if best is None or best[0] >= INF / 2:
++            return self._rover_action_old(d, r, ro, other_xy)
++        _, (ci, cj), op = best
++        ti, tj = i0 + ci, j0 + cj
++        mdx = float(np.clip(COORDS[ti] - x, -0.2, 0.2))
++        mdy = float(np.clip(COORDS[tj] - y, -0.2, 0.2))
++        px, py = x + mdx, y + mdy
++        if op == "noop":
++            vis = self._visible_objs(r, px, py, th)
++            need_imgs = [t[1] for t in order[stage:] if t[0] == "obj"]
++            if full:
++                op = "drop"
++            elif not cal and need_imgs and vis:
++                op = "calibrate"
++            elif pending and self._lander_visible(r, px, py, th, None):
++                op = "send"
++        return mdx, mdy, op
++
++    def _rover_action_old(self, d, r, ro, other_xy):
++        plan = self.fields[r]
++        order = plan["order"]
++        stage = 0
++        while stage < len(order) and self._task_done(d, r, order[stage]):
++            stage += 1
++        x, y, th = ro["x"], ro["y"], ro["theta"]
++        i, j = to_cell(x, y)
++        # pending results to send?
++        pending = False
++        for n, o in d["objective"]:
++            if o["have_image_" + r] > 0.5 and o["received_image"] < 0.5:
++                pending = True
++        for n, s in d["sample"]:
++            if s["analyzed_" + r] > 0.5 and s["received_analysis"] < 0.5:
++                pending = True
++        if stage < len(order) and "fields" not in plan:
++            F = self.V_send[r]
++            reg = None
++        elif stage < len(order):
++            F = plan["fields"][stage]
++            reg = plan["regs"][stage]
++        else:
++            if pending:
++                F = self.V_send[r]
++                reg = None
++                if not self._predicting:
++                    tgt = self._final_send_target(d, r)
++                    if tgt is not None:
++                        F = tgt
++            else:
++                F = self.V_home[r]
++                reg = None
++        # choose next cell
++        best = None
++        i0, i1 = max(i - STEP_CELLS, 0), min(i + STEP_CELLS, N - 1)
++        j0, j1 = max(j - STEP_CELLS, 0), min(j + STEP_CELLS, N - 1)
++        sub = F[i0:i1 + 1, j0:j1 + 1]
++        cur = F[i, j]
++        # stay if current cell is a goal (in region) for this stage
++        ready = True
++        if stage < len(order):
++            t0 = order[stage]
++            if t0[0] == "obj":
++                ready = ro["calibrated"] > 0.5
++            else:
++                ready = ro["store_full"] < 0.5
++        if (not ready) and reg is not None and reg[i, j]:
++            rsub = reg[i0:i1 + 1, j0:j1 + 1]
++            sub = np.where(rsub, sub, INF)
++        mn = sub.min()
++        cands = np.argwhere(sub <= mn + 1e-9)
++        # tie-break: prefer staying close (smaller move) -- then toward straight
++        bestc = None
++        bestscore = None
++        for ci, cj in cands:
++            ii, jj = i0 + ci, j0 + cj
++            score = max(abs(ii - i), abs(jj - j)) * 0.01 + math.hypot(ii - i, jj - j) * 0.001
++            if bestscore is None or score < bestscore:
++                bestscore, bestc = score, (ii, jj)
++        ti, tj = bestc
++        if cur <= mn + 1e-9 and reg is not None and reg[i, j]:
++            ti, tj = i, j
++        nx, ny = COORDS[ti], COORDS[tj]
++        mdx = float(np.clip(nx - x, -0.2, 0.2))
++        mdy = float(np.clip(ny - y, -0.2, 0.2))
++        px, py = x + mdx, y + mdy
++        # ---- operator selection (evaluated at post-move position)
++        op = "noop"
++        vis = self._visible_objs(r, px, py, th)
++        held = set(n for n, o in d["objective"] if o["have_image_" + r] > 0.5)
++        notheld = [o for dd, o in vis if o not in held]
++        need_imgs = [t[1] for t in order[stage:] if t[0] == "obj"]
++        cal = ro["calibrated"] > 0.5
++        store_full = ro["store_full"] > 0.5
++        if stage < len(order):
++            t = order[stage]
++            if t[0] in ("stone", "soil"):
++                sx, sy, _ = self.samples[t[1]]
++                if not store_full and math.hypot(px - sx, py - sy) <= 0.24:
++                    return mdx, mdy, "sample"
++        if cal and notheld and notheld[0] in need_imgs:
++            return mdx, mdy, "image"
++        if store_full:
++            return mdx, mdy, "drop"
++        if not cal and need_imgs and vis:
++            return mdx, mdy, "calibrate"
++        if pending and self._lander_visible(r, px, py, th, None):
++            return mdx, mdy, "send"
++        return mdx, mdy, op
+diff --git a/offline_rot.py b/offline_rot.py
+new file mode 100644
+index 0000000..f687a5f
+--- /dev/null
++++ b/offline_rot.py
+@@ -0,0 +1,32 @@
++import json, sys, time
++from concurrent.futures import ProcessPoolExecutor
++class T:
++    def __init__(s,n): s.name=n
++class O:
++    def __init__(s,n,t): s.name=n; s.type=T(t)
++class FakeState:
++    def __init__(s,objs): s.objs=objs; s.o={n:O(n,v['type']) for n,v in objs.items()}
++    def get_object_names(s): return set(s.objs)
++    def get_object_from_name(s,n): return s.o[n]
++    def get(s,o,f): return s.objs[o.name]['f'][f]
++def run(args):
++    seed, st = args
++    import approach_rot as approach
++    ap=approach.GeneratedApproach(None,None,{})
++    t=time.time()
++    ap.reset(FakeState(st['objs']), st['info'])
++    tp=time.time()-t
++    from approach import parse
++    d=parse(FakeState(st['objs']))
++    steps=ap._simulate(d)
++    return seed, st['info'].get('object_count'), steps, ap.plan_cost, round(tp,2)
++if __name__=='__main__':
++    S=json.load(open(sys.argv[1]))
++    lo,hi=int(sys.argv[2]),int(sys.argv[3])
++    items=[(int(k),v) for k,v in S.items() if lo<=int(k)<hi]
++    with ProcessPoolExecutor(16) as ex:
++        res=list(ex.map(run, items))
++    res.sort()
++    if len(sys.argv)>4:
++        for r in res: print(*r)
++    print('TOTAL', sum(r[2] for r in res), 'N', len(res), 'maxt', max(r[4] for r in res))
+diff --git a/pE_an.py b/pE_an.py
+new file mode 100644
+index 0000000..765d232
+--- /dev/null
++++ b/pE_an.py
+@@ -0,0 +1,12 @@
++import json,numpy as np
++r=json.load(open('/sandbox/pE_data.json'))
++def cr(a,b): return a[0]*b[1]-a[1]*b[0]
++out=[]
++for x in r:
++    sp=np.array(x['sp']); o=np.array(x['obj']); d=o-sp; L=np.linalg.norm(d); u=d/L
++    best=None
++    for p in x['P']:
++        v=np.array(p)-sp; t=v@u; perp=cr(u,v)
++        if -0.1<t<L+0.1 and (best is None or abs(perp)<abs(best[1])): best=(t,perp)
++    out.append((x['cal'],round(best[1],3),round(best[0],2),round(L,2),round(best[0]/L,2),x['seed'],x['i']))
++for o in sorted(out,key=lambda z:abs(z[1])): print(o)
+diff --git a/pE_an2.py b/pE_an2.py
+new file mode 100644
+index 0000000..04cb3c3
+--- /dev/null
++++ b/pE_an2.py
+@@ -0,0 +1,8 @@
++import json,numpy as np,sys
++r=json.load(open('/sandbox/pE_data.json'))
++def cr(a,b): return a[0]*b[1]-a[1]*b[0]
++for x in r:
++    if x['seed'] not in eval(sys.argv[1]): continue
++    sp=np.array(x['sp']); o=np.array(x['obj']); d=o-sp; L=np.linalg.norm(d); u=d/L
++    near=[(np.round(p,2).tolist(),round(cr(u,np.array(p)-sp),3),round((np.array(p)-sp)@u,2)) for p in x['P'] if abs(cr(u,np.array(p)-sp))<0.15 and -0.2<(np.array(p)-sp)@u<L+0.2]
++    print(x['seed'],x['i'],round(x['x'],2),round(x['y'],2),'obj',np.round(o,2).tolist(),'L',round(L,3),'cal',x['cal'],near)
+diff --git a/pE_an3.py b/pE_an3.py
+new file mode 100644
+index 0000000..be1c8a4
+--- /dev/null
++++ b/pE_an3.py
+@@ -0,0 +1,8 @@
++import json,numpy as np
++r=json.load(open('/sandbox/pE_data.json'))
++for x in r:
++    sp=np.array(x['sp']); o=np.array(x['obj']); d=o-sp; L=np.linalg.norm(d); u=d/L
++    th=np.pi if x['i']==0 else 0
++    lx=np.cos(th)*u[0]+np.sin(th)*u[1]; ly=-np.sin(th)*u[0]+np.cos(th)*u[1]
++    m=min(((abs(u[0]*(p[1]-sp[1])-u[1]*(p[0]-sp[0]))),(np.array(p)-sp)@u) for p in x['P'] if 0<(np.array(p)-sp)@u<L)
++    if m[0]<0.045: print(x['seed'],x['i'],'cal',x['cal'],'u_world',np.round(u,2),'local',round(lx,2),round(ly,2),'perp',round(m[0],3))
+diff --git a/pE_col.py b/pE_col.py
+new file mode 100644
+index 0000000..642889e
+--- /dev/null
++++ b/pE_col.py
+@@ -0,0 +1,16 @@
++from pE_lib import *
++import sys
++def approach(seed,i,px,py,side):
++    s=Sim(seed)
++    # start below pillar at y=py-0.6
++    if side=='below': start=(px,py-0.6); d=(0,0.01)
++    else: start=(px+(0.6 if i==0 else -0.6) ,py); d=((-0.01 if i==0 else 0.01),0)
++    if not drive(s,i,*start): return 'noreach'
++    for k in range(80):
++        p=s.r(i); a=(d[0],d[1],0,'noop')
++        if i==0: s.act(a0=a)
++        else: s.act(a1=a)
++        if s.r(i)==p: break
++    c=s.r(i); return (round(c['x']-px,3),round(c['y']-py,3))
++for seed,i,px,py in eval(sys.argv[1]):
++    print(seed,i,(px,py),approach(seed,i,px,py,'below'),approach(seed,i,px,py,'side'))
+diff --git a/pE_data.json b/pE_data.json
+new file mode 100644
+index 0000000..e617da4
+--- /dev/null
++++ b/pE_data.json
+@@ -0,0 +1 @@
++[{"seed": 0, "i": 1, "x": -0.25, "y": 0.5500000000000025, "sp": [-0.33699999999999997, 0.538], "obj": [0.6602243185043335, 1.9191694259643555], "P": [[-2.3528029918670654, -0.02079753205180168], [-0.13526616990566254, -0.6399457454681396], [0.6542917490005493, -0.19871839880943298], [-1.808438777923584, -1.5490243434906006], [-1.3539739847183228, 0.5535165071487427], [0.2724447250366211, 1.2091444730758667], [1.3540021181106567, 2.2589950561523438], [-0.8076643943786621, 0.1918671876192093]], "cal": 1.0}, {"seed": 0, "i": 1, "x": -0.35, "y": 0.40000000000000213, "sp": [-0.43699999999999994, 0.388], "obj": [0.6602243185043335, 1.9191694259643555], "P": [[-2.3528029918670654, -0.02079753205180168], [-0.13526616990566254, -0.6399457454681396], [0.6542917490005493, -0.19871839880943298], [-1.808438777923584, -1.5490243434906006], [-1.3539739847183228, 0.5535165071487427], [0.2724447250366211, 1.2091444730758667], [1.3540021181106567, 2.2589950561523438], [-0.8076643943786621, 0.1918671876192093]], "cal": 1.0}, {"seed": 0, "i": 1, "x": -0.3, "y": 0.40000000000000213, "sp": [-0.387, 0.388], "obj": [0.6602243185043335, 1.9191694259643555], "P": [[-2.3528029918670654, -0.02079753205180168], [-0.13526616990566254, -0.6399457454681396], [0.6542917490005493, -0.19871839880943298], [-1.808438777923584, -1.5490243434906006], [-1.3539739847183228, 0.5535165071487427], [0.2724447250366211, 1.2091444730758667], [1.3540021181106567, 2.2589950561523438], [-0.8076643943786621, 0.1918671876192093]], "cal": 1.0}, {"seed": 2, "i": 0, "x": 0.8499999999999999, "y": 0.15000000000000213, "sp": [0.9370048809387846, 0.16196455986770553], "obj": [0.4399506747722626, 1.8454203605651855], "P": [[0.7348376512527466, 0.4442424476146698], [1.639979600906372, 0.7337386012077332], [-2.1559410095214844, -1.0042955875396729], [-0.21526943147182465, -0.5559921264648438], [1.7862882614135742, -0.5400499105453491], [2.1178300380706787, -0.9612797498703003], [-0.9069060683250427, 1.2679052352905273], [-1.7171909809112549, 0.9063087105751038]], "cal": 1.0}, {"seed": 2, "i": 0, "x": 0.7, "y": 1.7763568394002505e-15, "sp": [0.7870048809387846, 0.011964559867705523], "obj": [0.4399506747722626, 1.8454203605651855], "P": [[0.7348376512527466, 0.4442424476146698], [1.639979600906372, 0.7337386012077332], [-2.1559410095214844, -1.0042955875396729], [-0.21526943147182465, -0.5559921264648438], [1.7862882614135742, -0.5400499105453491], [2.1178300380706787, -0.9612797498703003], [-0.9069060683250427, 1.2679052352905273], [-1.7171909809112549, 0.9063087105751038]], "cal": 0.0}, {"seed": 2, "i": 0, "x": 0.7999999999999998, "y": -0.04999999999999827, "sp": [0.8870048809387847, -0.038035440132294485], "obj": [0.4399506747722626, 1.8454203605651855], "P": [[0.7348376512527466, 0.4442424476146698], [1.639979600906372, 0.7337386012077332], [-2.1559410095214844, -1.0042955875396729], [-0.21526943147182465, -0.5559921264648438], [1.7862882614135742, -0.5400499105453491], [2.1178300380706787, -0.9612797498703003], [-0.9069060683250427, 1.2679052352905273], [-1.7171909809112549, 0.9063087105751038]], "cal": 0.0}, {"seed": 2, "i": 0, "x": 0.7999999999999998, "y": 0.10000000000000187, "sp": [0.8870048809387847, 0.11196455986770552], "obj": [0.4399506747722626, 1.8454203605651855], "P": [[0.7348376512527466, 0.4442424476146698], [1.639979600906372, 0.7337386012077332], [-2.1559410095214844, -1.0042955875396729], [-0.21526943147182465, -0.5559921264648438], [1.7862882614135742, -0.5400499105453491], [2.1178300380706787, -0.9612797498703003], [-0.9069060683250427, 1.2679052352905273], [-1.7171909809112549, 0.9063087105751038]], "cal": 0.0}, {"seed": 2, "i": 0, "x": 0.6499999999999999, "y": 0.10000000000000187, "sp": [0.7370048809387847, 0.11196455986770552], "obj": [0.4399506747722626, 1.8454203605651855], "P": [[0.7348376512527466, 0.4442424476146698], [1.639979600906372, 0.7337386012077332], [-2.1559410095214844, -1.0042955875396729], [-0.21526943147182465, -0.5559921264648438], [1.7862882614135742, -0.5400499105453491], [2.1178300380706787, -0.9612797498703003], [-0.9069060683250427, 1.2679052352905273], [-1.7171909809112549, 0.9063087105751038]], "cal": 0.0}, {"seed": 2, "i": 0, "x": 0.6499999999999999, "y": 1.7763568394002505e-15, "sp": [0.7370048809387847, 0.011964559867705523], "obj": [0.4399506747722626, 1.8454203605651855], "P": [[0.7348376512527466, 0.4442424476146698], [1.639979600906372, 0.7337386012077332], [-2.1559410095214844, -1.0042955875396729], [-0.21526943147182465, -0.5559921264648438], [1.7862882614135742, -0.5400499105453491], [2.1178300380706787, -0.9612797498703003], [-0.9069060683250427, 1.2679052352905273], [-1.7171909809112549, 0.9063087105751038]], "cal": 0.0}, {"seed": 2, "i": 1, "x": -1.3999999999999997, "y": 0.0500000000000016, "sp": [-1.4869999999999999, 0.038000000000000006], "obj": [-2.1755123138427734, 1.8365923166275024], "P": [[0.7348376512527466, 0.4442424476146698], [1.639979600906372, 0.7337386012077332], [-2.1559410095214844, -1.0042955875396729], [-0.21526943147182465, -0.5559921264648438], [1.7862882614135742, -0.5400499105453491], [2.1178300380706787, -0.9612797498703003], [-0.9069060683250427, 1.2679052352905273], [-1.7171909809112549, 0.9063087105751038]], "cal": 1.0}, {"seed": 2, "i": 1, "x": -1.3499999999999996, "y": 0.0500000000000016, "sp": [-1.437, 0.038000000000000006], "obj": [-2.1755123138427734, 1.8365923166275024], "P": [[0.7348376512527466, 0.4442424476146698], [1.639979600906372, 0.7337386012077332], [-2.1559410095214844, -1.0042955875396729], [-0.21526943147182465, -0.5559921264648438], [1.7862882614135742, -0.5400499105453491], [2.1178300380706787, -0.9612797498703003], [-0.9069060683250427, 1.2679052352905273], [-1.7171909809112549, 0.9063087105751038]], "cal": 1.0}, {"seed": 2, "i": 1, "x": -1.4499999999999997, "y": 0.10000000000000187, "sp": [-1.537, 0.08800000000000001], "obj": [-2.1755123138427734, 1.8365923166275024], "P": [[0.7348376512527466, 0.4442424476146698], [1.639979600906372, 0.7337386012077332], [-2.1559410095214844, -1.0042955875396729], [-0.21526943147182465, -0.5559921264648438], [1.7862882614135742, -0.5400499105453491], [2.1178300380706787, -0.9612797498703003], [-0.9069060683250427, 1.2679052352905273], [-1.7171909809112549, 0.9063087105751038]], "cal": 1.0}, {"seed": 2, "i": 1, "x": -1.3999999999999997, "y": 0.10000000000000187, "sp": [-1.4869999999999999, 0.08800000000000001], "obj": [-2.1755123138427734, 1.8365923166275024], "P": [[0.7348376512527466, 0.4442424476146698], [1.639979600906372, 0.7337386012077332], [-2.1559410095214844, -1.0042955875396729], [-0.21526943147182465, -0.5559921264648438], [1.7862882614135742, -0.5400499105453491], [2.1178300380706787, -0.9612797498703003], [-0.9069060683250427, 1.2679052352905273], [-1.7171909809112549, 0.9063087105751038]], "cal": 1.0}, {"seed": 4, "i": 1, "x": -2.1499999999999995, "y": 0.15000000000000213, "sp": [-2.237, 0.13799999999999998], "obj": [-1.8025481700897217, 1.9246771335601807], "P": [[1.355916976928711, -0.639632523059845], [-0.9720496535301208, 1.3049595355987549], [-1.9206608533859253, 1.2813137769699097], [1.7166746854782104, 1.215036153793335], [1.249559760093689, 2.3779003620147705], [-1.8589937686920166, 0.44547125697135925], [0.1178240180015564, 0.3486069142818451], [-1.3587859869003296, 1.0556634664535522]], "cal": 0.0}, {"seed": 4, "i": 1, "x": -2.1499999999999995, "y": 0.20000000000000195, "sp": [-2.237, 0.188], "obj": [-1.8025481700897217, 1.9246771335601807], "P": [[1.355916976928711, -0.639632523059845], [-0.9720496535301208, 1.3049595355987549], [-1.9206608533859253, 1.2813137769699097], [1.7166746854782104, 1.215036153793335], [1.249559760093689, 2.3779003620147705], [-1.8589937686920166, 0.44547125697135925], [0.1178240180015564, 0.3486069142818451], [-1.3587859869003296, 1.0556634664535522]], "cal": 0.0}, {"seed": 4, "i": 1, "x": -1.1999999999999997, "y": 0.6500000000000021, "sp": [-1.287, 0.638], "obj": [-1.8025481700897217, 1.9246771335601807], "P": [[1.355916976928711, -0.639632523059845], [-0.9720496535301208, 1.3049595355987549], [-1.9206608533859253, 1.2813137769699097], [1.7166746854782104, 1.215036153793335], [1.249559760093689, 2.3779003620147705], [-1.8589937686920166, 0.44547125697135925], [0.1178240180015564, 0.3486069142818451], [-1.3587859869003296, 1.0556634664535522]], "cal": 1.0}, {"seed": 4, "i": 1, "x": -2.1499999999999995, "y": 0.6000000000000023, "sp": [-2.237, 0.588], "obj": [-1.8025481700897217, 1.9246771335601807], "P": [[1.355916976928711, -0.639632523059845], [-0.9720496535301208, 1.3049595355987549], [-1.9206608533859253, 1.2813137769699097], [1.7166746854782104, 1.215036153793335], [1.249559760093689, 2.3779003620147705], [-1.8589937686920166, 0.44547125697135925], [0.1178240180015564, 0.3486069142818451], [-1.3587859869003296, 1.0556634664535522]], "cal": 1.0}, {"seed": 4, "i": 1, "x": -0.7, "y": 0.40000000000000213, "sp": [-0.7869999999999999, 0.388], "obj": [-1.8025481700897217, 1.9246771335601807], "P": [[1.355916976928711, -0.639632523059845], [-0.9720496535301208, 1.3049595355987549], [-1.9206608533859253, 1.2813137769699097], [1.7166746854782104, 1.215036153793335], [1.249559760093689, 2.3779003620147705], [-1.8589937686920166, 0.44547125697135925], [0.1178240180015564, 0.3486069142818451], [-1.3587859869003296, 1.0556634664535522]], "cal": 1.0}, {"seed": 6, "i": 0, "x": 1.1999999999999997, "y": 0.3500000000000023, "sp": [1.2870048809387846, 0.36196455986770554], "obj": [0.6754189729690552, 1.9155398607254028], "P": [[-1.003123164176941, 0.9469658136367798], [1.0960665941238403, 0.6989491581916809], [1.532206416130066, -0.3089228868484497], [-0.2593466341495514, -2.247386932373047], [1.2770472764968872, 1.2630878686904907], [-2.3479177951812744, 2.1812400817871094], [1.7658292055130005, 1.4306260347366333], [-1.5802319049835205, -0.3195483982563019]], "cal": 1.0}, {"seed": 6, "i": 0, "x": 1.6999999999999995, "y": 0.3500000000000023, "sp": [1.7870048809387846, 0.36196455986770554], "obj": [0.6754189729690552, 1.9155398607254028], "P": [[-1.003123164176941, 0.9469658136367798], [1.0960665941238403, 0.6989491581916809], [1.532206416130066, -0.3089228868484497], [-0.2593466341495514, -2.247386932373047], [1.2770472764968872, 1.2630878686904907], [-2.3479177951812744, 2.1812400817871094], [1.7658292055130005, 1.4306260347366333], [-1.5802319049835205, -0.3195483982563019]], "cal": 1.0}, {"seed": 6, "i": 1, "x": -1.1999999999999997, "y": 0.15000000000000213, "sp": [-1.287, 0.13799999999999998], "obj": [-0.616466224193573, 1.9193686246871948], "P": [[-1.003123164176941, 0.9469658136367798], [1.0960665941238403, 0.6989491581916809], [1.532206416130066, -0.3089228868484497], [-0.2593466341495514, -2.247386932373047], [1.2770472764968872, 1.2630878686904907], [-2.3479177951812744, 2.1812400817871094], [1.7658292055130005, 1.4306260347366333], [-1.5802319049835205, -0.3195483982563019]], "cal": 0.0}, {"seed": 6, "i": 1, "x": -1.1499999999999997, "y": 0.3500000000000023, "sp": [-1.2369999999999999, 0.33799999999999997], "obj": [-0.616466224193573, 1.9193686246871948], "P": [[-1.003123164176941, 0.9469658136367798], [1.0960665941238403, 0.6989491581916809], [1.532206416130066, -0.3089228868484497], [-0.2593466341495514, -2.247386932373047], [1.2770472764968872, 1.2630878686904907], [-2.3479177951812744, 2.1812400817871094], [1.7658292055130005, 1.4306260347366333], [-1.5802319049835205, -0.3195483982563019]], "cal": 0.0}, {"seed": 6, "i": 1, "x": -1.0499999999999998, "y": 0.10000000000000187, "sp": [-1.137, 0.08800000000000001], "obj": [-0.616466224193573, 1.9193686246871948], "P": [[-1.003123164176941, 0.9469658136367798], [1.0960665941238403, 0.6989491581916809], [1.532206416130066, -0.3089228868484497], [-0.2593466341495514, -2.247386932373047], [1.2770472764968872, 1.2630878686904907], [-2.3479177951812744, 2.1812400817871094], [1.7658292055130005, 1.4306260347366333], [-1.5802319049835205, -0.3195483982563019]], "cal": 1.0}, {"seed": 6, "i": 1, "x": -1.1499999999999997, "y": 0.10000000000000187, "sp": [-1.2369999999999999, 0.08800000000000001], "obj": [-0.616466224193573, 1.9193686246871948], "P": [[-1.003123164176941, 0.9469658136367798], [1.0960665941238403, 0.6989491581916809], [1.532206416130066, -0.3089228868484497], [-0.2593466341495514, -2.247386932373047], [1.2770472764968872, 1.2630878686904907], [-2.3479177951812744, 2.1812400817871094], [1.7658292055130005, 1.4306260347366333], [-1.5802319049835205, -0.3195483982563019]], "cal": 1.0}, {"seed": 6, "i": 1, "x": -1.3499999999999996, "y": 0.30000000000000204, "sp": [-1.437, 0.288], "obj": [-0.616466224193573, 1.9193686246871948], "P": [[-1.003123164176941, 0.9469658136367798], [1.0960665941238403, 0.6989491581916809], [1.532206416130066, -0.3089228868484497], [-0.2593466341495514, -2.247386932373047], [1.2770472764968872, 1.2630878686904907], [-2.3479177951812744, 2.1812400817871094], [1.7658292055130005, 1.4306260347366333], [-1.5802319049835205, -0.3195483982563019]], "cal": 1.0}, {"seed": 6, "i": 1, "x": -0.9999999999999998, "y": 0.40000000000000213, "sp": [-1.087, 0.388], "obj": [-0.616466224193573, 1.9193686246871948], "P": [[-1.003123164176941, 0.9469658136367798], [1.0960665941238403, 0.6989491581916809], [1.532206416130066, -0.3089228868484497], [-0.2593466341495514, -2.247386932373047], [1.2770472764968872, 1.2630878686904907], [-2.3479177951812744, 2.1812400817871094], [1.7658292055130005, 1.4306260347366333], [-1.5802319049835205, -0.3195483982563019]], "cal": 1.0}, {"seed": 7, "i": 1, "x": -0.35, "y": 0.0500000000000016, "sp": [-0.43699999999999994, 0.038000000000000006], "obj": [-0.5388090014457703, 1.8302867412567139], "P": [[-0.6932554841041565, 1.0566117763519287], [-0.3712671995162964, 0.7869153022766113], [1.5414416790008545, -1.132764220237732], [1.234261393547058, 0.04434873163700104], [-0.8229485750198364, 0.3480057120323181], [-0.4931207001209259, -0.6309523582458496], [-1.828883409500122, 1.1798979043960571], [0.7972133159637451, 1.0064725875854492]], "cal": 1.0}, {"seed": 7, "i": 1, "x": -0.3, "y": -0.04999999999999827, "sp": [-0.387, -0.062], "obj": [-0.5388090014457703, 1.8302867412567139], "P": [[-0.6932554841041565, 1.0566117763519287], [-0.3712671995162964, 0.7869153022766113], [1.5414416790008545, -1.132764220237732], [1.234261393547058, 0.04434873163700104], [-0.8229485750198364, 0.3480057120323181], [-0.4931207001209259, -0.6309523582458496], [-1.828883409500122, 1.1798979043960571], [0.7972133159637451, 1.0064725875854492]], "cal": 1.0}, {"seed": 7, "i": 1, "x": -0.7499999999999998, "y": -0.04999999999999827, "sp": [-0.837, -0.062], "obj": [-0.5388090014457703, 1.8302867412567139], "P": [[-0.6932554841041565, 1.0566117763519287], [-0.3712671995162964, 0.7869153022766113], [1.5414416790008545, -1.132764220237732], [1.234261393547058, 0.04434873163700104], [-0.8229485750198364, 0.3480057120323181], [-0.4931207001209259, -0.6309523582458496], [-1.828883409500122, 1.1798979043960571], [0.7972133159637451, 1.0064725875854492]], "cal": 0.0}, {"seed": 7, "i": 1, "x": -0.5499999999999999, "y": 1.7763568394002505e-15, "sp": [-0.637, -0.012], "obj": [-0.5388090014457703, 1.8302867412567139], "P": [[-0.6932554841041565, 1.0566117763519287], [-0.3712671995162964, 0.7869153022766113], [1.5414416790008545, -1.132764220237732], [1.234261393547058, 0.04434873163700104], [-0.8229485750198364, 0.3480057120323181], [-0.4931207001209259, -0.6309523582458496], [-1.828883409500122, 1.1798979043960571], [0.7972133159637451, 1.0064725875854492]], "cal": 1.0}, {"seed": 7, "i": 1, "x": -2.0999999999999996, "y": 1.0500000000000025, "sp": [-2.1870000000000003, 1.038], "obj": [-0.5388090014457703, 1.8302867412567139], "P": [[-0.6932554841041565, 1.0566117763519287], [-0.3712671995162964, 0.7869153022766113], [1.5414416790008545, -1.132764220237732], [1.234261393547058, 0.04434873163700104], [-0.8229485750198364, 0.3480057120323181], [-0.4931207001209259, -0.6309523582458496], [-1.828883409500122, 1.1798979043960571], [0.7972133159637451, 1.0064725875854492]], "cal": 0.0}, {"seed": 8, "i": 0, "x": 1.1499999999999997, "y": 0.3500000000000023, "sp": [1.2370048809387846, 0.36196455986770554], "obj": [1.857717514038086, 2.1887311935424805], "P": [[0.599370539188385, 1.2821154594421387], [2.3602755069732666, -1.5905033349990845], [1.259828805923462, 0.6431530117988586], [-1.9354742765426636, 0.3947531282901764], [-1.051819920539856, 1.2043700218200684], [-0.9911293387413025, 0.8287094831466675], [-0.16158358752727509, -0.08824300765991211], [1.1889575719833374, 2.0945098400115967]], "cal": 1.0}, {"seed": 8, "i": 0, "x": 1.0499999999999998, "y": 0.40000000000000213, "sp": [1.1370048809387847, 0.4119645598677056], "obj": [1.857717514038086, 2.1887311935424805], "P": [[0.599370539188385, 1.2821154594421387], [2.3602755069732666, -1.5905033349990845], [1.259828805923462, 0.6431530117988586], [-1.9354742765426636, 0.3947531282901764], [-1.051819920539856, 1.2043700218200684], [-0.9911293387413025, 0.8287094831466675], [-0.16158358752727509, -0.08824300765991211], [1.1889575719833374, 2.0945098400115967]], "cal": 1.0}, {"seed": 8, "i": 0, "x": 0.9999999999999998, "y": 0.45000000000000195, "sp": [1.0870048809387847, 0.46196455986770557], "obj": [1.857717514038086, 2.1887311935424805], "P": [[0.599370539188385, 1.2821154594421387], [2.3602755069732666, -1.5905033349990845], [1.259828805923462, 0.6431530117988586], [-1.9354742765426636, 0.3947531282901764], [-1.051819920539856, 1.2043700218200684], [-0.9911293387413025, 0.8287094831466675], [-0.16158358752727509, -0.08824300765991211], [1.1889575719833374, 2.0945098400115967]], "cal": 1.0}, {"seed": 8, "i": 0, "x": 1.0999999999999999, "y": 0.3500000000000023, "sp": [1.1870048809387848, 0.36196455986770554], "obj": [1.857717514038086, 2.1887311935424805], "P": [[0.599370539188385, 1.2821154594421387], [2.3602755069732666, -1.5905033349990845], [1.259828805923462, 0.6431530117988586], [-1.9354742765426636, 0.3947531282901764], [-1.051819920539856, 1.2043700218200684], [-0.9911293387413025, 0.8287094831466675], [-0.16158358752727509, -0.08824300765991211], [1.1889575719833374, 2.0945098400115967]], "cal": 1.0}, {"seed": 8, "i": 0, "x": 0.9999999999999998, "y": 0.40000000000000213, "sp": [1.0870048809387847, 0.4119645598677056], "obj": [1.857717514038086, 2.1887311935424805], "P": [[0.599370539188385, 1.2821154594421387], [2.3602755069732666, -1.5905033349990845], [1.259828805923462, 0.6431530117988586], [-1.9354742765426636, 0.3947531282901764], [-1.051819920539856, 1.2043700218200684], [-0.9911293387413025, 0.8287094831466675], [-0.16158358752727509, -0.08824300765991211], [1.1889575719833374, 2.0945098400115967]], "cal": 1.0}, {"seed": 8, "i": 1, "x": -1.9999999999999996, "y": 1.7763568394002505e-15, "sp": [-2.087, -0.012], "obj": [-1.8016111850738525, 1.8543975353240967], "P": [[0.599370539188385, 1.2821154594421387], [2.3602755069732666, -1.5905033349990845], [1.259828805923462, 0.6431530117988586], [-1.9354742765426636, 0.3947531282901764], [-1.051819920539856, 1.2043700218200684], [-0.9911293387413025, 0.8287094831466675], [-0.16158358752727509, -0.08824300765991211], [1.1889575719833374, 2.0945098400115967]], "cal": 1.0}, {"seed": 8, "i": 1, "x": -1.9999999999999996, "y": 0.0500000000000016, "sp": [-2.087, 0.038000000000000006], "obj": [-1.8016111850738525, 1.8543975353240967], "P": [[0.599370539188385, 1.2821154594421387], [2.3602755069732666, -1.5905033349990845], [1.259828805923462, 0.6431530117988586], [-1.9354742765426636, 0.3947531282901764], [-1.051819920539856, 1.2043700218200684], [-0.9911293387413025, 0.8287094831466675], [-0.16158358752727509, -0.08824300765991211], [1.1889575719833374, 2.0945098400115967]], "cal": 1.0}, {"seed": 8, "i": 1, "x": -1.7999999999999996, "y": 1.7763568394002505e-15, "sp": [-1.887, -0.012], "obj": [-1.8016111850738525, 1.8543975353240967], "P": [[0.599370539188385, 1.2821154594421387], [2.3602755069732666, -1.5905033349990845], [1.259828805923462, 0.6431530117988586], [-1.9354742765426636, 0.3947531282901764], [-1.051819920539856, 1.2043700218200684], [-0.9911293387413025, 0.8287094831466675], [-0.16158358752727509, -0.08824300765991211], [1.1889575719833374, 2.0945098400115967]], "cal": 1.0}, {"seed": 8, "i": 1, "x": -1.7999999999999996, "y": 0.0500000000000016, "sp": [-1.887, 0.038000000000000006], "obj": [-1.8016111850738525, 1.8543975353240967], "P": [[0.599370539188385, 1.2821154594421387], [2.3602755069732666, -1.5905033349990845], [1.259828805923462, 0.6431530117988586], [-1.9354742765426636, 0.3947531282901764], [-1.051819920539856, 1.2043700218200684], [-0.9911293387413025, 0.8287094831466675], [-0.16158358752727509, -0.08824300765991211], [1.1889575719833374, 2.0945098400115967]], "cal": 1.0}, {"seed": 8, "i": 1, "x": -1.7499999999999996, "y": 1.7763568394002505e-15, "sp": [-1.837, -0.012], "obj": [-1.8016111850738525, 1.8543975353240967], "P": [[0.599370539188385, 1.2821154594421387], [2.3602755069732666, -1.5905033349990845], [1.259828805923462, 0.6431530117988586], [-1.9354742765426636, 0.3947531282901764], [-1.051819920539856, 1.2043700218200684], [-0.9911293387413025, 0.8287094831466675], [-0.16158358752727509, -0.08824300765991211], [1.1889575719833374, 2.0945098400115967]], "cal": 1.0}, {"seed": 8, "i": 1, "x": -1.7499999999999996, "y": 0.15000000000000213, "sp": [-1.837, 0.13799999999999998], "obj": [-1.8016111850738525, 1.8543975353240967], "P": [[0.599370539188385, 1.2821154594421387], [2.3602755069732666, -1.5905033349990845], [1.259828805923462, 0.6431530117988586], [-1.9354742765426636, 0.3947531282901764], [-1.051819920539856, 1.2043700218200684], [-0.9911293387413025, 0.8287094831466675], [-0.16158358752727509, -0.08824300765991211], [1.1889575719833374, 2.0945098400115967]], "cal": 1.0}, {"seed": 10, "i": 1, "x": -0.8499999999999999, "y": 0.10000000000000187, "sp": [-0.9369999999999999, 0.08800000000000001], "obj": [-0.3925993740558624, 1.9287258386611938], "P": [[-0.28399938344955444, -0.7855584621429443], [2.3068339824676514, 0.23645123839378357], [-1.1456115245819092, -0.7056430578231812], [0.38144704699516296, -1.6358813047409058], [-1.9426652193069458, 0.20236629247665405], [-0.9373608231544495, 0.39532485604286194], [-0.9029765725135803, 1.0501313209533691], [-1.2283709049224854, 0.45192721486091614]], "cal": 1.0}, {"seed": 11, "i": 1, "x": -0.39999999999999997, "y": 1.500000000000003, "sp": [-0.487, 1.488], "obj": [-2.0966074466705322, 2.0041697025299072], "P": [[-0.7415972352027893, -0.7925357222557068], [1.8918756246566772, -0.46649399399757385], [0.48372581601142883, -2.1444954872131348], [-1.311220407485962, 1.8670309782028198], [0.5674732327461243, 0.9071117043495178], [1.2984998226165771, 1.0159571170806885], [1.440147042274475, -0.19332359731197357], [-0.8423476815223694, 2.1227071285247803]], "cal": 1.0}, {"seed": 11, "i": 1, "x": -0.9999999999999998, "y": 1.8000000000000034, "sp": [-1.087, 1.788], "obj": [-2.0966074466705322, 2.0041697025299072], "P": [[-0.7415972352027893, -0.7925357222557068], [1.8918756246566772, -0.46649399399757385], [0.48372581601142883, -2.1444954872131348], [-1.311220407485962, 1.8670309782028198], [0.5674732327461243, 0.9071117043495178], [1.2984998226165771, 1.0159571170806885], [1.440147042274475, -0.19332359731197357], [-0.8423476815223694, 2.1227071285247803]], "cal": 1.0}, {"seed": 11, "i": 1, "x": -0.44999999999999996, "y": 1.5500000000000034, "sp": [-0.537, 1.538], "obj": [-2.0966074466705322, 2.0041697025299072], "P": [[-0.7415972352027893, -0.7925357222557068], [1.8918756246566772, -0.46649399399757385], [0.48372581601142883, -2.1444954872131348], [-1.311220407485962, 1.8670309782028198], [0.5674732327461243, 0.9071117043495178], [1.2984998226165771, 1.0159571170806885], [1.440147042274475, -0.19332359731197357], [-0.8423476815223694, 2.1227071285247803]], "cal": 1.0}, {"seed": 12, "i": 0, "x": 0.6499999999999999, "y": 0.45000000000000195, "sp": [0.7370048809387847, 0.46196455986770557], "obj": [0.302485853433609, 2.0046653747558594], "P": [[-1.9364697933197021, -1.3646252155303955], [2.2056539058685303, -2.1275546550750732], [-0.5593640804290771, 0.22532367706298828], [-0.14680126309394836, -1.6462442874908447], [0.3498835563659668, -2.280456781387329], [1.995186448097229, -1.2217729091644287], [0.8583569526672363, -2.384126663208008], [0.5402265787124634, 1.4761147499084473]], "cal": 1.0}, {"seed": 12, "i": 0, "x": 0.7999999999999998, "y": 0.8000000000000025, "sp": [0.8870048809387847, 0.8119645598677055], "obj": [0.302485853433609, 2.0046653747558594], "P": [[-1.9364697933197021, -1.3646252155303955], [2.2056539058685303, -2.1275546550750732], [-0.5593640804290771, 0.22532367706298828], [-0.14680126309394836, -1.6462442874908447], [0.3498835563659668, -2.280456781387329], [1.995186448097229, -1.2217729091644287], [0.8583569526672363, -2.384126663208008], [0.5402265787124634, 1.4761147499084473]], "cal": 0.0}, {"seed": 12, "i": 0, "x": 0.7499999999999998, "y": 1.0500000000000025, "sp": [0.8370048809387847, 1.0619645598677057], "obj": [0.302485853433609, 2.0046653747558594], "P": [[-1.9364697933197021, -1.3646252155303955], [2.2056539058685303, -2.1275546550750732], [-0.5593640804290771, 0.22532367706298828], [-0.14680126309394836, -1.6462442874908447], [0.3498835563659668, -2.280456781387329], [1.995186448097229, -1.2217729091644287], [0.8583569526672363, -2.384126663208008], [0.5402265787124634, 1.4761147499084473]], "cal": 0.0}, {"seed": 12, "i": 0, "x": 1.0499999999999998, "y": 0.3500000000000023, "sp": [1.1370048809387847, 0.36196455986770554], "obj": [0.302485853433609, 2.0046653747558594], "P": [[-1.9364697933197021, -1.3646252155303955], [2.2056539058685303, -2.1275546550750732], [-0.5593640804290771, 0.22532367706298828], [-0.14680126309394836, -1.6462442874908447], [0.3498835563659668, -2.280456781387329], [1.995186448097229, -1.2217729091644287], [0.8583569526672363, -2.384126663208008], [0.5402265787124634, 1.4761147499084473]], "cal": 0.0}, {"seed": 12, "i": 0, "x": 0.9999999999999998, "y": 0.45000000000000195, "sp": [1.0870048809387847, 0.46196455986770557], "obj": [0.302485853433609, 2.0046653747558594], "P": [[-1.9364697933197021, -1.3646252155303955], [2.2056539058685303, -2.1275546550750732], [-0.5593640804290771, 0.22532367706298828], [-0.14680126309394836, -1.6462442874908447], [0.3498835563659668, -2.280456781387329], [1.995186448097229, -1.2217729091644287], [0.8583569526672363, -2.384126663208008], [0.5402265787124634, 1.4761147499084473]], "cal": 0.0}, {"seed": 12, "i": 0, "x": 0.7499999999999998, "y": 0.6500000000000021, "sp": [0.8370048809387847, 0.6619645598677055], "obj": [0.302485853433609, 2.0046653747558594], "P": [[-1.9364697933197021, -1.3646252155303955], [2.2056539058685303, -2.1275546550750732], [-0.5593640804290771, 0.22532367706298828], [-0.14680126309394836, -1.6462442874908447], [0.3498835563659668, -2.280456781387329], [1.995186448097229, -1.2217729091644287], [0.8583569526672363, -2.384126663208008], [0.5402265787124634, 1.4761147499084473]], "cal": 1.0}, {"seed": 13, "i": 1, "x": -1.8999999999999997, "y": 1.3500000000000032, "sp": [-1.9869999999999999, 1.338], "obj": [-0.6583507657051086, 2.181946277618408], "P": [[-0.40088212490081787, -0.7029783725738525], [-1.291014552116394, 1.8400359153747559], [0.5349814891815186, -0.5702030658721924], [-1.2929505109786987, -0.2258441001176834], [1.5831186771392822, 1.2535215616226196], [1.4404922723770142, -2.2825567722320557], [-0.2463884949684143, -2.264265537261963], [-2.191558361053467, 1.113136887550354]], "cal": 0.0}, {"seed": 13, "i": 1, "x": -1.7499999999999996, "y": 1.500000000000003, "sp": [-1.837, 1.488], "obj": [-0.6583507657051086, 2.181946277618408], "P": [[-0.40088212490081787, -0.7029783725738525], [-1.291014552116394, 1.8400359153747559], [0.5349814891815186, -0.5702030658721924], [-1.2929505109786987, -0.2258441001176834], [1.5831186771392822, 1.2535215616226196], [1.4404922723770142, -2.2825567722320557], [-0.2463884949684143, -2.264265537261963], [-2.191558361053467, 1.113136887550354]], "cal": 0.0}, {"seed": 13, "i": 1, "x": -1.6499999999999997, "y": 1.500000000000003, "sp": [-1.7369999999999999, 1.488], "obj": [-0.6583507657051086, 2.181946277618408], "P": [[-0.40088212490081787, -0.7029783725738525], [-1.291014552116394, 1.8400359153747559], [0.5349814891815186, -0.5702030658721924], [-1.2929505109786987, -0.2258441001176834], [1.5831186771392822, 1.2535215616226196], [1.4404922723770142, -2.2825567722320557], [-0.2463884949684143, -2.264265537261963], [-2.191558361053467, 1.113136887550354]], "cal": 0.0}, {"seed": 14, "i": 0, "x": 1.5999999999999996, "y": 0.5000000000000022, "sp": [1.6870048809387848, 0.5119645598677055], "obj": [1.9954756498336792, 1.9713901281356812], "P": [[0.8883811831474304, -2.364142417907715], [1.5698357820510864, -0.39615413546562195], [-1.9110448360443115, 0.8682423830032349], [-2.38181471824646, 1.5064551830291748], [1.7108449935913086, 0.895994246006012], [1.6843281984329224, -1.0590119361877441], [-1.1650744676589966, 0.26955267786979675], [-2.000152826309204, -1.010337471961975]], "cal": 1.0}, {"seed": 14, "i": 0, "x": 1.5499999999999996, "y": 0.45000000000000195, "sp": [1.6370048809387847, 0.46196455986770557], "obj": [1.9954756498336792, 1.9713901281356812], "P": [[0.8883811831474304, -2.364142417907715], [1.5698357820510864, -0.39615413546562195], [-1.9110448360443115, 0.8682423830032349], [-2.38181471824646, 1.5064551830291748], [1.7108449935913086, 0.895994246006012], [1.6843281984329224, -1.0590119361877441], [-1.1650744676589966, 0.26955267786979675], [-2.000152826309204, -1.010337471961975]], "cal": 1.0}, {"seed": 14, "i": 0, "x": 1.5999999999999996, "y": 0.45000000000000195, "sp": [1.6870048809387848, 0.46196455986770557], "obj": [1.9954756498336792, 1.9713901281356812], "P": [[0.8883811831474304, -2.364142417907715], [1.5698357820510864, -0.39615413546562195], [-1.9110448360443115, 0.8682423830032349], [-2.38181471824646, 1.5064551830291748], [1.7108449935913086, 0.895994246006012], [1.6843281984329224, -1.0590119361877441], [-1.1650744676589966, 0.26955267786979675], [-2.000152826309204, -1.010337471961975]], "cal": 1.0}, {"seed": 14, "i": 0, "x": 1.2999999999999996, "y": 0.3500000000000023, "sp": [1.3870048809387847, 0.36196455986770554], "obj": [1.9954756498336792, 1.9713901281356812], "P": [[0.8883811831474304, -2.364142417907715], [1.5698357820510864, -0.39615413546562195], [-1.9110448360443115, 0.8682423830032349], [-2.38181471824646, 1.5064551830291748], [1.7108449935913086, 0.895994246006012], [1.6843281984329224, -1.0590119361877441], [-1.1650744676589966, 0.26955267786979675], [-2.000152826309204, -1.010337471961975]], "cal": 1.0}, {"seed": 14, "i": 0, "x": 1.4499999999999997, "y": 0.6500000000000021, "sp": [1.5370048809387846, 0.6619645598677055], "obj": [1.9954756498336792, 1.9713901281356812], "P": [[0.8883811831474304, -2.364142417907715], [1.5698357820510864, -0.39615413546562195], [-1.9110448360443115, 0.8682423830032349], [-2.38181471824646, 1.5064551830291748], [1.7108449935913086, 0.895994246006012], [1.6843281984329224, -1.0590119361877441], [-1.1650744676589966, 0.26955267786979675], [-2.000152826309204, -1.010337471961975]], "cal": 1.0}, {"seed": 14, "i": 0, "x": 1.4999999999999998, "y": 0.6500000000000021, "sp": [1.5870048809387847, 0.6619645598677055], "obj": [1.9954756498336792, 1.9713901281356812], "P": [[0.8883811831474304, -2.364142417907715], [1.5698357820510864, -0.39615413546562195], [-1.9110448360443115, 0.8682423830032349], [-2.38181471824646, 1.5064551830291748], [1.7108449935913086, 0.895994246006012], [1.6843281984329224, -1.0590119361877441], [-1.1650744676589966, 0.26955267786979675], [-2.000152826309204, -1.010337471961975]], "cal": 1.0}, {"seed": 15, "i": 0, "x": 0.7499999999999998, "y": 0.20000000000000195, "sp": [0.8370048809387847, 0.21196455986770554], "obj": [0.44575583934783936, 1.8075942993164062], "P": [[-0.13668321073055267, 0.8556169271469116], [-1.782539963722229, -0.22960880398750305], [2.1742680072784424, -0.9013628959655762], [0.5746158957481384, 1.5964922904968262], [-1.306209921836853, -1.0493584871292114], [0.9341977834701538, 0.5551276803016663], [-0.4578779637813568, 1.3129433393478394], [0.28670474886894226, -1.8393561840057373]], "cal": 1.0}, {"seed": 15, "i": 0, "x": 0.5999999999999999, "y": -0.04999999999999827, "sp": [0.6870048809387846, -0.038035440132294485], "obj": [0.44575583934783936, 1.8075942993164062], "P": [[-0.13668321073055267, 0.8556169271469116], [-1.782539963722229, -0.22960880398750305], [2.1742680072784424, -0.9013628959655762], [0.5746158957481384, 1.5964922904968262], [-1.306209921836853, -1.0493584871292114], [0.9341977834701538, 0.5551276803016663], [-0.4578779637813568, 1.3129433393478394], [0.28670474886894226, -1.8393561840057373]], "cal": 1.0}, {"seed": 15, "i": 0, "x": 1.2999999999999996, "y": 0.10000000000000187, "sp": [1.3870048809387847, 0.11196455986770552], "obj": [0.44575583934783936, 1.8075942993164062], "P": [[-0.13668321073055267, 0.8556169271469116], [-1.782539963722229, -0.22960880398750305], [2.1742680072784424, -0.9013628959655762], [0.5746158957481384, 1.5964922904968262], [-1.306209921836853, -1.0493584871292114], [0.9341977834701538, 0.5551276803016663], [-0.4578779637813568, 1.3129433393478394], [0.28670474886894226, -1.8393561840057373]], "cal": 0.0}, {"seed": 15, "i": 0, "x": 0.5499999999999999, "y": 0.20000000000000195, "sp": [0.6370048809387847, 0.21196455986770554], "obj": [0.44575583934783936, 1.8075942993164062], "P": [[-0.13668321073055267, 0.8556169271469116], [-1.782539963722229, -0.22960880398750305], [2.1742680072784424, -0.9013628959655762], [0.5746158957481384, 1.5964922904968262], [-1.306209921836853, -1.0493584871292114], [0.9341977834701538, 0.5551276803016663], [-0.4578779637813568, 1.3129433393478394], [0.28670474886894226, -1.8393561840057373]], "cal": 1.0}, {"seed": 15, "i": 0, "x": 0.5499999999999999, "y": 0.30000000000000204, "sp": [0.6370048809387847, 0.31196455986770555], "obj": [0.44575583934783936, 1.8075942993164062], "P": [[-0.13668321073055267, 0.8556169271469116], [-1.782539963722229, -0.22960880398750305], [2.1742680072784424, -0.9013628959655762], [0.5746158957481384, 1.5964922904968262], [-1.306209921836853, -1.0493584871292114], [0.9341977834701538, 0.5551276803016663], [-0.4578779637813568, 1.3129433393478394], [0.28670474886894226, -1.8393561840057373]], "cal": 1.0}, {"seed": 15, "i": 0, "x": 0.44999999999999996, "y": 0.2500000000000018, "sp": [0.5370048809387847, 0.26196455986770556], "obj": [0.44575583934783936, 1.8075942993164062], "P": [[-0.13668321073055267, 0.8556169271469116], [-1.782539963722229, -0.22960880398750305], [2.1742680072784424, -0.9013628959655762], [0.5746158957481384, 1.5964922904968262], [-1.306209921836853, -1.0493584871292114], [0.9341977834701538, 0.5551276803016663], [-0.4578779637813568, 1.3129433393478394], [0.28670474886894226, -1.8393561840057373]], "cal": 1.0}, {"seed": 16, "i": 0, "x": 1.7999999999999996, "y": 0.15000000000000213, "sp": [1.8870048809387847, 0.16196455986770553], "obj": [1.8715852499008179, 1.8253905773162842], "P": [[1.3840398788452148, 0.05604425072669983], [-2.2940897941589355, -0.2694941759109497], [2.370157480239868, 0.27437669038772583], [0.5368955731391907, -0.25991109013557434], [1.547366738319397, -0.35802099108695984], [1.099547028541565, -0.1487695574760437], [0.8556717038154602, 2.3534417152404785], [1.7723140716552734, 0.47060051560401917]], "cal": 1.0}, {"seed": 16, "i": 0, "x": 1.7999999999999996, "y": 0.10000000000000187, "sp": [1.8870048809387847, 0.11196455986770552], "obj": [1.8715852499008179, 1.8253905773162842], "P": [[1.3840398788452148, 0.05604425072669983], [-2.2940897941589355, -0.2694941759109497], [2.370157480239868, 0.27437669038772583], [0.5368955731391907, -0.25991109013557434], [1.547366738319397, -0.35802099108695984], [1.099547028541565, -0.1487695574760437], [0.8556717038154602, 2.3534417152404785], [1.7723140716552734, 0.47060051560401917]], "cal": 1.0}, {"seed": 16, "i": 0, "x": 1.7999999999999996, "y": -0.09999999999999831, "sp": [1.8870048809387847, -0.08803544013229449], "obj": [1.8715852499008179, 1.8253905773162842], "P": [[1.3840398788452148, 0.05604425072669983], [-2.2940897941589355, -0.2694941759109497], [2.370157480239868, 0.27437669038772583], [0.5368955731391907, -0.25991109013557434], [1.547366738319397, -0.35802099108695984], [1.099547028541565, -0.1487695574760437], [0.8556717038154602, 2.3534417152404785], [1.7723140716552734, 0.47060051560401917]], "cal": 1.0}, {"seed": 17, "i": 1, "x": -0.5499999999999999, "y": 0.15000000000000213, "sp": [-0.637, 0.13799999999999998], "obj": [-0.5510851740837097, 1.8509376049041748], "P": [[2.344771385192871, -2.3340706825256348], [0.4535106122493744, -0.2976192533969879], [-1.5503801107406616, -0.47493216395378113], [-0.6323992013931274, 1.4177719354629517], [0.6723269820213318, -0.7997660040855408], [-1.173314094543457, -1.1500154733657837], [-2.0610949993133545, 2.3434791564941406], [1.2926115989685059, 2.063962459564209]], "cal": 1.0}, {"seed": 17, "i": 1, "x": -0.39999999999999997, "y": 0.10000000000000187, "sp": [-0.487, 0.08800000000000001], "obj": [-0.5510851740837097, 1.8509376049041748], "P": [[2.344771385192871, -2.3340706825256348], [0.4535106122493744, -0.2976192533969879], [-1.5503801107406616, -0.47493216395378113], [-0.6323992013931274, 1.4177719354629517], [0.6723269820213318, -0.7997660040855408], [-1.173314094543457, -1.1500154733657837], [-2.0610949993133545, 2.3434791564941406], [1.2926115989685059, 2.063962459564209]], "cal": 1.0}, {"seed": 17, "i": 1, "x": -0.44999999999999996, "y": 0.3500000000000023, "sp": [-0.537, 0.33799999999999997], "obj": [-0.5510851740837097, 1.8509376049041748], "P": [[2.344771385192871, -2.3340706825256348], [0.4535106122493744, -0.2976192533969879], [-1.5503801107406616, -0.47493216395378113], [-0.6323992013931274, 1.4177719354629517], [0.6723269820213318, -0.7997660040855408], [-1.173314094543457, -1.1500154733657837], [-2.0610949993133545, 2.3434791564941406], [1.2926115989685059, 2.063962459564209]], "cal": 1.0}, {"seed": 19, "i": 0, "x": 1.7499999999999996, "y": 0.9500000000000028, "sp": [1.8370048809387847, 0.9619645598677055], "obj": [0.43692079186439514, 1.9683380126953125], "P": [[-2.153827428817749, -0.5808426737785339], [1.83260178565979, 0.31935185194015503], [0.2477836161851883, -1.5760544538497925], [1.6043659448623657, -1.1172767877578735], [-1.8525712490081787, 0.8826199769973755], [1.1515591144561768, 1.38009774684906], [0.680338978767395, -0.17420856654644012], [-0.5950009226799011, 0.21368901431560516]], "cal": 0.0}, {"seed": 19, "i": 0, "x": 1.5499999999999996, "y": 1.0000000000000027, "sp": [1.6370048809387847, 1.0119645598677056], "obj": [0.43692079186439514, 1.9683380126953125], "P": [[-2.153827428817749, -0.5808426737785339], [1.83260178565979, 0.31935185194015503], [0.2477836161851883, -1.5760544538497925], [1.6043659448623657, -1.1172767877578735], [-1.8525712490081787, 0.8826199769973755], [1.1515591144561768, 1.38009774684906], [0.680338978767395, -0.17420856654644012], [-0.5950009226799011, 0.21368901431560516]], "cal": 0.0}, {"seed": 19, "i": 0, "x": 1.7999999999999996, "y": 0.9500000000000028, "sp": [1.8870048809387847, 0.9619645598677055], "obj": [0.43692079186439514, 1.9683380126953125], "P": [[-2.153827428817749, -0.5808426737785339], [1.83260178565979, 0.31935185194015503], [0.2477836161851883, -1.5760544538497925], [1.6043659448623657, -1.1172767877578735], [-1.8525712490081787, 0.8826199769973755], [1.1515591144561768, 1.38009774684906], [0.680338978767395, -0.17420856654644012], [-0.5950009226799011, 0.21368901431560516]], "cal": 1.0}, {"seed": 19, "i": 0, "x": 1.5999999999999996, "y": 0.9000000000000026, "sp": [1.6870048809387848, 0.9119645598677055], "obj": [0.43692079186439514, 1.9683380126953125], "P": [[-2.153827428817749, -0.5808426737785339], [1.83260178565979, 0.31935185194015503], [0.2477836161851883, -1.5760544538497925], [1.6043659448623657, -1.1172767877578735], [-1.8525712490081787, 0.8826199769973755], [1.1515591144561768, 1.38009774684906], [0.680338978767395, -0.17420856654644012], [-0.5950009226799011, 0.21368901431560516]], "cal": 0.0}, {"seed": 19, "i": 0, "x": 1.3999999999999997, "y": 1.0500000000000025, "sp": [1.4870048809387846, 1.0619645598677057], "obj": [0.43692079186439514, 1.9683380126953125], "P": [[-2.153827428817749, -0.5808426737785339], [1.83260178565979, 0.31935185194015503], [0.2477836161851883, -1.5760544538497925], [1.6043659448623657, -1.1172767877578735], [-1.8525712490081787, 0.8826199769973755], [1.1515591144561768, 1.38009774684906], [0.680338978767395, -0.17420856654644012], [-0.5950009226799011, 0.21368901431560516]], "cal": 0.0}, {"seed": 19, "i": 0, "x": 1.3499999999999996, "y": 0.9000000000000026, "sp": [1.4370048809387848, 0.9119645598677055], "obj": [0.43692079186439514, 1.9683380126953125], "P": [[-2.153827428817749, -0.5808426737785339], [1.83260178565979, 0.31935185194015503], [0.2477836161851883, -1.5760544538497925], [1.6043659448623657, -1.1172767877578735], [-1.8525712490081787, 0.8826199769973755], [1.1515591144561768, 1.38009774684906], [0.680338978767395, -0.17420856654644012], [-0.5950009226799011, 0.21368901431560516]], "cal": 1.0}, {"seed": 19, "i": 1, "x": -1.6499999999999997, "y": 0.3500000000000023, "sp": [-1.7369999999999999, 0.33799999999999997], "obj": [-1.9677848815917969, 1.8509492874145508], "P": [[-2.153827428817749, -0.5808426737785339], [1.83260178565979, 0.31935185194015503], [0.2477836161851883, -1.5760544538497925], [1.6043659448623657, -1.1172767877578735], [-1.8525712490081787, 0.8826199769973755], [1.1515591144561768, 1.38009774684906], [0.680338978767395, -0.17420856654644012], [-0.5950009226799011, 0.21368901431560516]], "cal": 1.0}, {"seed": 19, "i": 1, "x": -1.7499999999999996, "y": 0.15000000000000213, "sp": [-1.837, 0.13799999999999998], "obj": [-1.9677848815917969, 1.8509492874145508], "P": [[-2.153827428817749, -0.5808426737785339], [1.83260178565979, 0.31935185194015503], [0.2477836161851883, -1.5760544538497925], [1.6043659448623657, -1.1172767877578735], [-1.8525712490081787, 0.8826199769973755], [1.1515591144561768, 1.38009774684906], [0.680338978767395, -0.17420856654644012], [-0.5950009226799011, 0.21368901431560516]], "cal": 1.0}, {"seed": 19, "i": 1, "x": -1.6499999999999997, "y": 1.7763568394002505e-15, "sp": [-1.7369999999999999, -0.012], "obj": [-1.9677848815917969, 1.8509492874145508], "P": [[-2.153827428817749, -0.5808426737785339], [1.83260178565979, 0.31935185194015503], [0.2477836161851883, -1.5760544538497925], [1.6043659448623657, -1.1172767877578735], [-1.8525712490081787, 0.8826199769973755], [1.1515591144561768, 1.38009774684906], [0.680338978767395, -0.17420856654644012], [-0.5950009226799011, 0.21368901431560516]], "cal": 1.0}, {"seed": 19, "i": 1, "x": -1.5999999999999996, "y": 0.10000000000000187, "sp": [-1.687, 0.08800000000000001], "obj": [-1.9677848815917969, 1.8509492874145508], "P": [[-2.153827428817749, -0.5808426737785339], [1.83260178565979, 0.31935185194015503], [0.2477836161851883, -1.5760544538497925], [1.6043659448623657, -1.1172767877578735], [-1.8525712490081787, 0.8826199769973755], [1.1515591144561768, 1.38009774684906], [0.680338978767395, -0.17420856654644012], [-0.5950009226799011, 0.21368901431560516]], "cal": 1.0}, {"seed": 19, "i": 1, "x": -1.6999999999999995, "y": 0.5000000000000022, "sp": [-1.787, 0.488], "obj": [-1.9677848815917969, 1.8509492874145508], "P": [[-2.153827428817749, -0.5808426737785339], [1.83260178565979, 0.31935185194015503], [0.2477836161851883, -1.5760544538497925], [1.6043659448623657, -1.1172767877578735], [-1.8525712490081787, 0.8826199769973755], [1.1515591144561768, 1.38009774684906], [0.680338978767395, -0.17420856654644012], [-0.5950009226799011, 0.21368901431560516]], "cal": 1.0}, {"seed": 19, "i": 1, "x": -1.7499999999999996, "y": 0.10000000000000187, "sp": [-1.837, 0.08800000000000001], "obj": [-1.9677848815917969, 1.8509492874145508], "P": [[-2.153827428817749, -0.5808426737785339], [1.83260178565979, 0.31935185194015503], [0.2477836161851883, -1.5760544538497925], [1.6043659448623657, -1.1172767877578735], [-1.8525712490081787, 0.8826199769973755], [1.1515591144561768, 1.38009774684906], [0.680338978767395, -0.17420856654644012], [-0.5950009226799011, 0.21368901431560516]], "cal": 1.0}]
+\ No newline at end of file
+diff --git a/pE_data.py b/pE_data.py
+new file mode 100644
+index 0000000..89d3148
+--- /dev/null
++++ b/pE_data.py
+@@ -0,0 +1,25 @@
++from pE_lib import *
++import json,random
++random.seed(0); rows=[]
++for seed in range(0,20):
++    s0=Sim(seed); O=objs(s0); P=pillars(s0)
++    for i in (0,1):
++        th=s0.r(i)['theta']; cands=[]
++        for x in np.arange(0.2,2.3,0.05):
++            for y in np.arange(-2.0,2.2,0.05):
++                X=x if i==0 else -x
++                if min([np.hypot(X-p[0],y-p[1]) for p in P])<0.3: continue
++                sp=(X-0.087*np.cos(th)+0.012*np.sin(th), y-0.087*np.sin(th)-0.012*np.cos(th))
++                d=[np.hypot(o[0]-sp[0],o[1]-sp[1]) for o in O]
++                inr=[k for k in range(len(O)) if d[k]<1.95]
++                if len(inr)!=1 or sum(dd<2.05 for dd in d)!=1: continue
++                k=inr[0]; m=[(segd(p,sp,O[k][:2]),p) for p in P]; mm,pp=min(m)
++                if mm<0.12: cands.append((X,y,k))
++        random.shuffle(cands)
++        for X,y,k in cands[:6]:
++            s=Sim(seed)
++            if not drive(s,i,X,y): continue
++            sp=sense(s,i); act1(s,i,'cal'); c=s.r(i)['calibrated']
++            rows.append(dict(seed=seed,i=i,x=X,y=y,sp=sp,obj=O[k][:2],P=P,cal=c))
++            print(seed,i,round(X,2),round(y,2),k,c,flush=True)
++json.dump(rows,open('pE_data.json','w'))
+diff --git a/pE_fit.py b/pE_fit.py
+new file mode 100644
+index 0000000..cbe11fd
+--- /dev/null
++++ b/pE_fit.py
+@@ -0,0 +1,16 @@
++import json,numpy as np
++r=json.load(open('/sandbox/pE_data.json'))
++def segd(p,a,b):
++    d=b-a; t=np.clip(np.dot(p-a,d)/np.dot(d,d),0,1); return np.linalg.norm(a+t*d-p)
++best=[]
++for ox in np.arange(-0.3,0.31,0.025):
++  for oy in np.arange(-0.3,0.31,0.025):
++    ms=[]
++    for x in r:
++        th=np.pi if x['i']==0 else 0.0
++        c=np.array([x['x'],x['y']]); org=c+np.array([ox*np.cos(th)-oy*np.sin(th), ox*np.sin(th)+oy*np.cos(th)])
++        o=np.array(x['obj']); ms.append(min(segd(np.array(p),org,o) for p in x['P']))
++    ms=np.array(ms); cal=np.array([x['cal'] for x in r])
++    for rad in np.arange(0.03,0.09,0.005):
++        err=np.sum((ms>rad)!=(cal>0.5)); best.append((err,round(ox,3),round(oy,3),round(rad,3)))
++best.sort(); print(best[:15], len(r))
+diff --git a/pE_h.py b/pE_h.py
+new file mode 100644
+index 0000000..f157bbf
+--- /dev/null
++++ b/pE_h.py
+@@ -0,0 +1,4 @@
++from pE_lib import *
++for seed in (6,19,12,8):
++    s=Sim(seed); o=s.obs
++    print(seed,[ (n,[round(float(o.get(o.get_object_from_name(n),f)),3) for f in ['z','half_z']]) for n in sorted(o.get_object_names()) if str(n).startswith('obstacle') or str(n).startswith('objective')][:20])
+diff --git a/pE_lib.py b/pE_lib.py
+new file mode 100644
+index 0000000..56c6a15
+--- /dev/null
++++ b/pE_lib.py
+@@ -0,0 +1,43 @@
++from pB_lib import *
++import numpy as np
++def objs(s):
++    out=[]
++    for k in range(10):
++        try: o=s.obs.get_object_from_name('objective%d'%k)
++        except Exception: break
++        out.append([float(s.obs.get(o,f)) for f in ['x','y','have_image_rover0','have_image_rover1','received_image']])
++    return out
++def pillars(s):
++    P=[]
++    for n in s.obs.get_object_names():
++        if str(n).startswith('obstacle'):
++            o=s.obs.get_object_from_name(n)
++            if abs(float(s.obs.get(o,'half_x'))-0.05)<1e-3: P.append((float(s.obs.get(o,'x')),float(s.obs.get(o,'y'))))
++    return P
++def sense(s,i):
++    c=s.r(i); th=c['theta']; return (c['x']-0.087*np.cos(th)+0.012*np.sin(th), c['y']-0.087*np.sin(th)-0.012*np.cos(th))
++def segd(p,a,b):
++    p,a,b=map(np.array,(p,a,b)); d=b-a; t=np.clip(np.dot(p-a,d)/np.dot(d,d),0,1); return np.linalg.norm(a+t*d-p)
++def info(s,i):
++    sp=sense(s,i); P=pillars(s); res=[]
++    for k,o in enumerate(objs(s)):
++        d=np.hypot(o[0]-sp[0],o[1]-sp[1]); m=min([segd(p,sp,o[:2]) for p in P]+[9])
++        res.append((k,round(d,3),round(m,3),o[2:]))
++    return res
++def drive(s,i,x,y):
++    c=s.r(i)
++    for pts in ([(c['x'],y),(x,y)],[(x,c['y']),(x,y)],[(c['x'],(c['y']+y)/2),((c['x']+x)/2,(c['y']+y)/2),(x,y)]):
++        if gp(s,i,pts): return True
++    return False
++def act1(s,i,sel):
++    a=(0,0,0,sel)
++    if i==0: s.act(a0=a)
++    else: s.act(a1=a)
++def probe(s,i,x,y,verbose=True):
++    ok=drive(s,i,x,y)
++    c=s.r(i); before=objs(s); I=info(s,i)
++    act1(s,i,'cal'); cal=s.r(i)['calibrated']
++    act1(s,i,'img'); after=objs(s)
++    got=[k for k in range(len(before)) if after[k][2+i]!=before[k][2+i]]
++    if verbose: print('rover',i,'reached',ok,(c['x'],c['y']),'cal',cal,'imaged',got,'calafter',s.r(i)['calibrated'],'\n  (k,dist,minpillar,[h0,h1,rec])',I)
++    return cal,got
+diff --git a/pE_rep.py b/pE_rep.py
+new file mode 100644
+index 0000000..822dcd5
+--- /dev/null
++++ b/pE_rep.py
+@@ -0,0 +1,12 @@
++from pE_lib import *
++import json
++r=json.load(open('pE_data.json'))
++def cr(a,b): return a[0]*b[1]-a[1]*b[0]
++n=0
++for x in r:
++    if min(segd(p,x['sp'],x['obj']) for p in x['P'])>0.07: continue
++    res=[]
++    for rep in range(3):
++        s=Sim(x['seed']); drive(s,x['i'],x['x'],x['y']); act1(s,x['i'],'cal'); res.append(s.r(x['i'])['calibrated'])
++    print(x['seed'],x['i'],round(x['x'],2),round(x['y'],2),'orig',x['cal'],'rep',res,flush=True); n+=1
++    if n>14: break
+diff --git a/pE_s4.py b/pE_s4.py
+new file mode 100644
+index 0000000..3f4d3a7
+--- /dev/null
++++ b/pE_s4.py
+@@ -0,0 +1,8 @@
++from pE_lib import *
++for seed,i,x,y in [(4,1,-0.9,0.3),(4,1,-1.0,0.6),(2,1,-1.4,0.4),(6,0,1.2,0.1)]:
++    s=Sim(seed); drive(s,i,x,y); sp=np.array(sense(s,i)); O=objs(s); P=pillars(s)
++    for k,o in enumerate(O):
++        o=np.array(o[:2]); d=o-sp; L=np.linalg.norm(d); u=d/L
++        if L>2: continue
++        pp=[(np.round(p,2).tolist(),round(u[0]*(p[1]-sp[1])-u[1]*(p[0]-sp[0]),3)) for p in P if abs(u[0]*(p[1]-sp[1])-u[1]*(p[0]-sp[0]))<0.1 and 0<(np.array(p)-sp)@u<L]
++        print(seed,i,(x,y),'obj',k,np.round(o,2).tolist(),'L',round(L,2),'u',np.round(u,2).tolist(),pp)
+diff --git a/pE_scan.py b/pE_scan.py
+new file mode 100644
+index 0000000..ec1142b
+--- /dev/null
++++ b/pE_scan.py
+@@ -0,0 +1,7 @@
++from pE_lib import *
++import sys
++seed,i,y,x0,x1,st=eval(sys.argv[1])
++for x in np.arange(x0,x1+1e-9,st):
++    s=Sim(seed)
++    if not drive(s,i,x,y): print(round(x,3),'noreach'); continue
++    I=info(s,i); act1(s,i,'cal'); print(round(x,3),s.r(i)['calibrated'],[(k,d,m) for k,d,m,_ in I if d<2.1],flush=True)
+diff --git a/pE_scan2.py b/pE_scan2.py
+new file mode 100644
+index 0000000..8697d5a
+--- /dev/null
++++ b/pE_scan2.py
+@@ -0,0 +1,14 @@
++from pE_lib import *
++import sys
++seed,i,ys,xw,st,k=eval(sys.argv[1])
++for y in ys:
++    s0=Sim(seed); O=objs(s0); o=np.array(O[k][:2]); P=pillars(s0)
++    blocked=[]
++    for x in np.arange(xw[0],xw[1]+1e-9,st):
++        s=Sim(seed)
++        if not drive(s,i,x,y): continue
++        sp=np.array(sense(s,i)); act1(s,i,'cal')
++        if s.r(i)['calibrated']<0.5:
++            u=(o-sp)/np.linalg.norm(o-sp); perps=[round(u[0]*(p[1]-sp[1])-u[1]*(p[0]-sp[0]),3) for p in P if abs(u[0]*(p[1]-sp[1])-u[1]*(p[0]-sp[0]))<0.15]
++            blocked.append((round(x,3),perps))
++    print('y',y,'blocked',blocked[:1],blocked[-1:],len(blocked),flush=True)
+diff --git a/pE_scan3.py b/pE_scan3.py
+new file mode 100644
+index 0000000..5afedc0
+--- /dev/null
++++ b/pE_scan3.py
+@@ -0,0 +1,12 @@
++from pE_lib import *
++import sys
++seed,i,y,xw,st,k=eval(sys.argv[1])
++s0=Sim(seed); O=objs(s0); o=np.array(O[k][:2]); P=pillars(s0)
++out=[]
++for x in np.arange(xw[0],xw[1]+1e-9,st):
++    s=Sim(seed)
++    if not drive(s,i,x,y): out.append((round(x,3),'NR')); continue
++    sp=np.array(sense(s,i)); I=info(s,i); act1(s,i,'cal')
++    u=(o-sp)/np.linalg.norm(o-sp); perps=[round(u[0]*(p[1]-sp[1])-u[1]*(p[0]-sp[0]),3) for p in P if abs(u[0]*(p[1]-sp[1])-u[1]*(p[0]-sp[0]))<0.2 and (p-sp)@u>0]
++    out.append((round(x,3),int(s.r(i)['calibrated']),perps, [d for kk,d,m,_ in I if d<2.0]))
++for z in out: print(z)
+diff --git a/pE_search.py b/pE_search.py
+new file mode 100644
+index 0000000..824d08a
+--- /dev/null
++++ b/pE_search.py
+@@ -0,0 +1,19 @@
++from pE_lib import *
++import sys
++for seed in range(0,12):
++    s=Sim(seed); O=objs(s); P=pillars(s)
++    for i in (0,1):
++        th=s.r(i)['theta']; A=[];B=[]
++        for x in np.arange(0.3,2.3,0.1):
++            for y in np.arange(-2.0,2.2,0.1):
++                X=x if i==0 else -x
++                if min([np.hypot(X-p[0],y-p[1]) for p in P])<0.3: continue
++                sp=(X-0.087*np.cos(th)+0.012*np.sin(th), y-0.087*np.sin(th)-0.012*np.cos(th))
++                d=[np.hypot(o[0]-sp[0],o[1]-sp[1]) for o in O]
++                m=[min(segd(p,sp,o[:2]) for p in P) for o in O]
++                inr=[k for k in range(len(O)) if d[k]<1.93]; outr=[k for k in range(len(O)) if d[k]>2.07]
++                if len(inr)+len(outr)<len(O): continue
++                if inr and all(m[k]<0.03 for k in inr): A.append((round(X,2),round(y,2),inr))
++                near=int(np.argmin(d))
++                if near in outr and any(m[k]>0.12 for k in inr): B.append((round(X,2),round(y,2),near,inr))
++        print(seed,i,'A',A[:4],'B',B[:3])
+diff --git a/pE_sel.py b/pE_sel.py
+new file mode 100644
+index 0000000..53a9cde
+--- /dev/null
++++ b/pE_sel.py
+@@ -0,0 +1,18 @@
++from pE_lib import *
++for seed in range(0,30):
++    s0=Sim(seed); O=objs(s0); P=pillars(s0)
++    for i in (0,1):
++        th=s0.r(i)['theta']; C=[]
++        for x in np.arange(0.3,2.3,0.1):
++            for y in np.arange(-1.0,1.8,0.1):
++                X=x if i==0 else -x
++                if min([np.hypot(X-p[0],y-p[1]) for p in P])<0.3: continue
++                sp=np.array((X-0.087*np.cos(th), y-0.087*np.sin(th)-0.012*np.cos(th)))
++                d=[np.hypot(o[0]-sp[0],o[1]-sp[1]) for o in O]
++                m=[min(segd(p,sp,o[:2]) for p in P) for o in O]
++                inr=[k for k in range(len(O)) if d[k]<1.9 and m[k]>0.1]
++                if len(inr)>=2 and all(d[k]>2.1 or k in inr for k in range(len(O))):
++                    near=min(inr,key=lambda k:d[k])
++                    C.append((round(X,1),round(y,1),inr,near,round(abs(d[inr[0]]-d[inr[1]]),2)))
++        C=[c for c in C if c[4]>0.15]
++        if C: print(seed,i,len(C),[c for c in C if c[3]!=c[2][0]][:2],[c for c in C if c[3]==c[2][0]][:2])
+diff --git a/pE_sel2.py b/pE_sel2.py
+new file mode 100644
+index 0000000..56fbe5e
+--- /dev/null
++++ b/pE_sel2.py
+@@ -0,0 +1,10 @@
++from pE_lib import *
++import sys
++for seed,i,x,y in eval(sys.argv[1]):
++    s=Sim(seed)
++    if not drive(s,i,x,y): print(seed,i,'noreach'); continue
++    I=info(s,i); seq=[]
++    for rep in range(3):
++        b=objs(s); act1(s,i,'cal'); c=s.r(i)['calibrated']; act1(s,i,'img'); a=objs(s)
++        seq.append((int(c),[k for k in range(len(a)) if a[k][2+i]!=b[k][2+i]]))
++    print(seed,i,(x,y),'dists',[(k,d,m) for k,d,m,_ in I if d<2.1],'seq(cal,imaged)',seq,flush=True)
+diff --git a/pE_sel3.py b/pE_sel3.py
+new file mode 100644
+index 0000000..7960124
+--- /dev/null
++++ b/pE_sel3.py
+@@ -0,0 +1,8 @@
++from pE_lib import *
++s=Sim(12)
++print(objs(s))
++drive(s,0,0.65,0.45); act1(s,0,'cal'); act1(s,0,'img'); print('after r0 img',[o[2:] for o in objs(s)])
++drive(s,1,-0.3,1.1); print(info(s,1))
++act1(s,1,'cal'); act1(s,1,'img'); print('after r1 img',[o[2:] for o in objs(s)])
++act1(s,1,'cal'); act1(s,1,'img'); print('after r1 img2',[o[2:] for o in objs(s)])
++act1(s,1,'cal'); act1(s,1,'img'); print('after r1 img3',[o[2:] for o in objs(s)],'cal',s.r(1)['calibrated'])
+diff --git a/pE_sel4.py b/pE_sel4.py
+new file mode 100644
+index 0000000..78a57a0
+--- /dev/null
++++ b/pE_sel4.py
+@@ -0,0 +1,9 @@
++from pE_lib import *
++s=Sim(12)
++drive(s,0,0.65,0.45); print(info(s,0)); act1(s,0,'cal'); act1(s,0,'img'); print('after r0 img',[o[2:] for o in objs(s)])
++for pos in [(0.65,0.45),(1.0,-1.75),(0.5,-1.0)]:
++    drive(s,0,*pos); act1(s,0,'send'); print('send at',pos,[o[2:] for o in objs(s)],s.r(0))
++    if objs(s)[1][4]>0.5: break
++drive(s,0,0.65,0.45); print(info(s,0))
++act1(s,0,'cal'); act1(s,0,'img'); print('re-img',[o[2:] for o in objs(s)])
++drive(s,1,-0.3,1.1); print(info(s,1)); act1(s,1,'cal'); act1(s,1,'img'); print('r1 img after received',[o[2:] for o in objs(s)])
+diff --git a/pE_t1.py b/pE_t1.py
+new file mode 100644
+index 0000000..7c474be
+--- /dev/null
++++ b/pE_t1.py
+@@ -0,0 +1,2 @@
++from pE_lib import *
++s=Sim(2); probe(s,1,-1.30,0.15)
+diff --git a/pE_t2.py b/pE_t2.py
+new file mode 100644
+index 0000000..bf9c34e
+--- /dev/null
++++ b/pE_t2.py
+@@ -0,0 +1,3 @@
++from pE_lib import *
++for seed,i,x,y in [(2,0,0.7,0.0),(2,0,0.7,0.1),(2,1,-1.4,0.4),(4,1,-0.9,0.3),(4,1,-1.0,0.6),(6,0,1.2,0.1),(6,0,1.6,0.8),(6,1,-1.1,0.5),(6,1,-1.2,0.2),(7,1,-0.8,0.0),(8,1,-1.9,0.0),(9,1,-2.0,0.2),(11,1,-0.4,1.7)]:
++    s=Sim(seed); print('seed',seed); probe(s,i,x,y)

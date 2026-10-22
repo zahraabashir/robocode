@@ -1,0 +1,66 @@
+diff --git a/probe_grasp.py b/probe_grasp.py
+index 0b868ce..eafaf57 100644
+--- a/probe_grasp.py
++++ b/probe_grasp.py
+@@ -112,11 +112,60 @@ def joint_grid(seed=0):
+     env.close()
+ 
+ 
++def triple_grid(seed=0):
++    """Sweep shoulder, elbow, and wrist pitch at target-aligned base y."""
++    env = make_env()
++    state, _ = env.reset(seed=seed)
++    initial = snapshot(state)
++    action = np.zeros(11, dtype=np.float32)
++    action[1] = np.clip(initial["target_block"]["pose_y"], -0.2, 0.2)
++    state, *_ = env.step(action)
++    home = snapshot(state)["robot"]
++    vals2 = [home["joint_2"] + 0.2 * k for k in range(-6, 7)]
++    vals4 = [home["joint_4"] + 0.2 * k for k in range(-6, 7)]
++    vals6 = [home["joint_6"] + 0.2 * k for k in range(-6, 7)]
++    # First walk to the low corner (joint deltas are capped at 0.2).
++    for _ in range(6):
++        action = np.zeros(11, dtype=np.float32)
++        action[[4, 6, 8]] = -0.2
++        action[10] = -1.0
++        state, *_ = env.step(action)
++    for i, wanted2 in enumerate(vals2):
++        order4 = vals4 if i % 2 == 0 else list(reversed(vals4))
++        for j, wanted4 in enumerate(order4):
++            order6 = vals6 if (i + j) % 2 == 0 else list(reversed(vals6))
++            for wanted6 in order6:
++                now = snapshot(state)["robot"]
++                action = np.zeros(11, dtype=np.float32)
++                action[4] = np.clip(wanted2 - now["joint_2"], -0.2, 0.2)
++                action[6] = np.clip(wanted4 - now["joint_4"], -0.2, 0.2)
++                action[8] = np.clip(wanted6 - now["joint_6"], -0.2, 0.2)
++                action[10] = -1.0
++                state, reward, term, trunc, _ = env.step(action)
++                ss = snapshot(state)
++                moved = []
++                for name, old in initial.items():
++                    if "pose_x" not in old:
++                        continue
++                    d = max(abs(ss[name]["pose_" + c] - old["pose_" + c]) for c in "xyz")
++                    if d > 1e-5:
++                        moved.append((name, d, tuple(ss[name]["pose_" + c] for c in "xyz")))
++                if moved or ss["robot"]["grasp_active"]:
++                    print("TRIPLE EVENT", wanted2, wanted4, wanted6,
++                          "moved", moved, "robot", ss["robot"], "done", term, trunc)
++                if ss["robot"]["grasp_active"] or term or trunc:
++                    env.close()
++                    return
++    print("triple grid found no grasp")
++    env.close()
++
++
+ if __name__ == "__main__":
+     import argparse
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--random", action="store_true")
+     parser.add_argument("--grid", action="store_true")
++    parser.add_argument("--triple", action="store_true")
+     parser.add_argument("--seed", type=int, default=0)
+     args = parser.parse_args()
+-    joint_grid(args.seed) if args.grid else (random_search(args.seed) if args.random else main())
++    triple_grid(args.seed) if args.triple else (joint_grid(args.seed) if args.grid else (random_search(args.seed) if args.random else main()))

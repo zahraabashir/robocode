@@ -1,0 +1,43 @@
+diff --git a/approach.py b/approach.py
+index bb2a059..6a538b5 100644
+--- a/approach.py
++++ b/approach.py
+@@ -33,6 +33,8 @@ class GeneratedApproach:
+         self.pair_amount = 0.0
+         self.translate_amount = 0.0
+         self.has_oriented = False
++        self.nav_last_distance = None
++        self.nav_stall = 0
+ 
+     def _local_to_world(self, s, point):
+         return s[0:2] + self._rot(float(s[2])).dot(np.asarray(point, dtype=float))
+@@ -172,6 +174,8 @@ class GeneratedApproach:
+         self.next_mode = next_mode
+         self.force_local = np.asarray(force_local, dtype=float)
+         self.mode = "nav"
++        self.nav_last_distance = None
++        self.nav_stall = 0
+ 
+     def _begin_decision(self, s):
+         raw_angle_error = float(s[31] - s[2])
+@@ -227,6 +231,20 @@ class GeneratedApproach:
+             while self.path and np.linalg.norm(self.path[0] - robot) < 0.028:
+                 self.path.pop(0)
+             if self.path:
++                waypoint_distance = float(np.linalg.norm(self.path[0] - robot))
++                if (self.nav_last_distance is not None and
++                        abs(waypoint_distance - self.nav_last_distance) < 1e-5):
++                    self.nav_stall += 1
++                else:
++                    self.nav_stall = 0
++                self.nav_last_distance = waypoint_distance
++                # Walls and residual contact can make a geometrically exact
++                # waypoint unreachable; accept the closest physical point.
++                if self.nav_stall >= 7:
++                    self.path.pop(0)
++                    self.nav_last_distance = None
++                    self.nav_stall = 0
++                    return np.zeros(2, dtype=float)
+                 return self._action(self.path[0] - robot)
+             self.mode = self.next_mode
+             self.push_start = s.copy()

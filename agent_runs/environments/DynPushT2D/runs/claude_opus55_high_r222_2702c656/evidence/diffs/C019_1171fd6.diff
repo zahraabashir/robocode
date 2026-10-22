@@ -1,0 +1,52 @@
+diff --git a/approach.py b/approach.py
+index 2096509..51188de 100644
+--- a/approach.py
++++ b/approach.py
+@@ -183,6 +183,8 @@ class GeneratedApproach:
+         # rotate if angle error large
+         gm = self.wall_margin_pose(B, g, float(obs[31]))
+         wall_m = min(self.wall_m, max(0.0, gm - 0.08))
++        self.cur_wall_m = wall_m
++        self._dmax = {}
+         if need_rot and (abs(dth) > math.radians(6) or not need_pos or dist < 0.05):
+             best, bs = None, -1e9
+             for pr in prims:
+@@ -260,6 +262,21 @@ class GeneratedApproach:
+                 continue
+             nw = self.push_dir(B, pr, err)
+             s = float(nw @ err)
++            dmax = s
++            if s > 0:
++                m0 = self.wall_margin_pose(B, B.p, B.th)
++                req = min(self.cur_wall_m, m0) - 0.01
++                t = 0.0
++                dmax = 0.0
++                while t < s:
++                    t2 = min(s, t + 0.05)
++                    if self.wall_margin_pose(B, B.p + nw * t2, B.th) < req:
++                        break
++                    t = t2
++                    dmax = t
++                if dmax < s:
++                    s = dmax - 0.02
++            self._dmax[pr[0]] = dmax
+             if k == 'f':
+                 s = s * 0.6 - 0.01
+             cands.append((s, pr))
+@@ -356,6 +373,7 @@ class GeneratedApproach:
+             if res is None:
+                 return np.zeros(2)
+             pr, dth, self.push_goal = res
++            self.push_maxd = self._dmax.get(pr[0], 1e9) if pr is not None and pr[3] != 'r' else 1e9
+             if pr is None:
+                 if self.banned:
+                     self.banned.clear()
+@@ -410,6 +428,8 @@ class GeneratedApproach:
+                 rem = float(nw @ err)
+                 if rem < 0.004:
+                     done = True
++                if self.push_steps > 1 and float((B.p - self.push_start[0]) @ nw) >= self.push_maxd:
++                    done = True
+                 speed = min(MAXS, max(self.tk * rem, 0.002))
+                 # stop to re-evaluate if angle drifts
+                 if abs(dth) > max(math.radians(6), abs(self.push_dth0) + math.radians(4)):

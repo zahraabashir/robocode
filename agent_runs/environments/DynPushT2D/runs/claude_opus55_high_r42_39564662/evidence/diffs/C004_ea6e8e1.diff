@@ -1,0 +1,76 @@
+diff --git a/approach.py b/approach.py
+index b32c32b..a562a4a 100644
+--- a/approach.py
++++ b/approach.py
+@@ -5,7 +5,7 @@ from tmodel import TGeom, sim_step, wrap, corners_world, R_ROBOT
+ AMAX = 0.0499
+ LO, HI = 0.1 + 1e-3, 4.9 - 1e-3
+ POS_TOL, ANG_TOL = 0.03, np.deg2rad(8.0)
+-K_ANG = 0.3
++K_ANG = 0.8
+ 
+ 
+ def cost(bx, by, bt, goal):
+diff --git a/sw_0.8_0_50.txt b/sw_0.8_0_50.txt
+new file mode 100644
+index 0000000..c9358ee
+--- /dev/null
++++ b/sw_0.8_0_50.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 119.58
+diff --git a/sw_0.8_50_100.txt b/sw_0.8_50_100.txt
+new file mode 100644
+index 0000000..cb87cfa
+--- /dev/null
++++ b/sw_0.8_50_100.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 133.06
+diff --git a/sw_1.2_0_50.txt b/sw_1.2_0_50.txt
+new file mode 100644
+index 0000000..3249ac6
+--- /dev/null
++++ b/sw_1.2_0_50.txt
+@@ -0,0 +1 @@
++K 1.2 succ 1.0 meansteps 122.04
+diff --git a/sw_1.2_50_100.txt b/sw_1.2_50_100.txt
+new file mode 100644
+index 0000000..661de90
+--- /dev/null
++++ b/sw_1.2_50_100.txt
+@@ -0,0 +1 @@
++K 1.2 succ 1.0 meansteps 136.34
+diff --git a/sw_1.6_0_50.txt b/sw_1.6_0_50.txt
+new file mode 100644
+index 0000000..4f4eb3f
+--- /dev/null
++++ b/sw_1.6_0_50.txt
+@@ -0,0 +1 @@
++K 1.6 succ 1.0 meansteps 125.12
+diff --git a/sw_1.6_50_100.txt b/sw_1.6_50_100.txt
+new file mode 100644
+index 0000000..d8f41cc
+--- /dev/null
++++ b/sw_1.6_50_100.txt
+@@ -0,0 +1 @@
++K 1.6 succ 1.0 meansteps 140.0
+diff --git a/sweep.py b/sweep.py
+new file mode 100644
+index 0000000..b485eb5
+--- /dev/null
++++ b/sweep.py
+@@ -0,0 +1,15 @@
++import sys, time, numpy as np
++from env_client import make_env
++import approach
++K=float(sys.argv[1]); approach.K_ANG=K
++seeds=[int(x) for x in sys.argv[2].split(',')] if ',' in sys.argv[2] else range(*map(int,sys.argv[2].split(':')))
++env=make_env(); res=[]; steps=[]
++for sd in seeds:
++    obs,info=env.reset(seed=sd); ap=approach.GeneratedApproach(env.action_space,env.observation_space,{}); ap.reset(obs,info)
++    ok=False
++    for t in range(1000):
++        obs,r,term,trunc,info=env.step(ap.get_action(obs))
++        if term: ok=True; break
++    res.append(ok); steps.append(t+1)
++    if not ok: print('fail',sd)
++print('K',K,'succ',np.mean(res),'meansteps',np.mean(steps))

@@ -1,0 +1,38 @@
+diff --git a/probe_dynamics.py b/probe_dynamics.py
+index 8e25f4f..108d0c4 100644
+--- a/probe_dynamics.py
++++ b/probe_dynamics.py
+@@ -5,7 +5,7 @@ e=make_env()
+ for seed in range(3):
+  s,i=e.reset(seed=seed)
+  print('RESET',seed,'max',e.max_steps,'state',s.tolist(),flush=True)
+- for k,a in enumerate(([.05,0],[0,.05],[0,0],[-.05,0],[0,-.05])):
+-  old=s.copy();s,r,t,tr,i=e.step(np.array(a,dtype=np.float32))
++ for k,a in enumerate(([.049,0],[0,.049],[0,0],[-.049,0],[0,-.049])):
++  old=s.copy();s,r,t,tr,i=e.step(np.array(a,dtype=np.float64))
+   print('FREE',seed,k,'robot',s[16:22],'block',s[:6],'robot_delta',s[16:18]-old[16:18],flush=True)
+ e.close()
+diff --git a/test_approach.py b/test_approach.py
+new file mode 100644
+index 0000000..b722425
+--- /dev/null
++++ b/test_approach.py
+@@ -0,0 +1,18 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import numpy as np
++import time
++import sys
++import json
++seeds = [int(x) for x in sys.argv[1:]] or list(range(10))
++for seed in seeds:
++    env=make_env(); s,info=env.reset(seed=seed)
++    policy=GeneratedApproach(env.action_space,env.observation_space,{})
++    policy.reset(s,info); trace=[s.tolist()]; start=time.monotonic()
++    for t in range(env.max_steps):
++        a=policy.get_action(s); s,r,done,trunc,info=env.step(a); trace.append(s.tolist())
++        if done or trunc: break
++    err=s[29:32]-s[:3]; err[2]=(err[2]+np.pi)%(2*np.pi)-np.pi
++    print(seed,'success',done,'steps',t+1,'err',np.round(err,4).tolist(),'time',round(time.monotonic()-start,3),flush=True)
++    with open('trace_%s.json'%seed,'w') as f: json.dump(trace,f)
++    env.close()

@@ -1,0 +1,156 @@
+diff --git a/approach.py b/approach.py
+index 2fec6ed..4ca92f1 100644
+--- a/approach.py
++++ b/approach.py
+@@ -163,6 +163,8 @@ class GeneratedApproach:
+         self.target_name = None
+         self.block_dest = None
+         self.attempts = {}
++        self.carry = None
++        self.stuck_carry = 0
+ 
+     def _grasp_x(self, b, others, rng=None, pref=None):
+         half = self.robot["gh"] / 2.0
+@@ -271,8 +273,8 @@ class GeneratedApproach:
+             lo = hi = center
+         best = None
+         for dx in np.linspace(lo, hi, 25):
+-            glo = max(0.006, X_MIN - dx)
+-            ghi = min(b["w"] - 0.006, X_MAX - dx)
++            glo = max(0.006, X_MIN - dx, X_MIN - b["x"])
++            ghi = min(b["w"] - 0.006, X_MAX - dx, X_MAX - b["x"])
+             if ghi < glo:
+                 continue
+             grel = min(max(b["w"] / 2, glo), ghi)
+@@ -297,6 +299,17 @@ class GeneratedApproach:
+             self.block_dest, self.block_grel = self._choose_block_dest()
+         blockers = [o for o in self.obst.values() if self._column_hit(o)]
+         rx, ry = self.robot["x"], self.robot["y"]
++        if not blockers:
++            bb = self.block
++            others = [b for n, b in movable.items() if n != bb["name"]]
++            rng = (bb["x"] + X_MIN - self.block_dest, bb["x"] + X_MAX - self.block_dest)
++            gxb = self._grasp_x(bb, others, rng=rng, pref=bb["x"] + self.block_grel)
++            if gxb is not None and abs(gxb - bb["x"] - self.block_grel) > 1e-4:
++                grel = gxb - bb["x"]
++                bl2 = [o for o in self.obst.values() if self._column_hit(o, grel=grel)]
++                if bl2:
++                    self.block_grel = grel
++                    blockers = bl2
+         if blockers:
+             tgt = min(blockers, key=lambda b: abs(b["x"] + b["w"] / 2 - rx))
+         else:
+@@ -360,6 +373,29 @@ class GeneratedApproach:
+             segs.append(dict(x=w[0], y=w[1], vac=1, kind="carry"))
+         # release on the final step of the carry
+         segs[-1]["release_last"] = not is_block
++        self.carry = dict(name=tgt["name"], px=px, py=py, release=not is_block,
++                          rel=(tgt["x"] - gx, tgt["y"] - gy))
++        return segs
++
++    def _replan_carry(self):
++        """Replan carry path from current pose if still holding the object."""
++        c = self.carry
++        if c is None or self.robot["vac"] < 0.5:
++            return None
++        movable = self._all_movable()
++        if c["name"] not in movable:
++            return None
++        o = movable[c["name"]]
++        rx, ry = self.robot["x"], self.robot["y"]
++        if abs(o["x"] - rx - c["rel"][0]) > 2e-3 or abs(o["y"] - ry - c["rel"][1]) > 2e-3:
++            return None
++        others = [b for n, b in movable.items() if n != o["name"]]
++        carried = (o["x"] - rx, o["x"] + o["w"] - rx, o["y"] - ry, o["y"] + o["h"] - ry)
++        p = self._plan_path((rx, ry), (c["px"], c["py"]), others, carried)
++        segs = [dict(x=w[0], y=w[1], vac=1, kind="carry") for w in p[1:]]
++        if not segs:
++            return None
++        segs[-1]["release_last"] = c["release"]
+         return segs
+ 
+     # ---------------------------------------------------------------- control
+@@ -399,6 +435,13 @@ class GeneratedApproach:
+             # stuck: nudge up and replan
+             self.stall = 0
+             self.plan = []
++            if wp["kind"] == "carry":
++                self.stuck_carry += 1
++                if self.stuck_carry <= 4:
++                    segs = self._replan_carry()
++                    if segs:
++                        self.plan = [dict(x=r["x"], y=min(Y_MAX, r["y"] + 0.02), vac=1,
++                                          kind="carry")] + segs
+             if wp["kind"] == "carry" and wp is not None:
+                 return self._act(0, 0.02, 0, 1 if r["vac"] > 0.5 else 0, dth)
+             return self._act(0, 0.02, 0, 0, dth)
+diff --git a/dbg4.py b/dbg4.py
+new file mode 100644
+index 0000000..94b8c0c
+--- /dev/null
++++ b/dbg4.py
+@@ -0,0 +1,17 @@
++import sys
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++seed, count, T = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
++env = make_env()
++obs, info = env.reset(seed=seed, options={'object_count': count})
++ap = GeneratedApproach(env.action_space, env.observation_space, {})
++ap.reset(obs, info)
++for t in range(T):
++    a = ap.get_action(obs)
++    obs, r, term, trunc, info = env.step(a)
++ap._parse(obs)
++print('robot', {k:round(v,3) for k,v in ap.robot.items()})
++print('dest', ap.block_dest, ap.block_grel, 'surface', ap.surface)
++for n,b in ap._all_movable().items(): print(n, {k:round(v,3) for k,v in b.items() if k!='name'}, 'hit', ap._column_hit(b))
++print(ap.plan)
+diff --git a/run_many.sh b/run_many.sh
+new file mode 100755
+index 0000000..6f5ae4a
+--- /dev/null
++++ b/run_many.sh
+@@ -0,0 +1,8 @@
++#!/bin/bash
++# usage: run_many.sh count start end nproc
++c=$1; s=$2; e=$3; p=$4
++step=$(( (e - s + p - 1) / p ))
++for ((i=s; i<e; i+=step)); do
++  j=$((i+step)); [ $j -gt $e ] && j=$e
++  timeout 1500 /opt/robocode-strict/bin/python test_approach.py $i $j $c 2>&1 | grep -E "FAIL|success|Error" &
++done; wait
+diff --git a/test_approach.py b/test_approach.py
+index 17ddc6a..d5cbcbc 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -3,6 +3,7 @@ import numpy as np
+ from env_client import make_env
+ from approach import GeneratedApproach
+ TMAX=0
++AT=[0]
+ def run(seed, count=None, verbose=False):
+     env = make_env()
+     kw = {}
+@@ -12,11 +13,12 @@ def run(seed, count=None, verbose=False):
+     ap.reset(obs, info)
+     n_obj = info.get('object_count')
+     global TMAX
++    AT[0]=0
+     t0=time.time()
+     for t in range(env.max_steps):
+-        a = ap.get_action(obs)
++        tt=time.time(); a = ap.get_action(obs); AT[0]+=time.time()-tt
+         obs, r, term, trunc, info = env.step(a)
+-        if term: env.close(); TMAX=max(TMAX, time.time()-t0); return True, t+1, n_obj
++        if term: env.close(); TMAX=max(TMAX, AT[0]); return True, t+1, n_obj
+         if trunc: break
+     env.close(); return False, env.max_steps, n_obj
+ if __name__ == '__main__':
+@@ -27,4 +29,4 @@ if __name__ == '__main__':
+         succ, n, c = run(s, count)
+         ok += succ; steps.append(n)
+         if not succ: print('FAIL seed', s, 'count', c)
+-    print(f'success {ok}/{s1-s0}, mean steps {np.mean(steps):.1f} max ep time {TMAX:.1f}s')
++    print(f'success {ok}/{s1-s0}, mean steps {np.mean(steps):.1f} max approach time {TMAX:.1f}s')

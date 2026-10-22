@@ -1,0 +1,54 @@
+diff --git a/approach.py b/approach.py
+index cdfd7e2..ebecc8b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -254,6 +254,7 @@ class GeneratedApproach:
+         self.targets = {rn: None for rn in self.rnames}
+         self.last_pos = {}
+         self._bw_cache = {}
++        self._pred = {}
+         self.bad_points = []
+         self.cmd = {}
+         self.step_count = 0
+@@ -615,7 +616,19 @@ class GeneratedApproach:
+             cx = S.CX[S.fi, S.fj]
+             cy = S.CY[S.fi, S.fj]
+             lx, ly = self.lander
+-            blk = _seg_circle_hit(cx, cy, lx, ly, other_xy[0], other_xy[1], ROVER_BLOCK_R + 0.03)
++            traj = self._pred.get(self.other[rn]) or [other_xy]
++            dcur = S.dist_from_node(cur)
++            karr = np.ceil(dcur / CELLS_PER_STEP)
++            blk = np.zeros(S.N, dtype=bool)
++            for kk in range(len(traj)):
++                sel = (karr == kk) if kk < len(traj) - 1 else (karr >= kk)
++                if kk == 0:
++                    sel = karr <= 0
++                if not sel.any():
++                    continue
++                px_, py_ = traj[kk]
++                blk[sel] = _seg_circle_hit(cx[sel], cy[sel], lx, ly, px_, py_,
++                                           ROVER_BLOCK_R + 0.03)
+             m2 = m & ~blk
+             if m2.any():
+                 m = m2
+@@ -643,6 +656,20 @@ class GeneratedApproach:
+                       g(self.rover_objs[rn], "theta")) for rn in self.rnames}
+         nexts = {}
+         tasks = {}
++        self._pred = {}
++        for rn in self.rnames:
++            x, y, _ = poses[rn]
++            tr = [(x, y)]
++            t = self.targets.get(rn)
++            if t is not None and t[1] is not None:
++                px, py = x, y
++                for _ in range(25):
++                    q = self._next_pos(rn, px, py, t[1])
++                    if abs(q[0] - px) < 1e-6 and abs(q[1] - py) < 1e-6:
++                        break
++                    px, py = q
++                    tr.append(q)
++            self._pred[rn] = tr
+         for rn in self.rnames:
+             x, y, th = poses[rn]
+             S = self.sides[rn]

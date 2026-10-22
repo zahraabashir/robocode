@@ -1,0 +1,39 @@
+diff --git a/candidate_strategy.py b/candidate_strategy.py
+index ba2bb5c..b32a766 100644
+--- a/candidate_strategy.py
++++ b/candidate_strategy.py
+@@ -61,7 +61,7 @@ class CandidateStrategy:
+             force = self._unit(np.asarray(s[29:31]) - c)
+             # Contact somewhere on the rear-facing support surface.
+             contact = c - force * 0.52
+-            setup = c - force * 0.83
++            setup = c - force * 0.64
+         else:
+             th = float(s[2])
+             ex = np.array([math.cos(th), math.sin(th)])
+@@ -81,7 +81,7 @@ class CandidateStrategy:
+ 
+         # Use a collision-free polar repositioning maneuver around the object.
+         ray = self._unit(setup - c)
+-        radius = 0.88
++        radius = 0.70
+         rvec = robot - c
+         rdist = float(np.linalg.norm(rvec))
+         rang = math.atan2(rvec[1], rvec[0])
+@@ -104,6 +104,7 @@ class CandidateStrategy:
+                 # A look-ahead point gives smooth travel around the clearance circle.
+                 stepang = rang + max(-0.35, min(0.35, adiff))
+                 waypoint = c + radius * np.array([math.cos(stepang), math.sin(stepang)])
++                waypoint = np.clip(waypoint, 0.12, 4.88)
+                 return self._move(robot, waypoint)
+ 
+         if self.phase == "approach":
+@@ -116,7 +117,7 @@ class CandidateStrategy:
+         if self.phase == "push":
+             ae = wrap_angle(float(s[31] - s[2]))
+             pe = float(np.linalg.norm(s[29:31] - c))
+-            done = ((self.mode == "rotate" and (abs(ae) < 0.065 or self.ticks > 55)) or
++            done = ((self.mode == "rotate" and (abs(ae) < 0.065 or self.ticks > 7)) or
+                     (self.mode == "translate" and (pe < 0.020 or abs(ae) > 0.16 or self.ticks > 90)))
+             if done:
+                 self.phase = "select"

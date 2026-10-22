@@ -1,0 +1,43 @@
+diff --git a/approach.py b/approach.py
+index 0d277ab..9bb4685 100644
+--- a/approach.py
++++ b/approach.py
+@@ -73,7 +73,10 @@ class GeneratedApproach:
+         self.last_pose = None
+         self.margin = (0.012, 0.03, 0.07)
+ 
+-    ANG_W = 0.6
++    ANG_W = 2.2
++    ANGS = (-35, -18, 0, 18, 35)
++    STANDOFF = 0.04
++    FRIC = 0.85
+ 
+     # ---------------- helpers ----------------
+     def err(self, ref, th, goal):
+@@ -196,7 +199,7 @@ class GeneratedApproach:
+         robot = s[16:18].copy()
+         E0 = float(self.err(pose[0:2], pose[2], goal))
+ 
+-        angs = np.deg2rad([-35, -18, 0, 18, 35])
++        angs = np.deg2rad(list(self.ANGS))
+         Q = np.repeat(g.cq, len(angs), 0)
+         Nn = np.repeat(g.cn, len(angs), 0)
+         A = np.tile(angs, len(g.cq))
+@@ -223,7 +226,7 @@ class GeneratedApproach:
+         nsteps = 150
+         best = (-np.inf, None)
+         # travel cost to each candidate start
+-        standoff = 0.04
++        standoff = self.STANDOFF
+         pre = pose[0:2] + pb_body @ R0.T - uw * standoff
+         travel = np.full(K, np.inf)
+         paths = [None] * K
+@@ -276,7 +279,7 @@ class GeneratedApproach:
+             f1 = (-a12 * db[:, 0] + a11 * db[:, 1]) / det
+             fn = -(f0 * Nn[:, 0] + f1 * Nn[:, 1])
+             ft = f0 * tb[:, 0] + f1 * tb[:, 1]
+-            valid &= (fn > 0) & (np.abs(ft) <= 0.85 * fn)
++            valid &= (fn > 0) & (np.abs(ft) <= self.FRIC * fn)
+             om = (r[:, 0] * f1 - r[:, 1] * f0) / c2
+             com = com + np.stack([c * f0 - sn * f1, sn * f0 + c * f1], 1)
+             th = th + om

@@ -1,0 +1,31 @@
+diff --git a/probe_rotation_agent.py b/probe_rotation_agent.py
+index 702b8af..9e2024d 100644
+--- a/probe_rotation_agent.py
++++ b/probe_rotation_agent.py
+@@ -26,7 +26,7 @@ def move_to(env, s, target, nmax=200):
+         d = np.asarray(target) - s[[16, 17]]
+         if np.linalg.norm(d) < 0.012:
+             break
+-        a = np.clip(d, -0.05, 0.05).astype(np.float32)
++        a = np.clip(d, -0.049, 0.049).astype(np.float32)
+         s, _, done, trunc, _ = env.step(a)
+         if done or trunc:
+             break
+@@ -42,7 +42,7 @@ def horizontal_scan(seed, yoff):
+     s = move_to(env, s, [bx - 1.2, safe_y])
+     first = None
+     for k in range(38):
+-        s, _, done, trunc, _ = env.step(np.array([0.05, 0.0], dtype=np.float32))
++        s, _, done, trunc, _ = env.step(np.array([0.049, 0.0], dtype=np.float32))
+         delta = np.linalg.norm(s[:2] - p0[:2])
+         if first is None and (delta > 1e-4 or abs(wrap(float(s[2]-p0[2]))) > 1e-4):
+             first = (k, float(s[16]), float(s[17]))
+@@ -59,7 +59,7 @@ def vertical_scan(seed, xoff):
+     s = move_to(env, s, [bx + xoff, by - 1.2])
+     first = None
+     for k in range(38):
+-        s, _, done, trunc, _ = env.step(np.array([0.0, 0.05], dtype=np.float32))
++        s, _, done, trunc, _ = env.step(np.array([0.0, 0.049], dtype=np.float32))
+         delta = np.linalg.norm(s[:2] - p0[:2])
+         if first is None and (delta > 1e-4 or abs(wrap(float(s[2]-p0[2]))) > 1e-4):
+             first = (k, float(s[16]), float(s[17]))

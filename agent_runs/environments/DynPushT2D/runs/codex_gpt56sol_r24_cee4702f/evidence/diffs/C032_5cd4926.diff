@@ -1,0 +1,17 @@
+diff --git a/approach.py b/approach.py
+index 6b011b7..2311190 100644
+--- a/approach.py
++++ b/approach.py
+@@ -165,9 +165,10 @@ class GeneratedApproach:
+                 current_ae = self._angle(goal_theta - theta)
+                 turned = abs(self._angle(theta - self.start_pose[2]))
+                 if (current_ae * self.turn_sign < 0.0 or abs(current_ae) < 0.055
+-                        or turned > 0.12 or self.count >= 8):
++                        or turned > 0.18 or self.count >= 9):
+                     self.mode = "rot_retreat"
+-                return self._safe(force, 0.016)
++                speed = 0.014 if min(obj) < 0.8 or max(obj) > 4.2 else 0.022
++                return self._safe(force, speed)
+             if np.linalg.norm(robot - far) < 0.04:
+                 self.mode = "choose"
+             return self._safe(far - robot, 0.035)

@@ -1,0 +1,15 @@
+diff --git a/approach.py b/approach.py
+index 0a82704..e11fdac 100644
+--- a/approach.py
++++ b/approach.py
+@@ -172,8 +172,9 @@ class GeneratedApproach:
+                 for sa in sas:
+                     x, y = o.p[:2] + sd * d + sa * a
+                     blockers = []
++                    boxes = self._finger_boxes(x, y, yaw) + [(np.array([x, y]), d, a, 0.043, 0.011)]
+                     for n, b in near:
+-                        for box in self._finger_boxes(x, y, yaw):
++                        for box in boxes:
+                             if self._box_hits_obj(box, b):
+                                 blockers.append(n)
+                                 break

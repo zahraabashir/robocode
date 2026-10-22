@@ -1,0 +1,594 @@
+[
+  {
+    "id": "C001",
+    "commit": "5eb2325b23296eedbfdb58ffaeb5f963c08b5f48",
+    "parents": [],
+    "date": "2026-09-21T13:17:17-04:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".gitignore",
+      "AGENTS.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_5eb2325.diff",
+    "diff_sha256": "9f3e70e7a4f9aa8b1895ff67dd046de4a35724320b6b60dd8f0081293c686b46",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "7553b0a83cdd8b3c2910f304522fcd648dd60faa",
+    "parents": [
+      "5eb2325b23296eedbfdb58ffaeb5f963c08b5f48"
+    ],
+    "date": "2026-09-21T17:18:10Z",
+    "title": "Add initial object-centric policy scaffold for grasp experiments",
+    "files": [
+      "approach.py",
+      "probe_dynamics.py",
+      "probe_layouts.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C002_7553b0a.diff",
+    "diff_sha256": "aa4d924ec516fec9ca89fd88bb1a02fd9a56a1690c87631c5d49912458b38c1b",
+    "events": [
+      {
+        "event": "E0014",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "581bcfc496ad14850677ef43aea0a6d2e81f9c27fc25f2e8f6f544dec11365be",
+    "version": "evidence/versions/C002_7553b0a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "a695a4f577789019891b6d4b97757662a1219bf5",
+    "parents": [
+      "7553b0a83cdd8b3c2910f304522fcd648dd60faa"
+    ],
+    "date": "2026-09-21T17:20:35Z",
+    "title": "Implement top-grasp transport and clear destination obstructions into free space",
+    "files": [
+      "approach.py",
+      "probe_dynamics.py",
+      "probe_edges.py",
+      "probe_limits.py",
+      "probe_release.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C003_a695a4f.diff",
+    "diff_sha256": "e05ca79094151466585edbb68886eeb452dc2e48771e756ab48b32ab7f6eae7a",
+    "events": [
+      {
+        "event": "E0025",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1c5df040aaa61afafbef94f3a4d3ae3fd8508816d642e08031fe671690ed0650",
+    "version": "evidence/versions/C003_a695a4f_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C004",
+    "commit": "327ced2e64eb5bc6485e9474c9c502c7c4b3a7f4",
+    "parents": [
+      "a695a4f577789019891b6d4b97757662a1219bf5"
+    ],
+    "date": "2026-09-21T17:21:32Z",
+    "title": "Detect early vacuum attachment and keep transport base within workspace",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C004_327ced2.diff",
+    "diff_sha256": "c04628e3bd6b22c7a4bddfa6847d78ffebbaa392575580df31de4e492368b73e",
+    "events": [
+      {
+        "event": "E0027",
+        "evidence": "commit title in command; output may not confirm creation"
+      },
+      {
+        "event": "E0032",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6a27a83e303d0dc4463e93691eaa2e62b9fb907d57911af1e3fa2c87a9518e37",
+    "version": "evidence/versions/C004_327ced2_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "ab62469ecce03eeee0f7ececba4deeb569f06baf",
+    "parents": [
+      "327ced2e64eb5bc6485e9474c9c502c7c4b3a7f4"
+    ],
+    "date": "2026-09-21T17:24:59Z",
+    "title": "Plan grasp offsets and clearing tasks with gripper and base collision clearance",
+    "files": [
+      "approach.py",
+      "probe_failure239.py",
+      "probe_validation_60_259.jsonl",
+      "results.jsonl",
+      "rewrite_policy.py",
+      "test_counts_scene.jsonl",
+      "test_counts_scene.log",
+      "test_counts_scene.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C005_ab62469.diff",
+    "diff_sha256": "5258a6c600979a7d1a67add04bc7270b6395be146e17a7668470f8acbc1b719d",
+    "events": [
+      {
+        "event": "E0050",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "13245c7011c02f1d4089e03b0d7c769012e356faf99befc1333ba51d8f6bc247",
+    "version": "evidence/versions/C005_ab62469_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C006",
+    "commit": "41ec7aaba58f7c4e90a7656565f0ab9ccf715908",
+    "parents": [
+      "ab62469ecce03eeee0f7ececba4deeb569f06baf"
+    ],
+    "date": "2026-09-21T17:27:01Z",
+    "title": "Reserve target pickup clearance when parking removed obstructions",
+    "files": [
+      "approach.py",
+      "probe_validation_239_260_459.jsonl",
+      "results_geometry.jsonl",
+      "test_counts_scene.jsonl",
+      "test_counts_scene.log",
+      "test_counts_scene.py",
+      "test_counts_scene_v2.jsonl",
+      "test_counts_scene_v2.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C006_41ec7aa.diff",
+    "diff_sha256": "43690f23611e1f32caa96552f25d4a259b7d87f81ad66819d6e8bae8be7931fd",
+    "events": [
+      {
+        "event": "E0052",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "9f3a3e10c301bce608e3f32bd1e564842cc5950ac575cfcccdb83998f459faeb",
+    "version": "evidence/versions/C006_41ec7aa_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "56e8c6c08294a6ecee4669861d506320de347c66",
+    "parents": [
+      "41ec7aaba58f7c4e90a7656565f0ab9ccf715908"
+    ],
+    "date": "2026-09-21T17:27:41Z",
+    "title": "Reduce transport height from observed obstacle clearance and combine safe approach motion",
+    "files": [
+      "approach.py",
+      "probe_failure319.log",
+      "probe_failure319.py",
+      "probe_validation_239_260_459.jsonl",
+      "test_counts_scene_v2.jsonl",
+      "test_counts_scene_v2.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C007_56e8c6c.diff",
+    "diff_sha256": "9a29267dad3cf0de93d9abcde4a36f147eb3877660753b5a1a31544b9e6c177e",
+    "events": [
+      {
+        "event": "E0056",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a8c75997905a04296e2f18fd03a2a1fbf7ba148be1a47b2d734c6b8a5b021b0a",
+    "version": "evidence/versions/C007_56e8c6c_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C008",
+    "commit": "2c8ccf93c784b3875bf5bc5d75e02b55e5cc28a0",
+    "parents": [
+      "56e8c6c08294a6ecee4669861d506320de347c66"
+    ],
+    "date": "2026-09-21T17:28:10Z",
+    "title": "Keep vacuum grasp proximity clear to prevent attaching two neighboring blocks",
+    "files": [
+      "approach.py",
+      "probe_recheck319.jsonl",
+      "probe_validation_239_260_459.jsonl",
+      "results_fast.jsonl"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C008_2c8ccf9.diff",
+    "diff_sha256": "3e892d51be7d4b08474867402f1eff95422b1466b2200f426a124a753b7606b0",
+    "events": [
+      {
+        "event": "E0055",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "df5468c64bceadb121fdf96a5e4e29ea76a9f14eef68e98b82410dbe16133c05",
+    "version": "evidence/versions/C008_2c8ccf9_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C009",
+    "commit": "4942e85ec3e5c6faa35a66cd13cd62b220ff5373",
+    "parents": [
+      "2c8ccf93c784b3875bf5bc5d75e02b55e5cc28a0"
+    ],
+    "date": "2026-09-21T17:28:39Z",
+    "title": "Distinguish existing close-packed pickup geometry from placement clearance",
+    "files": [
+      "approach.py",
+      "probe319_fix.py",
+      "results_fast.jsonl"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C009_4942e85.diff",
+    "diff_sha256": "bc95e3d83833556e1e82128df1c71f488f51bf39402050b6c93e89c51909bade",
+    "events": [
+      {
+        "event": "E0059",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "bccc72cb1d2544d6da03c4636b5a7ec8db51a821e7c94a976a50322082e5595e",
+    "version": "evidence/versions/C009_4942e85_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C010",
+    "commit": "ca0e8ec24a2bdf8ac40eb8d6f3d0e75bb6fde39d",
+    "parents": [
+      "4942e85ec3e5c6faa35a66cd13cd62b220ff5373"
+    ],
+    "date": "2026-09-21T17:29:27Z",
+    "title": "Add reproducible count-controlled validation with policy runtime measurement",
+    "files": [
+      "probe_final_0_499.jsonl",
+      "test_counts_scene.py",
+      "test_counts_scene_v3.jsonl",
+      "test_counts_scene_v3.log",
+      "validate.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C010_ca0e8ec.diff",
+    "diff_sha256": "d7848ba042bf9bbd330284c3d070918ca165855741e22de57c9c539746bbe4af",
+    "events": [
+      {
+        "event": "E0077",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C011",
+    "commit": "4ef204b1169e79429247b7774e33bece8740190e",
+    "parents": [
+      "ca0e8ec24a2bdf8ac40eb8d6f3d0e75bb6fde39d"
+    ],
+    "date": "2026-09-21T17:30:52Z",
+    "title": "Add stress probe for fixed-grasp workspace reachability",
+    "files": [
+      "probe_final_0_499.jsonl",
+      "probe_reachability.py",
+      "test_counts_scene_v3.jsonl",
+      "test_counts_scene_v3.log",
+      "validate_count3.jsonl"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C011_4ef204b.diff",
+    "diff_sha256": "9395b67a8f1fe43f9cd172c5ee437291a3904f6e5995347c25af94b43acc6fd5",
+    "events": [
+      {
+        "event": "E0086",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C012",
+    "commit": "e8ce3b889ab7f28c968f9f5f00117b5b19934db1",
+    "parents": [
+      "4ef204b1169e79429247b7774e33bece8740190e"
+    ],
+    "date": "2026-09-21T17:33:17Z",
+    "title": "Clear neighboring grasp dependencies even when the obstructing block is shorter",
+    "files": [
+      "approach.py",
+      "probe_final_0_499.jsonl",
+      "reachability.jsonl",
+      "test_counts_scene_v3.jsonl",
+      "test_counts_scene_v3.log",
+      "validate_count3.jsonl"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C012_e8ce3b8.diff",
+    "diff_sha256": "7ed316f898be8d7ef5b49d22382986fd750e61c8c74ea58db0fe37bef1cc583c",
+    "events": [
+      {
+        "event": "E0081",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "294449e5b3c8fd7689c629932693d3e4c2705cee7de785ae0b7d10bc01522dd4",
+    "version": "evidence/versions/C012_e8ce3b8_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C013",
+    "commit": "ffca88e4b374cf20096b79c277d3c5907a3cab00",
+    "parents": [
+      "e8ce3b889ab7f28c968f9f5f00117b5b19934db1"
+    ],
+    "date": "2026-09-21T17:37:19Z",
+    "title": "Protect the full target lift column and clear overhead grasp obstructions",
+    "files": [
+      "approach.py",
+      "probe_final_0_499.jsonl",
+      "probe_grasp_offsets.py",
+      "probe_grasp_offsets_fine.py",
+      "probe_reach_edges.json",
+      "probe_reach_edges.py",
+      "reachability.jsonl",
+      "test_counts_scene_v3.jsonl",
+      "test_counts_scene_v3.log",
+      "validate_count4_later.jsonl"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C013_ffca88e.diff",
+    "diff_sha256": "962dc7e9a0d9f51454d846ace267cee7a3f84452eb56dee9b69ebdbd9e4595cd",
+    "events": [
+      {
+        "event": "E0091",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "eb856011f5fafa2ee913a1f6ee85b7edc5fedf18c5d7ab72c805459b38b607e0",
+    "version": "evidence/versions/C013_ffca88e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C014",
+    "commit": "04cf477a35413b414056a4e756cd7a9b029a1df1",
+    "parents": [
+      "ffca88e4b374cf20096b79c277d3c5907a3cab00"
+    ],
+    "date": "2026-09-21T17:42:52Z",
+    "title": "Use empirically verified edge grasps with one millimeter gripper overlap",
+    "files": [
+      "approach.py",
+      "final_count3.jsonl",
+      "final_count4.jsonl",
+      "final_count4.log",
+      "final_defaults.jsonl",
+      "probe_reach_edges.json",
+      "test_counts_scene_v3.jsonl",
+      "test_counts_scene_v3.log",
+      "validate_count4_later.jsonl"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C014_04cf477.diff",
+    "diff_sha256": "bab15676e6e7c788224cce984e72007e046889c9d022891a32e14ad1f2959143",
+    "events": [
+      {
+        "event": "E0119",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "b18b06785dae1434cf2711f79fdd488d69c6f24661955b0dc414f41953615676",
+    "version": "evidence/versions/C014_04cf477_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C015",
+    "commit": "64aee982b0d765fcdfeca16866ce03112f61e524",
+    "parents": [
+      "04cf477a35413b414056a4e756cd7a9b029a1df1"
+    ],
+    "date": "2026-09-21T17:43:28Z",
+    "title": "Use extreme edge grasps only when ordinary grasp offsets cannot reach",
+    "files": [
+      "approach.py",
+      "final_count4.jsonl",
+      "final_defaults.jsonl"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C015_64aee98.diff",
+    "diff_sha256": "beaf33b266716bd09370779ec6a823f2387253403af3e358e6b3d717f0d566ba",
+    "events": [
+      {
+        "event": "E0121",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "698917f00434a9536af30a0cadce3a26435a3188b4e31ce9526d879bdd5d0451",
+    "version": "evidence/versions/C015_64aee98_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C016",
+    "commit": "29518eb3545b9c0f7b352d23c86da968224cd617",
+    "parents": [
+      "64aee982b0d765fcdfeca16866ce03112f61e524"
+    ],
+    "date": "2026-09-21T17:45:49Z",
+    "title": "Record final regression evidence and add extreme workspace-edge search",
+    "files": [
+      "final_count4.jsonl",
+      "final_edge_regression.jsonl",
+      "probe_count3_edges.json",
+      "probe_count3_edges.py",
+      "scan_edge_cases.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C016_29518eb.diff",
+    "diff_sha256": "d013b0fadc9ec8301f3fe0ff80d1a98ab162dbb5a6908c8a641e649bc23667e1",
+    "events": [
+      {
+        "event": "E0128",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C017",
+    "commit": "71ac23558ec105e23f8d9346938d625af3325b3b",
+    "parents": [
+      "29518eb3545b9c0f7b352d23c86da968224cd617"
+    ],
+    "date": "2026-09-21T17:47:46Z",
+    "title": "Add tested tilted-gripper recovery for unreachable wall-side grasp configurations",
+    "files": [
+      "approach.py",
+      "probe_angled_grasp.py",
+      "probe_angled_grasp_heights.py",
+      "scan_edge_cases.jsonl"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C017_71ac235.diff",
+    "diff_sha256": "33665be0d56034fb66acf69dacff5f79cb6aa2f84a44facd215c0d60501de332",
+    "events": [
+      {
+        "event": "E0130",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "c7c9db30a99eb3764bb063ed6b03030573cfa8e0d5623c189cac5c65e31afb38",
+    "version": "evidence/versions/C017_71ac235_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C018",
+    "commit": "93f861c63ca0004f84e50cf03b352c7bd077c2d1",
+    "parents": [
+      "71ac23558ec105e23f8d9346938d625af3325b3b"
+    ],
+    "date": "2026-09-21T17:49:45Z",
+    "title": "Add reproducible forced edge-recovery regression tests",
+    "files": [
+      "final_smoke_count3.jsonl",
+      "final_smoke_count4.jsonl",
+      "final_smoke_defaults.jsonl",
+      "test_edge_recovery.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C018_93f861c.diff",
+    "diff_sha256": "032a4acc1bfd3e4f2095ef7fe2bb21d7e64e3439c6ca8caf12d0458ddc7e94dc",
+    "events": [
+      {
+        "event": "E0146",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C019",
+    "commit": "3b0289191de493678a1a4daa43dfa65bc0784e45",
+    "parents": [
+      "93f861c63ca0004f84e50cf03b352c7bd077c2d1"
+    ],
+    "date": "2026-09-21T17:50:20Z",
+    "title": "Document validation evidence and preserve the final tested policy",
+    "files": [
+      "VALIDATION.md",
+      "final_forced_edges.jsonl",
+      "validation_summary.json"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C019_3b02891.diff",
+    "diff_sha256": "a09ba1aa3cd8dde8047bcbda7ddf6687a8d2ca36f24ee70a39f456af6a6fc6ca",
+    "events": [
+      {
+        "event": "E0148",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {}
+  }
+]

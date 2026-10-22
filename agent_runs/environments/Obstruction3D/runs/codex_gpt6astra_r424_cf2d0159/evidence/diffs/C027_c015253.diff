@@ -1,0 +1,59 @@
+diff --git a/probe_calibrated.py b/probe_calibrated.py
+new file mode 100644
+index 0000000..ff8d441
+--- /dev/null
++++ b/probe_calibrated.py
+@@ -0,0 +1,23 @@
++from env_client import make_env
++from kinematics_fit import fk
++from scipy.optimize import least_squares
++import numpy as np
++q0=np.array([0,-.35,-np.pi,-2.5,0,-.87,np.pi/2])
++def solve(x,z,guess):
++ def fun(v):
++  q=q0.copy();q[[1,3,5]]=v;p,r=fk(q);return np.r_[5*(p[[0,2]]-[x,z]),r[:,2]-[0,0,-1]]
++ v=least_squares(fun,guess[[1,3,5]],max_nfev=100).x;q=q0.copy();q[[1,3,5]]=v;return q
++qs=[];q=q0
++for z in np.arange(.4,.089,-.005):q=solve(.55,z,q);qs.append(q)
++e=make_env()
++for dy in [0]:
++ for dx in [0]:
++  s,_=e.reset(seed=0,options={'object_count':0});o=s.get_object_from_name('target_block');bx=s.get(o,'pose_x')-.55+dx;by=s.get(o,'pose_y')-.001+dy;ro=s.get_object_from_name('robot')
++  for stage,q in enumerate(qs):
++   for t in range(60 if stage==0 else 4):
++    cur=np.array([s.get(ro,'joint_'+str(j)) for j in range(1,8)]);a=np.zeros(11);a[:2]=np.clip([bx-s.get(ro,'pos_base_x'),by-s.get(ro,'pos_base_y')],-.1,.1);a[3:10]=np.clip(q-cur,-.02,.02);a[-1]=-1
++    s,r,term,tr,i=e.step(a)
++    if s.get(ro,'grasp_active'):
++     print('SUCCESS',dx,dy,stage,{f:s.get(ro,f) for f in s.type_features[ro.type]},flush=True);e.close();quit()
++  cur=np.array([s.get(ro,'joint_'+str(j)) for j in range(1,8)]);print('FAIL',dx,dy,'FK',fk(cur)[0],flush=True)
++e.close()
+diff --git a/probe_lift_place.log b/probe_lift_place.log
+new file mode 100644
+index 0000000..2135574
+--- /dev/null
++++ b/probe_lift_place.log
+@@ -0,0 +1,24 @@
++LIFT 0 [0.19834743440151215, -0.3352738916873932, 0.11396364867687225]
++LIFT 1 [0.20720134675502777, -0.33527398109436035, 0.12833887338638306]
++LIFT 2 [0.2156113237142563, -0.3352741003036499, 0.14311116933822632]
++LIFT 3 [0.22356072068214417, -0.33527421951293945, 0.15826508402824402]
++LIFT 4 [0.23103345930576324, -0.3352743685245514, 0.1737847477197647]
++LIFT 5 [0.2380140870809555, -0.33527448773384094, 0.1896534264087677]
++LIFT 6 [0.24448776245117188, -0.3352746367454529, 0.20585384964942932]
++LIFT 7 [0.2504402995109558, -0.3352747857570648, 0.22236816585063934]
++LIFT 8 [0.2558581233024597, -0.33527490496635437, 0.2391778826713562]
++LIFT 9 [0.26072850823402405, -0.3352750539779663, 0.25626397132873535]
++MOVE 0 [0.16072848439216614, -0.2352750301361084, 0.25626397132873535]
++MOVE 1 [0.15949532389640808, -0.13527502119541168, 0.25626397132873535]
++MOVE 2 [0.15949532389640808, -0.035275042057037354, 0.25626397132873535]
++MOVE 3 [0.15949532389640808, 0.06472495943307877, 0.25626397132873535]
++MOVE 4 [0.15949532389640808, 0.0742836520075798, 0.25626397132873535]
++MOVE 5 [0.15949532389640808, 0.0742836520075798, 0.25626397132873535]
++MOVE 6 [0.15949532389640808, 0.0742836520075798, 0.25626397132873535]
++MOVE 7 [0.15949532389640808, 0.0742836520075798, 0.25626397132873535]
++MOVE 8 [0.15949532389640808, 0.0742836520075798, 0.25626397132873535]
++MOVE 9 [0.15949532389640808, 0.0742836520075798, 0.25626397132873535]
++RELEASE -1.0 False False {'object_count': 0} [0.09368305653333664, 0.0742848664522171, 0.10867827385663986]
++POST -1.0 False False {'object_count': 0} [0.09368305653333664, 0.0742848664522171, 0.10867827385663986]
++POST -1.0 False False {'object_count': 0} [0.09368305653333664, 0.0742848664522171, 0.10867827385663986]
++POST -1.0 False False {'object_count': 0} [0.09368305653333664, 0.0742848664522171, 0.10867827385663986]

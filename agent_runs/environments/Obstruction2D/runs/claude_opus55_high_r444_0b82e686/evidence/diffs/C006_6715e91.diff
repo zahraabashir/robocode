@@ -1,0 +1,179 @@
+diff --git a/approach.py b/approach.py
+index 8487c8d..588cb11 100644
+--- a/approach.py
++++ b/approach.py
+@@ -200,9 +200,25 @@ class GeneratedApproach:
+                 best = (cost, x)
+         if best is None:
+             return float(np.clip(obj["cx"], lo, hi)), ty
++        self._last_grasp_ok = not best[0][0]
+         return best[1], ty
+ 
+-    def _drop_spot(self, robot, objs, held, g, next_x):
++    def _grasp_ok(self, robot, obj, objs, prefer_g=0.0):
++        self._last_grasp_ok = False
++        gx, ty = self._grasp_x(robot, obj, objs, prefer_g)
++        return self._last_grasp_ok, gx, ty
++
++    def _violators(self, robot, obj, objs, gx, ty):
++        parts = self._parts(robot)
++        res = []
++        for n, o in objs.items():
++            if n == obj["name"]:
++                continue
++            if self._req(gx, parts, [(o["x"], o["x"] + o["w"], o["top"])]) > ty + 1e-9:
++                res.append(n)
++        return res
++
++    def _drop_spot(self, robot, objs, held, g, next_x, strict=True):
+         """Choose drop center for obstruction held with offset g (robot_x - center)."""
+         lo, hi = self._xlim(robot)
+         w = held["w"]
+@@ -225,7 +241,8 @@ class GeneratedApproach:
+             if rx < lo or rx > hi:
+                 continue
+             a, b = c - w / 2, c + w / 2
+-            if any(a < o1 + 0.01 and b > o0 - 0.01 for (o0, o1, _) in obst):
++            sep = 0.01 if strict else 0.002
++            if any(a < o1 + sep and b > o0 - sep for (o0, o1, _) in obst):
+                 continue
+             if any(a < r1 and b > r0 for (r0, r1) in reserved):
+                 continue
+@@ -233,7 +250,7 @@ class GeneratedApproach:
+             if self._req(rx, parts, obst) > ty + 1e-9:
+                 continue
+             # does dropping here block future block grasp/placement?
+-            if blk is not None and self.place_c is not None:
++            if strict and blk is not None and self.place_c is not None:
+                 newob = [(a, b, FLOOR + held["h"])]
+                 bparts = self._parts(robot)
+                 gx = blk["cx"] + self.block_g
+@@ -252,6 +269,23 @@ class GeneratedApproach:
+             return None
+         return best[1]
+ 
++    def _air_spot(self, robot, objs, held, g):
++        lo, hi = self._xlim(robot)
++        blk = objs.get("target_block")
++        best = None
++        for rx in np.linspace(lo, hi, 200):
++            c = float(rx) - g
++            a, b = c - held["w"] / 2, c + held["w"] / 2
++            d = 0.0
++            for zc in [self.place_c + self.block_g, (blk["cx"] + self.block_g) if blk else None]:
++                if zc is not None:
++                    d = min(d, abs(rx - zc) - 0.35) if d < 0 else min(abs(rx - zc) - 0.35, 1e9)
++            score = min(abs(float(rx) - (self.place_c + self.block_g)),
++                        abs(float(rx) - (blk["cx"] + self.block_g)) if blk else 1e9)
++            if best is None or score > best[0]:
++                best = (score, c)
++        return best[1]
++
+     # ---------------- main ----------------
+     def get_action(self, state):
+         robot, objs, surf = self._parse(state)
+@@ -298,7 +332,11 @@ class GeneratedApproach:
+                     nxt = self._peek_next(robot, objs, exclude=self.cur)
+                     d = self._drop_spot(robot, objs, obj, self.g_actual, nxt)
+                     if d is None:
+-                        d = obj["cx"]  # fallback: lift and put back higher later
++                        d = self._drop_spot(robot, objs, obj, self.g_actual, nxt, strict=False)
++                    self.drop_y = None
++                    if d is None:
++                        d = self._air_spot(robot, objs, obj, self.g_actual)
++                        self.drop_y = H - robot["r"] - 1e-3
+                     self.drop = d
+                 self.mode = "carry"
+                 continue
+@@ -311,6 +349,8 @@ class GeneratedApproach:
+                 obst = self._obst(objs, exclude=(obj["name"],))
+                 tx = self.drop + (robot["x"] - obj["cx"])
+                 ty = robot["y"] - obj["y"] + FLOOR + PLACE_GAP
++                if self.cur != "target_block" and getattr(self, "drop_y", None) is not None:
++                    ty = self.drop_y
+                 act, arrived = self._move(robot, tx, ty, parts, obst, 1.0)
+                 # detect failed grasp: object not following
+                 if abs(robot["y"] - obj["y"] - self.depth) > 5e-3:
+@@ -335,16 +375,31 @@ class GeneratedApproach:
+         return False if o.get("_moved") else True
+ 
+     def _next_target(self, robot, objs):
+-        rem = [n for n in self.blockers if n in objs]
+-        rem = [n for n in rem if n not in getattr(self, "done", set())]
+-        if not hasattr(self, "done"):
+-            self.done = set()
+-        if rem:
+-            rem.sort(key=lambda n: abs(objs[n]["cx"] - robot["x"]))
+-            n = rem[0]
++        rem = [n for n in self.blockers if n in objs and n not in self.done]
++        goals = rem if rem else ["target_block"]
++        goals = sorted(goals, key=lambda n: abs(objs[n]["cx"] - robot["x"]))
++        infeasible = []
++        for n in goals:
++            pref = self.block_g if n == "target_block" else 0.0
++            ok, gx, ty = self._grasp_ok(robot, objs[n], objs, pref)
++            if ok:
++                if n != "target_block":
++                    self.done.add(n)
++                return n
++            infeasible.append((n, gx, ty))
++        # nothing directly graspable: move an obstacle that blocks a goal's grasp
++        for n, gx, ty in infeasible:
++            for v in self._violators(robot, objs[n], objs, gx, ty):
++                if v == "target_block":
++                    continue
++                ok, _, _ = self._grasp_ok(robot, objs[v], objs)
++                if ok:
++                    self.done.add(v)
++                    return v
++        n = goals[0]
++        if n != "target_block":
+             self.done.add(n)
+-            return n
+-        return "target_block"
++        return n
+ 
+     def _peek_next(self, robot, objs, exclude):
+         done = getattr(self, "done", set())
+diff --git a/dbg.py b/dbg.py
+index 058b94b..50595af 100644
+--- a/dbg.py
++++ b/dbg.py
+@@ -4,7 +4,8 @@ from env_client import make_env
+ from approach import GeneratedApproach
+ seed=int(sys.argv[1]); N=int(sys.argv[2]) if len(sys.argv)>2 else 200
+ env = make_env(); ap = GeneratedApproach(env.action_space, env.observation_space, {})
+-obs, info = env.reset(seed=seed); ap.reset(obs, info)
++OC=int(sys.argv[3]) if len(sys.argv)>3 else None
++obs, info = env.reset(seed=seed, options=({"object_count":OC} if OC else None)); ap.reset(obs, info)
+ r0,objs,surf=ap._parse(obs)
+ print("surf",surf); [print(o) for o in objs.values()]
+ prev=None
+diff --git a/test_approach.py b/test_approach.py
+index 1370d4d..12b4a46 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -4,10 +4,11 @@ from env_client import make_env
+ from approach import GeneratedApproach
+ from concurrent.futures import ThreadPoolExecutor
+ 
++OC=None
+ def run(seed):
+     env = make_env()
+     ap = GeneratedApproach(env.action_space, env.observation_space, {})
+-    obs, info = env.reset(seed=seed)
++    obs, info = env.reset(seed=seed, options=({'object_count': OC} if OC else None))
+     ap.reset(obs, info)
+     t0 = time.time()
+     for step in range(env.max_steps):
+@@ -21,8 +22,10 @@ def run(seed):
+     return seed, False, env.max_steps, time.time() - t0
+ 
+ if __name__ == "__main__":
++    global_oc = None
+     s0 = int(sys.argv[1]) if len(sys.argv) > 1 else 0
+     n = int(sys.argv[2]) if len(sys.argv) > 2 else 20
++    globals()["OC"] = int(sys.argv[3]) if len(sys.argv) > 3 else None
+     with ThreadPoolExecutor(8) as ex:
+         res = list(ex.map(run, range(s0, s0 + n)))
+     for r in res:

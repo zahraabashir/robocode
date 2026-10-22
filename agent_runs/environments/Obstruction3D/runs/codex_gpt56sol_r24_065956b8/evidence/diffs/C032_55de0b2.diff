@@ -1,0 +1,20 @@
+diff --git a/probe_grasp.py b/probe_grasp.py
+index 12a0094..bc59631 100644
+--- a/probe_grasp.py
++++ b/probe_grasp.py
+@@ -184,6 +184,15 @@ def exact_sequence(seed=0):
+         a[8] = 0.2 if k < 2 else 0.0
+         a[10] = 1.0
+         actions.append(("pose_open", a))
++    far_extra = np.clip(
++        (block0[0] - 0.33598166704177856) /
++        (0.4644085764884949 - 0.33598166704177856) * 0.2,
++        0.0, 0.2)
++    if far_extra > 1e-6:
++        a = np.zeros(11, dtype=np.float32)
++        a[[4, 6, 8]] = far_extra
++        a[10] = 1.0
++        actions.append(("far_reach", a))
+     close = np.zeros(11, dtype=np.float32)
+     close[10] = -1.0
+     actions.append(("close", close))

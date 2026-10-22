@@ -1,0 +1,100 @@
+diff --git a/approach.py b/approach.py
+index 631df04..0f005da 100644
+--- a/approach.py
++++ b/approach.py
+@@ -4,6 +4,7 @@ WORLD_X = (0.0, 1.618)
+ WORLD_Y = (0.0, 1.0)
+ MAXD = 0.05
+ ARM_MAX = 0.2
++EARLY = True
+ 
+ 
+ class GeneratedApproach:
+@@ -248,17 +249,11 @@ class GeneratedApproach:
+             need_step = self._clear_y_range(x, nx, rects, held) + margin
+             ty = max(gy, need_rest)
+             dy = float(np.clip(ty - y, -MAXD, MAXD))
+-            ny = y + dy
+-            if min(ny, y) < need_step and ny < need_step:
+-                # can't move horizontally yet; go up only
++            if y + dy < need_step:
++                dy = float(np.clip(need_step - y, -MAXD, MAXD))
++            if y + dy < need_step - 1e-9:
+                 dx = 0.0
+-                dy = float(np.clip(max(need_step, ty) - y, -MAXD, MAXD))
+-                if dy < 0:
+-                    dy = 0.0
+-                dy = max(dy, min(MAXD, need_step - y)) if need_step > y else dy
+-            elif ny < need_step:
+-                ny = need_step
+-                dy = ny - y
++                dy = MAXD
+         else:
+             dy = float(np.clip(gy - y, -MAXD, MAXD))
+         ymax = WORLD_Y[1] - r['R'] - 1e-3
+@@ -303,7 +298,12 @@ class GeneratedApproach:
+             # allow reaching the grasp contact height (target object excluded margin)
+             if abs(r['x'] - task['gx']) < 1e-6:
+                 dy = float(np.clip(gy - r['y'], -MAXD, MAXD))
+-            a = self._action(dx, dy, darm, 0.0)
++            vac = 0.0
++            if (EARLY and abs(r['x'] + dx - task['gx']) < 1e-6 and abs(r['y'] + dy - gy) < 1e-6
++                    and r['aj'] + darm >= ARM_MAX - 1e-6):
++                vac = 1.0
++                self.phase = 'grasp'
++            a = self._action(dx, dy, darm, vac)
+             a[2] = dth
+             return self._check_stuck(a, r)
+ 
+@@ -331,7 +331,12 @@ class GeneratedApproach:
+                 dx, dy = self._move_toward(px, py, rects, held)
+                 if abs(r['x'] - px) < 1e-6:
+                     dy = float(np.clip(py - r['y'], -MAXD, MAXD))
+-                a = self._action(dx, dy, darm, 1.0)
++                vac = 1.0
++                if (EARLY and task['kind'] == 'obst' and abs(r['x'] + dx - px) < 1e-6
++                        and abs(r['y'] + dy - py) < 1e-6):
++                    vac = 0.0
++                    self.phase = 'after_release'
++                a = self._action(dx, dy, darm, vac)
+                 a[2] = dth
+                 res = self._check_stuck(a, r)
+                 if self.stuck > 4 and self.task['kind'] == 'obst' and r['x'] == px:
+diff --git a/dbg.py b/dbg.py
+index 96529e2..ce93c4c 100644
+--- a/dbg.py
++++ b/dbg.py
+@@ -19,3 +19,5 @@ for t in range(300):
+     if t<300 and (t%5==0 or ap.phase!='to_grasp'): print(t, ap.phase, ap.task['obj'], np.round(a,3), round(rr['x'],3), round(rr['y'],3), ap.stuck)
+     if term: print('done', t); break
+ print('compute', tt)
++_,rects = ap._parse(obs)
++for k,v in sorted(rects.items()): print(k, {q: round(v[q],3) for q in ['x0','x1','y0','y1']})
+diff --git a/test_approach.py b/test_approach.py
+index 580f9aa..5dd1163 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -4,10 +4,11 @@ from env_client import make_env
+ from approach import GeneratedApproach
+ from concurrent.futures import ThreadPoolExecutor
+ 
++OC=None
+ def run(seed):
+     env = make_env()
+     ap = GeneratedApproach(env.action_space, env.observation_space, {})
+-    obs, info = env.reset(seed=seed)
++    obs, info = env.reset(seed=seed, options=({'object_count':OC} if OC is not None else None))
+     ap.reset(obs, info)
+     tot = 0; t0 = time.time()
+     for t in range(env.max_steps):
+@@ -20,7 +21,9 @@ def run(seed):
+ 
+ if __name__ == '__main__':
+     a, b = int(sys.argv[1]), int(sys.argv[2])
++    if len(sys.argv)>3: OC=int(sys.argv[3])
+     with ThreadPoolExecutor(8) as ex:
+         res = list(ex.map(run, range(a, b)))
+-    for r in res: print(r)
++    for r in res:
++        if not r[2] or len(res)<20: print(r)
+     print('success', sum(r[2] for r in res), '/', len(res), 'mean steps', np.mean([r[3] for r in res]))

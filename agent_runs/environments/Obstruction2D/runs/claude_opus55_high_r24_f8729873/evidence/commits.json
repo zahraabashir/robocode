@@ -1,0 +1,408 @@
+[
+  {
+    "id": "C001",
+    "commit": "116c19480d4ef8b40e19ef696286fe7a94fc3798",
+    "parents": [],
+    "date": "2026-09-30T10:21:40+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".claude/settings.json",
+      ".claude/validate_sandbox.py",
+      ".gitignore",
+      "CLAUDE.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_116c194.diff",
+    "diff_sha256": "793952e9ff67c212d45a351bbfaef00fe5085227cfeb4b6dcad83de7bda1722a",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "5e7d2f3ab66326dec9ed97b0f25b6179e5e5ef70",
+    "parents": [
+      "116c19480d4ef8b40e19ef696286fe7a94fc3798"
+    ],
+    "date": "2026-09-30T10:24:27+02:00",
+    "title": "Initial approach: remove blockers, place target",
+    "files": [
+      "approach.py",
+      "dump.py",
+      "probe.py",
+      "probe2.py",
+      "probe3.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C002_5e7d2f3.diff",
+    "diff_sha256": "cfa9231703c9403f21f07db0ffdf82ba5aae7338f1af9e68b636334febd57239",
+    "events": [
+      {
+        "event": "E0035",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6beb463d4acb6e7578d795047b62e13f282b3784b7dab331ebb1c5e4b6a0bf26",
+    "version": "evidence/versions/C002_5e7d2f3_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "536f820f235b80570a659c909d09dd0393026aa0",
+    "parents": [
+      "5e7d2f3ab66326dec9ed97b0f25b6179e5e5ef70"
+    ],
+    "date": "2026-09-30T10:28:20+02:00",
+    "title": "Grasp offsets respecting robot x bounds",
+    "files": [
+      "approach.py",
+      "res_0.txt",
+      "res_1.txt",
+      "res_2.txt",
+      "res_3.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C003_536f820.diff",
+    "diff_sha256": "5af177eee946fd2121d23cfcd5fefc7e890cbc656c8e66a6355617a5fdce8331",
+    "events": [
+      {
+        "event": "E0063",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "14aae82413f83fd902afffc3770b4b862b5399d508f50626f2f96c973574ee65",
+    "version": "evidence/versions/C003_536f820_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C004",
+    "commit": "9e7bfa8f3930de4f417d9ea9120ddb364481d484",
+    "parents": [
+      "536f820f235b80570a659c909d09dd0393026aa0"
+    ],
+    "date": "2026-09-30T10:29:41+02:00",
+    "title": "Allow partial-overlap grasps near world edge",
+    "files": [
+      "approach.py",
+      "res_0.txt",
+      "res_1.txt",
+      "res_2.txt",
+      "res_3.txt",
+      "trace.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C004_9e7bfa8.diff",
+    "diff_sha256": "cbd0d0ee647f546e40d5381dfcd5444aa3f5f3345ae874b22ac135c091d9154d",
+    "events": [
+      {
+        "event": "E0078",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "915bb982d521258b65969c0feb5465474dac1e656b676ea7a51e7cf1e79ac6fb",
+    "version": "evidence/versions/C004_9e7bfa8_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "cd87509345aea40f91463ddbf7f5c6cff8451a8c",
+    "parents": [
+      "9e7bfa8f3930de4f417d9ea9120ddb364481d484"
+    ],
+    "date": "2026-09-30T10:40:43+02:00",
+    "title": "Better parking spot search (stacking, sweep-based exclusion)",
+    "files": [
+      "approach.py",
+      "c3.txt",
+      "c4.txt",
+      "c5.txt",
+      "cd.txt",
+      "cnt_3.txt",
+      "cnt_4.txt",
+      "cnt_6.txt",
+      "cnt_8.txt",
+      "dump2.py",
+      "test_approach.py",
+      "trace.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C005_cd87509.diff",
+    "diff_sha256": "5d7ef326a3430efa3184afa37c13827d1841bff8a44223f5a59b2cba59370071",
+    "events": [
+      {
+        "event": "E0146",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "ce582b28c4e184299e072de0600d1ce838ac7a0ec42ca07aae3a10e345b01b34",
+    "version": "evidence/versions/C005_cd87509_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C006",
+    "commit": "e24e591f5ef916db93a0aa99a7696779e41d0f66",
+    "parents": [
+      "cd87509345aea40f91463ddbf7f5c6cff8451a8c"
+    ],
+    "date": "2026-09-30T10:42:17+02:00",
+    "title": "Motion planner: diagonal collision-checked paths, grasp on final descent step",
+    "files": [
+      "approach.py",
+      "approach_v1.py",
+      "r3.txt",
+      "r4.txt",
+      "rd.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C006_e24e591.diff",
+    "diff_sha256": "e3ea680753ffa30bebf2b970264ba9e11e1e67d3c558bb6c5c094ee70cc5765a",
+    "events": [
+      {
+        "event": "E0166",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "d945a21f26e54e690d76638ef7721f8ba87b13759023e3e2a37b9a3d18878e91",
+    "version": "evidence/versions/C006_e24e591_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "82c16cf5103b0e60740ba496cea01c863e188e11",
+    "parents": [
+      "e24e591f5ef916db93a0aa99a7696779e41d0f66"
+    ],
+    "date": "2026-09-30T10:55:12+02:00",
+    "title": "DP path planner, binned spot reranking, placement minimizing blockers",
+    "files": [
+      "approach.py",
+      "approach_prev.py",
+      "c3.txt",
+      "c4.txt",
+      "c5.txt",
+      "cd.txt",
+      "cnt_3.txt",
+      "cnt_4.txt",
+      "cnt_6.txt",
+      "cnt_8.txt",
+      "dbg_spot.py",
+      "quick.py",
+      "r3.txt",
+      "r4.txt",
+      "rd.txt",
+      "res_0.txt",
+      "res_1.txt",
+      "res_2.txt",
+      "res_3.txt",
+      "test_approach.py",
+      "timing.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C007_82c16cf.diff",
+    "diff_sha256": "93c45e74bfdbd2c20fcf31736e7cb04ddf5bca305cc2876f9874b4aff357e8c4",
+    "events": [
+      {
+        "event": "E0289",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "f16e618bb4721a65f2d8254cdd531a6d2a40d704962b134760687616fcfa22c0",
+    "version": "evidence/versions/C007_82c16cf_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C008",
+    "commit": "c162fd43402cff3274796523d571b942555bc8b1",
+    "parents": [
+      "82c16cf5103b0e60740ba496cea01c863e188e11"
+    ],
+    "date": "2026-09-30T11:10:51+02:00",
+    "title": "Spot cost uses next blocker as next target; nearest-first blocker order",
+    "files": [
+      "a_near3.txt",
+      "a_near4.txt",
+      "a_tall3.txt",
+      "a_tall4.txt",
+      "approach.py",
+      "approach_tall.py",
+      "events.py",
+      "q_3.txt",
+      "q_4.txt",
+      "q_d.txt",
+      "timing2.py"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C008_c162fd4.diff",
+    "diff_sha256": "c407c3f4f5bce5f7363e28bdb8e93728a5f9d7102af96e573411d9b8ab4dd99b",
+    "events": [
+      {
+        "event": "E0381",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "b73307f827573e3af19b96f2acc36d8e9cf9d2b0ca388563ae8e9b2eb76bfe6f",
+    "version": "evidence/versions/C008_c162fd4_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C009",
+    "commit": "091283e27d47e0229a81d52c2973b84898784cf0",
+    "parents": [
+      "c162fd43402cff3274796523d571b942555bc8b1"
+    ],
+    "date": "2026-09-30T11:15:57+02:00",
+    "title": "Allow higher floating parking",
+    "files": [
+      "approach.py",
+      "approach_t36.py",
+      "quick.py",
+      "t36.txt",
+      "t46.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C009_091283e.diff",
+    "diff_sha256": "1354aac5f7fb86723322f1e8aa819d6bc337b3010550771f0fd310597b0b9c32",
+    "events": [
+      {
+        "event": "E0407",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "8330232f94aafc258a68f2105bec0475fe7fba6c8740be986882a1dce9a64046",
+    "version": "evidence/versions/C009_091283e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C010",
+    "commit": "421d9a586411b4d5ca9cc889e07e2f5d60724059",
+    "parents": [
+      "091283e27d47e0229a81d52c2973b84898784cf0"
+    ],
+    "date": "2026-09-30T11:20:30+02:00",
+    "title": "Arm-aware 3D DP path planner (uses arm extension for free vertical motion)",
+    "files": [
+      "approach.py",
+      "approach_head.py",
+      "approach_noarm.py",
+      "dbg3.py",
+      "probe_stuck.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C010_421d9a5.diff",
+    "diff_sha256": "e682209944f6dcf66ea5ac49bd792a94012a1f302af7baac890082c212bc0580",
+    "events": [
+      {
+        "event": "E0466",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "2f1e26267463a464d0cd9b7caaf52c3830519d62bda6c8a004b3f85d1b0c13dc",
+    "version": "evidence/versions/C010_421d9a5_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C011",
+    "commit": "fec32dd911ab498c5a5ecd25f407b14403a1aac9",
+    "parents": [
+      "421d9a586411b4d5ca9cc889e07e2f5d60724059"
+    ],
+    "date": "2026-09-30T11:24:48+02:00",
+    "title": "3D DP: don't force goal cell free for arms where exact goal collides",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C011_fec32dd.diff",
+    "diff_sha256": "6f216e0ee7463ef8bdd9a1d258b03d4d642b0c853cca899c1e93588b26028db0",
+    "events": [
+      {
+        "event": "E0495",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a031de04e060654b1cfe5cf0cbad97c74ee1ea6ba28532a137000f378ef9a342",
+    "version": "evidence/versions/C011_fec32dd_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C012",
+    "commit": "c6c922b66d02fd0d4acc8cfb3ddb4d572ce2588e",
+    "parents": [
+      "fec32dd911ab498c5a5ecd25f407b14403a1aac9"
+    ],
+    "date": "2026-09-30T11:36:02+02:00",
+    "title": "Add optional 3D DP spot costs (disabled: no gain, slower)",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C012_c6c922b.diff",
+    "diff_sha256": "d169a82f5fbecc2a892b8082b858dc41760d5cfbe43858ca8751d8694ee12419",
+    "events": [
+      {
+        "event": "E0545",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "906f851a40c1cc131b8f620c67acb168c23b168b618d31c494ac4827353c775f",
+    "version": "evidence/versions/C012_c6c922b_approach.py",
+    "same_policy_as_earlier": []
+  }
+]

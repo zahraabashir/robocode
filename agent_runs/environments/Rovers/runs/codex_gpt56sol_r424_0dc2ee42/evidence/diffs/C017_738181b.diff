@@ -1,0 +1,184 @@
+diff --git a/approach.py b/approach.py
+index f740435..9f65e6d 100644
+--- a/approach.py
++++ b/approach.py
+@@ -43,20 +43,26 @@ class GeneratedApproach:
+             hx = self._v(state, ob, "half_x")
+             hy = self._v(state, ob, "half_y")
+             self.obstacles.append((x, y, hx, hy))
++        # The fixed separating wall is part of the arena but omitted from the
++        # object list.  Treat it as a full-height divider: all useful tasks have
++        # a reachable stance on their own side.
++        self.obstacles.append((0.0, 0.0, 0.18, 2.6))
+         samples = self._objs(state, "sample")
+         stones = [s for s in samples if self._v(state, s, "is_soil") < 0.5]
+         soils = [s for s in samples if self._v(state, s, "is_soil") > 0.5]
++        right_stones = [s for s in stones if self._v(state, s, "x") >= -0.05]
++        left_soils = [s for s in soils if self._v(state, s, "x") <= 0.05]
+         self.sample_names = {
+-            0: self._closest_name(state, stones, self.homes[0]),
+-            1: self._closest_name(state, soils, self.homes[1]),
++            0: self._closest_name(state, right_stones or stones, self.homes[0]),
++            1: self._closest_name(state, left_soils or soils, self.homes[1]),
+         }
+         self.phase = ["sample", "sample"]
+         self.targets = [None, None]
+         self.paths = [[], []]
+         self.last_pos = [self.homes[0], self.homes[1]]
+         self.stuck = [0, 0]
+-        self.image_site_index = 0
+-        self.image_attempts = 0
++        self.image_site_index = [0, 0]
++        self.image_attempts = [0, 0]
+         self.send_attempts = [0, 0]
+ 
+     def _closest_name(self, state, objs, point):
+@@ -68,7 +74,7 @@ class GeneratedApproach:
+     def _dist(a, b):
+         return math.hypot(a[0] - b[0], a[1] - b[1])
+ 
+-    def _blocked(self, p, extra=None, margin=0.27):
++    def _blocked(self, p, extra=None, margin=0.18):
+         x, y = p
+         if x < -2.38 or x > 2.38 or y < -2.38 or y > 2.38:
+             return True
+@@ -156,8 +162,10 @@ class GeneratedApproach:
+         dy = max(-0.2, min(0.2, waypoint[1] - pos[1]))
+         return dx, dy
+ 
+-    def _objective_sites(self, state):
++    def _objective_sites(self, state, idx):
+         objs = sorted(self._objs(state, "objective"), key=self._name)
++        objs = [o for o in objs if not self._image_done(state, o) and
++                ((self._v(state, o, "x") >= 0) == (idx == 0))]
+         sites = []
+         # South is normally shortest and clear of the mound row; alternate
+         # directions handle pillars that happen to occlude a particular view.
+@@ -167,12 +175,24 @@ class GeneratedApproach:
+             x, y = self._xy(state, ob)
+             for ux, uy in directions:
+                 q = (x + 0.62 * ux, y + 0.62 * uy)
+-                if not self._blocked(q):
++                if not self._blocked(q) and ((q[0] > 0) == (idx == 0)):
+                     sites.append(q)
+         return sites
+ 
+-    def _all_images_taken(self, state):
+-        return all(self._v(state, o, "have_image_rover0") > 0.5
++    def _image_done(self, state, ob):
++        return (self._v(state, ob, "received_image") > 0.5 or
++                self._v(state, ob, "have_image_rover0") > 0.5 or
++                self._v(state, ob, "have_image_rover1") > 0.5)
++
++    def _side_images_done(self, state, idx):
++        side = [o for o in self._objs(state, "objective")
++                if ((self._v(state, o, "x") >= 0) == (idx == 0))]
++        return all(self._image_done(state, o) for o in side)
++
++    def _own_images_received(self, state, idx):
++        own = "have_image_rover%d" % idx
++        return all(self._v(state, o, own) < 0.5 or
++                   self._v(state, o, "received_image") > 0.5
+                    for o in self._objs(state, "objective"))
+ 
+     def _all_images_received(self, state):
+@@ -185,6 +205,15 @@ class GeneratedApproach:
+             return None
+         return state.get_object_from_name(name)
+ 
++    @staticmethod
++    def _same_side_goal(point, idx):
++        x, y = point
++        if idx == 0 and x < 0.43:
++            x = 0.43
++        if idx == 1 and x > -0.43:
++            x = -0.43
++        return (x, y)
++
+     def _received_own_sample(self, state, idx):
+         ob = self._sample_obj(state, idx)
+         return ob is None or self._v(state, ob, "received_analysis") > 0.5
+@@ -217,20 +246,21 @@ class GeneratedApproach:
+                     self._set_op(action, i, SAMPLE)
+                     continue
+                 else:
+-                    dx, dy = self._move(i, positions[i], self._xy(state, sob), positions[1-i])
++                    goal = self._same_side_goal(self._xy(state, sob), i)
++                    dx, dy = self._move(i, positions[i], goal, positions[1-i])
+                     action[4*i] = dx
+                     action[4*i+1] = dy
+                     continue
+ 
+             if self.phase[i] == "images":
+-                if self._all_images_taken(state):
++                if self._side_images_done(state, i):
+                     self.phase[i] = "send"
+                     self.targets[i] = None
+                 else:
+-                    sites = self._objective_sites(state)
++                    sites = self._objective_sites(state, i)
+                     if not sites:
+                         sites = [(0.0, 1.25)]
+-                    site = sites[self.image_site_index % len(sites)]
++                    site = sites[self.image_site_index[i] % len(sites)]
+                     if self._dist(positions[i], site) > 0.12:
+                         dx, dy = self._move(i, positions[i], site, positions[1-i])
+                         action[4*i] = dx
+@@ -240,24 +270,25 @@ class GeneratedApproach:
+                         self._set_op(action, i, IMAGE)
+                     else:
+                         self._set_op(action, i, CALIBRATE)
+-                    self.image_attempts += 1
+-                    if self.image_attempts >= 3:
+-                        self.image_attempts = 0
+-                        self.image_site_index += 1
++                    self.image_attempts[i] += 1
++                    if self.image_attempts[i] >= 3:
++                        self.image_attempts[i] = 0
++                        self.image_site_index[i] += 1
+                         self.targets[i] = None
+                     continue
+ 
+             if self.phase[i] == "send":
+                 need = (not self._received_own_sample(state, i) or
+-                        (i == 0 and not self._all_images_received(state)))
++                        not self._own_images_received(state, i))
+                 if not need:
+                     self.phase[i] = "drop"
+                 else:
+                     lander = self._xy(state, self._objs(state, "lander")[0])
+                     # Close, unobstructed points around the lander.
+-                    send_sites = [(lander[0] + 0.48, lander[1] + 0.15),
+-                                  (lander[0] + 0.15, lander[1] + 0.48),
+-                                  (lander[0] - 0.35, lander[1] + 0.25)]
++                    if i == 0:
++                        send_sites = [(0.43, -1.95), (0.43, -2.15)]
++                    else:
++                        send_sites = [(-1.2, -1.8), (-1.45, -1.65)]
+                     site = send_sites[(self.send_attempts[i] // 2) % len(send_sites)]
+                     if self._dist(positions[i], site) > 0.13:
+                         dx, dy = self._move(i, positions[i], site, positions[1-i])
+diff --git a/trace_run.py b/trace_run.py
+new file mode 100644
+index 0000000..b18825f
+--- /dev/null
++++ b/trace_run.py
+@@ -0,0 +1,18 @@
++from env_client import make_env
++from approach import GeneratedApproach
++
++env = make_env(); s, info = env.reset(seed=0)
++a = GeneratedApproach(env.action_space, env.observation_space, {})
++a.reset(s, info)
++last = None
++for k in range(250):
++    act = a.get_action(s)
++    s, r, term, trunc, info = env.step(act)
++    rovers = sorted(a._objs(s, "rover"), key=a._name)
++    snap = (tuple(a.phase), tuple((round(a._v(s, x, "x"), 2), round(a._v(s, x, "y"), 2)) for x in rovers))
++    if k % 10 == 0 or tuple(a.phase) != (last[0] if last else None):
++        print(k + 1, snap, [round(float(x), 2) for x in act], [a.stuck[i] for i in range(2)])
++    last = snap
++    if term or trunc:
++        print("END", k + 1, term, trunc); break
++env.close()

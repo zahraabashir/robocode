@@ -1,0 +1,54 @@
+diff --git a/approach.py b/approach.py
+index c2c33a1..2a2bc7b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -42,7 +42,7 @@ class GeneratedApproach:
+             occupied=[self.rect(s,p) for p in obs+[self.block] if p!=o]
+             occupied.append([gx,sy+sh,bw,bh])
+             places=[]
+-            for px in np.linspace(.012,1.606-w,90):
++            for px in np.linspace(.11,1.50-w,90):
+                 py=.105
+                 for qx,qy,qw,qh in occupied:
+                     if px<qx+qw+.018 and px+w>qx-.018:
+@@ -50,7 +50,7 @@ class GeneratedApproach:
+                 if py+h<.48 and not (px<gx+bw+.12 and px+w>gx-.12):
+                     places.append((py*8+abs(px-x),float(px),py))
+             if not places:
+-                for px in np.linspace(.012,1.606-w,90):
++                for px in np.linspace(.11,1.50-w,90):
+                     if px<gx+bw+.04 and px+w>gx-.04: continue
+                     py=max([.105]+[qy+qh+.02 for qx,qy,qw,qh in occupied if px<qx+qw+.01 and px+w>qx-.01])
+                     places.append((py*8+abs(px-x),float(px),py))
+@@ -63,7 +63,10 @@ class GeneratedApproach:
+             self.dest=self.goal
+         self.task=o
+         x,y,w,h=self.rect(s,o)
+-        self.pickx=max(.105,min(1.513,x+w/2))
++        lower=max(.1002-x,.1002-self.dest[0],-.025)
++        upper=min(1.5178-x,1.5178-self.dest[0],w+.025)
++        offset=max(lower,min(upper,w/2))
++        self.pickx=max(.1002,min(1.5178,x+offset))
+         self.offsetx=self.pickx-x
+         self.picktop=y+h
+         self.phase='above'
+@@ -75,6 +78,10 @@ class GeneratedApproach:
+         rx,ry=float(s.get(r,'x')),float(s.get(r,'y'))
+         theta=float(s.get(r,'theta'))
+         arm=float(s.get(r,'arm_joint'))
++        pose=(rx,ry)
++        oldphase=self.phase
++        self.stuck=self.stuck+1 if self.last==(pose,oldphase) else 0
++        self.last=(pose,oldphase)
+         if self.phase=='choose':self.select(s)
+         x,y,w,h=self.rect(s,self.task)
+         vac=0.
+@@ -86,7 +93,7 @@ class GeneratedApproach:
+                 if abs(rx-tx)<.002:self.phase='down'
+         if self.phase=='down':
+             tx=self.pickx;ty=self.picktop+.215;vac=1.
+-            if abs(rx-tx)<.002 and abs(ry-ty)<.002:
++            if (abs(rx-tx)<.002 and abs(ry-ty)<.002) or self.stuck>=2:
+                 self.phase='lift';self.before_y=y
+         elif self.phase=='lift':
+             vac=1.;ty=.86

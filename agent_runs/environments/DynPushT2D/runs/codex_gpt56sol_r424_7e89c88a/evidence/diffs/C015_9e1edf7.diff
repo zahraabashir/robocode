@@ -1,0 +1,52 @@
+diff --git a/probe_rotation_agent.py b/probe_rotation_agent.py
+index 944a516..d4d161a 100644
+--- a/probe_rotation_agent.py
++++ b/probe_rotation_agent.py
+@@ -133,10 +133,44 @@ def general_frame_trial(seed, xoff, pushes=4):
+     env.close()
+ 
+ 
++def push_until_moved(env, s, action, count=4):
++    got = 0
++    for _ in range(45):
++        old = s[:3].copy()
++        s, _, done, trunc, _ = env.step(np.asarray(action, dtype=np.float32))
++        if np.linalg.norm(s[:2]-old[:2]) > 2e-5 or abs(wrap(float(s[2]-old[2]))) > 2e-5:
++            got += 1
++            if got >= count: break
++        if done or trunc: break
++    return s
++
++
++def paired_torque(seed=11):
++    env = make_env(); s, _ = env.reset(seed=seed); initial = s[:3].copy()
++    # Right underside, push toward the crossbar: positive torque.
++    b, th = s[:2].copy(), float(s[2])
++    s = move_to(env, s, [b[0]+1.0, s[17]])
++    s = move_to(env, s, b + rot(th, [1.0, -1.2]))
++    s = move_to(env, s, b + rot(th, [0.5, -1.2]))
++    s = push_until_moved(env, s, rot(th, [0, 0.049]), 4)
++    middle = s[:3].copy()
++    # Retreat and go around the outside to left topside; push down for same torque.
++    b, th = s[:2].copy(), float(s[2])
++    s = move_to(env, s, s[[16,17]] + rot(th, [0, -0.55]))
++    s = move_to(env, s, b + rot(th, [1.0, -1.2]))
++    s = move_to(env, s, b + rot(th, [1.0, 1.2]))
++    s = move_to(env, s, b + rot(th, [-0.5, 1.2]))
++    s = push_until_moved(env, s, rot(th, [0, -0.049]), 4)
++    final = s[:3].copy()
++    print("PAIR", "first", np.round(middle[:2]-initial[:2],3),
++          round(wrap(float(middle[2]-initial[2])),3),
++          "net", np.round(final[:2]-initial[:2],3),
++          round(wrap(float(final[2]-initial[2])),3))
++    env.close()
++
++
+ def main():
+-    for seed in [0, 1, 2, 5, 7, 9, 10, 11]:
+-        general_frame_trial(seed, 0.5)
+-        general_frame_trial(seed, -0.5)
++    paired_torque()
+ 
+ 
+ if __name__ == "__main__":

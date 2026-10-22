@@ -1,0 +1,36 @@
+diff --git a/probe_radio_details.py b/probe_radio_details.py
+index 50841ce..19ebd42 100644
+--- a/probe_radio_details.py
++++ b/probe_radio_details.py
+@@ -38,5 +38,4 @@ def trial(seed,j,target):
+  if seed==2 and target==(-2.2,0):
+   print('obs',p.boxes.tolist(),flush=True)
+  e.close()
+-for t in [(1,.60),(1,.605),(1,.61),(1,.615)]:trial(0,0,t)
+-for x in [-2.19,-2.185,-2.18,-2.175]:trial(2,1,(x,0))
++for t in [(1,.62),(1,.625),(1,.63),(1,.635),(1,.64),(.9,.74),(1.1,.505)]:trial(0,0,t)
+diff --git a/radio_details.log b/radio_details.log
+index 64bfda4..630b28d 100644
+--- a/radio_details.log
++++ b/radio_details.log
+@@ -1,13 +1,8 @@
+-0 0 (1, 0.65) actual [1.         0.64999998] have 2.0 received 0.0 go True
+-0 0 (1, 0.66) actual [1.         0.66000003] have 2.0 received 0.0 go True
+-0 0 (1, 0.67) actual [1.         0.67000002] have 2.0 received 0.0 go True
+-0 0 (1, 0.68) actual [1.         0.68000001] have 2.0 received 0.0 go True
+-0 0 (1, 0.69) actual [1.   0.69] have 2.0 received 0.0 go True
+-2 1 (-2.25, 0) actual [-2.25  0.  ] have 2.0 received 0.0 go True
+-2 1 (-2.2, 0) actual [-2.20000005  0.        ] have 2.0 received 0.0 go True
+-obs [[2.0, 2.0, 0.25, 0.25], [-2.0, 2.0, 0.25, 0.25], [-0.21526943147182465, -0.5559921264648438, 0.05000000074505806, 0.05000000074505806], [0.7348376512527466, 0.4442424476146698, 0.05000000074505806, 0.05000000074505806], [0.5, 2.0, 0.25, 0.25], [-0.5, 2.0, 0.25, 0.25], [2.1178300380706787, -0.9612797498703003, 0.05000000074505806, 0.05000000074505806], [-1.7171909809112549, 0.9063087105751038, 0.05000000074505806, 0.05000000074505806], [1.639979600906372, 0.7337386012077332, 0.05000000074505806, 0.05000000074505806], [1.7862882614135742, -0.5400499105453491, 0.05000000074505806, 0.05000000074505806], [-0.9069060683250427, 1.2679052352905273, 0.05000000074505806, 0.05000000074505806], [-2.1559410095214844, -1.0042955875396729, 0.05000000074505806, 0.05000000074505806], [0.0, 0.0, 0.05, 2.5]]
++0 0 (1, 0.6) actual [1.         0.59999996] have 2.0 received 2.0 go True
++0 0 (1, 0.605) actual [1.         0.60499996] have 2.0 received 2.0 go True
++0 0 (1, 0.61) actual [1.         0.61000001] have 2.0 received 2.0 go True
++0 0 (1, 0.615) actual [1.         0.61500001] have 2.0 received 2.0 go True
++2 1 (-2.19, 0) actual [-2.19000006  0.        ] have 2.0 received 0.0 go True
++2 1 (-2.185, 0) actual [-2.18499994  0.        ] have 2.0 received 0.0 go True
++2 1 (-2.18, 0) actual [-2.17999983  0.        ] have 2.0 received 2.0 go True
+ 2 1 (-2.175, 0) actual [-2.17499995  0.        ] have 2.0 received 2.0 go True
+-2 1 (-2.15, 0) actual [-2.14999986  0.        ] have 2.0 received 2.0 go True
+-2 1 (-2.125, 0) actual [-2.125  0.   ] have 2.0 received 2.0 go True
+-2 1 (-2.1, 0) actual [-2.10000014  0.        ] have 2.0 received 2.0 go True
+-2 1 (-2.05, 0) actual [-2.05000019  0.        ] have 2.0 received 2.0 go True

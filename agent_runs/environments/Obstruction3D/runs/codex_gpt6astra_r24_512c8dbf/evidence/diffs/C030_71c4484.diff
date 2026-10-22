@@ -1,0 +1,92 @@
+diff --git a/debug2.txt b/debug2.txt
+new file mode 100644
+index 0000000..56a6cb6
+--- /dev/null
++++ b/debug2.txt
+@@ -0,0 +1,17 @@
++0 above obstruction1:Kinematic3DCuboid pos [0.1476 0.1024 0.1028] model [0.154  0.001  0.2494] a [-0.0584  0.      0.      0.      0.1459  0.      0.18    0.     -0.0546
++ -0.      0.    ] stall 0
++10 grasp obstruction1:Kinematic3DCuboid pos [0.1476 0.1024 0.1028] model [0.1476 0.1024 0.34  ] a [-0.  0.  0.  0. -0. -0. -0.  0. -0.  0.  0.] stall 0
++20 grasp obstruction1:Kinematic3DCuboid pos [0.1476 0.1024 0.1028] model [0.1476 0.1024 0.166 ] a [ 0.     -0.      0.      0.      0.0109  0.     -0.0099  0.      0.0208
++ -0.     -1.    ] stall 0
++30 grasp obstruction1:Kinematic3DCuboid pos [0.1476 0.1024 0.1028] model [0.1476 0.1024 0.166 ] a [ 0.     -0.      0.      0.      0.0109  0.     -0.0099  0.      0.0208
++ -0.     -1.    ] stall 10
++40 grasp obstruction1:Kinematic3DCuboid pos [0.1476 0.1024 0.1028] model [0.1476 0.1024 0.166 ] a [ 0.     -0.      0.      0.      0.0109  0.     -0.0099  0.      0.0208
++ -0.     -1.    ] stall 20
++50 grasp obstruction1:Kinematic3DCuboid pos [0.1476 0.1024 0.1028] model [0.1476 0.1024 0.166 ] a [ 0.     -0.      0.      0.      0.0109  0.     -0.0099  0.      0.0208
++ -0.     -1.    ] stall 30
++60 grasp obstruction1:Kinematic3DCuboid pos [0.1476 0.1024 0.1028] model [0.1476 0.1024 0.166 ] a [ 0.     -0.      0.      0.      0.0109  0.     -0.0099  0.      0.0208
++ -0.     -1.    ] stall 40
++70 grasp obstruction1:Kinematic3DCuboid pos [0.1476 0.1024 0.1028] model [0.1476 0.1024 0.166 ] a [ 0.     -0.      0.      0.      0.0109  0.     -0.0099  0.      0.0208
++ -0.     -1.    ] stall 50
++80 grasp obstruction1:Kinematic3DCuboid pos [0.1476 0.1024 0.1028] model [0.1476 0.1024 0.166 ] a [ 0.     -0.      0.      0.      0.0109  0.     -0.0099  0.      0.0208
++ -0.     -1.    ] stall 60
+diff --git a/test_results.txt b/test_results.txt
+new file mode 100644
+index 0000000..44c76eb
+--- /dev/null
++++ b/test_results.txt
+@@ -0,0 +1,43 @@
++0 0 above block [0.336 0.173 0.1  ] held 0.0
++0 8 align block [0.336 0.173 0.1  ] held 0.0
++0 11 grasp block [0.336 0.173 0.1  ] held 0.0
++0 22 lift block [0.336 0.173 0.1  ] held 1.0
++0 30 carry block [0.336 0.173 0.1  ] held 1.0
++0 32 lower block [0.336 0.173 0.1  ] held 1.0
++0 42 release block [0.336 0.173 0.1  ] held 1.0
++0 44 above block [0.336 0.173 0.1  ] held 0.0
++0 52 align block [0.336 0.173 0.1  ] held 0.0
++0 54 grasp block [0.336 0.173 0.1  ] held 0.0
++0 65 lift block [0.336 0.173 0.1  ] held 1.0
++0 74 carry block [0.336 0.173 0.1  ] held 1.0
++0 76 lower block [0.336 0.173 0.1  ] held 1.0
++0 86 release block [0.336 0.173 0.1  ] held 1.0
++0 88 above block [0.336 0.173 0.1  ] held 0.0
++0 97 align block [0.336 0.173 0.1  ] held 0.0
++0 100 grasp block [0.336 0.173 0.1  ] held 0.0
++0 110 lift block [0.336 0.173 0.125] held 1.0
++0 118 carry block [0.336 0.173 0.3  ] held 1.0
++0 121 lower block [0.144 0.233 0.3  ] held 1.0
++0 130 release block [0.144 0.233 0.111] held 1.0
++RESULT 0 {'object_count': 2} 132 True 3.01 phase release
++2 0 above block [ 0.189 -0.335  0.1  ] held 0.0
++2 8 align block [ 0.189 -0.335  0.1  ] held 0.0
++2 10 grasp block [ 0.189 -0.335  0.1  ] held 0.0
++RESULT 2 {'object_count': 2} 350 False 12.36 phase grasp
++5 0 above block [0.464 0.111 0.1  ] held 0.0
++5 8 align block [0.464 0.111 0.1  ] held 0.0
++5 11 grasp block [0.464 0.111 0.1  ] held 0.0
++5 19 lift block [0.464 0.111 0.1  ] held 1.0
++5 27 carry block [0.464 0.111 0.1  ] held 1.0
++5 29 lower block [0.464 0.111 0.1  ] held 1.0
++5 38 release block [0.464 0.111 0.1  ] held 1.0
++5 40 above block [0.464 0.111 0.1  ] held 0.0
++5 47 align block [0.464 0.111 0.1  ] held 0.0
++5 49 grasp block [0.464 0.111 0.1  ] held 0.0
++5 61 lift block [0.464 0.111 0.1  ] held 1.0
++5 69 carry block [0.464 0.111 0.1  ] held 1.0
++5 71 lower block [0.464 0.111 0.1  ] held 1.0
++5 81 release block [0.464 0.111 0.1  ] held 1.0
++5 83 above block [0.464 0.111 0.1  ] held 0.0
++5 91 align block [0.464 0.111 0.1  ] held 0.0
++5 94 grasp block [0.464 0.111 0.1  ] held 0.0
+diff --git a/test_sweep_agent.py b/test_sweep_agent.py
+new file mode 100644
+index 0000000..5686ece
+--- /dev/null
++++ b/test_sweep_agent.py
+@@ -0,0 +1,14 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import time,json
++import sys
++seeds=list(range(20,40)) if len(sys.argv)<2 else [int(x) for x in sys.argv[1:]]
++for seed in seeds:
++ e=make_env();s,i=e.reset(seed=seed);p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,i);started=time.monotonic();done=False
++ for step in range(300):
++  s,r,done,tr,i=e.step(p.get_action(s))
++  if done or tr or time.monotonic()-started>50:break
++ report={'seed':seed,'count':i.get('object_count'),'success':done,'steps':step+1,'sec':round(time.monotonic()-started,2)}
++ if not done:
++  report.update(phase=p.phase,obj=p.obj.name,stall=p.stall,base=[s.get(p.robot,f) for f in ['pos_base_x','pos_base_y']],held=s.get(p.robot,'grasp_active'),pos=p.pos(s,p.obj).tolist(),dest=p.destination.tolist())
++ print(json.dumps(report),flush=True);e.close()

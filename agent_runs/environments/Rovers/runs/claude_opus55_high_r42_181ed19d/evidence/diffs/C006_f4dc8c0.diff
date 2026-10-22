@@ -1,0 +1,45 @@
+diff --git a/approach.py b/approach.py
+index 95a4d56..cdfd7e2 100644
+--- a/approach.py
++++ b/approach.py
+@@ -448,7 +448,12 @@ class GeneratedApproach:
+             n = int(bestn)
+             path.append(n)
+         best = path[0]
+-        for n in path[1:]:
++        if len(path) > 1:
++            p1 = S.pos(path[1])
++            if not any(abs(bx - p1[0]) < 0.03 and abs(by - p1[1]) < 0.03
++                       for (bx, by) in self.bad_points):
++                best = path[1]
++        for n in path[2:]:
+             px, py = S.pos(n)
+             if abs(px - x) <= 0.2 + 1e-6 and abs(py - y) <= 0.2 + 1e-6:
+                 if self._seg_free(S, x, y, px, py):
+@@ -458,20 +463,20 @@ class GeneratedApproach:
+         return S.pos(best)
+ 
+     def _seg_free(self, S, x0, y0, x1, y1):
+-        for t in np.linspace(0, 1, 6):
++        if not self._point_free(x1, y1, S.sign):
++            return False
++        for t in (0.25, 0.5, 0.75):
+             x = x0 + t * (x1 - x0)
+             y = y0 + t * (y1 - y0)
+-            i, j = S.cell_of(x, y)
+-            # check the actual point against obstacles more precisely
+-            if not self._point_free(x, y, S.sign):
++            if not self._point_free(x, y, S.sign, 0.05):
+                 return False
+         return True
+ 
+-    def _point_free(self, x, y, sign):
++    def _point_free(self, x, y, sign, slack=0.01):
+         if sign * x < 0.235 or abs(x) > 2.26 or abs(y) > 2.26:
+             return False
+         for (ox, oy, hx, hy) in self.pillars:
+-            if not _pillar_free(x, y, ox, oy, hx, hy, 0.01):
++            if not _pillar_free(x, y, ox, oy, hx, hy, slack):
+                 return False
+         for (bx, by) in self.bad_points:
+             if abs(bx - x) < 0.03 and abs(by - y) < 0.03:

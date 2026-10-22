@@ -1,0 +1,21 @@
+diff --git a/approach.py b/approach.py
+index 47f00df..c2627c9 100644
+--- a/approach.py
++++ b/approach.py
+@@ -74,9 +74,13 @@ class GeneratedApproach:
+             for i in range(2):
+                 reachable = feasible(items, i)
+                 if reachable:
+-                    ob = min(reachable, key=lambda s: self._dist(
+-                        self._xy(state, s), self.homes[i]))
+-                    options.append((self._dist(self._xy(state, ob), self.homes[i]), i, ob))
++                    def sample_cost(s):
++                        travel = self._dist(self._xy(state, s), self.homes[i])
++                        near_lander = max(0.0, 0.70 - self._dist(
++                            self._xy(state, s), self.lander_xy)) * 20.0
++                        return travel + near_lander
++                    ob = min(reachable, key=sample_cost)
++                    options.append((sample_cost(ob), i, ob))
+             if options:
+                 _, owner, ob = min(options, key=lambda x: x[0])
+                 self.sample_queues[owner].append(ob.name)

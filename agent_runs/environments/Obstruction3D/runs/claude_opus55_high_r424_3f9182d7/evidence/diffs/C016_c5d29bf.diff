@@ -1,0 +1,59 @@
+diff --git a/approach.py b/approach.py
+index d444777..b568c06 100644
+--- a/approach.py
++++ b/approach.py
+@@ -43,6 +43,8 @@ class GeneratedApproach:
+         self.last_q = None
+         self.retries = 0
+         self.grasp_fail = 0
++        self.fail_count = {}
++        self.cur_obj = None
+         self.place_yaw = None
+         self.bad_spots = []
+         self.cur_spot = None
+@@ -130,7 +132,7 @@ class GeneratedApproach:
+             yaw = oyaw if h[0] <= h[1] else oyaw + np.pi / 2
+             return _wrap(yaw)
+         cands.sort(reverse=True)
+-        idx = min(self.grasp_fail, len(cands) - 1)
++        idx = self.grasp_fail % len(cands)
+         return cands[idx][1]
+ 
+     def _plan_pick_place(self, s, obj, place_xy, support_top, others, place_yaw=None):
+@@ -139,6 +141,7 @@ class GeneratedApproach:
+         h = _he(s, obj)
+         yaw = self._grasp_yaw(s, obj, q, base, others, place_yaw is not None)
+         self.place_yaw = place_yaw
++        self.cur_obj = obj.name
+         gz = p[2] + 0.035  # TCP height for grasp (object centre 2-5 cm below TCP works)
+         place_center = np.array([place_xy[0], place_xy[1], support_top + h[2] + 0.002])
+         return [
+@@ -192,7 +195,8 @@ class GeneratedApproach:
+         blocking = [o for o in cubes if self._overlaps(s, o, reg)]
+         if blocking:
+             # remove the tallest (top-most) first
+-            o = max(blocking, key=lambda c: _pose(s, c)[2] + _he(s, c)[2])
++            o = max(blocking, key=lambda c: _pose(s, c)[2] + _he(s, c)[2]
++                    - 0.05 * self.fail_count.get(c.name, 0))
+             others = [c for c in cubes if c.name != o.name] + [reg, tb]
+             spot = self._free_spot(s, o, others, cur)
+             self.cur_spot = spot
+@@ -262,6 +266,8 @@ class GeneratedApproach:
+                 # failed grasp: replan from scratch with another yaw
+                 self.retries = 0
+                 self.grasp_fail += 1
++                if self.cur_obj is not None:
++                    self.fail_count[self.cur_obj] = self.fail_count.get(self.cur_obj, 0) + 1
+                 self.queue = [('move_rel_up', SAFE_Z, None)]
+                 return None
+             a[10] = -1.0
+@@ -326,6 +332,9 @@ class GeneratedApproach:
+                 return None
+             self.queue.pop(0)
+             if not allow:
++                if not grasping and self.cur_obj is not None:
++                    self.grasp_fail += 1
++                    self.fail_count[self.cur_obj] = self.fail_count.get(self.cur_obj, 0) + 1
+                 if kind == 'place_move' and self.cur_spot is not None and self.place_yaw is None:
+                     self.bad_spots.append(tuple(self.cur_spot))
+                 self.queue = [('move_rel_up', SAFE_Z + 0.03, None, True)]  # retreat, then replan

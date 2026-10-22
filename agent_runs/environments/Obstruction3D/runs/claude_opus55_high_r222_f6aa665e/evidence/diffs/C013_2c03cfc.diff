@@ -1,0 +1,185 @@
+diff --git a/approach.py b/approach.py
+index 9f38194..a72711c 100644
+--- a/approach.py
++++ b/approach.py
+@@ -120,7 +120,7 @@ def wrap(a):
+ TABLE_TOP = 0.075
+ STEP_FAST = 0.12
+ STEP_LOW = 0.05
+-SAFE_FLOOR = 0.26
++SAFE_FLOOR = 0.2
+ SAFE_CLR = 0.02
+ MOUNT_OFF = 0.12            # arm mount = base_xy + MOUNT_OFF * (cos rot, sin rot)
+ TABLE_X = (0.10, 0.50)
+@@ -306,11 +306,20 @@ class GeneratedApproach:
+         cands.sort(key=lambda c: -c[0])
+         return cands
+ 
+-    def _safe_z(self, boxes, exclude=None, held_below=0.0):
++    def _safe_z(self, boxes, exclude=None, held_below=0.0, path=None, rad=0.08):
+         top = TABLE_TOP + 0.03
+         for n, b in boxes.items():
+             if b["g"] > 0.5 or n == exclude:
+                 continue
++            if path is not None:
++                a = np.asarray(path[0][:2], float)
++                c = np.asarray(path[1][:2], float)
++                o = np.array([b["x"], b["y"]])
++                ab = c - a
++                t = 0.0 if ab @ ab < 1e-12 else min(1.0, max(0.0, (o - a) @ ab / (ab @ ab)))
++                ex, ey = self._extent_xy(b)
++                if np.linalg.norm(a + t * ab - o) > rad + np.hypot(ex, ey):
++                    continue
+             top = max(top, b["z"] + b["hz"])
+         return max(SAFE_FLOOR, top + SAFE_CLR + held_below + FINGER)
+ 
+@@ -387,7 +396,8 @@ class GeneratedApproach:
+         b = boxes[name]
+         yaw, tip = cand
+         seeds = [q, self.q_nom, self.q_home]
+-        safe = self._safe_z(boxes)
++        Tw0 = self._ee_world(q, base)
++        safe = self._safe_z(boxes, path=(Tw0[:3, 3], (b["x"], b["y"])))
+         grasp_z = tip + FINGER
+         above = np.array([b["x"], b["y"], safe])
+         gpos = np.array([b["x"], b["y"], grasp_z])
+@@ -420,8 +430,11 @@ class GeneratedApproach:
+         # xy offset of object centre relative to EE (in world, keep yaw constant)
+         dxy = np.array([b["x"] - Tw[0, 3], b["y"] - Tw[1, 3]])
+         seeds = [q, self.q_nom, self.q_home]
+-        safe = max(self._safe_z(boxes, exclude=name, held_below=b["hz"] + off - FINGER),
+-                   Tw[2, 3])
++        hb = b["hz"] + off - FINGER
++        ex0 = np.array([place_xy[0] - dxy[0], place_xy[1] - dxy[1]])
++        bex, bey = self._extent_xy(b)
++        safe = self._safe_z(boxes, exclude=name, held_below=hb,
++                            path=(Tw[:3, 3], ex0), rad=max(0.08, np.hypot(bex, bey) + 0.02))
+         safe = max(safe, bottom + b["hz"] + off + 0.03)
+         ex = np.array([place_xy[0] - dxy[0], place_xy[1] - dxy[1]])
+         pz = bottom + b["hz"] + off
+@@ -429,13 +442,12 @@ class GeneratedApproach:
+         ppos = np.array([ex[0], ex[1], pz])
+         nb, ok = self._choose_base(base, [(above, yaw), (ppos, yaw)], seeds)
+         segs = []
+-        segs.append(("move", np.array([Tw[0, 3], Tw[1, 3], safe]), yaw, "lift"))
++        segs.append(("move", np.array([Tw[0, 3], Tw[1, 3], max(safe, Tw[2, 3])]), yaw, "lift"))
+         if np.max(np.abs(nb - base)) > 1e-6:
+             segs.append(("base", nb))
+         segs.append(("move", above, yaw, "travel"))
+         segs.append(("move", ppos, yaw, "place_descend"))
+         segs.append(("grip", 1.0, None))
+-        segs.append(("move", np.array([ex[0], ex[1], pz + 0.06]), yaw, "retreat"))
+         return segs
+ 
+     def _held(self, boxes):
+diff --git a/probe_dz.py b/probe_dz.py
+new file mode 100644
+index 0000000..ebfc781
+--- /dev/null
++++ b/probe_dz.py
+@@ -0,0 +1,18 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++seed=int(sys.argv[1]); DZ=float(sys.argv[2])
++class P(GeneratedApproach):
++    def _plan_place(self, state, boxes, name, place_xy, bottom):
++        if name=="target_block": bottom=bottom+DZ
++        return super()._plan_place(state, boxes, name, place_xy, bottom)
++    def _blocking(self, boxes): return []
++env=make_env(); obs,info=env.reset(seed=seed, options={"object_count":0})
++ap=P(env.action_space, env.observation_space, {}); ap.reset(obs,info)
++rob=ap._robot(obs); r_=ap._boxes(obs)["target_region"]
++for t in range(40):
++    a=ap.get_action(obs)
++    obs,r,term,trunc,info=env.step(a)
++    bb=ap._boxes(obs)["target_block"]
++    print(t, "a10",round(float(a[10]),2),"grasp",obs.get(rob,"grasp_active"),"blkg",bb["g"],"bottom-regtop",round(bb["z"]-bb["hz"]-r_["z"]-r_["hz"],4),"term",term, ap.cur[0] if ap.cur else None)
++    if term: break
+diff --git a/res_t.txt b/res_t.txt
+index f398c79..2eb641c 100644
+--- a/res_t.txt
++++ b/res_t.txt
+@@ -1,41 +1,41 @@
+-(0, 2, True, 43, 31.6, 0.3, 0.078)
+-(1, 1, True, 45, 34.5, 0.3, 0.055)
+-(2, 2, True, 63, 61.2, 0.44, 0.068)
+-(3, 2, True, 40, 27.5, 0.22, 0.029)
+-(4, 2, True, 49, 42.5, 0.31, 0.049)
+-(5, 2, True, 65, 56.2, 0.4, 0.053)
+-(6, 1, True, 38, 25.2, 0.27, 0.073)
+-(7, 2, True, 50, 40.6, 0.29, 0.051)
+-(8, 2, True, 50, 53.1, 0.22, 0.02)
+-(9, 1, True, 28, 26.3, 0.11, 0.018)
+-(10, 2, True, 35, 37.3, 0.17, 0.043)
+-(11, 0, True, 22, 23.2, 0.1, 0.016)
+-(12, 1, True, 45, 44.1, 0.25, 0.024)
+-(13, 2, True, 58, 59.7, 0.37, 0.029)
+-(14, 0, True, 13, 12.9, 0.05, 0.01)
+-(15, 2, True, 37, 40.7, 0.21, 0.025)
+-(16, 1, True, 32, 22.7, 0.16, 0.019)
+-(17, 2, True, 51, 54.3, 0.36, 0.029)
+-(18, 2, True, 34, 32.8, 0.18, 0.025)
+-(19, 1, True, 42, 40.8, 0.39, 0.037)
+-(20, 2, True, 59, 66.2, 0.34, 0.026)
+-(21, 0, True, 30, 33.8, 0.2, 0.023)
+-(22, 2, True, 35, 37.9, 0.21, 0.026)
+-(23, 0, True, 29, 33.6, 0.19, 0.02)
+-(24, 1, True, 25, 24.1, 0.16, 0.023)
+-(25, 1, True, 49, 48.6, 0.24, 0.018)
+-(26, 2, True, 37, 33.4, 0.19, 0.026)
+-(27, 0, True, 37, 34.6, 0.23, 0.028)
+-(28, 1, True, 62, 58.0, 0.44, 0.04)
+-(29, 2, True, 22, 20.0, 0.11, 0.029)
+-(30, 0, True, 30, 26.2, 0.16, 0.027)
+-(31, 1, True, 51, 41.7, 0.32, 0.075)
+-(32, 2, True, 46, 37.0, 0.22, 0.02)
+-(33, 2, True, 47, 34.8, 0.28, 0.04)
+-(34, 0, True, 18, 15.4, 0.14, 0.07)
+-(35, 0, True, 20, 17.8, 0.16, 0.059)
+-(36, 1, True, 29, 18.2, 0.17, 0.028)
+-(37, 0, True, 23, 10.8, 0.17, 0.064)
+-(38, 0, True, 20, 8.1, 0.1, 0.014)
+-(39, 2, True, 52, 8.3, 0.28, 0.023)
+-success 40 / 40 mean steps 39.025
++(0, 2, True, 40, 63.9, 0.3, 0.065)
++(1, 1, True, 43, 61.8, 0.34, 0.049)
++(2, 2, True, 61, 87.9, 0.4, 0.026)
++(3, 2, True, 37, 60.8, 0.31, 0.064)
++(4, 2, True, 45, 71.8, 0.34, 0.073)
++(5, 2, True, 60, 71.7, 0.43, 0.034)
++(6, 1, True, 36, 47.6, 0.25, 0.026)
++(7, 2, True, 49, 69.0, 0.43, 0.085)
++(8, 2, True, 45, 48.7, 0.27, 0.021)
++(9, 1, True, 28, 23.1, 0.2, 0.039)
++(10, 2, True, 32, 31.3, 0.24, 0.057)
++(11, 0, True, 22, 23.1, 0.14, 0.017)
++(12, 1, True, 42, 36.7, 0.27, 0.035)
++(13, 2, True, 59, 57.7, 0.38, 0.025)
++(14, 0, True, 13, 14.3, 0.07, 0.018)
++(15, 2, True, 38, 33.3, 0.23, 0.022)
++(16, 1, True, 30, 23.8, 0.22, 0.027)
++(17, 2, True, 47, 37.2, 0.34, 0.034)
++(18, 2, True, 31, 25.3, 0.19, 0.02)
++(19, 1, True, 41, 32.7, 0.32, 0.047)
++(20, 2, True, 57, 55.8, 0.41, 0.05)
++(21, 0, True, 30, 29.4, 0.18, 0.021)
++(22, 2, True, 32, 31.3, 0.16, 0.019)
++(23, 0, True, 29, 30.0, 0.21, 0.026)
++(24, 1, True, 24, 22.6, 0.15, 0.014)
++(25, 1, True, 47, 47.3, 0.46, 0.092)
++(26, 2, True, 35, 30.1, 0.27, 0.034)
++(27, 0, True, 37, 34.6, 0.31, 0.033)
++(28, 1, True, 61, 57.3, 0.48, 0.073)
++(29, 2, True, 22, 18.8, 0.15, 0.029)
++(30, 0, True, 30, 30.7, 0.29, 0.032)
++(31, 1, True, 50, 45.7, 0.38, 0.069)
++(32, 2, True, 40, 36.8, 0.2, 0.015)
++(33, 2, True, 41, 35.7, 0.27, 0.035)
++(34, 0, True, 18, 17.3, 0.12, 0.023)
++(35, 0, True, 20, 19.4, 0.12, 0.021)
++(36, 1, True, 25, 19.7, 0.12, 0.017)
++(37, 0, True, 23, 14.2, 0.14, 0.02)
++(38, 0, True, 20, 9.3, 0.12, 0.033)
++(39, 2, True, 56, 5.8, 0.33, 0.024)
++success 40 / 40 mean steps 37.4

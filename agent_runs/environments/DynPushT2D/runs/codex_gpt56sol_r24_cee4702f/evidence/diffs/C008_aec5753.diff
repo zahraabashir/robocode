@@ -1,0 +1,32 @@
+diff --git a/probe_dynamics.py b/probe_dynamics.py
+index 2140a5a..3c8404b 100644
+--- a/probe_dynamics.py
++++ b/probe_dynamics.py
+@@ -83,6 +83,7 @@ def ram_center(seed):
+                 obs[16:18].copy(),
+                 obs[0:2].copy(),
+                 obs[3:6].copy(),
++                float(obs[2]),
+             )
+         if first_contact is not None and step in {
+             first_contact[0],
+@@ -103,12 +104,19 @@ def ram_center(seed):
+             break
+     fc = None
+     if first_contact:
++        contact_delta = first_contact[2] - first_contact[3]
++        c, s = math.cos(first_contact[5]), math.sin(first_contact[5])
++        local_contact = np.array(
++            [c * contact_delta[0] + s * contact_delta[1],
++             -s * contact_delta[0] + c * contact_delta[1]]
++        )
+         fc = (
+             first_contact[0],
+             round(first_contact[1], 5),
+             np.round(first_contact[2], 5).tolist(),
+             np.round(first_contact[3], 5).tolist(),
+             np.round(first_contact[4], 5).tolist(),
++            np.round(local_contact, 5).tolist(),
+         )
+     pretty_samples = [
+         (s, np.round(d, 5).tolist(), round(a, 5), np.round(r, 5).tolist())

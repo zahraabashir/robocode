@@ -1,0 +1,63 @@
+diff --git a/approach.py b/approach.py
+index b4a9f6d..e8e2eec 100644
+--- a/approach.py
++++ b/approach.py
+@@ -243,6 +243,18 @@ class GeneratedApproach:
+             steps += 1
+         return steps
+ 
++    def _box_ok(self, bx, grasps, tplace):
++        """Dropped box must not block grasps of other objects nor the target placement."""
++        rs = {'_box': bx}
++        for gx, gy in grasps:
++            if self._clear_y_at(gx, rs, None, ARM_MAX, vm=VM) > gy - 1e-4:
++                return False
++        if tplace is not None:
++            rx, ry, hb = tplace
++            if self._clear_y_at(rx, rs, hb, ARM_MAX) > ry - 1e-4:
++                return False
++        return True
++
+     def _mk_held(self, o, gx, gy):
+         return dict(name=o['name'], dx0=o['x0'] - gx, dx1=o['x1'] - gx,
+                     dy0=o['y0'] - gy, dy1=o['y1'] - gy)
+@@ -260,6 +272,14 @@ class GeneratedApproach:
+             _, _, rxt, ryt, _ = cands[0]
+         else:
+             rxt, ryt = (surf['x0'] + surf['x1']) / 2, 0.5
++        tplace = None
++        if cands:
++            tplace = (cands[0][2], cands[0][3], held_b)
++        grasps = []
++        for k, q in others.items():
++            if q['type'] == 'target_surface':
++                continue
++            grasps.append((self._grasp_x(q, others), q['y1'] + ARM_MAX + r['gw'] + self.grasp_eps))
+         P1 = self._profile(xs, others, held)
+         P2 = self._profile(xs, others, None)
+         P3 = self._profile(xs, {k: v for k, v in others.items() if k != blk['name']}, held_b)
+@@ -291,7 +311,9 @@ class GeneratedApproach:
+                     c3 = self._est(gxb, gyb, rxt, ryt, P3n)
+                     cost = c1 + c2 + c3 + 0.01 * (ry - ry_low)
+                     if best is None or cost < best[0]:
+-                        best = (cost, rx, ry)
++                        bx = dict(x0=x0, x1=x1, y1=ry + held['dy1'], name='_box')
++                        if self._box_ok(bx, grasps, tplace):
++                            best = (cost, rx, ry)
+             if best is not None:
+                 return best[1], best[2], gx, gy
+         return None
+diff --git a/big_test.txt b/big_test.txt
+index 45069c7..c9bf6dc 100644
+--- a/big_test.txt
++++ b/big_test.txt
+@@ -4,6 +4,6 @@ success 60 / 60 mean steps 48.75
+ (2049, 3, False, 1000, 62.1)
+ (2051, 3, False, 1000, 41.5)
+ success 58 / 60 mean steps 82.1
+- False, 1000, 197.2)
+-(1077, 4, False, 1000, 133.9)
+-success 76 / 80 mean steps 103.3625
++(2021, 4, False, 1000, 71.3)
++(2024, 4, False, 1000, 78.7)
++success 58 / 60 mean steps 86.53333333333333

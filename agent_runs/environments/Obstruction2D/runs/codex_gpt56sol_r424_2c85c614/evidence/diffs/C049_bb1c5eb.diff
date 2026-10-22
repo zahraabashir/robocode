@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 8d3b6a3..82b4498 100644
+--- a/approach.py
++++ b/approach.py
+@@ -71,7 +71,7 @@ class GeneratedApproach:
+             used.append((self.target_park, tw))
+         for o in obstacles:
+             ow = state.get(o, "width")
+-            goal_clearance = sw / 2 + tw / 2 + ow / 2 + 0.03
++            goal_clearance = sw / 2 + tw / 2 + ow / 2 + 0.10
+             future = [q for q in obstacles + [target]
+                       if q.name != o.name and first_rank.get(q.name, 10**9) > first_rank[o.name]]
+             valid = [x for x in candidates

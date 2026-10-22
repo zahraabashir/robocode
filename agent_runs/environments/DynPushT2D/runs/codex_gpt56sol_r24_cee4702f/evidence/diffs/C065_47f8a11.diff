@@ -1,0 +1,41 @@
+diff --git a/approach.py b/approach.py
+index 3d51f31..49acfd4 100644
+--- a/approach.py
++++ b/approach.py
+@@ -107,10 +107,17 @@ class GeneratedApproach:
+         ae = self._angle(goal_theta - theta)
+         dp = goal - obj
+         pd = float(np.linalg.norm(dp))
++        local_outline = [(-lh*.5, -width*.5), (lh*.5, -width*.5),
++                         (-lh*.5, width*.5), (lh*.5, width*.5),
++                         (-width*.5, -lv), (width*.5, -lv)]
++        outline = np.array([obj + self._world(np.array(p), theta)
++                            for p in local_outline])
++        footprint_crowded = (float(np.min(outline)) < 0.42 or
++                             float(np.max(outline)) > 4.58)
+ 
+         if self.mode == "choose":
+             branch_mismatch = pd < 0.06 and abs(goal_theta-theta) > 0.14
+-            boundary_recover = min(obj) < 0.92 or max(obj) > 4.08
++            boundary_recover = footprint_crowded
+             if (abs(ae) > 0.11 or branch_mismatch) and not boundary_recover and not self.force_move:
+                 self.turn_sign = 1.0 if ae > 0.0 else -1.0
+                 self.mode = "rot_far"
+@@ -189,7 +196,7 @@ class GeneratedApproach:
+                 self.count += 1
+                 current_ae = self._angle(goal_theta - theta)
+                 turned = abs(self._angle(theta - self.start_pose[2]))
+-                crowded = min(obj) < 0.95 or max(obj) > 4.05
++                crowded = footprint_crowded
+                 edge_zone = min(obj) < 1.20 or max(obj) > 3.80
+                 turn_limit = 0.12 if crowded else (0.22 if edge_zone else 0.18)
+                 count_limit = 8 if crowded else (11 if edge_zone else 9)
+@@ -236,7 +243,7 @@ class GeneratedApproach:
+                 return self._safe(-self.push_dir, 0.018)
+             # Once contact is established, keep following through in short
+             # closed-loop segments instead of paying to reacquire every time.
+-            near_boundary = min(obj) < 0.96 or max(obj) > 4.04
++            near_boundary = footprint_crowded
+             if self.force_move and moved > 0.55:
+                 self.force_move = False
+                 self.mode = "move_retreat"

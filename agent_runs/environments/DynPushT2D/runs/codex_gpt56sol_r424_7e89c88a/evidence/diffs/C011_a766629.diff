@@ -1,0 +1,53 @@
+diff --git a/probe_rotation_agent.py b/probe_rotation_agent.py
+index 9e2024d..4a9ec23 100644
+--- a/probe_rotation_agent.py
++++ b/probe_rotation_agent.py
+@@ -69,11 +69,44 @@ def vertical_scan(seed, xoff):
+     env.close()
+ 
+ 
++def short_vertical(seed, xoff, direction, pushes):
++    env = make_env(); s, _ = env.reset(seed=seed)
++    bx, by = s[:2]
++    start_y = by - 1.2 if direction > 0 else by + 1.2
++    # Seed 11 starts well below the block; route around its left or right edge.
++    route_x = bx - 1.0 if xoff < 0 else bx + 1.0
++    s = move_to(env, s, [route_x, s[17]])
++    s = move_to(env, s, [route_x, start_y])
++    s = move_to(env, s, [bx + xoff, start_y])
++    prep = s[:3].copy()
++    contact = None
++    after = 0
++    for k in range(45):
++        old = s[:3].copy()
++        a = np.array([0.0, direction * 0.049], dtype=np.float32)
++        s, _, done, trunc, _ = env.step(a)
++        moved = np.linalg.norm(s[:2]-old[:2]) > 2e-5 or abs(wrap(float(s[2]-old[2]))) > 2e-5
++        if contact is None and moved:
++            contact = k
++        if contact is not None:
++            after += 1
++            if after >= pushes: break
++        if done or trunc: break
++    print("SHORTV", "xoff", xoff, "dir", direction, "n", pushes,
++          "prep", np.round(prep-[bx,by,s[2]*0 + prep[2]], 4),
++          "contact", contact, "delta", np.round(s[:2]-prep[:2],4),
++          "dth", round(wrap(float(s[2]-prep[2])),4),
++          "vel", np.round(s[[3,4,5]],4))
++    env.close()
++
++
+ def main():
+-    for off in [-0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7]:
+-        horizontal_scan(11, off)
+-    for off in [-0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7]:
+-        vertical_scan(11, off)
++    for off in [-0.5, -0.35, 0.35, 0.5]:
++        for n in [1, 2, 4, 8]:
++            short_vertical(11, off, 1, n)
++    for off in [-0.5, 0.5]:
++        for n in [1, 2, 4, 8]:
++            short_vertical(11, off, -1, n)
+ 
+ 
+ if __name__ == "__main__":

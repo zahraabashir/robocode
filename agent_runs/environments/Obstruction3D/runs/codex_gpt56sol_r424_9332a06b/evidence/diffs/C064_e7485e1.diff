@@ -1,0 +1,12 @@
+diff --git a/test_approach.py b/test_approach.py
+index f5e7ad2..3b30628 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -9,6 +9,7 @@ for seed in map(int,sys.argv[1:] or [11]):
+    rob=s.get_object_from_name('robot');b=s.get_object_from_name('target_block')
+    cur=s.get_object_from_name(p.object_name)
+    print(seed,t,p.object_name,p.mode,p.waypoint,'held',s.get(rob,'grasp_active'),
++         'finger',round(s.get(rob,'finger_state'),3),
+          'obj',[round(s.get(cur,'pose_'+c),3) for c in 'xyz'],
+          'b',[round(s.get(b,'pose_'+c),3) for c in 'xyz'])
+   if d or tr: break

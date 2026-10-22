@@ -1,0 +1,34 @@
+diff --git a/probe_dense.py b/probe_dense.py
+new file mode 100644
+index 0000000..137881b
+--- /dev/null
++++ b/probe_dense.py
+@@ -0,0 +1,6 @@
++from env_client import make_env
++import sys,numpy as np
++E=make_env();s,i=E.reset(seed=int(sys.argv[1]),options={'object_count':int(sys.argv[2])});o=s.get_object_from_name(sys.argv[3]);pos=lambda o:np.array([s.get(o,'pose_'+f) for f in 'xyz']);p=pos(o)
++for x in sorted(s.get_objects(E.observation_space.get_type('Kinematic3DCuboid')),key=lambda x:np.linalg.norm(pos(x)-p)):
++ print(x,pos(x).round(4),[round(s.get(x,'half_extent_'+f),4) for f in 'xyz'])
++E.close()
+diff --git a/stress20.txt b/stress20.txt
+index e279836..07000e0 100644
+--- a/stress20.txt
++++ b/stress20.txt
+@@ -2,3 +2,6 @@ progress 0 above obstruction13:Kinematic3DCuboid 0 9 0 0 0.1
+ progress 50 above obstruction13:Kinematic3DCuboid 0 9 0 3 13.58
+ progress 100 align obstruction13:Kinematic3DCuboid 0 9 0 5 25.09
+ progress 150 grasp obstruction13:Kinematic3DCuboid 0 9 2 7 33.85
++progress 200 align obstruction13:Kinematic3DCuboid 0 9 0 10 48.74
++progress 250 grasp obstruction13:Kinematic3DCuboid 0 9 0 12 54.08
++{"seed": 1, "count": 20, "success": false, "steps": 274, "seconds": 58.17, "compute": 0.208, "phase": "grasp", "obj": "obstruction13:Kinematic3DCuboid", "stall": 2, "attempt": 13}
+diff --git a/test_sweep_current.out b/test_sweep_current.out
+index 74da5f0..b29cf81 100644
+--- a/test_sweep_current.out
++++ b/test_sweep_current.out
+@@ -21,3 +21,6 @@
+ {"seed": 81, "count": 0, "success": true, "steps": 30, "sec": 2.04}
+ {"seed": 82, "count": 2, "success": true, "steps": 81, "sec": 4.75}
+ {"seed": 83, "count": 2, "success": true, "steps": 55, "sec": 4.77}
++{"seed": 84, "count": 1, "success": true, "steps": 54, "sec": 5.1}
++{"seed": 85, "count": 2, "success": true, "steps": 80, "sec": 6.64}
++{"seed": 86, "count": 2, "success": true, "steps": 83, "sec": 3.66}

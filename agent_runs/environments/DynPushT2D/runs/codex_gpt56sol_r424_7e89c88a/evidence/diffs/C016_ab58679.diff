@@ -1,0 +1,117 @@
+diff --git a/approach.py b/approach.py
+index ba422cd..c2fc7c5 100644
+--- a/approach.py
++++ b/approach.py
+@@ -12,6 +12,12 @@ class GeneratedApproach:
+ 
+     def reset(self, state, info):
+         self.step = 0
++        self.mode = "stage"
++        self.push_steps = 0
++
++    @staticmethod
++    def _wrap(angle):
++        return (angle + math.pi) % (2.0 * math.pi) - math.pi
+ 
+     def get_action(self, state):
+         s = np.asarray(state, dtype=float)
+@@ -24,9 +30,34 @@ class GeneratedApproach:
+             direction = np.array([1.0, 0.0])
+         else:
+             direction = delta / distance
+-        # Aim through the block. Collision constrains the robot at the boundary;
+-        # continuing toward a point beyond the centre supplies the push.
+-        target = block + direction * 0.5
++        behind = -direction
++        desired_angle = math.atan2(behind[1], behind[0])
++        rel = robot - block
++        radius = float(np.linalg.norm(rel))
++        current_angle = math.atan2(rel[1], rel[0]) if radius > 1e-8 else desired_angle
++        angle_error = self._wrap(desired_angle - current_angle)
++
++        if self.mode == "push":
++            # Periodically re-stage so angular or lateral errors cannot accumulate.
++            target = block + direction * 0.45
++            self.push_steps += 1
++            if self.push_steps >= 35:
++                self.mode = "stage"
++        else:
++            clearance = 0.78
++            # Orbit outside the T's circumscribed radius; direct travel to the
++            # far side would otherwise collide with and rotate the object.
++            if radius < clearance - 0.04:
++                target = block + clearance * np.array([math.cos(current_angle), math.sin(current_angle)])
++            elif abs(angle_error) > 0.055:
++                next_angle = current_angle + float(np.clip(angle_error, -0.10, 0.10))
++                target = block + clearance * np.array([math.cos(next_angle), math.sin(next_angle)])
++            else:
++                target = block + clearance * behind
++                if np.linalg.norm(robot - target) < 0.035:
++                    self.mode = "push"
++                    self.push_steps = 0
++                    target = block + direction * 0.45
+         # The server checks the open interval despite the advertised Box bounds.
+         move = np.clip(target - robot, self.low + 1e-6, self.high - 1e-6)
+         self.step += 1
+diff --git a/probe_geometry.py b/probe_geometry.py
+index 2321799..b7f341c 100644
+--- a/probe_geometry.py
++++ b/probe_geometry.py
+@@ -126,9 +126,45 @@ def natural(seed, speed=0.005):
+     env.close()
+ 
+ 
++def push_response(seed, approach_speed=0.015, push_speed=0.01, pushes=20):
++    """Approach along the reset-to-center line, then maintain that push direction."""
++    env = make_env()
++    obs, _ = env.reset(seed=seed)
++    initial = obs.copy()
++    direction = initial[:2] - initial[16:18]
++    direction /= np.linalg.norm(direction)
++    contact = None
++    for k in range(400):
++        prev = obs.copy()
++        obs, _, term, trunc, _ = env.step(direction * approach_speed)
++        if np.linalg.norm(obs[:2] - prev[:2]) + abs(obs[2] - prev[2]) > 1e-7:
++            contact = prev.copy()
++            break
++        if term or trunc:
++            break
++    if contact is None:
++        print("push", seed, "NO CONTACT")
++        env.close()
++        return
++    at_contact = obs.copy()
++    for _ in range(pushes):
++        obs, _, term, trunc, _ = env.step(direction * push_speed)
++        if term or trunc:
++            break
++    rel = contact[16:18] - contact[:2]
++    ct, st = math.cos(-contact[2]), math.sin(-contact[2])
++    local = np.array([[ct, -st], [st, ct]]) @ rel
++    db = obs[:3] - at_contact[:3]
++    print("push", seed, "local_contact", np.round(local, 4),
++          "20step block", np.round(db, 5), "robot", np.round(obs[16:18] - at_contact[16:18], 5),
++          "per_action_xy", round(float(np.linalg.norm(db[:2])) / pushes, 5),
++          "rot_per_action", round(float(db[2]) / pushes, 5))
++    env.close()
++
++
+ if __name__ == "__main__":
+     ap = argparse.ArgumentParser()
+-    ap.add_argument("mode", choices=["brief", "free", "rays", "natural"])
++    ap.add_argument("mode", choices=["brief", "free", "rays", "natural", "push"])
+     ap.add_argument("--seed", type=int, default=0)
+     args = ap.parse_args()
+     if args.mode == "brief":
+@@ -140,6 +176,9 @@ if __name__ == "__main__":
+         env = make_env(); o, _ = env.reset(seed=args.seed); th = float(o[2]); env.close()
+         for local_angle in np.linspace(0, 2 * math.pi, 12, endpoint=False):
+             ray(args.seed, th + local_angle)
+-    else:
++    elif args.mode == "natural":
+         for s in range(40):
+             natural(s)
++    else:
++        for s in range(12):
++            push_response(s)

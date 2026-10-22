@@ -1,0 +1,52 @@
+diff --git a/probe_grasp.py b/probe_grasp.py
+new file mode 100644
+index 0000000..8817979
+--- /dev/null
++++ b/probe_grasp.py
+@@ -0,0 +1,46 @@
++"""Focused black-box probes for Obstruction3D grasp mechanics."""
++
++import numpy as np
++
++from env_client import make_env
++
++
++def read(state, obj, names):
++    return {name: float(state.get(obj, name)) for name in names}
++
++
++def snapshot(state):
++    out = {}
++    for name in state.get_object_names():
++        obj = state.get_object_from_name(name)
++        try:
++            out[name] = read(state, obj, ["pose_x", "pose_y", "pose_z", "grasp_active"])
++        except Exception:
++            out[name] = read(state, obj, [
++                "pos_base_x", "pos_base_y", "pos_base_rot",
++                "joint_1", "joint_2", "joint_3", "joint_4", "joint_5",
++                "joint_6", "joint_7", "finger_state", "grasp_active",
++                "grasp_tf_x", "grasp_tf_y", "grasp_tf_z",
++            ])
++    return out
++
++
++def main():
++    env = make_env()
++    state, info = env.reset(seed=0)
++    print("max_steps", env.max_steps, "info", info)
++    print(snapshot(state))
++    for label, action in [
++        ("close", [0] * 10 + [-1]),
++        ("open", [0] * 10 + [1]),
++        ("all_joint_plus", [0, 0, 0] + [0.2] * 7 + [0]),
++        ("all_joint_minus", [0, 0, 0] + [-0.2] * 7 + [0]),
++        ("base_plus", [0.2, 0.2, 0.2] + [0] * 8),
++    ]:
++        state, reward, term, trunc, info = env.step(np.asarray(action, dtype=np.float32))
++        print(label, reward, term, trunc, info, snapshot(state))
++    env.close()
++
++
++if __name__ == "__main__":
++    main()

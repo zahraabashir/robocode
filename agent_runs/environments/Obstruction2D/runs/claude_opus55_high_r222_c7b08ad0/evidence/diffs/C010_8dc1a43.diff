@@ -1,0 +1,87 @@
+diff --git a/approach.py b/approach.py
+index 9c84cc6..b4a9f6d 100644
+--- a/approach.py
++++ b/approach.py
+@@ -296,6 +296,33 @@ class GeneratedApproach:
+                 return best[1], best[2], gx, gy
+         return None
+ 
++    def _grasp_blockers(self, o, rects):
++        """Names of objects preventing a top-down grasp of o (best offset)."""
++        r = self.r
++        goal = o['y1'] + ARM_MAX + r['gw'] + self.grasp_eps
++        best = None
++        for cx in np.linspace(o['x0'] + 0.008, o['x1'] - 0.008, 21):
++            if cx < WORLD_X[0] + r['R'] + 1e-3 or cx > WORLD_X[1] - r['R'] - 1e-3:
++                continue
++            bl = []
++            for n, q in rects.items():
++                if n == o['name']:
++                    continue
++                if self._clear_y_at(cx, {n: q}, None, ARM_MAX, vm=VM) > goal + 1e-6:
++                    bl.append(n)
++            if best is None or len(bl) < len(best):
++                best = bl
++                if not bl:
++                    break
++        return best or []
++
++    def _resolve(self, name, rects, depth=0):
++        bl = self._grasp_blockers(rects[name], rects)
++        if not bl or depth > 4:
++            return name
++        bl.sort(key=lambda n: -rects[n]['y1'])
++        return self._resolve(bl[0], rects, depth + 1)
++
+     def _plan(self, rects):
+         surf = None
+         blk = None
+@@ -306,16 +333,19 @@ class GeneratedApproach:
+                 blk = o
+         cands, held, gx, gy = self._place_candidates_target(blk, surf, rects)
+         if not cands or cands[0][0] == 0:
+-            if cands:
+-                _, _, rx, ry, _ = cands[0]
+-            else:
+-                rx = (surf['x0'] + surf['x1']) / 2 - (held['dx0'] + held['dx1']) / 2
+-                ry = surf['y1'] + BOTTOM_OFF - held['dy0']
+-            return dict(obj=blk['name'], gx=gx, gy=gy, px=rx, py=ry, kind='target')
+-        blockers = cands[0][4]
+-        # remove the blocker closest to robot
+-        blockers = sorted(blockers, key=lambda n: abs((rects[n]['x0'] + rects[n]['x1']) / 2 - self.r['x']))
+-        name = blockers[0]
++            name = self._resolve(blk['name'], rects)
++            if name == blk['name']:
++                if cands:
++                    _, _, rx, ry, _ = cands[0]
++                else:
++                    rx = (surf['x0'] + surf['x1']) / 2 - (held['dx0'] + held['dx1']) / 2
++                    ry = surf['y1'] + BOTTOM_OFF - held['dy0']
++                return dict(obj=blk['name'], gx=gx, gy=gy, px=rx, py=ry, kind='target')
++        else:
++            blockers = cands[0][4]
++            # remove the blocker closest to robot
++            blockers = sorted(blockers, key=lambda n: abs((rects[n]['x0'] + rects[n]['x1']) / 2 - self.r['x']))
++            name = self._resolve(blockers[0], rects)
+         o = rects[name]
+         spot = self._drop_spot(o, rects, surf, blk)
+         if spot is None:
+diff --git a/big_test.txt b/big_test.txt
+index f870ad2..45069c7 100644
+--- a/big_test.txt
++++ b/big_test.txt
+@@ -1,5 +1,9 @@
+-(1072, 1, False, 1000, 13.5)
+-success 79 / 80 mean steps 46.675
+-success 80 / 80 mean steps 44.2875
+-(1038, 3, False, 1000, 65.5)
+-success 79 / 80 mean steps 58.7125
++success 60 / 60 mean steps 21.15
++success 60 / 60 mean steps 33.18333333333333
++success 60 / 60 mean steps 48.75
++(2049, 3, False, 1000, 62.1)
++(2051, 3, False, 1000, 41.5)
++success 58 / 60 mean steps 82.1
++ False, 1000, 197.2)
++(1077, 4, False, 1000, 133.9)
++success 76 / 80 mean steps 103.3625

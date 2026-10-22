@@ -1,0 +1,984 @@
+[
+  {
+    "id": "C001",
+    "commit": "9afebcc4567cde1b8b54326e22dfcb1cbd708457",
+    "parents": [],
+    "date": "2026-09-20T03:46:11+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".gitignore",
+      "AGENTS.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_9afebcc.diff",
+    "diff_sha256": "bbb48dfd716715b7b96398cfd6f42873f1a95d1f90fa711484832e33a7038909",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "761887dbff1e2942ebe943d7ae74be9c61af0e1e",
+    "parents": [
+      "9afebcc4567cde1b8b54326e22dfcb1cbd708457"
+    ],
+    "date": "2026-09-20T03:46:40+02:00",
+    "title": "Add initial observation probe",
+    "files": [
+      "inspect_env.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C002_761887d.diff",
+    "diff_sha256": "35f836d5b696f43aef912f1c6a86a9fbc182a7c0138afef1742bbcce414f072c",
+    "events": [
+      {
+        "event": "E0007",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C003",
+    "commit": "9c8f0e94ede4353666f40be4487d702223d14905",
+    "parents": [
+      "761887dbff1e2942ebe943d7ae74be9c61af0e1e"
+    ],
+    "date": "2026-09-20T03:46:59+02:00",
+    "title": "Add initial geometry observation probe",
+    "files": [
+      "probe_geometry.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C003_9c8f0e9.diff",
+    "diff_sha256": "bfcdaa92c3512f66ef140fb438df8be5c10fe3a438a7bd1826df42e8c7949bf6",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C004",
+    "commit": "9bac1cd2df09557f5209075b1add81601c502b98",
+    "parents": [
+      "9c8f0e94ede4353666f40be4487d702223d14905"
+    ],
+    "date": "2026-09-20T03:47:17+02:00",
+    "title": "Probe motion scale and static wall collision",
+    "files": [
+      "probe_geometry.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C004_9bac1cd.diff",
+    "diff_sha256": "3918a4c6bf7dcbeca9d0c9a5228fa04740a76e6e11cb9417b80ba06bae70ff3b",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C005",
+    "commit": "95c9e620f775847d4e6ba5415d01e7fd2e26e589",
+    "parents": [
+      "9bac1cd2df09557f5209075b1add81601c502b98"
+    ],
+    "date": "2026-09-20T03:47:30+02:00",
+    "title": "Add camera visibility probes across candidate viewpoints",
+    "files": [
+      "probe_camera.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C005_95c9e62.diff",
+    "diff_sha256": "93a5dc63bde858ec87c2f9e671bb52fb1c72714fe722dd8d4c20b4bc2c59be7b",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C006",
+    "commit": "2777b78986fb3c3fa0e38dd17aede602a6da6f68",
+    "parents": [
+      "95c9e620f775847d4e6ba5415d01e7fd2e26e589"
+    ],
+    "date": "2026-09-20T03:47:43+02:00",
+    "title": "Map center wall extent with independent crossing probes",
+    "files": [
+      "probe_camera.log",
+      "probe_geometry.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C006_2777b78.diff",
+    "diff_sha256": "df1a6d14e13ede390a83402b7eb9ab3aac4ee690eb79aeb40c16c866aedcfbe0",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C007",
+    "commit": "f17dd4f3a77f0d141c2b0b5489f9c47344c4ad20",
+    "parents": [
+      "2777b78986fb3c3fa0e38dd17aede602a6da6f68"
+    ],
+    "date": "2026-09-20T03:48:02+02:00",
+    "title": "Implement geometric navigation with concurrent sampling imaging and radio tasks",
+    "files": [
+      "approach.py",
+      "probe_camera.log",
+      "probe_camera_results.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C007_f17dd4f.diff",
+    "diff_sha256": "67423186065cdbf7d79c7780abb155be635e1594e3e0cf612400cb1ab8fa8171",
+    "events": [
+      {
+        "event": "E0015",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "5e06f8f3a6fd65f2dd6c61ce77017422c41db85709a2206484de33334b93fa5c",
+    "version": "evidence/versions/C007_f17dd4f_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C008",
+    "commit": "51f7d9e85b87966a9ad21f8df4c8dd1605d9b2c9",
+    "parents": [
+      "f17dd4f3a77f0d141c2b0b5489f9c47344c4ad20"
+    ],
+    "date": "2026-09-20T03:48:19+02:00",
+    "title": "Measure wall opening and arena margin on independent seed",
+    "files": [
+      "probe_geometry.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C008_51f7d9e.diff",
+    "diff_sha256": "90d15e2b9f8797fcba2b8dd10b61d7315b920f0484d815fded4fff9a407dfa86",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C009",
+    "commit": "a6557ef1139e8e0132a844f77d27fc4e518b5c94",
+    "parents": [
+      "51f7d9e85b87966a9ad21f8df4c8dd1605d9b2c9"
+    ],
+    "date": "2026-09-20T03:48:30+02:00",
+    "title": "Separate full center driving wall from camera occlusion and add episode tests",
+    "files": [
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C009_a6557ef.diff",
+    "diff_sha256": "80a57f6ad5152f28d62597002b3b9d4c2ca8177e8a93b370caf54fbfc0243fb7",
+    "events": [
+      {
+        "event": "E0028",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C010",
+    "commit": "b86fb776c02056e39dd886b7de1ac31ed8fe9289",
+    "parents": [
+      "a6557ef1139e8e0132a844f77d27fc4e518b5c94"
+    ],
+    "date": "2026-09-20T03:48:41+02:00",
+    "title": "Correct wall driving extent and omit it from visibility checks",
+    "files": [
+      "approach.py",
+      "test_results.jsonl"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C010_b86fb77.diff",
+    "diff_sha256": "5dbc8023407102a67463fb0d9e56206c487dd89c36c273e187919aecdcc68a1a",
+    "events": [
+      {
+        "event": "E0019",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1bea2b6eb3ba4a722a4c9a0308df70e024731344335b94a9e42aa47e9104a93f",
+    "version": "evidence/versions/C010_b86fb77_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C011",
+    "commit": "58007891f65c5bef3d4658599af00479b10bc43a",
+    "parents": [
+      "b86fb776c02056e39dd886b7de1ac31ed8fe9289"
+    ],
+    "date": "2026-09-20T03:48:51+02:00",
+    "title": "Probe rover radius, pillar corners, and lander footprint",
+    "files": [
+      "probe_geometry.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C011_5800789.diff",
+    "diff_sha256": "48f4361dd82427623df1fbf978e22ac373afbe40baab12af689ffb31a237f754",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C012",
+    "commit": "aceb14a04746748e8beb615a7e6f2868ceafbc4c",
+    "parents": [
+      "58007891f65c5bef3d4658599af00479b10bc43a"
+    ],
+    "date": "2026-09-20T03:49:05+02:00",
+    "title": "Add concise trajectory debugger",
+    "files": [
+      "debug_run.py",
+      "test_results.jsonl"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C012_aceb14a.diff",
+    "diff_sha256": "b6c2d413495612ed1b1617f11d6dfeccc4305335c05eea25c6198bfe0609060c",
+    "events": [
+      {
+        "event": "E0025",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C013",
+    "commit": "3c4c4b945a9dbffdc248df340818b197350805b1",
+    "parents": [
+      "aceb14a04746748e8beb615a7e6f2868ceafbc4c"
+    ],
+    "date": "2026-09-20T03:49:06+02:00",
+    "title": "Refine collision margins near lander and pillars",
+    "files": [
+      "probe_geometry.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C013_3c4c4b9.diff",
+    "diff_sha256": "7c5e4b2a8d57ec30fab885b51bc4c4d07ac9b9edbee7f1e2fb31d6083816f44b",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C014",
+    "commit": "8ba0f2b4914b524b1ff86a54c92a230dddb4b32a",
+    "parents": [
+      "3c4c4b945a9dbffdc248df340818b197350805b1"
+    ],
+    "date": "2026-09-20T03:49:43+02:00",
+    "title": "Probe image transmission across middle wall at known ranges",
+    "files": [
+      "current_results.jsonl",
+      "probe_radio.py",
+      "test_results.jsonl"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C014_8ba0f2b.diff",
+    "diff_sha256": "ec37696868492c6ea8e4aafc88d420c9ebaba5fdfd3bd0418383c7fd2e5339c9",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C015",
+    "commit": "e438150f25dceecf80da4a8e0b3b2c3123c0c8af",
+    "parents": [
+      "8ba0f2b4914b524b1ff86a54c92a230dddb4b32a"
+    ],
+    "date": "2026-09-20T03:50:06+02:00",
+    "title": "Measure exact lander clearance and possible confounding pillars",
+    "files": [
+      "current_results.jsonl",
+      "probe_lander.py",
+      "visual_validation_20_29.jsonl"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C015_e438150.diff",
+    "diff_sha256": "7967277eab756141443a1c3afc9fa10bf89593a0078aff653da4577a55a2ed54",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C016",
+    "commit": "c7478172801f008c8ff0ed3cc284a44514b2c16f",
+    "parents": [
+      "e438150f25dceecf80da4a8e0b3b2c3123c0c8af"
+    ],
+    "date": "2026-09-20T03:50:17+02:00",
+    "title": "Learn failed radio and camera viewpoints and refine rover collision radius",
+    "files": [
+      "approach.py",
+      "current_results.jsonl"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C016_c747817.diff",
+    "diff_sha256": "2ab9e2da6e1548db7bbf9b46955b55fa0acb5586282df5afc5c74d62daa4e950",
+    "events": [
+      {
+        "event": "E0039",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "8912cb55bd93e5d2102a5b51f110fdb045fd4160dffacb7559a728d05424581b",
+    "version": "evidence/versions/C016_c747817_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C017",
+    "commit": "f3158c285e6569ef44ad3bf419587fc119ab1420",
+    "parents": [
+      "c7478172801f008c8ff0ed3cc284a44514b2c16f"
+    ],
+    "date": "2026-09-20T03:50:48+02:00",
+    "title": "Add independent seeds20-29 validation with stalled-state detection",
+    "files": [
+      "visual_validate.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C017_f3158c2.diff",
+    "diff_sha256": "09d57090dc09dfb9225749712a14113a8b892f584f840179c9b1aaf039083b55",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C018",
+    "commit": "e73f4506ec4518871be3666dda4572d7d91b6343",
+    "parents": [
+      "f3158c285e6569ef44ad3bf419587fc119ab1420"
+    ],
+    "date": "2026-09-20T03:51:15+02:00",
+    "title": "Add broad seed and variable-object-count regression checks",
+    "files": [
+      "current_results.jsonl",
+      "revised_results.jsonl",
+      "stress_test.py",
+      "visual_validation_20_29.jsonl"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C018_e73f450.diff",
+    "diff_sha256": "8713540f87e5e8f24e167313dc53bd89a947bc6fc6e19dfce4a8fcbd47134afa",
+    "events": [
+      {
+        "event": "E0057",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C019",
+    "commit": "44c1aeee5071e45dff8597e866f42c771891ae84",
+    "parents": [
+      "e73f4506ec4518871be3666dda4572d7d91b6343"
+    ],
+    "date": "2026-09-20T03:51:28+02:00",
+    "title": "Compare radio LOS and range across nearby transmission poses",
+    "files": [
+      "probe_radio_details.py",
+      "stress_default.jsonl",
+      "stress_eight.jsonl",
+      "stress_four.jsonl"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C019_44c1aee.diff",
+    "diff_sha256": "8324e5938ee659108de0b2df9d0608f458812e5a89c923b3ea64192ff862f6a8",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C020",
+    "commit": "831e0608b1a9e2a882b8eb72d2b3776ad3bf295c",
+    "parents": [
+      "44c1aeee5071e45dff8597e866f42c771891ae84"
+    ],
+    "date": "2026-09-20T03:52:39+02:00",
+    "title": "Photograph opportunistically during travel and cache static visibility maps",
+    "files": [
+      "approach.py",
+      "stress_default.jsonl",
+      "stress_four.jsonl"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C020_831e060.diff",
+    "diff_sha256": "10826fe5ef555fce4529e69d10513db05a317b6d044166f1711bf9903327a35c",
+    "events": [
+      {
+        "event": "E0059",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "c8ff266fc5b9023217b6c7cabf170c8ebd783e998032b27e9c6dc96ba31d41fc",
+    "version": "evidence/versions/C020_831e060_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C021",
+    "commit": "63b51c6878fd969b84292fb7c7185616c1d17d9d",
+    "parents": [
+      "831e0608b1a9e2a882b8eb72d2b3776ad3bf295c"
+    ],
+    "date": "2026-09-20T03:52:47+02:00",
+    "title": "Refine effective transmission radius below four meters",
+    "files": [
+      "opportunistic.jsonl"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C021_63b51c6.diff",
+    "diff_sha256": "0d53bd19d9dc60e79d07ce532ff2a089dadd1cad8e2e945f36c91f439218dbdb",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C022",
+    "commit": "1b5aab21049aa95ea6e05a41d71ed1e20c3a8d26",
+    "parents": [
+      "63b51c6878fd969b84292fb7c7185616c1d17d9d"
+    ],
+    "date": "2026-09-20T03:53:12+02:00",
+    "title": "Measure exact radio cutoff and occluder padding with fine-grained poses",
+    "files": [
+      "opportunistic.jsonl",
+      "probe_radio_details.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C022_1b5aab2.diff",
+    "diff_sha256": "198cb23d15096a96f210f1d7eaa8435c4f2a49e3ecae15022ac218047b94f853",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C023",
+    "commit": "36451407f00ea9fa74fef53897dba3972bdf7bab",
+    "parents": [
+      "1b5aab21049aa95ea6e05a41d71ed1e20c3a8d26"
+    ],
+    "date": "2026-09-20T03:53:43+02:00",
+    "title": "Test exact 3.9 meter radio radius and padded pillar threshold",
+    "files": [
+      "probe_radio_details.py",
+      "radio_details.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C023_3645140.diff",
+    "diff_sha256": "9d76bd2aebe9511928b841bcac7c62419a97bf2a61d0d3596d8fe9b9d6e7789a",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C024",
+    "commit": "e8d6a4cd4bb01aa61e6d6cc2aa4fce643b02e2e7",
+    "parents": [
+      "36451407f00ea9fa74fef53897dba3972bdf7bab"
+    ],
+    "date": "2026-09-20T03:54:00+02:00",
+    "title": "Locate radio cutoff and compare equivalent-distance poses",
+    "files": [
+      "probe_radio_details.py",
+      "radio_details.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C024_e8d6a4c.diff",
+    "diff_sha256": "9d8d76d2731932b28d91ce572995cfaabe40577465e12483be0f3e1559abdfe9",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C025",
+    "commit": "9425eeef7e42d43842e32244c7663f2d701a0963",
+    "parents": [
+      "e8d6a4cd4bb01aa61e6d6cc2aa4fce643b02e2e7"
+    ],
+    "date": "2026-09-20T03:54:14+02:00",
+    "title": "Radio while returning home and prepare the camera during otherwise idle travel",
+    "files": [
+      "approach.py",
+      "radio_details.log"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C025_9425eee.diff",
+    "diff_sha256": "87e7218627d9c86ee984e5d7abd3b47ec4abf79e14627f2ef29f1deb9963fc4d",
+    "events": [
+      {
+        "event": "E0071",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "78a3c3500d54108e7ef5c2f15714b5c01f800db29984fe2b0112fe9ab857b7a3",
+    "version": "evidence/versions/C025_9425eee_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C026",
+    "commit": "744f3f611e5bfac5fb9a5460c344205be923b500",
+    "parents": [
+      "9425eeef7e42d43842e32244c7663f2d701a0963"
+    ],
+    "date": "2026-09-20T03:54:28+02:00",
+    "title": "Prototype joint rover task selection minimizing concurrent route cost",
+    "files": [
+      "assignment_baseline.py",
+      "build_assignment.py",
+      "candidate_assignment.py",
+      "test_assignment.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C026_744f3f6.diff",
+    "diff_sha256": "71a186d298124f79876875f2eb774463fb67ba191f7d7ad371d99af9a26d521c",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C027",
+    "commit": "730d4d131cad228ad52b5f6964457a6bb6a66486",
+    "parents": [
+      "744f3f611e5bfac5fb9a5460c344205be923b500"
+    ],
+    "date": "2026-09-20T03:55:20+02:00",
+    "title": "Use total immediate task distance for joint rover matching",
+    "files": [
+      "candidate_assignment.py"
+    ],
+    "file_roles": [
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C027_730d4d1.diff",
+    "diff_sha256": "39f8dca3d94556923f607e88e7eb54eb7cac0562fa7c4d415f7650f311533e93",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C028",
+    "commit": "b429738699a38464886aabfb7bbe867cd69b77cc",
+    "parents": [
+      "730d4d131cad228ad52b5f6964457a6bb6a66486"
+    ],
+    "date": "2026-09-20T03:55:28+02:00",
+    "title": "Refine radio visibility from measured occlusion and continue useful travel while transmitting",
+    "files": [
+      "approach.py",
+      "assignment_minimax_results.jsonl",
+      "assignment_results.jsonl",
+      "larger_stress.jsonl",
+      "travel_ops.jsonl"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C028_b429738.diff",
+    "diff_sha256": "3cf28654dc6f8810446661470b0305a203126be3db76cebcb014581af1a22618",
+    "events": [
+      {
+        "event": "E0083",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "b5db4e072cce5142ecf278cc36b13069b3f5e329e31e107dab64949b833135b4",
+    "version": "evidence/versions/C028_b429738_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C029",
+    "commit": "ec4e79b4c244fce769b9ddd3b6f0c138ae7c90e2",
+    "parents": [
+      "b429738699a38464886aabfb7bbe867cd69b77cc"
+    ],
+    "date": "2026-09-20T03:56:03+02:00",
+    "title": "Compare balanced joint task distance without optional rover idling",
+    "files": [
+      "candidate_balanced.py",
+      "test_balanced.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C029_ec4e79b.diff",
+    "diff_sha256": "cb8c13a2d4522178110972c90d1f96f7166eedefae24d0fd4c031d180196efc7",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C030",
+    "commit": "2f9bf86e9bf4aea1d33a960b1a396787412c946b",
+    "parents": [
+      "ec4e79b4c244fce769b9ddd3b6f0c138ae7c90e2"
+    ],
+    "date": "2026-09-20T03:56:28+02:00",
+    "title": "Probe sample selector priority and repeated collection semantics",
+    "files": [
+      "assignment_results.jsonl",
+      "balanced_results.jsonl",
+      "larger_stress.jsonl",
+      "probe_samples.py",
+      "refined_radio.jsonl",
+      "stress_500.jsonl"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C030_2f9bf86.diff",
+    "diff_sha256": "2974453aa3f651483866b3db97edf657964f246c7285589b9d9522883a9600bd",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C031",
+    "commit": "6b263fc3e3c730a37ee698d3f8199d75c74f5ef3",
+    "parents": [
+      "2f9bf86e9bf4aea1d33a960b1a396787412c946b"
+    ],
+    "date": "2026-09-20T03:57:10+02:00",
+    "title": "Avoid repeatedly collecting the wrong material near overlapping sample sites",
+    "files": [
+      "approach.py",
+      "assignment_results.jsonl",
+      "balanced_results.jsonl",
+      "refined_radio.jsonl",
+      "stress_500.jsonl"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C031_6b263fc.diff",
+    "diff_sha256": "8e9d0ad3f6874ed0579872b4388d1dd399aaa392664465ada3f7572e92981f0e",
+    "events": [
+      {
+        "event": "E0085",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6495cee7f0f64c60b6ba105695b4d9fbd8182f0b5493d9e5d9a31d8af54701d5",
+    "version": "evidence/versions/C031_6b263fc_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C032",
+    "commit": "fd291b629a9a63642dd93948bc5e8133ee3f62e9",
+    "parents": [
+      "6b263fc3e3c730a37ee698d3f8199d75c74f5ef3"
+    ],
+    "date": "2026-09-20T03:57:10+02:00",
+    "title": "Add a sample-first scheduling candidate for comparative evaluation",
+    "files": [
+      "sample_priority.py",
+      "test_priority.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C032_fd291b6.diff",
+    "diff_sha256": "d0fe53a071124a4f93434f56b34d90a915bf20bab595b25fd8e7d2bf2ff6a4ad",
+    "events": [
+      {
+        "event": "E0092",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C033",
+    "commit": "c1d186ed0008fabdf31c2d0e5dc09f570c603253",
+    "parents": [
+      "fd291b629a9a63642dd93948bc5e8133ee3f62e9"
+    ],
+    "date": "2026-09-20T03:57:54+02:00",
+    "title": "Evaluate navigation edges matching full per-step motion bounds",
+    "files": [
+      "assignment_results.jsonl",
+      "navigation_candidate.py",
+      "sample_priority_results.jsonl",
+      "stress_500.jsonl",
+      "test_navigation.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C033_c1d186e.diff",
+    "diff_sha256": "e9744fc347f0bda043f2d580b7cdde1da15e4d214df090f52b220c2ba3b7a108",
+    "events": [
+      {
+        "event": "E0100",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C034",
+    "commit": "34dc5d60085bcc5a3e4e7479c46636c7e692014f",
+    "parents": [
+      "c1d186ed0008fabdf31c2d0e5dc09f570c603253"
+    ],
+    "date": "2026-09-20T03:59:10+02:00",
+    "title": "Preserve comparison data and add sample scheduling trace",
+    "files": [
+      "debug_priority.py",
+      "navigation_results.jsonl",
+      "sample_priority_results.jsonl",
+      "stress_500.jsonl"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C034_34dc5d6.diff",
+    "diff_sha256": "7f83bd229100f61c82c9d066ef0d544c077fb282ee2527aebdee1182015bdfb0",
+    "events": [
+      {
+        "event": "E0107",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C035",
+    "commit": "5e426722e51e711e45a92d76cef3bf520c3e4cbd",
+    "parents": [
+      "34dc5d60085bcc5a3e4e7479c46636c7e692014f"
+    ],
+    "date": "2026-09-20T04:00:04+02:00",
+    "title": "Use full-motion navigation and favor collecting samples along outbound routes",
+    "files": [
+      "approach.py",
+      "stress_500.jsonl"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C035_5e42672.diff",
+    "diff_sha256": "5fa7afdce63f3583ebfd1cce6a3ca6e5147a21fec82f70d6d653e7d7f81935d8",
+    "events": [
+      {
+        "event": "E0113",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "731a00c076235bef3e4c0882f45be5035503092c4436a712fb2c9bf3b4320bef",
+    "version": "evidence/versions/C035_5e42672_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C036",
+    "commit": "c7180a498e0c4a5dbe22b4d3f4d2c22f36ba6e59",
+    "parents": [
+      "5e426722e51e711e45a92d76cef3bf520c3e4cbd"
+    ],
+    "date": "2026-09-20T04:01:04+02:00",
+    "title": "Compare balanced task ownership from small abstract route optimization",
+    "files": [
+      "combined_results.jsonl",
+      "test_tour.py",
+      "tour_candidate.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C036_c7180a4.diff",
+    "diff_sha256": "6e99e7e5ce8df8c7aeb711c8a16b95d264ab447456e7dca4a1ac6daa2e7a2a0b",
+    "events": [
+      {
+        "event": "E0122",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C037",
+    "commit": "e57842e3d05f9fd7cd6cd9d29f51e75f8fbb68dd",
+    "parents": [
+      "c7180a498e0c4a5dbe22b4d3f4d2c22f36ba6e59"
+    ],
+    "date": "2026-09-20T04:02:20+02:00",
+    "title": "Treat refused calibration as evidence against every predicted image at that viewpoint",
+    "files": [
+      "approach.py",
+      "failure_15_None.json",
+      "tour_candidate.py",
+      "tour_results.jsonl",
+      "validation_combined.jsonl"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C037_e57842e.diff",
+    "diff_sha256": "edc9eee6f79e9ae98ec2a4a0902d54a9aa0d9c1a0f9f45f634fc0625e5c8104f",
+    "events": [
+      {
+        "event": "E0130",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "34392c6a26169265a12c5198a9db0020ef82b685bfb07bf5953b709ab6cb5484",
+    "version": "evidence/versions/C037_e57842e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C038",
+    "commit": "1a3f4c1e66e1ec0a7436fcdd2f49cc7e30ce0cf5",
+    "parents": [
+      "e57842e3d05f9fd7cd6cd9d29f51e75f8fbb68dd"
+    ],
+    "date": "2026-09-20T04:04:06+02:00",
+    "title": "Compare following the task order from the compact routing model",
+    "files": [
+      "ordered_candidate.py",
+      "test_ordered.py",
+      "tour_fixed.jsonl",
+      "validation_combined.jsonl"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C038_1a3f4c1.diff",
+    "diff_sha256": "2e76a2231e5a298aff00d22abf653314e49837c14963294c3675e03752346aeb",
+    "events": [
+      {
+        "event": "E0139",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C039",
+    "commit": "2e4955bb60ad4b90a3b00dc94140ead360d1e995",
+    "parents": [
+      "1a3f4c1e66e1ec0a7436fcdd2f49cc7e30ce0cf5"
+    ],
+    "date": "2026-09-20T04:05:16+02:00",
+    "title": "Document the validated controller and preserve comparison results",
+    "files": [
+      "approach.py",
+      "final_four_check.jsonl",
+      "final_mixed_check.jsonl",
+      "ordered_results.jsonl"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C039_2e4955b.diff",
+    "diff_sha256": "4d2eafe4685031bdc5397ec6165f336b3b3a4c151a87dcc04845fb0e7bf564a1",
+    "events": [
+      {
+        "event": "E0144",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a7c260a825f88845383d6ae950f031d307431d409d8aa778acb66db7bd4752f7",
+    "version": "evidence/versions/C039_2e4955b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C040",
+    "commit": "7cc4641efbbaea1a1018677648148bb1c5023d7b",
+    "parents": [
+      "2e4955bb60ad4b90a3b00dc94140ead360d1e995"
+    ],
+    "date": "2026-09-20T04:07:38+02:00",
+    "title": "Record final 200-episode validation with all goals completed",
+    "files": [
+      "final_four_check.jsonl",
+      "final_mixed_check.jsonl",
+      "validation_summary.json"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C040_7cc4641.diff",
+    "diff_sha256": "dc2a6e5937f28f7ecbb575c0338fc1fbf31dee3ecbf9c4f1d8546bd8edf18fe8",
+    "events": [
+      {
+        "event": "E0158",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {}
+  }
+]

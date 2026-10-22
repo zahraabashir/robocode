@@ -1,0 +1,51 @@
+diff --git a/approach.py b/approach.py
+index 697f75c..91d9276 100644
+--- a/approach.py
++++ b/approach.py
+@@ -31,7 +31,8 @@ class GeneratedApproach:
+         p=np.atleast_2d(p)
+         d=np.abs(p[:,None,:]-self.boxes[None,:,:2])-self.boxes[None,:,2:]
+         ok=np.all(np.sum(np.maximum(d,0)**2,axis=2) > 0.228**2,axis=1)
+-        ok &= np.linalg.norm(p-self.lander,axis=1)>.55
++        ld=np.maximum(np.abs(p-self.lander)-np.array([.45,.30]),0)
++        ok &= np.sum(ld**2,axis=1)>.228**2
+         ok &= np.max(np.abs(p),axis=1)<2.271
+         return ok
+     def make_graph(self):
+@@ -106,6 +107,8 @@ class GeneratedApproach:
+                 if cost<score: score=cost;best=(target,task,o,j)
+             if best is None: best=(self.nearest(self.homes[i]),'home',None,None)
+             target,task,o,j=best
++            if task=='send' and self.visible(p,self.lander,4)[0] and not self.send_bad[i,start]:
++                target=self.nearest(self.homes[i]);task='home'
+             if task=='sample': kinds.add(j)
+             if task=='image': assigned.add(j)
+             targetpos=self.points[target]
+@@ -134,6 +137,7 @@ class GeneratedApproach:
+                     op=-1/6 if s.get(r,'calibrated') else -.5
+             if op==0 and pending and self.visible(q,self.lander,4)[0] and not self.send_bad[i,self.nearest(q)]:op=.5
+             elif op==0 and s.get(r,'store_full'):op=5/6
++            elif op==0 and not s.get(r,'calibrated') and any(not s.get(oo,'received_image') for oo in self.objs) and any(self.visible(q,self.xy(s,oo),2)[0] for oo in self.objs):op=-.5
+             action[4*i:4*i+2]=move;action[4*i+3]=op
+             records.append((p,move,op,idx,self.pending_count(s,i)))
+         self.prev=records
+diff --git a/radio_details.log b/radio_details.log
+index 630b28d..710db39 100644
+--- a/radio_details.log
++++ b/radio_details.log
+@@ -1,8 +1,7 @@
+-0 0 (1, 0.6) actual [1.         0.59999996] have 2.0 received 2.0 go True
+-0 0 (1, 0.605) actual [1.         0.60499996] have 2.0 received 2.0 go True
+-0 0 (1, 0.61) actual [1.         0.61000001] have 2.0 received 2.0 go True
+-0 0 (1, 0.615) actual [1.         0.61500001] have 2.0 received 2.0 go True
+-2 1 (-2.19, 0) actual [-2.19000006  0.        ] have 2.0 received 0.0 go True
+-2 1 (-2.185, 0) actual [-2.18499994  0.        ] have 2.0 received 0.0 go True
+-2 1 (-2.18, 0) actual [-2.17999983  0.        ] have 2.0 received 2.0 go True
+-2 1 (-2.175, 0) actual [-2.17499995  0.        ] have 2.0 received 2.0 go True
++0 0 (1, 0.62) actual [1.   0.62] have 2.0 received 2.0 go True
++0 0 (1, 0.625) actual [1.    0.625] have 2.0 received 2.0 go True
++0 0 (1, 0.63) actual [1.   0.63] have 2.0 received 2.0 go True
++0 0 (1, 0.635) actual [1.         0.63499999] have 2.0 received 0.0 go True
++0 0 (1, 0.64) actual [1.         0.63999999] have 2.0 received 0.0 go True
++0 0 (0.9, 0.74) actual [0.89999998 0.74000001] have 2.0 received 2.0 go True
++0 0 (1.1, 0.505) actual [1.10000002 0.505     ] have 2.0 received 0.0 go True

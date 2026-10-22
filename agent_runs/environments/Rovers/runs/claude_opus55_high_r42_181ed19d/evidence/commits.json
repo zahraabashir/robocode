@@ -1,0 +1,423 @@
+[
+  {
+    "id": "C001",
+    "commit": "1e0b6830fc68ce8dbabcb5d3e36d0d40a63cd49f",
+    "parents": [],
+    "date": "2026-10-01T09:22:41+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".claude/settings.json",
+      ".claude/validate_sandbox.py",
+      ".gitignore",
+      "CLAUDE.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_1e0b683.diff",
+    "diff_sha256": "5f78915bdd2629e3280c39af3409fe4cf400f2374c90b9bac50d99e96b49200f",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "f36372bb1d0a1646742e562cea39abdd031e11a8",
+    "parents": [
+      "1e0b6830fc68ce8dbabcb5d3e36d0d40a63cd49f"
+    ],
+    "date": "2026-10-01T09:59:32+02:00",
+    "title": "Initial grid-planning approach + probes",
+    "files": [
+      "approach.py",
+      "probe.py",
+      "probe_motion.py",
+      "probe_vis.py",
+      "survey.py",
+      "t_order.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C002_f36372b.diff",
+    "diff_sha256": "cdd44f1d270c14958f6240155f0c73bb72b7b55845112d6aeee5753f861f3b35",
+    "events": [
+      {
+        "event": "E0625",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "9fe8d7eaa4dcc96b535b662d5f625aefa719f8b135ec3f69b28e40146cc29307",
+    "version": "evidence/versions/C002_f36372b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "4dd60177031409c9d2cfd58a841fb8d4a51d4421",
+    "parents": [
+      "f36372bb1d0a1646742e562cea39abdd031e11a8"
+    ],
+    "date": "2026-10-01T10:01:36+02:00",
+    "title": "Order-aware image regions; restrict unsent check",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C003_4dd6017.diff",
+    "diff_sha256": "0e2c19ba1c423efba1c7e924116de225fdda01e1204bc7c68529d83689488641",
+    "events": [
+      {
+        "event": "E0651",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a679c4d48491b1fc9ffada2271645785ec8d44b95aa15a3ad031b7b88f6dfc3e",
+    "version": "evidence/versions/C003_4dd6017_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C004",
+    "commit": "8dee43a367f3442636df71f578b3d6056109ebd2",
+    "parents": [
+      "4dd60177031409c9d2cfd58a841fb8d4a51d4421"
+    ],
+    "date": "2026-10-01T10:04:31+02:00",
+    "title": "Backward cost-to-go targeting each step; rover-blocking aware send; drop priority",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C004_8dee43a.diff",
+    "diff_sha256": "6a1694e6cf2f3c4c2ebbcbc9ca10c55be445b43c28d43f1e130114d1165767d2",
+    "events": [
+      {
+        "event": "E0675",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "c7f838e527ef3d5fd2a052e8ee166eeade259f2256f903c079e19ebe7b45bce9",
+    "version": "evidence/versions/C004_8dee43a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "d47f8220a9f56e51ab1d7fbea233ce5f8537243b",
+    "parents": [
+      "8dee43a367f3442636df71f578b3d6056109ebd2"
+    ],
+    "date": "2026-10-01T10:06:42+02:00",
+    "title": "Box footprint model for pillars; remember rejected moves",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C005_d47f822.diff",
+    "diff_sha256": "1e620e84f6d148e5457e947d3876695d885a03dc0786dcddb9e5aa32cbf9bdc4",
+    "events": [
+      {
+        "event": "E0695",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "b195ce3fc82a6a4cc612c769116f27285521f59a23ece04e3f7d7b0ba56aad8c",
+    "version": "evidence/versions/C005_d47f822_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C006",
+    "commit": "f4dc8c03f230a0b1bcc52b4e9c60728a3b9723dd",
+    "parents": [
+      "d47f8220a9f56e51ab1d7fbea233ce5f8537243b"
+    ],
+    "date": "2026-10-01T10:09:03+02:00",
+    "title": "Lenient segment check, fallback one-cell step",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C006_f4dc8c0.diff",
+    "diff_sha256": "b5935f6ffb022d0bbcc3909336727454e1493795b54e4af71e66d0fcfdaa3582",
+    "events": [
+      {
+        "event": "E0710",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6252c114bc3528c6a3e8d2d8acbe29bd1e8a21cd339f6ff3ee050ff7a959948a",
+    "version": "evidence/versions/C006_f4dc8c0_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "5c284d5f38b30956bf420a3b8f139d4f91ac4e1b",
+    "parents": [
+      "f4dc8c03f230a0b1bcc52b4e9c60728a3b9723dd"
+    ],
+    "date": "2026-10-01T10:10:12+02:00",
+    "title": "Predict other rover trajectory for send LOS",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C007_5c284d5.diff",
+    "diff_sha256": "add5a9ccd544e9ba72de3a1c3def75186392cf254329bc1b5c9f655cbec215a1",
+    "events": [
+      {
+        "event": "E0721",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "85df03dc7a0a96436c5c67cfe2fc3d41d4b85977187ac5e503b0422f72fdb57f",
+    "version": "evidence/versions/C007_5c284d5_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C008",
+    "commit": "8fb4df244eb2b5157bdcf3723037d293a39d6a9b",
+    "parents": [
+      "5c284d5f38b30956bf420a3b8f139d4f91ac4e1b"
+    ],
+    "date": "2026-10-01T10:11:29+02:00",
+    "title": "Fix traj blocking mask",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C008_8fb4df2.diff",
+    "diff_sha256": "cdba9ac7c4ed104a82bd0136f05a93a1dcb80ddbc5ae4f307342125f4900ade8",
+    "events": [
+      {
+        "event": "E0734",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "dded3452497e204c4e63035d3458feb5b8da6d5ef52b9a2786295de5d8dfb6ee",
+    "version": "evidence/versions/C008_8fb4df2_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C009",
+    "commit": "e52f23626fbdb80643136ddb0a2b5830493a9d78",
+    "parents": [
+      "8fb4df244eb2b5157bdcf3723037d293a39d6a9b"
+    ],
+    "date": "2026-10-01T10:13:20+02:00",
+    "title": "Fix send timing off-by-one",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C009_e52f236.diff",
+    "diff_sha256": "24a7231ea6e4784d03282868c5d7bd3b10087dec72de57045b8008090834ea7e",
+    "events": [
+      {
+        "event": "E0747",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a267ea9152a50fff86e1351646713d489eaea97ed2445d6f9bfc2089aa8d51d3",
+    "version": "evidence/versions/C009_e52f236_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C010",
+    "commit": "3be4aaa5369bd1094c6cf9f4284ef30bd141d3b6",
+    "parents": [
+      "e52f23626fbdb80643136ddb0a2b5830493a9d78"
+    ],
+    "date": "2026-10-01T10:15:13+02:00",
+    "title": "Tighter range margins",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C010_3be4aaa.diff",
+    "diff_sha256": "49b1ba81a9708131c62c33703165c5d43e8c622857c5d9ee0c09ea3eb4c339f5",
+    "events": [
+      {
+        "event": "E0760",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "4687db0df082beec697f75ae3c3be553a3c4f4697569fd4fb07c5af3df3a02cb",
+    "version": "evidence/versions/C010_3be4aaa_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C011",
+    "commit": "6ad06d5c8d2ae8874abc96d9a0f70781b12eee43",
+    "parents": [
+      "3be4aaa5369bd1094c6cf9f4284ef30bd141d3b6"
+    ],
+    "date": "2026-10-01T10:19:27+02:00",
+    "title": "Lookahead: do image/calibrate/send while moving toward next task",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C011_6ad06d5.diff",
+    "diff_sha256": "8dc92a0a89a7ce29f15bb9771df75a07378894b12ab909e819e46643aeb3ffb6",
+    "events": [
+      {
+        "event": "E0793",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "987f885a198597817b55300d89792d53ed6842b978faea7f70500437d7fa81f1",
+    "version": "evidence/versions/C011_6ad06d5_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C012",
+    "commit": "9760a00b95f26935b162d64dcf705ad5013c03ff",
+    "parents": [
+      "6ad06d5c8d2ae8874abc96d9a0f70781b12eee43"
+    ],
+    "date": "2026-10-01T10:22:14+02:00",
+    "title": "IMG_PEN const",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C012_9760a00.diff",
+    "diff_sha256": "eb49e16a25391991d223241c77da34aa4b7a600e308ef6f5aabba4a2ab01d280",
+    "events": [
+      {
+        "event": "E0810",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "38ef7afad184dc31a85c61d8d73996c43d3fcf297f84fade1006fb643f66f5bf",
+    "version": "evidence/versions/C012_9760a00_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C013",
+    "commit": "fcb5783d4f83529f6b1c92bab8e4eb0a72de0355",
+    "parents": [
+      "9760a00b95f26935b162d64dcf705ad5013c03ff"
+    ],
+    "date": "2026-10-01T10:23:45+02:00",
+    "title": "Sample region: target must be nearest sample",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C013_fcb5783.diff",
+    "diff_sha256": "43ead23e446b78cf2af78728b5ba90f249b8cf670f874b0cdf5d2360f8cb7b10",
+    "events": [
+      {
+        "event": "E0827",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "d50514d8fa1876398898e05934fa427e08c229a46f42d1cb94b656b8cc5513a5",
+    "version": "evidence/versions/C013_fcb5783_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C014",
+    "commit": "9f4ff37ff1692beb5bb5e006b547b95abee768eb",
+    "parents": [
+      "fcb5783d4f83529f6b1c92bab8e4eb0a72de0355"
+    ],
+    "date": "2026-10-01T10:31:56+02:00",
+    "title": "Exact home for rover nearer lander (avoid LOS shadow); gitignore",
+    "files": [
+      ".agent_prompts/system_prompt.md",
+      ".agent_sessions/-sandbox/2bdabd45-4dd3-4ae3-a755-e3071de60b54.jsonl",
+      ".agent_sessions/-sandbox/2bdabd45-4dd3-4ae3-a755-e3071de60b54/subagents/agent-a610568719f0ad7ee.jsonl",
+      ".agent_sessions/-sandbox/2bdabd45-4dd3-4ae3-a755-e3071de60b54/subagents/agent-a610568719f0ad7ee.meta.json",
+      ".agent_sessions/-sandbox/2bdabd45-4dd3-4ae3-a755-e3071de60b54/subagents/agent-ae58262366005a9d8.jsonl",
+      ".agent_sessions/-sandbox/2bdabd45-4dd3-4ae3-a755-e3071de60b54/subagents/agent-ae58262366005a9d8.meta.json",
+      ".gitignore",
+      ".mcp/mcp_config.json",
+      ".mcp/mcp_server.boot.log",
+      ".mcp/mcp_server.log",
+      ".mcp/mcp_server.stderr.log",
+      ".mcp/start_server.sh",
+      "agent_log.txt",
+      "approach.py",
+      "dbg.py",
+      "stats.py",
+      "trace.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C014_9f4ff37.diff",
+    "diff_sha256": "c91be85dd61fa768800735c5c7c33f1b1a85d29d03b7bea85a0f8f3a9f186a77",
+    "events": [
+      {
+        "event": "E0879",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "f5eaea5a6909337e675a1b4a6ddf52976edaf250981f386cedd5484d4af0e776",
+    "version": "evidence/versions/C014_9f4ff37_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C015",
+    "commit": "06b7f93fca7bed49e59e69ae7a915faf41a7f9dc",
+    "parents": [
+      "9f4ff37ff1692beb5bb5e006b547b95abee768eb"
+    ],
+    "date": "2026-10-01T10:35:40+02:00",
+    "title": "auto-commit uncommitted changes",
+    "files": [
+      ".agent_sessions/-sandbox/2bdabd45-4dd3-4ae3-a755-e3071de60b54.jsonl",
+      "agent_log.txt"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C015_06b7f93.diff",
+    "diff_sha256": "58dac5ccaa69f670dff037accacf5761cf96bfc5f687d363f7db0d4338bbf27c",
+    "events": [],
+    "annotation": {}
+  }
+]

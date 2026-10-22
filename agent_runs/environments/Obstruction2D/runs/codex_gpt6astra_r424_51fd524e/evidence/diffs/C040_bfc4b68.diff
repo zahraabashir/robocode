@@ -1,0 +1,162 @@
+diff --git a/regression_results.json b/regression_results.json
+index 6fd3517..32cf5b6 100644
+--- a/regression_results.json
++++ b/regression_results.json
+@@ -4,7 +4,7 @@
+     "count": null,
+     "done": true,
+     "steps": 50,
+-    "policy_seconds": 0.005131836049258709,
++    "policy_seconds": 0.00503266416490078,
+     "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+@@ -12,7 +12,7 @@
+     "count": null,
+     "done": true,
+     "steps": 79,
+-    "policy_seconds": 0.013064275495707989,
++    "policy_seconds": 0.009087708778679371,
+     "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+@@ -20,7 +20,7 @@
+     "count": null,
+     "done": true,
+     "steps": 25,
+-    "policy_seconds": 0.005541585385799408,
++    "policy_seconds": 0.0033139344304800034,
+     "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+@@ -28,7 +28,7 @@
+     "count": null,
+     "done": true,
+     "steps": 71,
+-    "policy_seconds": 0.01696677040308714,
++    "policy_seconds": 0.018764402717351913,
+     "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+@@ -36,7 +36,7 @@
+     "count": null,
+     "done": true,
+     "steps": 111,
+-    "policy_seconds": 0.026794604025781155,
++    "policy_seconds": 0.03076502401381731,
+     "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+@@ -44,7 +44,7 @@
+     "count": null,
+     "done": true,
+     "steps": 70,
+-    "policy_seconds": 0.01879723183810711,
++    "policy_seconds": 0.019007197581231594,
+     "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+@@ -52,7 +52,15 @@
+     "count": 3,
+     "done": true,
+     "steps": 93,
+-    "policy_seconds": 0.028547299094498158,
++    "policy_seconds": 0.02859614696353674,
++    "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
++  },
++  {
++    "seed": 154,
++    "count": 3,
++    "done": true,
++    "steps": 69,
++    "policy_seconds": 0.020431329496204853,
+     "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+@@ -60,7 +68,7 @@
+     "count": 4,
+     "done": true,
+     "steps": 95,
+-    "policy_seconds": 0.030501403845846653,
++    "policy_seconds": 0.032867164351046085,
+     "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+@@ -68,7 +76,7 @@
+     "count": 4,
+     "done": true,
+     "steps": 79,
+-    "policy_seconds": 0.02996176667511463,
++    "policy_seconds": 0.026706818491220474,
+     "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+@@ -76,7 +84,7 @@
+     "count": 4,
+     "done": true,
+     "steps": 137,
+-    "policy_seconds": 0.032656130380928516,
++    "policy_seconds": 0.016411777585744858,
+     "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+@@ -84,7 +92,7 @@
+     "count": 4,
+     "done": true,
+     "steps": 101,
+-    "policy_seconds": 0.031625750474631786,
++    "policy_seconds": 0.028363442048430443,
+     "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+@@ -92,7 +100,7 @@
+     "count": 4,
+     "done": true,
+     "steps": 165,
+-    "policy_seconds": 0.023875144310295582,
++    "policy_seconds": 0.018700494430959225,
+     "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   },
+   {
+@@ -100,7 +108,7 @@
+     "count": 4,
+     "done": true,
+     "steps": 83,
+-    "policy_seconds": 0.009609416127204895,
++    "policy_seconds": 0.024076828733086586,
+     "policy_hash": "76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2"
+   }
+ ]
+\ No newline at end of file
+diff --git a/regression_run.log b/regression_run.log
+index 8a83bb9..298dfa3 100644
+--- a/regression_run.log
++++ b/regression_run.log
+@@ -1,13 +1,14 @@
+-{'seed': 21, 'count': None, 'done': True, 'steps': 50, 'policy_seconds': 0.005131836049258709, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
+-{'seed': 31, 'count': None, 'done': True, 'steps': 79, 'policy_seconds': 0.013064275495707989, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
+-{'seed': 74, 'count': None, 'done': True, 'steps': 25, 'policy_seconds': 0.005541585385799408, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
+-{'seed': 151, 'count': None, 'done': True, 'steps': 71, 'policy_seconds': 0.01696677040308714, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
+-{'seed': 489, 'count': None, 'done': True, 'steps': 111, 'policy_seconds': 0.026794604025781155, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
+-{'seed': 627, 'count': None, 'done': True, 'steps': 70, 'policy_seconds': 0.01879723183810711, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
+-{'seed': 42, 'count': 3, 'done': True, 'steps': 93, 'policy_seconds': 0.028547299094498158, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
+-{'seed': 0, 'count': 4, 'done': True, 'steps': 95, 'policy_seconds': 0.030501403845846653, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
+-{'seed': 1, 'count': 4, 'done': True, 'steps': 79, 'policy_seconds': 0.02996176667511463, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
+-{'seed': 2, 'count': 4, 'done': True, 'steps': 137, 'policy_seconds': 0.032656130380928516, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
+-{'seed': 3, 'count': 4, 'done': True, 'steps': 101, 'policy_seconds': 0.031625750474631786, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
+-{'seed': 4, 'count': 4, 'done': True, 'steps': 165, 'policy_seconds': 0.023875144310295582, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
+-{'seed': 5, 'count': 4, 'done': True, 'steps': 83, 'policy_seconds': 0.009609416127204895, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 21, 'count': None, 'done': True, 'steps': 50, 'policy_seconds': 0.00503266416490078, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 31, 'count': None, 'done': True, 'steps': 79, 'policy_seconds': 0.009087708778679371, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 74, 'count': None, 'done': True, 'steps': 25, 'policy_seconds': 0.0033139344304800034, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 151, 'count': None, 'done': True, 'steps': 71, 'policy_seconds': 0.018764402717351913, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 489, 'count': None, 'done': True, 'steps': 111, 'policy_seconds': 0.03076502401381731, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 627, 'count': None, 'done': True, 'steps': 70, 'policy_seconds': 0.019007197581231594, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 42, 'count': 3, 'done': True, 'steps': 93, 'policy_seconds': 0.02859614696353674, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 154, 'count': 3, 'done': True, 'steps': 69, 'policy_seconds': 0.020431329496204853, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 0, 'count': 4, 'done': True, 'steps': 95, 'policy_seconds': 0.032867164351046085, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 1, 'count': 4, 'done': True, 'steps': 79, 'policy_seconds': 0.026706818491220474, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 2, 'count': 4, 'done': True, 'steps': 137, 'policy_seconds': 0.016411777585744858, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 3, 'count': 4, 'done': True, 'steps': 101, 'policy_seconds': 0.028363442048430443, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 4, 'count': 4, 'done': True, 'steps': 165, 'policy_seconds': 0.018700494430959225, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}
++{'seed': 5, 'count': 4, 'done': True, 'steps': 83, 'policy_seconds': 0.024076828733086586, 'policy_hash': '76a785db8796febc9c10d2ab83f6ceeff9d454a9459bb9ff283beed0e26b54d2'}

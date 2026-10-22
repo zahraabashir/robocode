@@ -1,0 +1,55 @@
+diff --git a/probe_raster.log b/probe_raster.log
+new file mode 100644
+index 0000000..252d2ae
+--- /dev/null
++++ b/probe_raster.log
+@@ -0,0 +1,8 @@
++INIT 0.27 [0.33598167 0.17328143 0.1       ] [ 0.          0.88840848 -3.14159265 -1.04907697  0.         -1.2041072
++  1.57079633]
++FAIL 0.27
++INIT 0.3 [0.33598167 0.17328143 0.1       ] [ 0.          0.86133325 -3.14159265 -1.00463675  0.         -1.27562266
++  1.57079633]
++FAIL 0.3
++INIT 0.24 [0.33598167 0.17328143 0.1       ] [ 0.          0.92014468 -3.14159265 -1.08472889  0.         -1.13671908
++  1.57079633]
+diff --git a/probe_stationary.log b/probe_stationary.log
+index f2d60ba..a0ac6fc 100644
+--- a/probe_stationary.log
++++ b/probe_stationary.log
+@@ -12,3 +12,4 @@ FAIL -0.06 -0.12 FK [0.48000001 0.00100004 0.23000001]
+ FAIL 0.06 -0.12 FK [0.48000002 0.00100004 0.18500003]
+ FAIL 0 0.12 FK [0.48000001 0.00100004 0.23000001]
+ FAIL -0.06 0.12 FK [0.48000001 0.00100004 0.23000001]
++FAIL 0.06 0.12 FK [0.48000002 0.00100004 0.18500003]
+diff --git a/probe_yaw.py b/probe_yaw.py
+new file mode 100644
+index 0000000..ece3ac0
+--- /dev/null
++++ b/probe_yaw.py
+@@ -0,0 +1,26 @@
++import numpy as np
++from env_client import make_env
++from approach import ik,fk
++E=make_env()
++def vals(s,r):return np.array([s.get(r,'joint_'+str(i)) for i in range(1,8)])
++for seed in [2,0,5]:
++ for yaw in [0,np.pi,-np.pi/2,np.pi/2]:
++  s,_=E.reset(seed=seed,options={'object_count':0});r=s.get_object_from_name('robot');o=s.get_object_from_name('target_block');p=np.array([s.get(o,'pose_'+a) for a in 'xyz'])
++  def move(q,b=None):
++   global s
++   for _ in range(70):
++    a=np.zeros(11);a[3:10]=q-vals(s,r)
++    if b is not None:a[:2]=b-np.array([s.get(r,'pos_base_'+v) for v in ['x','y']])
++    m=max(abs(a[:10]));
++    if m<1e-5:break
++    a[:10]*=min(1,.1/m);ss,*_=E.step(a)
++    if np.max(abs(vals(ss,r)-vals(s,r)))<1e-6 and b is None: s=ss;break
++    s=ss
++  q=ik(.5,.3);q[6]=yaw;move(q);move(q,p[:2]-[.5,.001])
++  for z in np.arange(.3,.069,-.005):
++   q=ik(.5,z);q[6]=yaw;move(q)
++   a=np.zeros(11);a[10]=-1;s,*_=E.step(a)
++   if s.get(r,'grasp_active'):
++    print('SUCCESS',seed,yaw,z,'p',p,'q',vals(s,r),'base',[s.get(r,'pos_base_'+v) for v in ['x','y']],'tf',[s.get(r,'grasp_tf_'+v) for v in ['x','y','z','qx','qy','qz','qw']],flush=True);E.close();quit()
++  print('FAIL',seed,yaw,'tip',fk(vals(s,r))[0],flush=True)
++E.close()

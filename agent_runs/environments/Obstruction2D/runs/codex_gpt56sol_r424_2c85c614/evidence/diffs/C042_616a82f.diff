@@ -1,0 +1,24 @@
+diff --git a/approach.py b/approach.py
+index 6ba4bfc..31cc0e1 100644
+--- a/approach.py
++++ b/approach.py
+@@ -26,9 +26,18 @@ class GeneratedApproach:
+         tasks = sorted(obstacles, key=top_y, reverse=True)
+         if crowded:
+             target_top = top_y(target)
++            target_angle = state.get(target, "theta")
++            target_hx = 0.5 * (abs(math.cos(target_angle)) * tw +
++                               abs(math.sin(target_angle)) * state.get(target, "height"))
++            def must_precede_target(o):
++                angle = state.get(o, "theta")
++                hx = 0.5 * (abs(math.cos(angle)) * state.get(o, "width") +
++                            abs(math.sin(angle)) * state.get(o, "height"))
++                overlaps = abs(state.get(o, "x") - tx) < hx + target_hx + 0.005
++                return top_y(o) > target_top + 0.035 or (overlaps and top_y(o) > target_top)
+             # Clear meaningfully taller neighbors first, then move the target
+             # before near-tied lower objects can obstruct its pickup corridor.
+-            insert_at = sum(top_y(o) > target_top + 0.035 for o in tasks)
++            insert_at = sum(must_precede_target(o) for o in tasks)
+             tasks.insert(insert_at, target)
+         self.todo = [o.name for o in tasks]
+         self.todo.append(target_name)  # retrieve it last for the actual placement

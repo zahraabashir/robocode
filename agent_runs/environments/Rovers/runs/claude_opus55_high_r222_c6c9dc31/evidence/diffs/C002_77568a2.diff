@@ -1,0 +1,1764 @@
+diff --git a/approach.py b/approach.py
+new file mode 100644
+index 0000000..818a5b3
+--- /dev/null
++++ b/approach.py
+@@ -0,0 +1,506 @@
++"""Rovers approach: per-rover layered grid BFS + Held-Karp over task subsets,
++joint assignment of tasks to the two rovers (they cannot cross the middle wall)."""
++import math
++import numpy as np
++from scipy.ndimage import maximum_filter
++
++H = 0.05          # grid resolution
++K = 4             # max cells per step (0.2 / H)
++INF = 10 ** 6
++SEL = {"sample": -5 / 6, "calibrate": -0.5, "image": -1 / 6, "none": 1 / 6,
++       "send": 0.5, "drop": 5 / 6}
++
++ARENA = 2.2729 - 0.004
++WALL = 0.227 + 0.012
++MOUND_R = 0.177 + 0.012
++SQ_HALF = 0.133 + 0.012
++LANDER_HALF = (0.69 + 0.012, 0.514 + 0.012)
++CAM_OFF = 0.0875
++CAM_ANG = math.radians(188.0)
++OBJ_RANGE = 1.975
++LANDER_RANGE = 3.965
++ROVER_BLOCK_R = 0.26
++SAMPLE_R = 0.235
++HOME_R = 0.235
++HOME_THETA = {"rover0": math.pi, "rover1": 0.0}
++
++
++def wrap(a):
++    return (a + math.pi) % (2 * math.pi) - math.pi
++
++
++def seg_point_dist(ax, ay, bx, by, px, py):
++    """Distance arrays from point (px,py) to segments a->b (a arrays)."""
++    dx = bx - ax
++    dy = by - ay
++    L2 = dx * dx + dy * dy + 1e-12
++    t = np.clip(((px - ax) * dx + (py - ay) * dy) / L2, 0.0, 1.0)
++    qx = ax + t * dx - px
++    qy = ay + t * dy - py
++    return np.sqrt(qx * qx + qy * qy)
++
++
++class World:
++    def __init__(self, state, obs_space):
++        self.space = obs_space
++        T = lambda n: obs_space.get_type(n) if hasattr(obs_space, "get_type") else n
++        self.rovers = {}
++        for o in state.get_objects(T("rover")):
++            self.rovers[o.name] = o
++        self.lander = list(state.get_objects(T("lander")))[0]
++        self.objectives = sorted(state.get_objects(T("objective")), key=lambda o: o.name)
++        self.samples = sorted(state.get_objects(T("sample")), key=lambda o: o.name)
++        self.obstacles = list(state.get_objects(T("obstacle")))
++
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.action_space = action_space
++        self.obs_space = observation_space
++        self.plans = None
++
++    # ------------------------------------------------------------------ utils
++    def _get(self, state, o, f):
++        return float(state.get(o, f))
++
++    def reset(self, state, info):
++        self.w = World(state, self.obs_space)
++        self.home = {}
++        for n, o in self.w.rovers.items():
++            self.home[n] = (self._get(state, o, "x"), self._get(state, o, "y"))
++        self.home_theta = {}
++        for n, o in self.w.rovers.items():
++            self.home_theta[n] = self._get(state, o, "theta")
++        self.plans = None
++        self.expect = None
++        self.nreplan = 0
++        self._plan(state)
++
++    # --------------------------------------------------------------- planning
++    def _grid(self, state, rname):
++        o = self.w.rovers[rname]
++        x0 = self._get(state, o, "x")
++        y0 = self._get(state, o, "y")
++        right = self.home[rname][0] > 0
++        xmin, xmax = (WALL, ARENA) if right else (-ARENA, -WALL)
++        ymin, ymax = -ARENA, ARENA
++        i0 = math.ceil((xmin - x0) / H - 1e-9)
++        i1 = math.floor((xmax - x0) / H + 1e-9)
++        j0 = math.ceil((ymin - y0) / H - 1e-9)
++        j1 = math.floor((ymax - y0) / H + 1e-9)
++        # ensure start included
++        i0 = min(i0, 0); i1 = max(i1, 0); j0 = min(j0, 0); j1 = max(j1, 0)
++        xs = x0 + H * np.arange(i0, i1 + 1)
++        ys = y0 + H * np.arange(j0, j1 + 1)
++        X, Y = np.meshgrid(xs, ys, indexing="ij")
++        start = (-i0, -j0)
++        return X, Y, start
++
++    def _free(self, state, X, Y):
++        free = np.ones(X.shape, bool)
++        for ob in self.w.obstacles:
++            ox = self._get(state, ob, "x"); oy = self._get(state, ob, "y")
++            hx = self._get(state, ob, "half_x"); hy = self._get(state, ob, "half_y")
++            ddx = np.maximum(np.abs(X - ox) - hx, 0)
++            ddy = np.maximum(np.abs(Y - oy) - hy, 0)
++            blocked = np.sqrt(ddx ** 2 + ddy ** 2) < MOUND_R
++            blocked |= (np.abs(X - ox) < hx + SQ_HALF) & (np.abs(Y - oy) < hy + SQ_HALF)
++            free &= ~blocked
++        lx = self._get(state, self.w.lander, "x"); ly = self._get(state, self.w.lander, "y")
++        free &= ~((np.abs(X - lx) < LANDER_HALF[0]) & (np.abs(Y - ly) < LANDER_HALF[1]))
++        return free
++
++    def _cam(self, rname, X, Y):
++        th = self.home_theta[rname]
++        return X + CAM_OFF * math.cos(th + CAM_ANG), Y + CAM_OFF * math.sin(th + CAM_ANG)
++
++    def _plan(self, state):
++        w = self.w
++        g = lambda o, f: self._get(state, o, f)
++        rnames = sorted(w.rovers.keys())
++        # ---- remaining requirements
++        need_img = []           # objectives needing imaging
++        must_send = {r: False for r in rnames}
++        for ob in w.objectives:
++            if g(ob, "received_image") > 0.5:
++                continue
++            held = False
++            for r in rnames:
++                if g(ob, "have_image_" + r) > 0.5:
++                    must_send[r] = True
++                    held = True
++            if not held:
++                need_img.append(ob)
++        need_kind = []          # 'stone' / 'soil' needing sampling
++        for kind, soil in (("stone", 0.0), ("soil", 1.0)):
++            ss = [s for s in w.samples if abs(g(s, "is_soil") - soil) < 0.5]
++            if any(g(s, "received_analysis") > 0.5 for s in ss):
++                continue
++            held = False
++            for r in rnames:
++                if any(g(s, "analyzed_" + r) > 0.5 for s in ss):
++                    must_send[r] = True
++                    held = True
++            if not held:
++                need_kind.append(kind)
++
++        per = {}
++        for r in rnames:
++            per[r] = self._rover_hk(state, r, need_img, need_kind, must_send[r], rnames)
++
++        # ---- joint assignment
++        best = None
++        tasks_all = [("img", ob.name) for ob in need_img] + [("kind", k) for k in need_kind]
++        r0, r1 = rnames
++        res0, res1 = per[r0], per[r1]
++        for S0, v0 in res0["final"].items():
++            for S1, v1 in res1["final"].items():
++                cov = set(res0["names"][i] for i in range(len(res0["names"])) if S0 >> i & 1)
++                cov |= set(res1["names"][i] for i in range(len(res1["names"])) if S1 >> i & 1)
++                if not all(t in cov for t in tasks_all):
++                    continue
++                key = (max(v0[0], v1[0]), v0[0] + v1[0], bin(S0).count("1") + bin(S1).count("1"))
++                if best is None or key < best[0]:
++                    best = (key, S0, S1)
++        self.plans = {}
++        if best is None:
++            # fallback: just go home
++            for r in rnames:
++                self.plans[r] = self._extract(per[r], per[r]["final_any_empty"])
++        else:
++            _, S0, S1 = best
++            self.plans[r0] = self._extract(res0, S0)
++            self.plans[r1] = self._extract(res1, S1)
++        self.t = 0
++
++    def _propagate(self, sU, sC, free, vany):
++        TU = np.full(free.shape, INF, np.int32)
++        TC = np.full(free.shape, INF, np.int32)
++        AU = np.full(free.shape, INF, np.int32)
++        AC = np.full(free.shape, INF, np.int32)
++        RU = np.zeros(free.shape, bool)
++        RC = np.zeros(free.shape, bool)
++        mU = sU.min(); mC = sC.min()
++        t = int(min(mU, mC))
++        if t >= INF:
++            return TU, TC, AU, AC
++        maxseed = max(int(sU[sU < INF].max()) if mU < INF else 0,
++                      int(sC[sC < INF].max()) if mC < INF else 0)
++        nfree = int(free.sum())
++        while True:
++            RU |= sU == t
++            RC |= sC == t
++            TU[RU & (TU == INF)] = t
++            TC[RC & (TC == INF)] = t
++            if t >= maxseed and RU.sum() + RC.sum() >= 2 * nfree:
++                break
++            dU = maximum_filter(RU, size=2 * K + 1, mode="constant") & free
++            dC = maximum_filter(RC, size=2 * K + 1, mode="constant") & free
++            AU[dU & (AU == INF)] = t + 1
++            AC[dC & (AC == INF)] = t + 1
++            nRU = RU | dU
++            nRC = RC | dC | (dU & vany)
++            if t >= maxseed and (nRU == RU).all() and (nRC == RC).all():
++                break
++            RU, RC = nRU, nRC
++            t += 1
++            if t > 600:
++                break
++        return TU, TC, AU, AC
++
++    def _rover_hk(self, state, r, need_img, need_kind, must_send, rnames):
++        w = self.w
++        g = lambda o, f: self._get(state, o, f)
++        X, Y, start = self._grid(state, r)
++        free = self._free(state, X, Y)
++        free[start] = True
++        CX, CY = self._cam(r, X, Y)
++        regions = []
++        names = []
++        vany = np.zeros(X.shape, bool)
++        for ob in w.objectives:
++            d = np.hypot(CX - g(ob, "x"), CY - g(ob, "y"))
++            vis = (d <= OBJ_RANGE) & free
++            vany |= vis
++            if ob in need_img and vis.any():
++                regions.append(("img", vis)); names.append(("img", ob.name))
++        for kind in need_kind:
++            soil = 1.0 if kind == "soil" else 0.0
++            reg = np.zeros(X.shape, bool)
++            for s in w.samples:
++                if abs(g(s, "is_soil") - soil) < 0.5:
++                    reg |= np.hypot(X - g(s, "x"), Y - g(s, "y")) < SAMPLE_R
++            reg &= free
++            if reg.any():
++                regions.append(("sample", reg)); names.append(("kind", kind))
++        # send region
++        lx, ly = g(w.lander, "x"), g(w.lander, "y")
++        send = (np.hypot(CX - lx, CY - ly) <= LANDER_RANGE) & free
++        for other in rnames:
++            if other == r:
++                continue
++            for (px, py) in (self.home[other], (g(w.rovers[other], "x"), g(w.rovers[other], "y"))):
++                send &= seg_point_dist(CX, CY, lx, ly, px, py) > ROVER_BLOCK_R
++        hx, hy = self.home[r]
++        homereg = (np.hypot(X - hx, Y - hy) <= HOME_R) & free
++        if not homereg.any():
++            homereg = np.zeros(X.shape, bool)
++            d = np.hypot(X - hx, Y - hy) + (~free) * 100
++            homereg[np.unravel_index(np.argmin(d), d.shape)] = True
++
++        n = len(regions)
++        calib = g(w.rovers[r], "calibrated") > 0.5
++        s0U = np.full(X.shape, INF, np.int32)
++        s0C = np.full(X.shape, INF, np.int32)
++        (s0C if calib else s0U)[start] = 0
++        maps = {}      # (S, j) -> (seedU, seedC, TU, TC, AU, AC)
++        seeds = {}
++        start_maps = self._propagate(s0U, s0C, free, vany)
++
++        def op_maps(M, j):
++            TU, TC, AU, AC = M
++            kind, reg = regions[j]
++            if kind == "img":
++                return np.where(reg, AC, INF), np.full(X.shape, INF, np.int32)
++            return np.where(reg, AU, INF), np.where(reg, AC, INF)
++
++        for j in range(n):
++            seeds[(1 << j, j)] = op_maps(start_maps, j)
++        order = sorted(seeds.keys(), key=lambda k: bin(k[0]).count("1"))
++        full = (1 << n) - 1
++        # BFS over subsets in increasing size
++        for size in range(1, n + 1):
++            for S in range(1, full + 1):
++                if bin(S).count("1") != size:
++                    continue
++                for j in range(n):
++                    if (S, j) not in seeds:
++                        continue
++                    sU, sC = seeds[(S, j)]
++                    if min(sU.min(), sC.min()) >= INF:
++                        continue
++                    M = self._propagate(sU, sC, free, vany)
++                    maps[(S, j)] = M
++                    for k in range(n):
++                        if S >> k & 1:
++                            continue
++                        nU, nC = op_maps(M, k)
++                        key = (S | 1 << k, k)
++                        if key in seeds:
++                            oU, oC = seeds[key]
++                            seeds[key] = (np.minimum(oU, nU), np.minimum(oC, nC))
++                        else:
++                            seeds[key] = (nU, nC)
++        # completions
++        final = {}
++        comp = {}
++
++        def complete(M, need_send):
++            TU, TC, AU, AC = M
++            if need_send:
++                op = np.where(send, np.minimum(AU, AC), INF)
++                if op.min() >= INF:
++                    return INF, None
++                M2 = self._propagate(op, np.full(X.shape, INF, np.int32), free, vany)
++                at = np.minimum(M2[0], M2[1])
++                v = np.where(homereg, at, INF)
++                return int(v.min()), (op, M2)
++            at = np.minimum(TU, TC)
++            v = np.where(homereg, at, INF)
++            return int(v.min()), None
++
++        v, extra = complete(start_maps, must_send)
++        if v < INF:
++            final[0] = (v, None, extra)
++        for (S, j), M in maps.items():
++            v, extra = complete(M, True)
++            if v >= INF:
++                continue
++            if S not in final or v < final[S][0]:
++                final[S] = (v, j, extra)
++        res = dict(X=X, Y=Y, free=free, vany=vany, regions=regions, names=names,
++                   maps=maps, seeds=seeds, start_maps=start_maps, s0=(s0U, s0C),
++                   final=final, homereg=homereg, send=send, must_send=must_send, r=r)
++        res["final_any_empty"] = 0 if 0 in final else (min(final, key=lambda s: final[s][0]) if final else None)
++        return res
++
++    # ------------------------------------------------------------ extraction
++    def _back_stage(self, M, sU, sC, vany, free, c, t, L, steps):
++        """Backtrack within stage until hitting a seed. Appends (cell, op) in
++        reverse order. Returns (cell, t, layer) at the seed."""
++        TU, TC, AU, AC = M
++        nx, ny = free.shape
++        while True:
++            if L == "U" and sU[c] == t:
++                return c, t, "U"
++            if L == "C" and sC[c] == t:
++                return c, t, "C"
++            T = TU if L == "U" else TC
++            if T[c] < t:
++                steps.append((c, "none")); t -= 1
++                continue
++            i, j = c
++            i0, i1 = max(0, i - K), min(nx, i + K + 1)
++            j0, j1 = max(0, j - K), min(ny, j + K + 1)
++            found = None
++            sub = T[i0:i1, j0:j1]
++            cand = np.argwhere(sub <= t - 1)
++            if len(cand):
++                # prefer farthest-consistent (any)
++                a, b = cand[0]
++                found = ((i0 + a, j0 + b), L, "none")
++            elif L == "C" and vany[c]:
++                cand = np.argwhere(TU[i0:i1, j0:j1] <= t - 1)
++                if len(cand):
++                    a, b = cand[0]
++                    found = ((i0 + a, j0 + b), "U", "calibrate")
++            if found is None:
++                raise RuntimeError("backtrack failed")
++            steps.append((c, found[2]))
++            c, L, t = found[0], found[1], t - 1
++
++    def _arrive(self, M, c, t, L, op, vany, free, steps):
++        """c reached by a move arrival at time t in layer L (for op)."""
++        TU, TC, AU, AC = M
++        nx, ny = free.shape
++        T = TU if L == "U" else TC
++        i, j = c
++        i0, i1 = max(0, i - K), min(nx, i + K + 1)
++        j0, j1 = max(0, j - K), min(ny, j + K + 1)
++        cand = np.argwhere(T[i0:i1, j0:j1] <= t - 1)
++        a, b = cand[0]
++        steps.append((c, op))
++        return (i0 + a, j0 + b), t - 1, L
++
++    def _extract(self, res, S):
++        if S is None or S not in res["final"]:
++            return []
++        X, Y, free, vany = res["X"], res["Y"], res["free"], res["vany"]
++        v, j, extra = res["final"][S]
++        steps = []
++        homereg = res["homereg"]
++        # final stage maps
++        if extra is not None:
++            op, M2 = extra
++            at = np.minimum(M2[0], M2[1])
++            vv = np.where(homereg, at, INF)
++            c = np.unravel_index(np.argmin(vv), vv.shape); t = int(vv[c])
++            L = "U" if M2[0][c] <= t else "C"
++            # send stage seeds are U only
++            c, t, L = self._back_stage(M2, op, np.full(op.shape, INF, np.int32), vany, free, c, t, L, steps)
++            Mprev = res["maps"][(S, j)] if S else res["start_maps"]
++            TU, TC, AU, AC = Mprev
++            Lp = "U" if AU[c] == t else "C"
++            c, t, L = self._arrive(Mprev, c, t, Lp, "send", vany, free, steps)
++        else:
++            Mprev = res["maps"][(S, j)] if S else res["start_maps"]
++            at = np.minimum(Mprev[0], Mprev[1])
++            vv = np.where(homereg, at, INF)
++            c = np.unravel_index(np.argmin(vv), vv.shape); t = int(vv[c])
++            L = "U" if Mprev[0][c] <= t else "C"
++        # walk back through task stages
++        curS, curj = S, j
++        while curS:
++            M = res["maps"][(curS, curj)]
++            sU, sC = res["seeds"][(curS, curj)]
++            c, t, L = self._back_stage(M, sU, sC, vany, free, c, t, L, steps)
++            kind = res["regions"][curj][0]
++            prevS = curS & ~(1 << curj)
++            # find predecessor
++            found = None
++            if prevS == 0:
++                cands = [(None, res["start_maps"])]
++            else:
++                cands = [(pj, res["maps"][(prevS, pj)]) for pj in range(len(res["regions"]))
++                         if (prevS >> pj & 1) and (prevS, pj) in res["maps"]]
++            for pj, Mp in cands:
++                TU, TC, AU, AC = Mp
++                if kind == "img":
++                    if L == "U" and AC[c] == t:
++                        found = (pj, Mp, "C"); break
++                else:
++                    if L == "U" and AU[c] == t:
++                        found = (pj, Mp, "U"); break
++                    if L == "C" and AC[c] == t:
++                        found = (pj, Mp, "C"); break
++            if found is None:
++                raise RuntimeError("pred not found")
++            pj, Mp, Lp = found
++            c, t, L = self._arrive(Mp, c, t, Lp, "image" if kind == "img" else "sample", vany, free, steps)
++            curS, curj = prevS, pj
++        # back to start
++        sU, sC = res["s0"]
++        c, t, L = self._back_stage(res["start_maps"], sU, sC, vany, free, c, t, L, steps)
++        steps.reverse()
++        return [((float(X[c]), float(Y[c])), op) for c, op in steps]
++
++    # -------------------------------------------------------------- acting
++    def get_action(self, state):
++        rnames = sorted(self.w.rovers.keys())
++        if self.expect is not None and self._deviated(state):
++            self.nreplan += 1
++            if self.nreplan < 40:
++                try:
++                    self._plan(state)
++                except Exception:
++                    self.plans = {r: [] for r in rnames}
++                    self.t = 0
++        act = np.zeros(8, np.float32)
++        self.expect = {}
++        for k, r in enumerate(rnames):
++            o = self.w.rovers[r]
++            x = self._get(state, o, "x"); y = self._get(state, o, "y")
++            th = self._get(state, o, "theta")
++            plan = self.plans.get(r, [])
++            if self.t < len(plan):
++                (tx, ty), op = plan[self.t]
++            else:
++                tx, ty = x, y
++                op = "none"
++                hx, hy = self.home[r]
++                if math.hypot(x - hx, y - hy) > HOME_R:
++                    tx, ty = hx, hy
++            store = self._get(state, o, "store_full") > 0.5
++            if op == "none" and store:
++                op = "drop"
++            dx = float(np.clip(tx - x, -0.2, 0.2)); dy = float(np.clip(ty - y, -0.2, 0.2))
++            dth = float(np.clip(wrap(self.home_theta[r] - th), -0.4, 0.4))
++            act[4 * k:4 * k + 4] = [dx, dy, dth, SEL[op]]
++            self.expect[r] = (x + dx, y + dy, op, self._snapshot(state, r))
++        self.t += 1
++        return act
++
++    def _snapshot(self, state, r):
++        o = self.w.rovers[r]
++        g = lambda ob, f: self._get(state, ob, f)
++        imgs = sum(g(ob, "have_image_" + r) for ob in self.w.objectives)
++        recv = sum(g(ob, "received_image") for ob in self.w.objectives) + \
++            sum(g(s, "received_analysis") for s in self.w.samples)
++        return (g(o, "store_full"), g(o, "calibrated"), imgs, recv)
++
++    def _deviated(self, state):
++        for r, (ex, ey, op, snap) in self.expect.items():
++            o = self.w.rovers[r]
++            x = self._get(state, o, "x"); y = self._get(state, o, "y")
++            if abs(x - ex) > 1e-3 or abs(y - ey) > 1e-3:
++                return True
++            store, cal, imgs, recv = self._snapshot(state, r)
++            if op == "sample" and store < 0.5:
++                return True
++            if op == "calibrate" and cal < 0.5:
++                return True
++            if op == "image" and imgs <= snap[2]:
++                return True
++            if op == "send" and recv <= snap[3] and self._unsent(state, r):
++                return True
++        return False
++
++    def _unsent(self, state, r):
++        g = lambda ob, f: self._get(state, ob, f)
++        for ob in self.w.objectives:
++            if g(ob, "have_image_" + r) > 0.5 and g(ob, "received_image") < 0.5:
++                return True
++        for s in self.w.samples:
++            if g(s, "analyzed_" + r) > 0.5 and g(s, "received_analysis") < 0.5:
++                return True
++        return False
+diff --git a/probe.py b/probe.py
+new file mode 100644
+index 0000000..f025741
+--- /dev/null
++++ b/probe.py
+@@ -0,0 +1,11 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++for seed in [0,1,2]:
++    obs, info = env.reset(seed=seed)
++    print("seed",seed, "info", info)
++    for t in ['rover','lander','objective','sample','obstacle']:
++        for o in obs.get_objects(env.observation_space.get_type(t)) if hasattr(env.observation_space,'get_type') else []:
++            feats = env.observation_space.type_features[env.observation_space.get_type(t)] if hasattr(env.observation_space,'type_features') else None
++            print(o.name, [round(float(obs.get(o,f)),3) for f in feats])
++env.close()
+diff --git a/probe_coll_1.py b/probe_coll_1.py
+new file mode 100644
+index 0000000..37ee659
+--- /dev/null
++++ b/probe_coll_1.py
+@@ -0,0 +1,12 @@
++from probe_coll_util import *
++obs,_=env.reset(seed=0)
++print(rov(obs))
++obs,*_=step((0.1,0,0),(0.1,0,0)); print('dx .1 both',rov(obs))
++obs,*_=step((0,0.1,0),(0,0.1,0)); print('dy .1',rov(obs))
++obs,*_=step((0,0,0.3),(0,0,0.3)); print('dth .3',rov(obs))
++obs,*_=step((0.1,0,0),(0.1,0,0)); print('dx .1 after rot',rov(obs))
++obs,*_=step((0.123456,0.0654321,0),(0,0,0)); print('frac',rov(obs))
++obs,r,te,tr,info=env.step(np.array([0.5,0,1.0,0,0,0.5,0,0],dtype=np.float32)); print('clip test',rov(obs),r,te,tr,info)
++obs,*_=step((0,0,0.4),(0,0,0)); 
++for i in range(8): obs,*_=step((0,0,0.4),(0,0,0))
++print('theta wrap',rov(obs))
+diff --git a/probe_coll_10.py b/probe_coll_10.py
+new file mode 100644
+index 0000000..f70c733
+--- /dev/null
++++ b/probe_coll_10.py
+@@ -0,0 +1,10 @@
++from probe_coll_util import *
++import numpy as np
++obs,_=env.reset(seed=3)
++out=[]
++for y in list(np.arange(-2.27,1.65,0.1))+[1.6,1.65,1.7,1.75,1.8]:
++    obs=goto(1,-1.0,rov(obs)[1][1],obs); obs=goto(1,-1.0,y,obs)
++    if abs(rov(obs)[1][1]-y)>1e-4: out.append(('cant reach',round(y,3),[round(v,3) for v in rov(obs)[1]])); break
++    obs=push(1,(1,0),obs,tol=1e-5)
++    out.append((round(y,3),round(rov(obs)[1][0],5)))
++print(out)
+diff --git a/probe_coll_11.py b/probe_coll_11.py
+new file mode 100644
+index 0000000..0552178
+--- /dev/null
++++ b/probe_coll_11.py
+@@ -0,0 +1,17 @@
++from probe_coll_util import *
++import math
++# seed with clear lander area
++for s in range(40):
++    obs,_=env.reset(seed=s)
++    P=[v for v in obst(obs).values() if v[2]<0.1]
++    if all(math.hypot(p[0]+1.9,p[1]+2.0)>1.3 for p in P): break
++print('seed',s)
++L=(-1.9,-2.0)
++for name,start,d in [('from+x',(-1.0,-2.0),(-1,0)),('from+y',(-1.9,-1.0),(0,-1)),('from+x low',(-1.0,-2.27),(-1,0)),('diag',(-1.2,-1.3),(-1/math.sqrt(2),-1/math.sqrt(2)))]:
++  for rot in [0,2]:
++    obs,_=env.reset(seed=s)
++    for _ in range(rot): obs,*_=step((0,0,0),(0,0,0.4))
++    obs=goto(1,-1.0,start[1],obs); obs=goto(1,*start,obs)
++    assert math.hypot(rov(obs)[1][0]-start[0],rov(obs)[1][1]-start[1])<1e-4, rov(obs)
++    obs=push(1,d,obs,tol=1e-5); x,y,t=rov(obs)[1]
++    print(name,'theta',round(t,2),'stop',round(x,5),round(y,5),'dx',round(x-L[0],5),'dy',round(y-L[1],5),'dist',round(math.hypot(x-L[0],y-L[1]),5))
+diff --git a/probe_coll_12.py b/probe_coll_12.py
+new file mode 100644
+index 0000000..0de6d88
+--- /dev/null
++++ b/probe_coll_12.py
+@@ -0,0 +1,11 @@
++from probe_coll_util import *
++obs,_=env.reset(seed=3)
++obs=goto(0,0.3,-1.75,obs); print('r0 at',rov(obs))
++obs,*_=step((-0.1,0.1,0.3),(0.1,0.1,0.3)); print('after (-.1,.1,.3) both:',rov(obs))
++obs,*_=step((-0.1,0.0,0.0),(0,0,0)); print('after -.1 x only',rov(obs))
++obs,*_=step((0,0.0,0.4),(0,0,0)); print('rot only at wall',rov(obs))
++obs,_=env.reset(seed=3); n=0
++while True:
++    obs,r,te,tr,info=env.step(act()); n+=1
++    if te or tr: print('ended at step',n,'term',te,'trunc',tr,'r',r); break
++    if n>1200: print('no end by 1200'); break
+diff --git a/probe_coll_13.py b/probe_coll_13.py
+new file mode 100644
+index 0000000..ac32f66
+--- /dev/null
++++ b/probe_coll_13.py
+@@ -0,0 +1,6 @@
++from probe_coll_util import *
++ox,oy=0.654,-0.199
++obs,_=env.reset(seed=0)
++obs=goto(0,1.3,oy,obs); obs=push(0,(-1,0),obs,tol=1e-5); print('contact',rov(obs)[0])
++for d in [0.1,0.4,0.4,-0.4]:
++    obs,*_=step((0,0,d)); print('rot',d,rov(obs)[0])
+diff --git a/probe_coll_2.py b/probe_coll_2.py
+new file mode 100644
+index 0000000..6909db3
+--- /dev/null
++++ b/probe_coll_2.py
+@@ -0,0 +1,10 @@
++from probe_coll_util import *
++for seed in [0,1]:
++    obs,_=env.reset(seed=seed)
++    print('seed',seed,{k:[round(x,3) for x in v] for k,v in obst(obs).items() if v[2]<0.1})
++    # rover0 right
++    obs=push(0,(1,0),obs); print('r0 +x',rov(obs)[0])
++    obs=push(0,(0,-1),obs); print('r0 -y',rov(obs)[0])
++    obs=push(0,(-1,0),obs); print('r0 -x along bottom',rov(obs)[0])
++    obs=push(1,(0,-1),obs); print('r1 -y',rov(obs)[1])
++    obs=push(1,(-1,0),obs); print('r1 -x',rov(obs)[1])
+diff --git a/probe_coll_3.py b/probe_coll_3.py
+new file mode 100644
+index 0000000..78320f6
+--- /dev/null
++++ b/probe_coll_3.py
+@@ -0,0 +1,14 @@
++from probe_coll_util import *
++import math
++ox,oy=0.654,-0.199
++for th_steps in [0,2]:  # rotate 0 or 0.8 rad
++  for name,start,d in [('from+x',(1.3,oy),(-1,0)),('from-y',(ox,-0.8),(0,1)),('from+y',(ox,0.4),(0,-1)),('diag ++',(1.2,0.35),(-1/math.sqrt(2),-1/math.sqrt(2))),('diag +-',(1.2,-0.75),(-1/math.sqrt(2),1/math.sqrt(2)))]:
++    obs,_=env.reset(seed=0)
++    for _ in range(th_steps): obs,*_=step((0,0,0.4))
++    obs=goto(0,*start,obs)
++    assert abs(rov(obs)[0][0]-start[0])<1e-5, rov(obs)
++    obs=push(0,d,obs,tol=2e-5)
++    x,y,t=rov(obs)[0]
++    # dist from box
++    ddx=max(abs(x-ox)-0.05,0); ddy=max(abs(y-oy)-0.05,0)
++    print(th_steps,name,round(x,5),round(y,5),'theta',round(t,3),'dist_to_box',round(math.hypot(ddx,ddy),5),'center dist',round(math.hypot(x-ox,y-oy),5))
+diff --git a/probe_coll_4.py b/probe_coll_4.py
+new file mode 100644
+index 0000000..17ca9ec
+--- /dev/null
++++ b/probe_coll_4.py
+@@ -0,0 +1,7 @@
++from probe_coll_util import *
++obs,_=env.reset(seed=0)
++obs=goto(0,0.654,0.4,obs); print(rov(obs)[0])
++for i in range(8):
++    obs,*_=step((0,-0.2,0)); print(rov(obs)[0])
++for i in range(8):
++    obs,*_=step((0,0.2,0)); print('up',rov(obs)[0])
+diff --git a/probe_coll_5.py b/probe_coll_5.py
+new file mode 100644
+index 0000000..627fded
+--- /dev/null
++++ b/probe_coll_5.py
+@@ -0,0 +1,14 @@
++from probe_coll_util import *
++import math
++ox,oy=0.654,-0.199
++for k in [0,1,2,3,4]:
++    th=0.2*k
++    obs,_=env.reset(seed=0)
++    nrot=k
++    for _ in range(nrot): obs,*_=step((0,0,0.2))
++    obs=push(0,(1,0),obs,tol=2e-5); xw=rov(obs)[0][0]
++    obs=goto(0,1.3,oy,obs); assert abs(rov(obs)[0][1]-oy)<1e-5
++    obs=push(0,(-1,0),obs,tol=2e-5); xp=rov(obs)[0][0]
++    obs=goto(0,1.3,0.5,obs);obs=goto(0,ox,0.5,obs); assert abs(rov(obs)[0][0]-ox)<1e-5 and abs(rov(obs)[0][1]-0.5)<1e-5
++    obs=push(0,(0,-1),obs,tol=2e-5); yp=rov(obs)[0][1]
++    print('rot',round(th,2),'theta',round(rov(obs)[0][2],3),'wall+x stop',round(xw,5),'pillar from+x gap',round(xp-(ox+.05),5),'pillar from+y gap',round((oy-.05)-yp,5))
+diff --git a/probe_coll_6.py b/probe_coll_6.py
+new file mode 100644
+index 0000000..290f321
+--- /dev/null
++++ b/probe_coll_6.py
+@@ -0,0 +1,14 @@
++from probe_coll_util import *
++import math
++res=[]
++for k in range(0,17):
++    phi=0.1*k
++    obs,_=env.reset(seed=0)
++    n=int(round(phi/0.1))
++    for _ in range(n): obs,*_=step((0,0,0.1))
++    th=rov(obs)[0][2]
++    obs=goto(0,2.0,-1.75,obs); obs=goto(0,2.0,1.0,obs); assert abs(rov(obs)[0][1]-1.0)<1e-5
++    obs=push(0,(0,1),obs,tol=1e-5); gy=1.75-rov(obs)[0][1]
++    obs=goto(0,2.0,1.0,obs);obs=goto(0,1.2,1.0,obs);obs=goto(0,1.2,1.9,obs); assert abs(rov(obs)[0][0]-1.2)<1e-5,rov(obs)
++    obs=push(0,(1,0),obs,tol=1e-5); gx=1.75-rov(obs)[0][0]
++    print('phi',round(phi,2),'theta',round(th,3),'gap below mound(+y dir)',round(gy,5),'gap left of mound(+x dir)',round(gx,5))
+diff --git a/probe_coll_7.py b/probe_coll_7.py
+new file mode 100644
+index 0000000..c8ee16e
+--- /dev/null
++++ b/probe_coll_7.py
+@@ -0,0 +1,10 @@
++from probe_coll_util import *
++import math
++ox,oy=0.654,-0.199
++for k in range(0,16):
++    obs,_=env.reset(seed=0)
++    for _ in range(k): obs,*_=step((0,0,0.4))
++    th=rov(obs)[0][2]
++    obs=goto(0,1.3,oy,obs); assert abs(rov(obs)[0][1]-oy)<1e-5
++    obs=push(0,(-1,0),obs,tol=1e-5); xp=rov(obs)[0][0]
++    print('theta',round(th,3),'pillar gap(from +x)',round(xp-(ox+.05),5))
+diff --git a/probe_coll_8.py b/probe_coll_8.py
+new file mode 100644
+index 0000000..aa3ddda
+--- /dev/null
++++ b/probe_coll_8.py
+@@ -0,0 +1,9 @@
++from probe_coll_util import *
++# wall scan: rover0 (right side) push -x at many y; rover1 push +x
++obs,_=env.reset(seed=3)
++print({k:[round(x,3) for x in v] for k,v in obst(obs).items() if v[2]<0.1})
++for y in [-2.27,-2.0,-1.5,-1.0,-0.5,0.0,0.5,1.0,1.5,2.0,2.27]:
++    obs=goto(0,1.0,rov(obs)[0][1],obs); obs=goto(0,1.0,y,obs)
++    p=rov(obs)[0]
++    obs=push(0,(-1,0),obs,tol=1e-5)
++    print('y target',y,'start',round(p[0],3),round(p[1],3),'stop',[round(v,5) for v in rov(obs)[0]])
+diff --git a/probe_coll_9.py b/probe_coll_9.py
+new file mode 100644
+index 0000000..fdd9031
+--- /dev/null
++++ b/probe_coll_9.py
+@@ -0,0 +1,7 @@
++from probe_coll_util import *
++for s in range(30):
++    obs,_=env.reset(seed=s)
++    P=[v for v in obst(obs).values() if v[2]<0.1]
++    okR=all(not(-0.1<p[0]<1.4 and -2.5<p[1]<2.5 and not (p[0]>1.25)) for p in P)
++    okL=all(not(-1.4<p[0]<0.1) for p in P)
++    if okR or okL: print(s,okR,okL)
+diff --git a/probe_coll_util.py b/probe_coll_util.py
+new file mode 100644
+index 0000000..75112a8
+--- /dev/null
++++ b/probe_coll_util.py
+@@ -0,0 +1,31 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++SP = env.observation_space
++def objs(obs,t): return obs.get_objects(SP.get_type(t))
++def rov(obs):
++    r={o.name:o for o in objs(obs,'rover')}
++    return [(float(obs.get(r[n],'x')),float(obs.get(r[n],'y')),float(obs.get(r[n],'theta'))) for n in ['rover0','rover1']]
++def obst(obs):
++    return {o.name:[float(obs.get(o,f)) for f in ['x','y','half_x','half_y']] for o in objs(obs,'obstacle')}
++def act(a0=(0,0,0),a1=(0,0,0)):
++    return np.array([a0[0],a0[1],a0[2],0,a1[0],a1[1],a1[2],0],dtype=np.float32)
++def step(a0=(0,0,0),a1=(0,0,0)):
++    obs,r,te,tr,info=env.step(act(a0,a1)); return obs,r,te,tr,info
++def push(i,d,obs,big=0.2,tol=1e-4,maxn=200):
++    """move rover i in unit direction d until blocked; refine step. returns obs"""
++    s=big; n=0
++    while s>tol and n<maxn:
++        n+=1
++        before=rov(obs)[i]
++        a=(d[0]*s,d[1]*s,0)
++        obs,*_=step(a,(0,0,0)) if i==0 else step((0,0,0),a)
++        after=rov(obs)[i]
++        if abs(after[0]-before[0])<1e-9 and abs(after[1]-before[1])<1e-9: s/=2
++    return obs
++def goto(i,x,y,obs,maxn=100):
++    for _ in range(maxn):
++        p=rov(obs)[i]; dx=np.clip(x-p[0],-.2,.2); dy=np.clip(y-p[1],-.2,.2)
++        if abs(x-p[0])<1e-6 and abs(y-p[1])<1e-6: break
++        a=(dx,dy,0); obs,*_=step(a,(0,0,0)) if i==0 else step((0,0,0),a)
++    return obs
+diff --git a/probe_order.py b/probe_order.py
+new file mode 100644
+index 0000000..f34ac68
+--- /dev/null
++++ b/probe_order.py
+@@ -0,0 +1,18 @@
++from env_client import make_env
++import numpy as np
++env=make_env(); obs,_=env.reset(seed=1)
++T=lambda n: env.observation_space.get_type(n)
++r1=[o for o in obs.get_objects(T('rover')) if o.name=='rover1'][0]
++# sample1 at (-1.485,-1.367); rover1 at (-1,-1.75)
++tx,ty=-1.485,-1.367+0.35
++def step(a):
++    global obs
++    obs,r,te,tr,info=env.step(np.array(a,dtype=np.float32)); return obs
++for _ in range(10):
++    x,y=obs.get(r1,'x'),obs.get(r1,'y')
++    dx=np.clip(tx-x,-.2,.2); dy=np.clip(ty-y,-.2,.2)
++    step([0,0,0,1/6,dx,dy,0,1/6])
++print(obs.get(r1,'x'),obs.get(r1,'y'))
++# now move down 0.2 (dist goes 0.35->0.15) with sample op
++step([0,0,0,1/6,0,-0.2,0,-5/6])
++print('post-move sample attempt: store', obs.get(r1,'store_full'), obs.get(r1,'y'))
+diff --git a/probe_samp_0.py b/probe_samp_0.py
+new file mode 100644
+index 0000000..27f9ff7
+--- /dev/null
++++ b/probe_samp_0.py
+@@ -0,0 +1,3 @@
++from probe_samp_util import *
++for s in [0,1,2,3]:
++    D=Driver(s); print('seed',s, D.info); dump(D.obs)
+diff --git a/probe_samp_1.py b/probe_samp_1.py
+new file mode 100644
+index 0000000..9a72ba1
+--- /dev/null
++++ b/probe_samp_1.py
+@@ -0,0 +1,14 @@
++from probe_samp_util import *
++def S(obs,n):
++    o=obs.get_object_from_name(n); return {f:round(float(obs.get(o,f)),3) for f in obs.type_features[o.type]}
++# seed 1: sample3 soil (0.547,-1.348); rover0 at (1,-1.75)
++sx,sy=0.547,-1.348
++for ang in [0.0, math.pi/2]:
++  D=Driver(1)
++  for d in [0.6,0.5,0.45,0.4,0.35,0.3,0.28,0.26,0.25,0.24,0.22,0.2,0.15,0.1]:
++    tx,ty=sx+d*math.cos(ang-0.9),sy+d*math.sin(ang-0.9)
++    ok=D.goto(0,tx,ty)
++    D.act(0,'sample'); p=rov(D.obs,0)
++    print('ang',round(ang,2),'d',d,'ok',ok,'dist',round(math.hypot(p['x']-sx,p['y']-sy),3),'th',round(p['theta'],2),'store',p['store_full'],S(D.obs,'sample3'),D.last[0],D.last[3])
++    if p['store_full']: break
++  print('rover0',rov(D.obs,0))
+diff --git a/probe_samp_10.py b/probe_samp_10.py
+new file mode 100644
+index 0000000..2ee6fd0
+--- /dev/null
++++ b/probe_samp_10.py
+@@ -0,0 +1,12 @@
++from probe_samp_util import *
++for i,(hx,hy,hth) in enumerate([(1,-1.75,math.pi),(-1,-1.75,0.0)]):
++  for ddir in [(1,0),(0,1),(-1,0),(0,-1)]:
++    D=Driver(1); last=None
++    for k in range(1,40):
++      d=0.01*k; D.goto(i,hx+ddir[0]*d,hy+ddir[1]*d,tol=1e-5)
++      h=rov(D.obs,i)['at_home']
++      if h<0.5: print('rover',i,'dir',ddir,'at_home lost at d=',round(d,3)); break
++  D=Driver(1)
++  for dth in [0.05,0.1,0.2,0.4,0.8,1.2,1.6,2.0,2.4,2.8,3.1]:
++    D.turn(i,hth+dth); print('rover',i,'dth',dth,'at_home',rov(D.obs,i)['at_home'],end='; ')
++  print()
+diff --git a/probe_samp_11.py b/probe_samp_11.py
+new file mode 100644
+index 0000000..f62e284
+--- /dev/null
++++ b/probe_samp_11.py
+@@ -0,0 +1,12 @@
++from probe_samp_util import *
++hx,hy,hth=1,-1.75,math.pi
++for sgn in [1,-1]:
++  D=Driver(1)
++  for k in range(20,41):
++    dth=0.01*k; D.turn(0,hth+sgn*dth)
++    if rov(D.obs,0)['at_home']<0.5: print('theta lost at',sgn*dth); break
++for d in [0.248,0.25,0.252,0.255]:
++  D=Driver(1); D.goto(0,hx+d/math.sqrt(2),hy+d/math.sqrt(2),tol=1e-6); p=rov(D.obs,0)
++  print('diag d',d,round(math.hypot(p['x']-hx,p['y']-hy),5),p['at_home'])
++# combined: d=0.2 and dth 0.25
++D=Driver(1); D.goto(0,hx+0.2,hy); D.turn(0,hth+0.25); print('combo',rov(D.obs,0)['at_home'])
+diff --git a/probe_samp_12.py b/probe_samp_12.py
+new file mode 100644
+index 0000000..0389e05
+--- /dev/null
++++ b/probe_samp_12.py
+@@ -0,0 +1,6 @@
++from probe_samp_util import *
++for i,hth in [(0,math.pi),(1,0.0)]:
++ for dth in [0.38,0.39,0.395,0.399,0.4,0.401,0.405,0.41,-0.39,-0.399,-0.401]:
++  D=Driver(1); D.turn(i,hth+dth); p=rov(D.obs,i)
++  print(i,dth,round(p['theta'],5),p['at_home'],end=' | ')
++ print()
+diff --git a/probe_samp_13.py b/probe_samp_13.py
+new file mode 100644
+index 0000000..bec42cb
+--- /dev/null
++++ b/probe_samp_13.py
+@@ -0,0 +1,10 @@
++from probe_samp_util import *
++def S(obs,n):
++    o=obs.get_object_from_name(n); return {f:round(float(obs.get(o,f)),3) for f in obs.type_features[o.type]}
++D=Driver(1)
++D.act(0,'calibrate'); D.act(1,'calibrate'); print('calib at start',rov(D.obs,0)['calibrated'],rov(D.obs,1)['calibrated'])
++D.goto(0,0.747,-1.348); D.act(0,'sample'); goto_fine(D,0,0.8,-2.0); D.act(0,'send'); print('s3',S(D.obs,'sample3'))
++D.goto(1,-1.285,-1.367); D.act(1,'sample'); D.act(1,'send'); print('s1',S(D.obs,'sample1'))
++print(goto_fine(D,0,1,-1.75), goto_fine(D,1,-1,-1.75)); D.turn(0,math.pi); D.turn(1,0)
++print('home',rov(D.obs,0),rov(D.obs,1),'term',D.last[1:],'R',D.R,'steps',D.steps)
++D.act(0,'drop'); D.act(1,'drop'); print('after drop term',D.last[1:])
+diff --git a/probe_samp_14.py b/probe_samp_14.py
+new file mode 100644
+index 0000000..e461c78
+--- /dev/null
++++ b/probe_samp_14.py
+@@ -0,0 +1,10 @@
++from probe_samp_util import *
++def S(obs,n):
++    o=obs.get_object_from_name(n); return {f:round(float(obs.get(o,f)),3) for f in obs.type_features[o.type]}
++ox,oy=-2.114,2.096
++D=Driver(1)
++for wp in [(-1.7,-1.0),(-1.7,0.0)]: print(goto_fine(D,1,*wp))
++for y in [0.0,0.3,0.6,0.9,1.2,1.4,1.5]:
++  ok,p=goto_fine(D,1,-1.7,y); th=math.atan2(oy-p[1],ox-p[0]); D.turn(1,th)
++  D.act(1,'calibrate'); c=rov(D.obs,1)['calibrated']; D.act(1,'image')
++  print('pos',[round(v,2) for v in p],'dist',round(math.hypot(ox-p[0],oy-p[1]),2),'calib',c,'img',S(D.obs,'objective1')['have_image_rover1'],'calib after',rov(D.obs,1)['calibrated'])
+diff --git a/probe_samp_15.py b/probe_samp_15.py
+new file mode 100644
+index 0000000..2115e17
+--- /dev/null
++++ b/probe_samp_15.py
+@@ -0,0 +1,25 @@
++from probe_samp_util import *
++def S(obs,n):
++    o=obs.get_object_from_name(n); return {f:round(float(obs.get(o,f)),3) for f in obs.type_features[o.type]}
++def pr(D,tag): print(tag,'r',D.last[0],'term',D.last[1],'trunc',D.last[2],D.last[3],'steps',D.steps,'R',D.R)
++D=Driver(1)
++# facing test for rover1 at (-1.7,0.9)
++goto_fine(D,1,-1.7,-1.0); goto_fine(D,1,-1.7,0.9)
++D.turn(1,math.atan2(2.096-0.9,-2.114+1.7)+math.pi); D.act(1,'calibrate'); print('calib facing away',rov(D.obs,1)['calibrated'])
++for off in [0.3,0.6,0.9,1.2]:
++  D.turn(1,math.atan2(2.096-0.9,-2.114+1.7)+off); D.act(1,'calibrate'); print('calib off',off,rov(D.obs,1)['calibrated'])
++D.turn(1,math.atan2(2.096-0.9,-2.114+1.7)); D.act(1,'calibrate'); D.act(1,'image'); print('obj1',S(D.obs,'objective1'))
++D.act(1,'send'); print('obj1 after send',S(D.obs,'objective1'))
++goto_fine(D,1,-1.7,-1.0); goto_fine(D,1,-1,-1.75); D.turn(1,0)
++D.goto(0,0.747,-1.348); D.act(0,'sample'); goto_fine(D,0,0.8,-2.0); D.act(0,'send')
++D.goto(1,-1.285,-1.367); D.act(1,'sample'); D.act(1,'send'); goto_fine(D,1,-1,-1.75); D.turn(1,0)
++print('s1',S(D.obs,'sample1')['received_analysis'],'s3',S(D.obs,'sample3')['received_analysis'])
++for wp in [(1.7,-1.5),(1.7,0.3)]: print(goto_fine(D,0,*wp))
++p=rov(D.obs,0); D.turn(0,math.atan2(1.923-p['y'],2.118-p['x'])); D.act(0,'calibrate'); D.act(0,'image'); print('obj0',S(D.obs,'objective0'))
++goto_fine(D,0,1.7,-1.5); goto_fine(D,0,0.8,-2.0); D.act(0,'send'); print('obj0',S(D.obs,'objective0')); pr(D,'after send')
++goto_fine(D,0,1.0,-1.75); pr(D,'r0 home pos'); D.turn(0,math.pi); pr(D,'r0 home theta')
++print(rov(D.obs,0),rov(D.obs,1))
++D.step(); pr(D,"extra step")
++D.act(0,"drop"); pr(D,"drop r0"); print(rov(D.obs,0)["store_full"])
++D.act(1,"drop"); pr(D,"drop r1")
++D.step(); pr(D,"post")
+diff --git a/probe_samp_16.py b/probe_samp_16.py
+new file mode 100644
+index 0000000..5a6dfed
+--- /dev/null
++++ b/probe_samp_16.py
+@@ -0,0 +1,21 @@
++from probe_samp_util import *
++def S(obs,n):
++    o=obs.get_object_from_name(n); return {f:round(float(obs.get(o,f)),3) for f in obs.type_features[o.type]}
++def run(img0=True, home0=True, drop_early=True):
++  D=Driver(1); T=[]
++  def chk(tag):
++    if D.last[1]: T.append((tag,D.steps))
++  goto_fine(D,1,-1.7,-1.0); goto_fine(D,1,-1.7,0.9)
++  D.turn(1,math.atan2(2.096-0.9,-2.114+1.7)); D.act(1,'calibrate'); D.act(1,'image'); D.act(1,'send')
++  goto_fine(D,1,-1.7,-1.0); D.goto(1,-1.285,-1.367); D.act(1,'sample'); D.act(1,'send'); D.act(1,'drop')
++  goto_fine(D,1,-1,-1.75); D.turn(1,0); chk('r1home')
++  D.goto(0,0.747,-1.348); D.act(0,'sample'); goto_fine(D,0,0.8,-2.0); D.act(0,'send'); D.act(0,'drop'); chk('r0drop')
++  if img0:
++    goto_fine(D,0,1.7,-1.5); goto_fine(D,0,1.7,0.3)
++    p=rov(D.obs,0); D.turn(0,math.atan2(1.923-p['y'],2.118-p['x'])); D.act(0,'calibrate'); D.act(0,'image')
++    goto_fine(D,0,1.7,-1.5); goto_fine(D,0,0.8,-2.0); D.act(0,'send'); chk('r0send')
++  if home0:
++    goto_fine(D,0,1.0,-1.75); chk('r0pos'); D.turn(0,math.pi); chk('r0theta')
++  D.step(); chk('final')
++  print('img0',img0,'home0',home0,'term events',T[:3],'r0',{k:round(v,2) for k,v in rov(D.obs,0).items()})
++run(True,False); run(False,True)
+diff --git a/probe_samp_17.py b/probe_samp_17.py
+new file mode 100644
+index 0000000..4002861
+--- /dev/null
++++ b/probe_samp_17.py
+@@ -0,0 +1,18 @@
++from probe_samp_util import *
++def run(stone=True, soil=True, hp=(1.0,-1.75,math.pi)):
++  D=Driver(1); T=[]
++  def chk(tag):
++    if D.last[1]: T.append((tag,D.steps))
++  goto_fine(D,1,-1.7,-1.0); goto_fine(D,1,-1.7,0.9)
++  D.turn(1,math.atan2(2.096-0.9,-2.114+1.7)); D.act(1,'calibrate'); D.act(1,'image'); D.act(1,'send')
++  goto_fine(D,1,-1.7,-1.0)
++  if stone: D.goto(1,-1.285,-1.367); D.act(1,'sample'); D.act(1,'send'); D.act(1,'drop')
++  goto_fine(D,1,-1,-1.75); D.turn(1,0); chk('r1home')
++  if soil: D.goto(0,0.747,-1.348); D.act(0,'sample')
++  goto_fine(D,0,1.7,-1.5); goto_fine(D,0,1.7,0.3)
++  p=rov(D.obs,0); D.turn(0,math.atan2(1.923-p['y'],2.118-p['x'])); D.act(0,'calibrate'); D.act(0,'image')
++  goto_fine(D,0,1.7,-1.5); goto_fine(D,0,0.8,-2.0); D.act(0,'send'); D.act(0,'drop'); chk('r0send')
++  goto_fine(D,0,hp[0],hp[1]); chk('r0pos'); D.turn(0,hp[2]); chk('r0theta')
++  D.step(); chk('final')
++  print('stone',stone,'soil',soil,'hp',hp,'term events',T[:3],'R',D.R,'r0',{k:round(v,2) for k,v in rov(D.obs,0).items()})
++run(hp=(1.2,-1.6,math.pi+0.35)); run(stone=False); run(soil=False)
+diff --git a/probe_samp_2.py b/probe_samp_2.py
+new file mode 100644
+index 0000000..008901e
+--- /dev/null
++++ b/probe_samp_2.py
+@@ -0,0 +1,16 @@
++from probe_samp_util import *
++def S(obs,n):
++    o=obs.get_object_from_name(n); return {f:round(float(obs.get(o,f)),3) for f in obs.type_features[o.type]}
++sx,sy=0.547,-1.348
++# fine radius, facing away (theta=0, rover west of sample => sample is east... choose rover east of sample facing east=away)
++for th in [0.0, math.pi/2]:
++  D=Driver(1); D.turn(0,th)
++  for d in [0.252,0.25,0.249,0.248,0.246,0.244]:
++    D.goto(0,sx+d,sy,tol=1e-5); D.act(0,'sample'); p=rov(D.obs,0)
++    print('th',th,'d',d,'actual',round(math.hypot(p['x']-sx,p['y']-sy),5),'store',p['store_full'])
++    if p['store_full']: break
++  # sample again while full
++  before=S(D.obs,'sample3'); D.act(0,'sample'); print('resample full', rov(D.obs,0)['store_full'], S(D.obs,'sample3'))
++  # drop far away
++  D.goto(0,1.5,-1.0); D.act(0,'drop'); print('drop far', D.last[0], rov(D.obs,0), S(D.obs,'sample3'))
++  D.act(0,'drop'); print('drop empty', rov(D.obs,0)['store_full'])
+diff --git a/probe_samp_3.py b/probe_samp_3.py
+new file mode 100644
+index 0000000..ef540e4
+--- /dev/null
++++ b/probe_samp_3.py
+@@ -0,0 +1,22 @@
++from probe_samp_util import *
++def S(obs,n):
++    o=obs.get_object_from_name(n); return {f:round(float(obs.get(o,f)),3) for f in obs.type_features[o.type]}
++sx,sy=0.547,-1.348
++D=Driver(1)
++D.goto(0,sx+0.2,sy); D.act(0,'sample'); D.act(0,'drop'); D.act(0,'sample')
++print('resample after drop: store',rov(D.obs,0)['store_full'],S(D.obs,'sample3'))
++D.act(0,'drop')
++# rover1 samples sample3 too
++D.goto(0,1.5,-1.0)
++print('r1 goto', D.goto(1,sx-0.2,sy), rov(D.obs,1))
++D.act(1,'sample'); print('r1 sample same: store',rov(D.obs,1)['store_full'],S(D.obs,'sample3'))
++D.act(1,'drop')
++# rover1 samples stone sample1 (-1.485,-1.367)
++print(D.goto(1,-1.485+0.2,-1.367)); D.act(1,'sample'); print('r1 stone', rov(D.obs,1)['store_full'], S(D.obs,'sample1'))
++# send radius: approach lander (-1.9,-2.0) from east
++lx,ly=-1.9,-2.0
++for d in [2.0,1.5,1.2,1.0,0.9,0.8,0.7,0.6,0.5,0.4,0.35,0.3,0.25]:
++    ok=D.goto(1,lx+d*0.8,ly+d*0.6)
++    D.act(1,'send'); p=rov(D.obs,1)
++    print('d',d,'ok',ok,'dist',round(math.hypot(p['x']-lx,p['y']-ly),3),'store',p['store_full'],'s1',S(D.obs,'sample1')['received_analysis'],'s3',S(D.obs,'sample3')['received_analysis'],D.last[1:])
++    if S(D.obs,'sample1')['received_analysis']: break
+diff --git a/probe_samp_4.py b/probe_samp_4.py
+new file mode 100644
+index 0000000..fbaea2f
+--- /dev/null
++++ b/probe_samp_4.py
+@@ -0,0 +1,16 @@
++from probe_samp_util import *
++def S(obs,n):
++    o=obs.get_object_from_name(n); return {f:round(float(obs.get(o,f)),3) for f in obs.type_features[o.type]}
++for s in [1,0]:
++  D=Driver(s)
++  print('seed',s,'r1 east', D.goto(1,1.0,-2.3), rov(D.obs,1)['x'],rov(D.obs,1)['y'])
++  D=Driver(s)
++  print('seed',s,'r0 west', D.goto(0,-1.0,-1.2), rov(D.obs,0)['x'],rov(D.obs,0)['y'])
++  D=Driver(s)
++  print('seed',s,'r1 north', D.goto(1,-1.0,2.0), rov(D.obs,1)['x'],rov(D.obs,1)['y'])
++# send from far: seed1 rover0 samples sample3 soil then drives to various points and sends
++sx,sy=0.547,-1.348
++for tgt in [(2.0,1.0),(1.5,-0.5),(0.9,-1.3)]:
++  D=Driver(1); D.goto(0,sx+0.2,sy); D.act(0,'sample')
++  ok=D.goto(0,*tgt); p=rov(D.obs,0); D.act(0,'send')
++  print('send from',tgt,ok,round(p['x'],2),round(p['y'],2),'recv',S(D.obs,'sample3')['received_analysis'],'store',rov(D.obs,0)['store_full'])
+diff --git a/probe_samp_5.py b/probe_samp_5.py
+new file mode 100644
+index 0000000..6e08971
+--- /dev/null
++++ b/probe_samp_5.py
+@@ -0,0 +1,4 @@
++from probe_samp_util import *
++for y in [-2.3,-1.0,0.0,1.0,1.8,2.3]:
++  D=Driver(1); D.goto(0,1.0,y) if y>-1.75 else D.goto(0,1.0,y)
++  ok,p=goto_fine(D,0,-1.0,y); print('r0 west at y',y,ok,[round(v,3) for v in p])
+diff --git a/probe_samp_6.py b/probe_samp_6.py
+new file mode 100644
+index 0000000..41c33cb
+--- /dev/null
++++ b/probe_samp_6.py
+@@ -0,0 +1,8 @@
++from probe_samp_util import *
++def S(obs,n):
++    o=obs.get_object_from_name(n); return {f:round(float(obs.get(o,f)),3) for f in obs.type_features[o.type]}
++# seed1 rover1 samples stone sample1 (-1.485,-1.367), then sends from various positions
++for tgt in [(-0.3,-0.5),(-0.3,1.0),(-1.5,1.0),(-2.2,-0.2),(-0.3,2.3),(-1.0,-2.3),(-1.9,-1.6),(-1.1,-0.2)]:
++  D=Driver(1); D.goto(1,-1.285,-1.367); D.act(1,'sample')
++  ok,p=goto_fine(D,1,*tgt); D.act(1,'send')
++  print('send from',tgt,ok,[round(v,2) for v in p],'dist',round(math.hypot(p[0]+1.9,p[1]+2.0),2),'recv',S(D.obs,'sample1')['received_analysis'])
+diff --git a/probe_samp_7.py b/probe_samp_7.py
+new file mode 100644
+index 0000000..9a0b104
+--- /dev/null
++++ b/probe_samp_7.py
+@@ -0,0 +1,10 @@
++from probe_samp_util import *
++def S(obs,n):
++    o=obs.get_object_from_name(n); return {f:round(float(obs.get(o,f)),3) for f in obs.type_features[o.type]}
++sx,sy=0.547,-1.348
++D=Driver(1); D.goto(0,sx+0.2,sy); D.act(0,'sample')
++for tgt in [(0.25,-2.2),(0.25,-2.45),(0.6,-2.45),(1.0,-2.45),(1.0,0.0),(0.6,2.45),(0.25,2.45)]:
++  ok,p=goto_fine(D,0,*tgt); D.act(0,'send'); print('r0 at',[round(v,3) for v in p],'recv',S(D.obs,'sample3')['received_analysis'])
++# sweep west at many y
++for y in [-2.45,-2.0,-1.5,-1.0,-0.5,0.0,0.5,1.0,1.5,2.0,2.45]:
++  ok,p=goto_fine(D,0,0.6,y); ok2,p2=goto_fine(D,0,-0.6,y); print('y',y,'reach',[round(v,3) for v in p],'west->',[round(v,3) for v in p2])
+diff --git a/probe_samp_8.py b/probe_samp_8.py
+new file mode 100644
+index 0000000..84ab7b0
+--- /dev/null
++++ b/probe_samp_8.py
+@@ -0,0 +1,10 @@
++from probe_samp_util import *
++def S(obs,n):
++    o=obs.get_object_from_name(n); return {f:round(float(obs.get(o,f)),3) for f in obs.type_features[o.type]}
++sx,sy=0.547,-1.348
++def trial(tgt):
++  D=Driver(1); D.goto(0,sx+0.2,sy); D.act(0,'sample')
++  ok,p=goto_fine(D,0,*tgt); D.act(0,'send'); return [round(v,3) for v in p], S(D.obs,'sample3')['received_analysis']
++if __name__=="__main__":
++ for tgt in [(0.25,-1.3),(0.25,-1.6),(0.25,-1.8),(0.25,-1.9),(0.25,-2.0),(0.25,-2.1),(0.5,-2.2),(0.8,-2.2),(1.2,-2.2),(1.6,-2.2),(0.8,-2.0),(0.8,-1.8)]:
++  print(tgt, *trial(tgt))
+diff --git a/probe_samp_9.py b/probe_samp_9.py
+new file mode 100644
+index 0000000..726bf79
+--- /dev/null
++++ b/probe_samp_9.py
+@@ -0,0 +1,3 @@
++from probe_samp_8 import trial
++for tgt in [(0.25,-1.82),(0.25,-1.84),(0.25,-1.86),(0.25,-1.88),(1.6,-1.8),(1.6,-1.6),(1.6,-1.7),(2.2,-1.6),(2.2,-1.5)]:
++  p,r=trial(tgt); cy=p[1]+(-2.0-p[1])*(p[0]-0)/(p[0]+1.9); print(tgt,p,r,'cross_y',round(cy,3))
+diff --git a/probe_samp_util.py b/probe_samp_util.py
+new file mode 100644
+index 0000000..dcf6e55
+--- /dev/null
++++ b/probe_samp_util.py
+@@ -0,0 +1,60 @@
++from env_client import make_env
++import numpy as np, math
++env = make_env()
++SP = env.observation_space
++SEL={'sample':-5/6,'calibrate':-0.5,'image':-1/6,'noop':1/6,'send':0.5,'drop':5/6}
++def objs(obs,t): return obs.get_objects(SP.get_type(t))
++def feats(obs,t):
++    out={}
++    for o in objs(obs,t):
++        out[o.name]={f:round(float(obs.get(o,f)),4) for f in SP.get_type(t).feature_names} if hasattr(SP.get_type(t),'feature_names') else None
++    return out
++def dump(obs):
++    for t in ['rover','lander','objective','sample','obstacle']:
++        try:
++            for o in objs(obs,t):
++                print(t,o.name,{f:round(float(obs.get(o,f)),3) for f in obs.type_features[o.type]})
++        except Exception as e: print(t,'err',e)
++def rov(obs,i):
++    r={o.name:o for o in objs(obs,'rover')}['rover%d'%i]
++    return {f:float(obs.get(r,f)) for f in obs.type_features[r.type]}
++class Driver:
++    def __init__(self,seed):
++        self.obs,self.info=env.reset(seed=seed); self.R=0; self.steps=0; self.term=False
++    def step(self,a0=(0,0,0),s0='noop',a1=(0,0,0),s1='noop'):
++        a=np.array([*a0,SEL[s0],*a1,SEL[s1]],dtype=np.float32)
++        self.obs,r,te,tr,info=env.step(a); self.R+=r; self.steps+=1; self.term=te
++        self.last=(r,te,tr,info); return self.obs,r,te,tr,info
++    def goto(self,i,tx,ty,tol=1e-3,maxn=200):
++        for _ in range(maxn):
++            p=rov(self.obs,i); dx,dy=tx-p['x'],ty-p['y']; d=math.hypot(dx,dy)
++            if d<tol: return True
++            s=min(1,0.2/max(abs(dx),abs(dy),1e-9)); mv=(dx*s,dy*s,0)
++            self.step(mv if i==0 else (0,0,0),'noop',mv if i==1 else (0,0,0),'noop')
++            q=rov(self.obs,i)
++            if abs(q['x']-p['x'])+abs(q['y']-p['y'])<1e-6: return False
++        return False
++    def turn(self,i,th):
++        for _ in range(50):
++            p=rov(self.obs,i); d=(th-p['theta']+math.pi)%(2*math.pi)-math.pi
++            if abs(d)<1e-4: return True
++            d=max(-0.4,min(0.4,d)); mv=(0,0,d)
++            self.step(mv if i==0 else (0,0,0),'noop',mv if i==1 else (0,0,0),'noop')
++        return False
++    def act(self,i,sel):
++        return self.step((0,0,0),sel if i==0 else 'noop',(0,0,0),sel if i==1 else 'noop')
++
++def goto_fine(D,i,tx,ty,maxn=300):
++    """straight line; on block, halve step until 0.005; returns (reached, pos)"""
++    for _ in range(maxn):
++        p=rov(D.obs,i); dx,dy=tx-p['x'],ty-p['y']; d=math.hypot(dx,dy)
++        if d<1e-3: return True,(p['x'],p['y'])
++        step=0.2
++        while True:
++            s=min(1,step/max(abs(dx),abs(dy),1e-9)); mv=(dx*s,dy*s,0)
++            D.step(mv if i==0 else (0,0,0),'noop',mv if i==1 else (0,0,0),'noop')
++            q=rov(D.obs,i)
++            if abs(q['x']-p['x'])+abs(q['y']-p['y'])>1e-7: break
++            step/=2
++            if step<0.004: return False,(q['x'],q['y'])
++    return False,(q['x'],q['y'])
+diff --git a/probe_vis_1.py b/probe_vis_1.py
+new file mode 100644
+index 0000000..c72e623
+--- /dev/null
++++ b/probe_vis_1.py
+@@ -0,0 +1,4 @@
++from probe_vis_util import *
++for seed in [0,1]:
++    r=R(seed); print('seed',seed); dump(r.obs)
++    r.step(); print(r.last)
+diff --git a/probe_vis_10.py b/probe_vis_10.py
+new file mode 100644
+index 0000000..09c783e
+--- /dev/null
++++ b/probe_vis_10.py
+@@ -0,0 +1,15 @@
++from probe_vis_util import *
++import sys
++th=float(sys.argv[1]); ang=math.radians(float(sys.argv[2])); ds=eval(sys.argv[3])
++r=R(1)
++path(r,1,[(-0.9,-0.5),(-1.6,0.0),(-2.1,1.0)])
++r.act(1,'calibrate'); r.act(1,'image')
++print(r.objst())
++L=(-1.9,-2.0)
++for d in ds:
++    ok=r.goto(1,L[0]+d*math.cos(ang),L[1]+d*math.sin(ang),tol=1e-6)
++    if not ok: print('blocked',d,r.rv(1)); break
++    r.turn(1,th)
++    r.act(1,'send')
++    if r.objst()['objective1'][2]>0: print('th',th,'sent at d=%.4f'%d); break
++else: print('never')
+diff --git a/probe_vis_11.py b/probe_vis_11.py
+new file mode 100644
+index 0000000..9ea1504
+--- /dev/null
++++ b/probe_vis_11.py
+@@ -0,0 +1,2 @@
++from probe_vis_util import *
++r=R(4); dump(r.obs,['objective','obstacle'])
+diff --git a/probe_vis_12.py b/probe_vis_12.py
+new file mode 100644
+index 0000000..c8eb82b
+--- /dev/null
++++ b/probe_vis_12.py
+@@ -0,0 +1,20 @@
++from probe_vis_util import *
++import sys
++seed,i,on,pn=int(sys.argv[1]),int(sys.argv[2]),sys.argv[3],sys.argv[4]; wps=eval(sys.argv[5]); extra=float(sys.argv[6])
++r=R(seed)
++g=lambda n:np.array([float(r.obs.get(r.obs.get_object_from_name(n),f)) for f in 'xy'])
++O=g(on); P=g(pn)
++v=P-O; n=np.linalg.norm(v); u=v/n; w=np.array([-u[1],u[0]])
++print('n',n, path(r,i,wps))
++a=math.atan2(-u[1],-u[0]); th=a-math.radians(188)
++out=''
++for s in np.arange(-0.30,0.301,0.01):
++    q=O+u*(n+extra)+w*s
++    if not r.goto(i,q[0],q[1],tol=1e-6): out+='X'; continue
++    r.turn(i,th)
++    rv=r.rv(i); cam=np.array([rv['x'],rv['y']])+0.0875*np.array([math.cos(rv['theta']+math.radians(188)),math.sin(rv['theta']+math.radians(188))])
++    # lateral distance of pillar center from segment cam-O
++    d=cam-O; t=np.dot(P-O,d)/np.dot(d,d); lat=np.cross(d/np.linalg.norm(d),P-O)
++    r.act(i,'calibrate'); c=r.rv(i)['calibrated']
++    if c: r.act(i,'image')
++    print('s %.2f lat %.3f cal %d'%(s,lat,c))
+diff --git a/probe_vis_13.py b/probe_vis_13.py
+new file mode 100644
+index 0000000..a57e48c
+--- /dev/null
++++ b/probe_vis_13.py
+@@ -0,0 +1,7 @@
++from probe_vis_util import *
++r=R(0)
++print(path(r,1,[(-0.5,-1.0),(-0.4,0.0),(-0.3,0.6)]), r.rv(1))
++for th in [0, math.pi]:
++    r.turn(1,th)
++    r.act(1,'calibrate'); print('th',th,'cal',r.rv(1)['calibrated'])
++    r.act(1,'image'); print(r.objst())
+diff --git a/probe_vis_14.py b/probe_vis_14.py
+new file mode 100644
+index 0000000..4ef2de2
+--- /dev/null
++++ b/probe_vis_14.py
+@@ -0,0 +1,16 @@
++from probe_vis_util import *
++r=R(4)
++O=np.array([-1.803,1.925]); P=np.array([-1.921,1.281]); u=(P-O)/np.linalg.norm(P-O)
++q=O+u*(0.654+0.4)
++print(path(r,1,[(-1.0,0.0),(-1.5,0.75),tuple(q)]))
++r.act(1,'calibrate'); r.act(1,'image'); print('behind pillar image',r.objst())
++# send with lander behind pillar? seed 4 pillar4 (-1.859,0.445) not near lander; just send from here dist
++r.act(1,'send'); print('send',r.objst(), 'dist to lander', math.hypot(q[0]+1.9,q[1]+2))
++r=R(0)
++L=np.array([-1.9,-2.0]); P=np.array([-1.808,-1.549]); u=(P-L)/np.linalg.norm(P-L)
++path(r,1,[(-0.5,-1.0),(-0.4,0.0),(-0.3,0.6)]); r.act(1,'calibrate'); r.act(1,'image'); print(r.objst())
++q=L+u*1.2
++print(path(r,1,[(-0.4,0.0),(-1.0,-0.6),tuple(q)]), r.rv(1))
++for th in [0,math.pi/2]:
++    r.turn(1,th)
++r.act(1,'send'); print('send behind pillar',r.objst())
+diff --git a/probe_vis_15.py b/probe_vis_15.py
+new file mode 100644
+index 0000000..43eab7c
+--- /dev/null
++++ b/probe_vis_15.py
+@@ -0,0 +1,13 @@
++from probe_vis_util import *
++r=R(4)
++O=np.array([0.683,1.874]); A=np.array([-0.25,0.4])
++print(path(r,1,[(-0.5,-1.0),(-0.4,0.0),tuple(A)]))
++u=(O-A)/np.linalg.norm(O-A)
++B=A+u*1.1
++print(path(r,0,[(1.0,0.5),tuple(B)]), r.rv(0))
++for th in [0,math.pi/2,math.pi,-math.pi/2]:
++    r.turn(1,th); r.act(1,'calibrate'); c=r.rv(1)['calibrated']
++    if c: r.act(1,'image')
++    print('blocked by rover0? th',th,'cal',c, r.objst())
++r.goto(0,1.0,0.5)
++r.act(1,'calibrate'); print('rover0 moved: cal',r.rv(1)['calibrated'])
+diff --git a/probe_vis_16.py b/probe_vis_16.py
+new file mode 100644
+index 0000000..dde66ad
+--- /dev/null
++++ b/probe_vis_16.py
+@@ -0,0 +1,13 @@
++from probe_vis_util import *
++import sys
++mode=sys.argv[1]
++r=R(0)
++if mode in 'BC':
++    path(r,1,[(-0.5,-1.0),(-0.4,0.0),(-0.3,0.6)]); r.act(1,'calibrate'); r.act(1,'image')
++    if mode=='C': r.act(1,'send')
++    print('after rover1',r.objst())
++path(r,0,[(1.2,0.0),(1.2,1.6)])
++for k in range(3):
++    r.act(0,'calibrate'); c=r.rv(0)['calibrated']; r.act(0,'image'); print(mode,'cal',c,'calafter',r.rv(0)['calibrated'],r.objst())
++r.act(0,'send'); print('send',r.objst())
++r.act(0,'calibrate'); print('cal when all received:',r.rv(0)['calibrated'])
+diff --git a/probe_vis_17.py b/probe_vis_17.py
+new file mode 100644
+index 0000000..a8b01bc
+--- /dev/null
++++ b/probe_vis_17.py
+@@ -0,0 +1,14 @@
++from probe_vis_util import *
++def smp(r): return {o.name:feats(r.obs,o,TF['sample'][3:]) for o in objs(r.obs,'sample')}
++r=R(0)
++path(r,0,[(1.2,0.0),(1.2,1.6)])
++for k in range(2): r.act(0,'calibrate'); r.act(0,'image')
++print(r.objst())
++path(r,0,[(1.2,0.0),(0.5,-1.0)])
++r.act(0,'send'); print('one send rover0:',r.objst())
++# rover1: sample then image then send
++print(path(r,1,[(-0.271,-1.9)]), r.rv(1))
++r.act(1,'sample'); print('after sample', r.rv(1)['store_full'], smp(r))
++r.goto(1,-0.271,-2.04); r.act(1,'sample'); print('after sample at exact', r.rv(1)['store_full'], smp(r))
++r.act(1,'send'); print('send analysis', smp(r), r.objst())
++r.act(1,'send'); print('send again', smp(r), r.rv(1))
+diff --git a/probe_vis_18.py b/probe_vis_18.py
+new file mode 100644
+index 0000000..a5a2c97
+--- /dev/null
++++ b/probe_vis_18.py
+@@ -0,0 +1,10 @@
++from probe_vis_util import *
++r=R(0)
++path(r,0,[(1.2,0.0),(1.2,1.6)])
++r.act(0,'calibrate'); r.act(0,'image'); print(r.objst())
++for p in [(0.3,-1.9),(0.3,-1.0),(0.3,0.0),(0.3,1.0),(0.3,1.5)]:
++    print(path(r,0,[p]))
++    for th in [0,math.pi/2,math.pi,-math.pi/2]:
++        r.turn(0,th); r.act(0,'send')
++        if r.objst()['objective0'][2]: print('sent at',p,th); break
++    else: print('no send at',p)
+diff --git a/probe_vis_19.py b/probe_vis_19.py
+new file mode 100644
+index 0000000..8e7a185
+--- /dev/null
++++ b/probe_vis_19.py
+@@ -0,0 +1,7 @@
++from probe_vis_util import *
++r=R(0)
++path(r,0,[(1.2,0.0),(1.2,1.6)])
++for k in range(2): r.act(0,'calibrate'); r.act(0,'image')
++print(path(r,0,[(1.2,0.0),(0.5,-1.0)]), r.rv(0))
++r.act(0,'send'); print('send w/ rover1 at start',r.objst())
++r.goto(1,-1.0,-1.3); r.act(0,'send'); print('rover1 moved to (-1,-1.3)',r.objst())
+diff --git a/probe_vis_2.py b/probe_vis_2.py
+new file mode 100644
+index 0000000..957a728
+--- /dev/null
++++ b/probe_vis_2.py
+@@ -0,0 +1,9 @@
++from probe_vis_util import *
++r=R(1)
++print(path(r,1,[(-0.9,-0.5),(-1.6,0.0),(-2.1,1.0)]), r.rv(1))
++r.act(1,'image'); print('image uncal', r.rv(1)['calibrated'], r.objst())
++r.act(1,'calibrate'); print('calib', r.rv(1)['calibrated'], r.last[0])
++r.act(1,'calibrate'); print('calib2', r.rv(1)['calibrated'])
++r.act(1,'image'); print('image', r.rv(1)['calibrated'], r.objst())
++r.act(1,'image'); print('image2', r.rv(1)['calibrated'], r.objst())
++r.act(1,'send'); print('send', r.objst(), r.last)
+diff --git a/probe_vis_20.py b/probe_vis_20.py
+new file mode 100644
+index 0000000..90c3f8b
+--- /dev/null
++++ b/probe_vis_20.py
+@@ -0,0 +1,16 @@
++from probe_vis_util import *
++import sys
++side=float(sys.argv[1])
++r=R(0)
++path(r,0,[(1.2,0.0),(1.2,1.6)])
++r.act(0,'calibrate'); r.act(0,'image')
++path(r,0,[(1.2,0.0),(0.5,-1.0)])
++rv=r.rv(0); th=rv['theta']
++cam=np.array([rv['x'],rv['y']])+0.0875*np.array([math.cos(th+math.radians(188)),math.sin(th+math.radians(188))])
++L=np.array([-1.9,-2.0]); u=(L-cam)/np.linalg.norm(L-cam); w=np.array([-u[1],u[0]])
++base=cam+u*1.5
++print(path(r,1,[(-1.0,-1.3),tuple(base)]), r.rv(1))
++for s in np.arange(0,0.5,0.01):
++    p=base+side*s*w; r.goto(1,*p,tol=1e-6)
++    r.act(0,'send')
++    if r.objst()['objective0'][2]: print('side',side,'clear at lateral offset s=%.3f'%s, r.rv(1)); break
+diff --git a/probe_vis_21.py b/probe_vis_21.py
+new file mode 100644
+index 0000000..35e4a6f
+--- /dev/null
++++ b/probe_vis_21.py
+@@ -0,0 +1,7 @@
++from probe_vis_util import *
++r=R(0)
++path(r,0,[(1.2,0.0),(1.2,1.6)])
++r.act(0,'calibrate'); r.act(0,'image')
++print(path(r,0,[(1.2,0.0),(1.9,-1.0),(1.95,-1.95)]), r.rv(0), 'dist',math.hypot(r.rv(0)['x']+1.9,r.rv(0)['y']+2))
++r.goto(1,-1.0,-1.0)
++r.turn(0,0); r.act(0,'send'); print('send from far right low',r.objst())
+diff --git a/probe_vis_22.py b/probe_vis_22.py
+new file mode 100644
+index 0000000..b69978c
+--- /dev/null
++++ b/probe_vis_22.py
+@@ -0,0 +1,7 @@
++from probe_vis_util import *
++r=R(1)
++path(r,1,[(-0.9,-0.5),(-1.6,0.0),(-2.1,1.0)])
++r.act(1,'calibrate'); r.act(1,'image'); r.act(1,'send'); print(r.objst())
++r.act(1,'calibrate'); print('cal after only-visible objective received:',r.rv(1)['calibrated'])
++r.act(1,'image'); print('image ->',r.rv(1)['calibrated'],r.objst())
++r.act(1,'send'); print('send holding already-received image ->',r.objst(),r.rv(1)['calibrated'])
+diff --git a/probe_vis_3.py b/probe_vis_3.py
+new file mode 100644
+index 0000000..118566a
+--- /dev/null
++++ b/probe_vis_3.py
+@@ -0,0 +1,9 @@
++from probe_vis_util import *
++r=R(1)
++path(r,1,[(-0.9,-0.5),(-1.6,0.0),(-2.1,1.0)])
++for k in range(8):
++    th=-math.pi+k*math.pi/4
++    r.turn(1,th)
++    r.act(1,'calibrate'); c=r.rv(1)['calibrated']
++    r.act(1,'image'); c2=r.rv(1)['calibrated']
++    print('theta %.2f'%r.rv(1)['theta'],'cal',c,'after image',c2,r.objst())
+diff --git a/probe_vis_4.py b/probe_vis_4.py
+new file mode 100644
+index 0000000..aad04ca
+--- /dev/null
++++ b/probe_vis_4.py
+@@ -0,0 +1,12 @@
++from probe_vis_util import *
++r=R(1)
++ox,oy=-2.114,2.096
++path(r,1,[(-0.9,-0.5),(-1.6,0.0),(ox,0.3)])
++prev=None
++for k in range(120):
++    y=0.13-k*0.0005
++    r.goto(1,ox,y,tol=1e-6)
++    r.act(1,'calibrate'); c=r.rv(1)['calibrated']
++    if c: r.act(1,'image')
++    if c!=prev: print('y %.5f d2=%.5f cal %s'%(r.rv(1)['y'],oy-r.rv(1)['y'],c), r.rv(1)['x'])
++    prev=c
+diff --git a/probe_vis_5.py b/probe_vis_5.py
+new file mode 100644
+index 0000000..e888c0c
+--- /dev/null
++++ b/probe_vis_5.py
+@@ -0,0 +1,15 @@
++from probe_vis_util import *
++def ex(r,name):
++    o=r.obs.get_object_from_name(name); return [float(r.obs.get(o,f)) for f in ['x','y','z']]
++r=R(1)
++O=ex(r,'objective1'); O0=ex(r,'objective0')
++ox,oy=O[0],O[1]
++print(path(r,1,[(-0.9,-0.5),(-1.0,0.0),(-0.7,0.2),(-0.3,1.3)]))
++a=math.radians(-20); u=np.array([math.cos(a),math.sin(a)])
++for d in np.arange(1.95,2.3,0.01):
++    p=np.array([ox,oy])+u*d
++    ok=r.goto(1,p[0],p[1],tol=1e-6)
++    r.act(1,'calibrate'); c=r.rv(1)['calibrated']
++    if c: r.act(1,'image')
++    q=r.rv(1); 
++    print('d %.3f cal %s ok %s pos %.3f %.3f d1 %.3f d0 %.3f'%(d,c,ok,q['x'],q['y'],math.hypot(q['x']-ox,q['y']-oy),math.hypot(q['x']-O0[0],q['y']-O0[1])), r.objst())
+diff --git a/probe_vis_6.py b/probe_vis_6.py
+new file mode 100644
+index 0000000..9ae5e97
+--- /dev/null
++++ b/probe_vis_6.py
+@@ -0,0 +1,16 @@
++from probe_vis_util import *
++def ex(r,name):
++    o=r.obs.get_object_from_name(name); return [float(r.obs.get(o,f)) for f in ['x','y','z']]
++r=R(1)
++O=ex(r,'objective1'); ox,oy=O[0],O[1]
++path(r,1,[(-0.9,-0.5),(-1.6,0.0),(ox,0.3)])
++print('theta cols: k*pi/8 - pi, k=0..15')
++for d in np.arange(1.2,2.15,0.05):
++    r.goto(1,ox,oy-d,tol=1e-6)
++    res=[]
++    for k in range(16):
++        r.turn(1,-math.pi+k*math.pi/8)
++        r.act(1,'calibrate'); c=r.rv(1)['calibrated']
++        if c: r.act(1,'image')
++        res.append(int(c))
++    print('d %.3f'%(oy-r.rv(1)['y']),''.join(map(str,res)))
+diff --git a/probe_vis_7.py b/probe_vis_7.py
+new file mode 100644
+index 0000000..cc2083a
+--- /dev/null
++++ b/probe_vis_7.py
+@@ -0,0 +1,8 @@
++from probe_vis_util import *
++r=R(1)
++o=r.obs.get_object_from_name('objective1'); ox,oy=float(r.obs.get(o,'x')),float(r.obs.get(o,'y'))
++path(r,1,[(-0.9,-0.5),(-1.6,0.0),(ox,0.3)])
++r.goto(1,ox,oy-2.0,tol=1e-6)
++for k in range(16):
++    r.turn(1,-math.pi+k*math.pi/8); q=r.rv(1)
++    print(k,'%.4f %.4f %.4f'%(q['x'],q['y'],q['theta']))
+diff --git a/probe_vis_8.py b/probe_vis_8.py
+new file mode 100644
+index 0000000..32dd872
+--- /dev/null
++++ b/probe_vis_8.py
+@@ -0,0 +1,14 @@
++from probe_vis_util import *
++r=R(1)
++o=r.obs.get_object_from_name('objective1'); ox,oy=float(r.obs.get(o,'x')),float(r.obs.get(o,'y'))
++path(r,1,[(-0.9,-0.5),(-1.6,0.0),(ox,0.3)])
++N=48
++for d in [1.90,1.92,1.94,1.96,1.98,2.0,2.02,2.04,2.06,2.08]:
++    r.goto(1,ox,oy-d,tol=1e-6)
++    res=[]
++    for k in range(N):
++        r.turn(1,-math.pi+k*2*math.pi/N)
++        r.act(1,'calibrate'); c=r.rv(1)['calibrated']
++        if c: r.act(1,'image')
++        res.append(int(c))
++    print('d %.3f'%d,''.join(map(str,res)))
+diff --git a/probe_vis_9.py b/probe_vis_9.py
+new file mode 100644
+index 0000000..42599f0
+--- /dev/null
++++ b/probe_vis_9.py
+@@ -0,0 +1,18 @@
++from probe_vis_util import *
++import sys
++seed=int(sys.argv[1]); oname=sys.argv[2]; i=int(sys.argv[3]); beta=math.radians(float(sys.argv[4]))
++wps=eval(sys.argv[5])
++r=R(seed)
++o=r.obs.get_object_from_name(oname); ox,oy=float(r.obs.get(o,'x')),float(r.obs.get(o,'y'))
++print(path(r,i,wps))
++N=48
++for d in [1.90,1.92,1.94,1.96,1.98,2.0,2.02,2.04,2.06,2.08,2.10]:
++    ok=r.goto(i,ox-d*math.cos(beta),oy-d*math.sin(beta),tol=1e-6)
++    if not ok: print('blocked',d); break
++    res=[]
++    for k in range(N):
++        r.turn(i,-math.pi+k*2*math.pi/N)
++        r.act(i,'calibrate'); c=r.rv(i)['calibrated']
++        if c: r.act(i,'image')
++        res.append(int(c))
++    print('%.3f'%d,''.join(map(str,res)))
+diff --git a/probe_vis_fit.py b/probe_vis_fit.py
+new file mode 100644
+index 0000000..8711cc4
+--- /dev/null
++++ b/probe_vis_fit.py
+@@ -0,0 +1,14 @@
++import numpy as np, math, sys
++data=open(sys.argv[1]).read().strip(); beta=math.radians(float(sys.argv[2]))
++rows=[(float(l.split()[0]),[int(c) for c in l.split()[1]]) for l in data.splitlines()]
++D=np.array([d for d,b in rows]); B=np.array([b for d,b in rows],bool)
++N=B.shape[1]; th=-math.pi+np.arange(N)*2*math.pi/N
++rho=np.arange(0.0,0.25,0.0025)[:,None,None,None]; phi=np.radians(np.arange(150,211,1.0))[None,:,None,None]
++cx=rho*np.cos(th[None,None,None,:]+phi); cy=rho*np.sin(th[None,None,None,:]+phi)
++dist=np.hypot(D[None,None,:,None]*math.cos(beta)-cx,D[None,None,:,None]*math.sin(beta)-cy)
++res=[]
++for R in np.arange(1.95,2.05,0.0025):
++    err=((dist<=R)!=B[None,None]).sum(axis=(2,3))
++    i,j=np.unravel_index(err.argmin(),err.shape)
++    res.append((int(err[i,j]),round(R,4),round(float(rho[i,0,0,0]),4),round(math.degrees(float(phi[0,j,0,0])),1)))
++res.sort(); print(res[:8])
+diff --git a/probe_vis_fit2.py b/probe_vis_fit2.py
+new file mode 100644
+index 0000000..be34fd7
+--- /dev/null
++++ b/probe_vis_fit2.py
+@@ -0,0 +1,13 @@
++import numpy as np, math
++data={1.5708:4.07,0.7854:4.065,0.0:4.015,2.3562:4.0275,-3.1416:3.96,-0.7854:3.9475,-2.3562:3.91,-1.5708:3.905}
++ang=math.radians(80); u=np.array([math.cos(ang),math.sin(ang)])
++best=[]
++for R in np.arange(3.95,4.05,0.0025):
++  for rho in np.arange(0.05,0.12,0.0025):
++    for phi in np.radians(np.arange(170,206,1.0)):
++      e=0
++      for th,d in data.items():
++        c=d*u+rho*np.array([math.cos(th+phi),math.sin(th+phi)])
++        e=max(e,abs(np.linalg.norm(c)-R))
++      best.append((round(e,4),round(R,4),round(rho,4),round(math.degrees(phi))))
++best.sort(); print(best[:6])
+diff --git a/probe_vis_fit_data.txt b/probe_vis_fit_data.txt
+new file mode 100644
+index 0000000..4661bb7
+--- /dev/null
++++ b/probe_vis_fit_data.txt
+@@ -0,0 +1,10 @@
++1.900 111111111111111111111111111111111111111111111111
++1.920 111111111111111111111111111111110000000111111111
++1.940 111111111111111111111111111110000000000000111111
++1.960 111111111111111111111111111000000000000000001111
++1.980 111111111111111111111111100000000000000000000011
++2.000 111111111111111111111110000000000000000000000000
++2.020 001111111111111111111000000000000000000000000000
++2.040 000111111111111111100000000000000000000000000000
++2.060 000000111111111110000000000000000000000000000000
++2.080 000000000111110000000000000000000000000000000000
+diff --git a/probe_vis_fit_data2.txt b/probe_vis_fit_data2.txt
+new file mode 100644
+index 0000000..cf56709
+--- /dev/null
++++ b/probe_vis_fit_data2.txt
+@@ -0,0 +1,11 @@
++1.900 111111111111111111111111111111111111111111111111
++1.920 111111111111111111111111110000000111111111111111
++1.940 111111111111111111111110000000000000111111111111
++1.960 111111111111111111111000000000000000001111111111
++1.980 111111111111111111100000000000000000000011111111
++2.000 111111111111111110000000000000000000000000111111
++2.020 111111111111111000000000000000000000000000001111
++2.040 111111111111100000000000000000000000000000000111
++2.060 111111111110000000000000000000000000000000000000
++2.080 000111110000000000000000000000000000000000000000
++2.100 000000000000000000000000000000000000000000000000
+diff --git a/probe_vis_scan.py b/probe_vis_scan.py
+new file mode 100644
+index 0000000..da1f1c9
+--- /dev/null
++++ b/probe_vis_scan.py
+@@ -0,0 +1,15 @@
++from probe_vis_util import *
++for seed in range(0,60):
++    obs,_=env.reset(seed=seed)
++    O=[(o.name,float(obs.get(o,'x')),float(obs.get(o,'y'))) for o in objs(obs,'objective')]
++    P=[(o.name,float(obs.get(o,'x')),float(obs.get(o,'y'))) for o in objs(obs,'obstacle') if float(obs.get(o,'half_x'))<0.1]
++    for on,ox,oy in O:
++        for pn,px,py in P:
++            v=np.array([px-ox,py-oy]); n=np.linalg.norm(v)
++            if n>1.4 or np.sign(px)!=np.sign(ox): continue
++            q=np.array([ox,oy])+v/n*(n+0.3)
++            if abs(q[0])<0.3 or abs(q[0])>2.3 or abs(q[1])>2.3 or np.sign(q[0])!=np.sign(ox): continue
++            # not near other pillars
++            if min(math.hypot(q[0]-a,q[1]-b) for _,a,b in P)<0.28: continue
++            if any(abs(q[0]-mx)<0.47 and abs(q[1]-2)<0.47 for mx in (-2,-0.5,0.5,2)): continue
++            print(seed,on,(round(ox,2),round(oy,2)),pn,(round(px,2),round(py,2)),'n=%.2f'%n,'q',q.round(2))
+diff --git a/probe_vis_util.py b/probe_vis_util.py
+new file mode 100644
+index 0000000..432c950
+--- /dev/null
++++ b/probe_vis_util.py
+@@ -0,0 +1,52 @@
++from env_client import make_env
++import numpy as np, math
++env = make_env()
++SP = env.observation_space
++SEL={'sample':-5/6,'calibrate':-0.5,'image':-1/6,'noop':1/6,'send':0.5,'drop':5/6}
++FEAT={}
++for t in ['rover','lander','objective','sample','obstacle']:
++    pass
++def objs(obs,t): return sorted(obs.get_objects(SP.get_type(t)),key=lambda o:o.name)
++def feats(obs,o,fs): return [round(float(obs.get(o,f)),3) for f in fs]
++TF={'rover':['x','y','theta','store_full','calibrated','at_home'],'lander':['x','y','z'],
++ 'objective':['x','y','z','have_image_rover0','have_image_rover1','received_image'],
++ 'sample':['x','y','z','is_soil','analyzed_rover0','analyzed_rover1','received_analysis'],
++ 'obstacle':['x','y','z','half_x','half_y','half_z']}
++def dump(obs,types=TF):
++    for t in types:
++        for o in objs(obs,t): print(t,o.name,feats(obs,o,TF[t]))
++class R:
++    def __init__(s,seed):
++        s.obs,_=env.reset(seed=seed)
++    def rv(s,i):
++        o=[r for r in objs(s.obs,'rover') if r.name=='rover%d'%i][0]
++        return {f:float(s.obs.get(o,f)) for f in TF['rover']}
++    def step(s,a0=(0,0,0),s0='noop',a1=(0,0,0),s1='noop'):
++        a=np.array([a0[0],a0[1],a0[2],SEL[s0],a1[0],a1[1],a1[2],SEL[s1]],dtype=np.float32)
++        s.obs,r,te,tr,info=env.step(a); s.last=(r,te,tr,info); return s.obs
++    def act(s,i,sel):
++        if i==0: return s.step(s0=sel)
++        return s.step(s1=sel)
++    def move(s,i,d):
++        if i==0: return s.step(a0=d)
++        return s.step(a1=d)
++    def goto(s,i,x,y,tol=1e-3,maxit=200):
++        for _ in range(maxit):
++            r=s.rv(i); dx,dy=x-r['x'],y-r['y']; d=math.hypot(dx,dy)
++            if d<tol: return True
++            k=min(1,0.19/d); s.move(i,(dx*k,dy*k,0))
++            r2=s.rv(i)
++            if abs(r2['x']-r['x'])+abs(r2['y']-r['y'])<1e-9: return False
++        return False
++    def turn(s,i,th):
++        for _ in range(50):
++            r=s.rv(i); d=(th-r['theta']+math.pi)%(2*math.pi)-math.pi
++            if abs(d)<1e-4: return
++            s.move(i,(0,0,max(-0.39,min(0.39,d))))
++    def objst(s):
++        return {o.name:feats(s.obs,o,TF['objective'][3:]) for o in objs(s.obs,'objective')}
++def path(r,i,wps):
++    for (x,y) in wps:
++        if not r.goto(i,x,y):
++            print('blocked at',r.rv(i),'going',(x,y)); return False
++    return True
+diff --git a/test_approach.py b/test_approach.py
+new file mode 100644
+index 0000000..5871ea0
+--- /dev/null
++++ b/test_approach.py
+@@ -0,0 +1,20 @@
++import sys, time
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++seeds = [int(s) for s in sys.argv[1:]] or list(range(10))
++env = make_env()
++tot=[]
++for seed in seeds:
++    obs, info = env.reset(seed=seed)
++    ap = GeneratedApproach(env.action_space, env.observation_space, {})
++    t0=time.time(); ap.reset(obs, info); tp=time.time()-t0
++    plen = {r: len(p) for r,p in ap.plans.items()}
++    done=False; steps=0
++    while not done and steps < 1000:
++        a = ap.get_action(obs)
++        obs, r, term, trunc, info = env.step(a)
++        steps += 1; done = term or trunc
++    print(f"seed {seed} n={info.get('object_count')} steps={steps} term={term} plan={plen} replans={ap.nreplan} tplan={tp:.2f}s total={time.time()-t0:.1f}s", flush=True)
++    tot.append(steps)
++print("mean", np.mean(tot))

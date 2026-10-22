@@ -1,0 +1,46 @@
+# Human pilot with an OpenAI model as explainer and profile updater.
+# The API key is read from the environment, never from this file:
+#   export OPENAI_API_KEY=...        (in the shell that runs the server)
+#   python experiments/explanations/serve_study.py --config experiments/explanations/conf/pilot_openai.yaml
+# Change the model in both sections below (or override on the command line,
+# e.g. explainer_llm.model=<id> updater_llm.model=<id>).
+
+study_id: pilot_openai_v1
+study_seed: 0
+output_dir: outputs/explanations/${study_id}
+
+policy_root: agent_runs
+envs: [Obstruction2D] #, DynPushT2D, Rovers]
+
+test_bank_dir: outputs/explanations/test_banks/o2d_dpt_rovers_v1
+test_bank:
+  seeds: [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112]
+  object_counts: [null]
+  max_steps: 400
+  require_same_outcome: true
+  require_solved: false
+  min_divergence: 0.05
+  tests_per_pair: 2
+  frame_stride: 2
+  fps: 15
+
+num_rounds: 8
+num_eval_rounds: 3
+balance_difficulty: true
+conditions: [no_learning, understanding_only, understanding_preference]
+
+# openai_compatible with no base_url talks to api.openai.com.
+explainer_llm:
+  provider: openai_compatible
+  model: gpt-5.6-sol
+  api_key_env: OPENAI_API_KEY
+updater_llm:
+  provider: openai_compatible
+  model: gpt-5.6-sol
+  api_key_env: OPENAI_API_KEY
+
+ui:
+  host: 127.0.0.1
+  port: 8765
+  show_explanation_during_test: false
+  reveal_correctness: false

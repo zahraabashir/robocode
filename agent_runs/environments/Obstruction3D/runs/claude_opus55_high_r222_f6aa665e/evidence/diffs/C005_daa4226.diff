@@ -1,0 +1,219 @@
+diff --git a/approach.py b/approach.py
+index d91a176..f7f0c1d 100644
+--- a/approach.py
++++ b/approach.py
+@@ -152,6 +152,7 @@ class GeneratedApproach:
+         self.placed_spots = []
+         self.yaw = 0.0
+         self.done_flag = False
++        self.pending_check = None
+ 
+     # ---------------------------------------------------------------- geometry
+     def _region(self, boxes):
+@@ -251,7 +252,10 @@ class GeneratedApproach:
+         T, _, _ = fk(q)
+         safe0 = self._safe_z(boxes)
+         # fingertip at object centre (but not below support+5mm)
+-        tip = max(b["z"], b["z"] - b["hz"] + 0.012)
++        k = self.fail.get(name, 0)
++        tip = max(b["z"], b["z"] - b["hz"] + 0.017)
++        tip = tip + [0.0, 0.003, -0.002, 0.006, 0.0, 0.003][k % 6]
++        tip = min(tip, b["z"] + b["hz"] - 0.001)
+         grasp_z = tip + FINGER
+         off = grasp_z - b["z"]          # EE z - object centre z while held
+         safe1 = max(self._safe_z(boxes, b["hz"], 0.0) , b["hz"] + off + 0.03 + 0.15)
+@@ -303,6 +307,15 @@ class GeneratedApproach:
+         self.last_q = q.copy()
+         self.last_cmd = None
+ 
++        if self.pending_check is not None:
++            name = self.pending_check
++            self.pending_check = None
++            r = self._robot(state)
++            if state.get(r, "grasp_active") < 0.5:
++                self.fail[name] = self.fail.get(name, 0) + 1
++                T, _, _ = fk(q)
++                self.segs = [("move", np.array([T[0, 3], T[1, 3], T[2, 3] + 0.05]), None)]
++                self.cur = None
+         if rejected and self.cur is not None and self.cur[0] == "move":
+             self._handle_reject(state)
+ 
+@@ -316,6 +329,7 @@ class GeneratedApproach:
+             if seg[0] == "grip":
+                 act[10] = seg[1]
+                 self.cur = None
++                self.pending_check = seg[2] if seg[1] < 0 else None
+                 self.last_cmd = np.zeros(7)
+                 return act
+             # move segment
+diff --git a/g9b.txt b/g9b.txt
+new file mode 100644
+index 0000000..ab022c1
+--- /dev/null
++++ b/g9b.txt
+@@ -0,0 +1,6 @@
++-0.008 0.0 reached True grasp 0.0 finger 0.0 [0. 0. 0.]
++-0.004 0.0 reached True grasp 0.0 finger 0.0 [0. 0. 0.]
++0.0 0.0 reached True grasp 0.0 finger 0.0 [0. 0. 0.]
++0.004 0.0 reached True grasp 1.0 finger 0.56 [0.00e+00 1.00e-04 3.38e-02]
++0.008 0.0 reached True grasp 1.0 finger 0.56 [0.00e+00 1.00e-04 3.78e-02]
++0.012 0.0 reached True grasp 1.0 finger 0.56 [0.00e+00 1.00e-04 4.18e-02]
+diff --git a/ga.txt b/ga.txt
+new file mode 100644
+index 0000000..09d781b
+--- /dev/null
++++ b/ga.txt
+@@ -0,0 +1,9 @@
++-0.02 0.0 reached False grasp 0.0 finger 0.0 [0. 0. 0.]
++-0.012 0.0 reached True grasp 0.0 finger 0.0 [0. 0. 0.]
++-0.006 0.0 reached True grasp 1.0 finger 0.6 [0.00e+00 1.00e-04 2.38e-02]
++0.0 0.0 reached True grasp 1.0 finger 0.6 [0.00e+00 1.00e-04 2.98e-02]
++0.004 0.0 reached True grasp 1.0 finger 0.6 [0.00e+00 1.00e-04 3.38e-02]
++0.01 0.0 reached True grasp 1.0 finger 0.6 [0.00e+00 1.00e-04 3.98e-02]
++0.016 0.0 reached True grasp 1.0 finger 0.6 [0.00e+00 1.00e-04 4.58e-02]
++0.022 0.0 reached True grasp 1.0 finger 0.6 [0.00e+00 1.00e-04 5.18e-02]
++0.03 0.0 reached True grasp 0.0 finger 0.0 [0. 0. 0.]
+diff --git a/gb.txt b/gb.txt
+new file mode 100644
+index 0000000..3f38b40
+--- /dev/null
++++ b/gb.txt
+@@ -0,0 +1,9 @@
++-0.02 0.0 reached False grasp 0.0 finger 0.0 [0. 0. 0.]
++-0.012 0.0 reached False grasp 0.0 finger 0.0 [0. 0. 0.]
++-0.006 0.0 reached False grasp 0.0 finger 0.0 [0. 0. 0.]
++0.0 0.0 reached False grasp 0.0 finger 0.0 [0. 0. 0.]
++0.004 0.0 reached False grasp 0.0 finger 0.0 [0. 0. 0.]
++0.01 0.0 reached True grasp 1.0 finger 0.42 [0.00e+00 1.00e-04 3.98e-02]
++0.016 0.0 reached True grasp 1.0 finger 0.42 [0.00e+00 1.00e-04 4.58e-02]
++0.022 0.0 reached True grasp 1.0 finger 0.42 [0.00e+00 1.00e-04 5.18e-02]
++0.03 0.0 reached True grasp 1.0 finger 0.42 [0.00e+00 1.00e-04 5.98e-02]
+diff --git a/gc.txt b/gc.txt
+new file mode 100644
+index 0000000..ae9d073
+--- /dev/null
++++ b/gc.txt
+@@ -0,0 +1,6 @@
++0.001 0.0 reached True grasp 0.0 finger 0.0 [0. 0. 0.]
++0.002 0.0 reached True grasp 1.0 finger 0.56 [0.00e+00 1.00e-04 3.18e-02]
++0.003 0.0 reached True grasp 1.0 finger 0.56 [0.00e+00 1.00e-04 3.28e-02]
++0.014 0.0 reached True grasp 1.0 finger 0.56 [0.00e+00 1.00e-04 4.38e-02]
++0.018 0.0 reached True grasp 0.0 finger 0.0 [0. 0. 0.]
++0.022 0.0 reached True grasp 0.0 finger 0.0 [0. 0. 0.]
+diff --git a/probe_g9.py b/probe_g9.py
+new file mode 100644
+index 0000000..4247317
+--- /dev/null
++++ b/probe_g9.py
+@@ -0,0 +1,26 @@
++from env_client import make_env
++from approach import ik, fk, down_R
++import numpy as np, sys
++seed=int(sys.argv[1]); name=sys.argv[2]; yaw=float(sys.argv[3])
++env = make_env()
++def q_of(o,R): return np.array([o.get(R,f'joint_{i}') for i in range(1,8)])
++def goto(obs, R, qt, maxn=40):
++    for _ in range(maxn):
++        q = q_of(obs,R); d = qt - q
++        if np.max(np.abs(d)) < 1e-4: break
++        a = np.zeros(11, np.float32); a[3:10] = np.clip(d,-.2,.2)
++        obs2, *_ = env.step(a)
++        if np.allclose(q_of(obs2,R), q): return obs2, False
++        obs = obs2
++    return obs, True
++for dtip in [float(v) for v in sys.argv[4].split(",")]:
++  for dx in [0.0]:
++    obs, info = env.reset(seed=seed)
++    R = obs.get_object_from_name("robot"); B = obs.get_object_from_name(name)
++    bx, by, bz = obs.get(B,'pose_x'), obs.get(B,'pose_y'), obs.get(B,'pose_z')
++    q=q_of(obs,R)
++    for z in [0.36, bz+0.155+dtip]:
++        qt,e = ik(q, np.array([bx+dx,by,z]), down_R(yaw)); obs,ok=goto(obs,R,qt); q=q_of(obs,R)
++    a=np.zeros(11,np.float32); a[10]=-1; obs,*_=env.step(a)
++    print(dtip, dx, "reached", ok, "grasp", obs.get(R,'grasp_active'), "finger", round(obs.get(R,'finger_state'),3), np.round(obs.data[R][12:15],4))
++env.close()
+diff --git a/probe_tab_ik2.py b/probe_tab_ik2.py
+new file mode 100644
+index 0000000..6d0c9a5
+--- /dev/null
++++ b/probe_tab_ik2.py
+@@ -0,0 +1,12 @@
++from kin import *
++import numpy as np
++q0=np.array([0,0.26,3.14,-2.27,0,0.96,1.57])
++pts=[(0.51,0.41),(0.51,-0.41),(0.09,0.41),(0.09,-0.41),(0.55,0),(0.6,0.3),(0.3,0),(0.12,0.0)]
++for yaw in [0,np.pi/2]:
++  for z in [0.23,0.40]:
++    r=[]
++    for x,y in pts:
++        s=np.array([np.arctan2(y,x),0.3,3.14,-2.0,0,0.9,1.57])
++        e=min(ik(s,np.array([x,y,z]),down_R(yaw),(0,0,0))[1], ik(q0,np.array([x,y,z]),down_R(yaw),(0,0,0))[1])
++        r.append("%.0e"%e)
++    print(round(yaw,2),z,r,flush=True)
+diff --git a/probe_tab_ref.out b/probe_tab_ref.out
+new file mode 100644
+index 0000000..e4c7e05
+--- /dev/null
++++ b/probe_tab_ref.out
+@@ -0,0 +1,12 @@
++y 0.0 yaw 0.0 [(0.6, '-17')]
++x 0.3 yaw 0.0 [(0.55, '-18')]
++y 0.3 yaw 0.0 [(-0.02, 'F'), (-0.01, 'F'), (0.0, 'F'), (0.01, 'F'), (0.02, 'F'), (0.03, 'O'), (0.04, 'O'), (0.05, 'O'), (0.06, 'O'), (0.07, 'O'), (0.08, 'O'), (0.09, 'O'), (0.1, 'O')]
++y 0.3 yaw 1.5708 [(-0.02, 'F'), (-0.01, 'F'), (0.0, 'F'), (0.01, 'F'), (0.02, 'F'), (0.03, 'O'), (0.04, 'O'), (0.05, 'O'), (0.06, 'O'), (0.07, 'O'), (0.08, 'O'), (0.09, 'O'), (0.1, 'O')]
++y -0.2 yaw 0.0 [(0.45, '22'), (0.46, '22'), (0.47, '22'), (0.48, '22'), (0.49, '22'), (0.5, '22'), (0.51, '22'), (0.52, '22'), (0.53, '22'), (0.54, '22'), (0.55, '22'), (0.56, '21'), (0.57, '19'), (0.58, 'F')]
++x 0.3 yaw 1.5708 [(-0.5, 'F'), (-0.49, 'F'), (-0.48, 'F'), (-0.47, '19'), (-0.46, '21'), (-0.45, '22'), (-0.44, '22'), (-0.43, '22'), (-0.42, '22'), (-0.41, '22'), (-0.4, '22'), (-0.39, '22'), (-0.38, '22'), (-0.37, '22'), (-0.36, '22')]
++x 0.3 yaw 1.5708 [(0.36, '22'), (0.37, '22'), (0.38, '22'), (0.39, '22'), (0.4, '22'), (0.41, '22'), (0.42, '22'), (0.43, '22'), (0.44, '22'), (0.45, '22'), (0.46, '21'), (0.47, '19'), (0.48, 'F'), (0.49, 'F'), (0.5, 'F')]
++y -0.2 yaw 1.5708 [(0.45, '22'), (0.46, '22'), (0.47, '22'), (0.48, '22'), (0.49, '22'), (0.5, '22'), (0.51, '22'), (0.52, '15'), (0.53, '12'), (0.54, 'F'), (0.55, 'F'), (0.56, 'F'), (0.57, 'F'), (0.58, 'F')]
++x 0.3 yaw 0.0 [(0.36, '22'), (0.37, '22'), (0.38, '22'), (0.39, '22'), (0.4, '22'), (0.41, '22'), (0.42, '15'), (0.43, '12'), (0.44, '11'), (0.45, '11'), (0.46, '11'), (0.47, 'F'), (0.48, 'F'), (0.49, 'F'), (0.5, 'F')]
++x 0.3 yaw 0.0 [(-0.5, 'F'), (-0.49, 'F'), (-0.48, 'F'), (-0.47, 'F'), (-0.46, 'F'), (-0.45, 'F'), (-0.44, 'F'), (-0.43, '12'), (-0.42, '15'), (-0.41, '22'), (-0.4, '22'), (-0.39, '22'), (-0.38, '22'), (-0.37, '22'), (-0.36, '22')]
++y -0.25 yaw 0.0 [(-0.02, 'F'), (-0.01, 'F'), (0.0, 'F'), (0.01, 'F'), (0.02, 'F'), (0.03, '18'), (0.04, '21'), (0.05, '22'), (0.06, '22'), (0.07, '22'), (0.08, '22'), (0.09, '22'), (0.1, '22')]
++y -0.25 yaw 1.5708 [(-0.02, 'F'), (-0.01, 'F'), (0.0, 'F'), (0.01, 'F'), (0.02, 'F'), (0.03, 'F'), (0.04, '11'), (0.05, '11'), (0.06, '11'), (0.07, '12'), (0.08, '15'), (0.09, '22'), (0.1, '22')]
+diff --git a/probe_tab_ref.py b/probe_tab_ref.py
+index 3dae27f..32aad83 100644
+--- a/probe_tab_ref.py
++++ b/probe_tab_ref.py
+@@ -1,11 +1,12 @@
+ from env_client import make_env
+ from kin import *
+ import numpy as np, sys
+-seed=int(sys.argv[1]); yaw=float(sys.argv[2]); x=float(sys.argv[3])
++seed=int(sys.argv[1]); yaw=float(sys.argv[2]); mode=sys.argv[3]; fixed=float(sys.argv[4])
+ ys=np.round(np.arange(-0.6,0.6001,0.05),3); ZMIN=0.0999
+-if len(sys.argv)>4: ys=np.round(np.arange(float(sys.argv[4]),float(sys.argv[5])+1e-6,float(sys.argv[6])),3)
++ys=np.round(np.arange(float(sys.argv[5]),float(sys.argv[6])+1e-6,float(sys.argv[7])),3)
++if len(sys.argv)>8: ZMIN=float(sys.argv[8])
+ env = make_env()
+-B=(0,0,0); Rd=down_R(yaw)
++import os; NOSKIP=os.environ.get("NOSKIP"); B=(0,0,0); Rd=down_R(yaw)
+ def reset():
+     o,_=env.reset(seed=seed); return o
+ obs=reset(); R=obs.get_object_from_name("robot")
+@@ -29,8 +30,9 @@ def moveto(obs,p):
+     if e>1e-3: return obs,False,e
+     obs,ok=goto(obs,qt); return obs,ok,e
+ res=[]
+-for y in ys:
+-    if any(np.hypot(x-ox,y-oy)<0.09 for ox,oy in objs): res.append('O'); continue
++for v in ys:
++    x,y=(fixed,v) if mode=='x' else (v,fixed)
++    if not NOSKIP and any(np.hypot(x-ox,y-oy)<0.09 for ox,oy in objs): res.append('O'); continue
+     q=q_of(obs)
+     _,e1=ik(q,np.array([x,y,0.36]),Rd,B); _,e2=ik(q,np.array([x,y,0.23]),Rd,B)
+     if e1>1e-3 and e2>1e-3: res.append('N'); continue
+@@ -51,5 +53,5 @@ for y in ys:
+         if not ok: stop='%d'%round(z*100); break
+     res.append(stop if stop else 'F')
+     for z in np.arange(ee_pose(q_of(obs),B)[2,3],0.37,0.02): obs,ok,e=moveto(obs,[x,y,min(z,0.36)])
+-print("%+.3f "%x+" ".join("%4s"%r for r in res), flush=True)
++print(mode,fixed,"yaw",yaw,list(zip(ys.tolist(),res)), flush=True)
+ env.close()
+diff --git a/probe_tab_ref2.out b/probe_tab_ref2.out
+new file mode 100644
+index 0000000..ed2125d
+--- /dev/null
++++ b/probe_tab_ref2.out
+@@ -0,0 +1,4 @@
++x 0.336 yaw 1.5708 [(0.1, '27'), (0.11, '27'), (0.12, '27'), (0.13, '27'), (0.14, '27'), (0.15, '27'), (0.16, 'F'), (0.17, 'F'), (0.18, 'F'), (0.19, 'F'), (0.2, '27'), (0.21, '27'), (0.22, '27'), (0.23, '27'), (0.24, '27'), (0.25, '27')]
++x 0.336 yaw 0.0 [(0.1, 'F'), (0.11, 'F'), (0.12, 'F'), (0.13, 'F'), (0.14, 'F'), (0.15, 'F'), (0.16, 'F'), (0.17, 'F'), (0.18, 'F'), (0.19, 'F'), (0.2, 'F'), (0.21, 'F'), (0.22, 'F'), (0.23, 'F'), (0.24, 'F'), (0.25, 'F')]
++y 0.173 yaw 0.0 [(0.24, '25'), (0.25, '27'), (0.26, '27'), (0.27, '27'), (0.28, '27'), (0.29, '27'), (0.3, '27'), (0.31, '27'), (0.32, '27'), (0.33, 'F'), (0.34, 'F'), (0.35, '27'), (0.36, '27'), (0.37, '27'), (0.38, '27'), (0.39, '27'), (0.4, '27'), (0.41, '27'), (0.42, '27'), (0.43, '25')]
++y 0.173 yaw 1.5708 [(0.24, 'F'), (0.25, 'F'), (0.26, 'F'), (0.27, 'F'), (0.28, 'F'), (0.29, 'F'), (0.3, 'F'), (0.31, 'F'), (0.32, 'F'), (0.33, 'F'), (0.34, 'F'), (0.35, 'F'), (0.36, 'F'), (0.37, 'F'), (0.38, 'F'), (0.39, 'F'), (0.4, 'F'), (0.41, 'F'), (0.42, 'F'), (0.43, 'F')]

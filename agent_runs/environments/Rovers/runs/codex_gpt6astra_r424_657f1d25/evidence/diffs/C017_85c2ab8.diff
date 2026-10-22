@@ -1,0 +1,141 @@
+diff --git a/approach.py b/approach.py
+index 0c73de7..922b727 100644
+--- a/approach.py
++++ b/approach.py
+@@ -30,7 +30,7 @@ class GeneratedApproach:
+             if state.get(o, 'half_z') > .1:
+                 self.occluders.append((p-h, p+h))
+         self.rects.append((np.array([-.05, -3.]), np.array([.05, 3.])))
+-        self.rects.append((self.lander-np.array([.50,.35]),self.lander+np.array([.50,.35])))
++        self.rects.append((self.lander-np.array([.510,.334]),self.lander+np.array([.510,.334])))
+         axis = np.arange(-2.2, 2.201, .1)
+         self.size = len(axis)
+         xx, yy = np.meshgrid(axis, axis)
+@@ -40,7 +40,7 @@ class GeneratedApproach:
+         for k, o in enumerate(self.objectives):
+             self.masks[('image',k)] = self.free & self.visible(self.points,self.xy(state,o),1.97)
+         for k, o in enumerate(self.samples):
+-            self.masks[('sample',k)] = self.free & (np.linalg.norm(self.points-self.xy(state,o),axis=1)<.235)
++            self.masks[('sample',k)] = self.free & self.sample_safe(state,self.points,k)
+         self.masks[('send',0)] = self.free & self.visible(self.points,self.lander,3.8)
+         self.tasks = [None,None]
+         self.paths = [[],[]]
+@@ -50,6 +50,14 @@ class GeneratedApproach:
+         self.last_op = [None, None]
+         self.bad_views = {}
+ 
++    def sample_safe(self, state, pts, k):
++        target=self.samples[k]
++        good=np.linalg.norm(pts-self.xy(state,target),axis=1)<.242
++        for obj in self.samples:
++            if state.get(obj,'is_soil')!=state.get(target,'is_soil'):
++                good &= np.linalg.norm(pts-self.xy(state,obj),axis=1)>.255
++        return good
++
+     def valid(self, pts):
+         good = np.all(np.abs(pts) <= 2.265, axis=-1)
+         for lo,hi in self.rects:
+@@ -188,7 +196,7 @@ class GeneratedApproach:
+             q=p+d
+             op=0.
+             kind,k=task
+-            if kind=='sample' and np.linalg.norm(q-self.xy(s,self.samples[k]))<.247:op=-5/6
++            if kind=='sample' and s.get(rob,'store_full')<.5 and self.sample_safe(s,q[None,:],k)[0]:op=-5/6
+             elif kind=='image' and self.visible(q[None,:],self.xy(s,self.objectives[k]),1.99)[0]:
+                 op=-1/6 if s.get(rob,'calibrated')>.5 else -.5
+                 if path and np.linalg.norm(q-path[-1])>.06 and last is not None and last[0]==task and last[2] in (-.5,-1/6):op=0.
+diff --git a/test_many.txt b/test_many.txt
+index 4d73660..c2323f1 100644
+--- a/test_many.txt
++++ b/test_many.txt
+@@ -1 +1,29 @@
+ RESULT 1000 {'object_count': 4} True 31 1.739
++RESULT 1001 {'object_count': 4} True 33 1.545
++RESULT 1002 {'object_count': 4} True 26 1.307
++RESULT 1003 {'object_count': 4} True 31 1.565
++RESULT 1004 {'object_count': 4} True 31 1.403
++RESULT 1005 {'object_count': 4} True 26 1.235
++RESULT 1006 {'object_count': 4} True 30 1.668
++RESULT 1007 {'object_count': 4} True 28 1.632
++RESULT 1008 {'object_count': 4} True 31 1.951
++RESULT 1009 {'object_count': 4} True 25 1.711
++RESULT 1010 {'object_count': 4} True 40 2.848
++RESULT 1011 {'object_count': 4} True 28 2.18
++RESULT 1012 {'object_count': 4} True 34 1.981
++RESULT 1013 {'object_count': 4} True 27 1.437
++RESULT 1014 {'object_count': 4} True 29 1.946
++RESULT 1015 {'object_count': 4} True 30 2.258
++RESULT 1016 {'object_count': 4} True 31 2.827
++RESULT 1017 {'object_count': 4} True 27 1.333
++RESULT 1018 {'object_count': 4} True 33 1.189
++RESULT 1019 {'object_count': 4} True 27 0.667
++RESULT 1020 {'object_count': 4} True 25 1.11
++RESULT 1021 {'object_count': 4} True 29 1.456
++RESULT 1022 {'object_count': 4} True 29 1.239
++RESULT 1023 {'object_count': 4} True 36 1.633
++RESULT 1024 {'object_count': 4} True 29 1.218
++RESULT 1025 {'object_count': 4} True 32 1.322
++RESULT 1026 {'object_count': 4} True 29 1.187
++RESULT 1027 {'object_count': 4} True 26 0.743
++RESULT 1028 {'object_count': 4} True 42 1.501
+diff --git a/test_refined.txt b/test_refined.txt
+index 03b3320..597cbcf 100644
+--- a/test_refined.txt
++++ b/test_refined.txt
+@@ -12,3 +12,34 @@ RESULT 10 {'object_count': 3} True 25 1.169
+ RESULT 11 {'object_count': 1} True 21 0.992
+ RESULT 12 {'object_count': 2} True 26 1.752
+ RESULT 13 {'object_count': 3} True 30 2.0
++RESULT 14 {'object_count': 1} True 34 1.552
++RESULT 15 {'object_count': 3} True 29 1.514
++RESULT 16 {'object_count': 2} True 26 1.382
++RESULT 17 {'object_count': 3} True 33 1.73
++RESULT 18 {'object_count': 3} True 27 1.328
++RESULT 19 {'object_count': 2} True 30 1.563
++RESULT 20 {'object_count': 3} True 33 1.949
++RESULT 21 {'object_count': 1} True 23 1.962
++RESULT 22 {'object_count': 3} True 28 2.07
++RESULT 23 {'object_count': 1} True 19 1.207
++RESULT 24 {'object_count': 2} True 26 1.816
++RESULT 25 {'object_count': 2} True 23 1.446
++RESULT 26 {'object_count': 3} True 31 1.648
++RESULT 27 {'object_count': 1} True 24 1.176
++RESULT 28 {'object_count': 2} True 42 3.474
++RESULT 29 {'object_count': 3} True 25 2.071
++RESULT 30 {'object_count': 1} True 22 1.438
++RESULT 31 {'object_count': 2} True 29 1.847
++RESULT 32 {'object_count': 3} True 28 1.38
++RESULT 33 {'object_count': 3} True 34 1.813
++RESULT 34 {'object_count': 1} True 21 0.518
++RESULT 35 {'object_count': 1} True 22 0.542
++RESULT 36 {'object_count': 2} True 21 0.937
++RESULT 37 {'object_count': 1} True 23 0.92
++RESULT 38 {'object_count': 1} True 22 0.449
++RESULT 39 {'object_count': 3} True 32 1.309
++RESULT 40 {'object_count': 2} True 29 1.087
++RESULT 41 {'object_count': 2} True 21 1.041
++RESULT 42 {'object_count': 1} True 28 0.88
++RESULT 43 {'object_count': 2} True 34 1.224
++RESULT 44 {'object_count': 3} True 24 0.595
+diff --git a/test_results_more.txt b/test_results_more.txt
+index e63760f..30cf7eb 100644
+--- a/test_results_more.txt
++++ b/test_results_more.txt
+@@ -85,3 +85,17 @@ RESULT 112 {'object_count': 1} True 29 1.045
+ RESULT 113 {'object_count': 1} True 24 1.129
+ RESULT 114 {'object_count': 1} True 29 1.097
+ RESULT 115 {'object_count': 2} True 31 1.352
++RESULT 116 {'object_count': 1} False 250 13.889
++FAILED [('home', 0), ('sample', 5)] [('rover0', {'x': 1.0, 'y': -1.75, 'theta': -3.1415927410125732, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}), ('rover1', {'x': -1.5, 'y': 0.3999998867511749, 'theta': 0.0, 'store_full': 1.0, 'calibrated': 0.0, 'at_home': 0.0}), ('objective0', {'x': 0.3243560194969177, 'y': 1.8972790241241455, 'z': 0.20100000500679016, 'have_image_rover0': 1.0, 'have_image_rover1': 0.0, 'received_image': 1.0}), ('sample0', {'x': -0.9633942246437073, 'y': -2.3797810077667236, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 1.0, 'received_analysis': 1.0}), ('sample1', {'x': -1.9395066499710083, 'y': -0.37688443064689636, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}), ('sample2', {'x': -1.3768526315689087, 'y': 0.30743154883384705, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 1.0, 'received_analysis': 0.0}), ('sample3', {'x': -1.8997358083724976, 'y': 1.3095738887786865, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}), ('sample4', {'x': -0.1688850373029709, 'y': 1.3331273794174194, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}), ('sample5', {'x': -1.4924739599227905, 'y': 0.6196938753128052, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0})]
++RESULT 117 {'object_count': 1} True 33 2.036
++RESULT 118 {'object_count': 2} True 30 1.838
++RESULT 119 {'object_count': 2} True 22 1.861
++RESULT 120 {'object_count': 1} True 24 1.882
++RESULT 121 {'object_count': 1} True 22 1.418
++RESULT 122 {'object_count': 3} True 26 1.122
++RESULT 123 {'object_count': 1} True 30 2.132
++RESULT 124 {'object_count': 3} True 28 2.825
++RESULT 125 {'object_count': 2} True 23 1.838
++RESULT 126 {'object_count': 1} True 22 2.261
++RESULT 127 {'object_count': 2} True 35 2.355
++RESULT 128 {'object_count': 3} True 36 1.905

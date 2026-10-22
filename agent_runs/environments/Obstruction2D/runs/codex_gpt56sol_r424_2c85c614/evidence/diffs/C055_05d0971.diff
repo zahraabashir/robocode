@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 4881cfd..0167393 100644
+--- a/approach.py
++++ b/approach.py
+@@ -55,7 +55,7 @@ class GeneratedApproach:
+         # Greedily reserve floor-clear parking columns, preferring positions far
+         # from both the pickup and goal.  The grid is count-independent.
+         # Keep parking poses one base radius away from both side walls.
+-        candidates = [0.20 + 0.05 * k for k in range(23)]
++        candidates = [0.12] + [0.20 + 0.05 * k for k in range(23)] + [1.38, 1.46]
+         # Allocate outermost slots first so a later blocker never has to pass
+         # through an earlier parked one on the way out of the goal region.
+         candidates.sort(key=lambda x: (abs(x - sx), abs(x - tx)), reverse=True)

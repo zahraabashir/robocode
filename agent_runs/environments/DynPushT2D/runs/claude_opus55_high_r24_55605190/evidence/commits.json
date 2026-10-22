@@ -1,0 +1,574 @@
+[
+  {
+    "id": "C001",
+    "commit": "56b6024251bd0ae40f7919db09697837f73e3c4b",
+    "parents": [],
+    "date": "2026-09-30T16:51:12+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".claude/settings.json",
+      ".claude/validate_sandbox.py",
+      ".gitignore",
+      "CLAUDE.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_56b6024.diff",
+    "diff_sha256": "663f52b2df9b318ebf9316be997e5298b23a4502ca0108daf0479a1877cd8686",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "b7366c092dfeaf4a2e197d86d3a5578f430a5451",
+    "parents": [
+      "56b6024251bd0ae40f7919db09697837f73e3c4b"
+    ],
+    "date": "2026-09-30T17:02:53+02:00",
+    "title": "Greedy model-based push planner v1",
+    "files": [
+      "approach.py",
+      "dyn_fit.py",
+      "dyn_fit2.py",
+      "dyn_fric.py",
+      "dyn_fric2.py",
+      "dyn_gap.py",
+      "dyn_lib.py",
+      "dyn_model.py",
+      "dyn_obs.py",
+      "dyn_probe.py",
+      "dyn_push.py",
+      "dyn_push2.py",
+      "dyn_q45.py",
+      "dyn_validate.py",
+      "explore.py",
+      "explore2.py",
+      "geom_blow.py",
+      "geom_bounds.py",
+      "geom_bounds2.py",
+      "geom_bounds3.py",
+      "geom_com.py",
+      "geom_confirm.py",
+      "geom_lib.py",
+      "geom_limits.py",
+      "geom_radial.py",
+      "geom_seeds.py",
+      "geom_wall.py",
+      "geom_wall2.py",
+      "geom_wrap.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C002_b7366c0.diff",
+    "diff_sha256": "92557b1806b6038558d62cb03f6c7332e537cc44e5c5ad941857199d816987f7",
+    "events": [
+      {
+        "event": "E0239",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "8bff5ad35646c6531b94e881168734c2528c3c3b1945fc0e153e9152dbb83beb",
+    "version": "evidence/versions/C002_b7366c0_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "aaedd14c6da7992be16f0c9e2f0dd2c03677f007",
+    "parents": [
+      "b7366c092dfeaf4a2e197d86d3a5578f430a5451"
+    ],
+    "date": "2026-09-30T17:10:57+02:00",
+    "title": "Better retreat from contact, relaxed start clearance, fallback move",
+    "files": [
+      "approach.py",
+      "dbg.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C003_aaedd14.diff",
+    "diff_sha256": "1af7d8a64c93d3c26bcb75e816e99d0176480ce8b06e39fb4748df1bdc683754",
+    "events": [
+      {
+        "event": "E0289",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "9d42605ed071dfbc94830d14c2707261f7e259746df312a61038b093820e847d",
+    "version": "evidence/versions/C003_aaedd14_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C004",
+    "commit": "6bf13553402e17c17fc6574b1f48e87a37ad49da",
+    "parents": [
+      "aaedd14c6da7992be16f0c9e2f0dd2c03677f007"
+    ],
+    "date": "2026-09-30T17:13:43+02:00",
+    "title": "Relative wall bounds when block starts near a wall",
+    "files": [
+      "approach.py",
+      "res_100_300.txt",
+      "test_list.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C004_6bf1355.diff",
+    "diff_sha256": "58a019fe23ad59810e5b248e431d88798331e7385b794d211860b500be15c76b",
+    "events": [
+      {
+        "event": "E0311",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "374771fc82c64946cbaf04542c139fafbe1719b620cd381eb94354f58fdeb8d4",
+    "version": "evidence/versions/C004_6bf1355_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "1dcac3607669f95bedf7710bea56e4be49df6ed0",
+    "parents": [
+      "6bf13553402e17c17fc6574b1f48e87a37ad49da"
+    ],
+    "date": "2026-09-30T17:16:54+02:00",
+    "title": "results",
+    "files": [
+      "res_300_600.txt"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C005_1dcac36.diff",
+    "diff_sha256": "e14711761b3d4a610a5bb403e074b8d0ceb17eedd8a765e7509cca01576478de",
+    "events": [
+      {
+        "event": "E0327",
+        "evidence": "commit title in command; output may not confirm creation"
+      },
+      {
+        "event": "E0334",
+        "evidence": "commit title in command; output may not confirm creation"
+      },
+      {
+        "event": "E0407",
+        "evidence": "commit title in command; output may not confirm creation"
+      },
+      {
+        "event": "E0644",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C006",
+    "commit": "49bdb1d479429e61c3c570a06acfe4c26bc3b521",
+    "parents": [
+      "1dcac3607669f95bedf7710bea56e4be49df6ed0"
+    ],
+    "date": "2026-09-30T17:17:17+02:00",
+    "title": "Diagonal-speed pushes, longer push horizon",
+    "files": [
+      "approach.py",
+      "stats.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C006_49bdb1d.diff",
+    "diff_sha256": "306cb4e34c8d038e3a54d8beee16bc59f8f59dea45016f1accaea1d263ee49c2",
+    "events": [
+      {
+        "event": "E0334",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "d94f72fe6f3dde5aeea923be398cbbed3c4d2d433456dfea75d0b4187631e7c7",
+    "version": "evidence/versions/C006_49bdb1d_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "ac791545304276d795aa311f589d544fc4fab223",
+    "parents": [
+      "49bdb1d479429e61c3c570a06acfe4c26bc3b521"
+    ],
+    "date": "2026-09-30T17:17:50+02:00",
+    "title": "Hinge cost with success-region margins",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C007_ac79154.diff",
+    "diff_sha256": "d1f16d7e2927ae8c5f0ddad7ce6875266b6a86fcac9ff28a987ede887859d4ec",
+    "events": [
+      {
+        "event": "E0344",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "9a5e6de78c3edf30ded6dbe07a9d743183f8fd3f69d130b481ed26fc19281297",
+    "version": "evidence/versions/C007_ac79154_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C008",
+    "commit": "3c76c01dd2ed2b5c042a6eae9ab5d107785dc088",
+    "parents": [
+      "ac791545304276d795aa311f589d544fc4fab223"
+    ],
+    "date": "2026-09-30T17:19:25+02:00",
+    "title": "Unwrapped angle success interval; tighten margins on stall",
+    "files": [
+      "approach.py",
+      "stats.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C008_3c76c01.diff",
+    "diff_sha256": "2827983f2bab0abdce4620d91b7181baf2d933b2c35b8cc3ed6ab1e2969f3cb0",
+    "events": [
+      {
+        "event": "E0366",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "214c0d012ce5a90baa1a33280e11c4315d81ef9540803d20ff281405493ebc41",
+    "version": "evidence/versions/C008_3c76c01_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C009",
+    "commit": "8950f03ac1149dda396093068727253c070180af",
+    "parents": [
+      "3c76c01dd2ed2b5c042a6eae9ab5d107785dc088"
+    ],
+    "date": "2026-09-30T17:22:19+02:00",
+    "title": "Configurable scoring modes",
+    "files": [
+      "approach.py",
+      "res_600_800.txt",
+      "sweep.py"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C009_8950f03.diff",
+    "diff_sha256": "c22462995bb0653e566bd1ceaff72ea08ebef63f55832fdf37c1ff8f285bd0f8",
+    "events": [
+      {
+        "event": "E0407",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "2168b0e23e5208e6e8d46033965b02c46889b199998393f923daeff95cf61e51",
+    "version": "evidence/versions/C009_8950f03_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C010",
+    "commit": "9cfce5290bd77f14b83bc9e2f583d4c7ff6f8a61",
+    "parents": [
+      "8950f03ac1149dda396093068727253c070180af"
+    ],
+    "date": "2026-09-30T17:32:55+02:00",
+    "title": "Tuned angle weight 2.2; more config attrs",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C010_9cfce52.diff",
+    "diff_sha256": "1f01f1d866ad8e69ca96ad75658e330aea7560d574ba2e2fdc2e4ab17a1cd907",
+    "events": [
+      {
+        "event": "E0436",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "9079f7f36a12908e1e583349a13cfd864293c53768b8cd7fd7b05f743ae55af2",
+    "version": "evidence/versions/C010_9cfce52_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C011",
+    "commit": "42cff1653603cadc800009ea270bdcbde3c54716",
+    "parents": [
+      "9cfce5290bd77f14b83bc9e2f583d4c7ff6f8a61"
+    ],
+    "date": "2026-09-30T17:37:49+02:00",
+    "title": "Contact continuation candidates and optional mid-push replanning",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C011_42cff16.diff",
+    "diff_sha256": "6e23ede43d3784c2739f97a47d42846ecf52eb6016d88e5e1cfc859806a9ec69",
+    "events": [
+      {
+        "event": "E0473",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "2523f27917ee6a6c042467f91238e600673fe342a5f6b9a45455db8440751a92",
+    "version": "evidence/versions/C011_42cff16_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C012",
+    "commit": "b644810ea5d0889315f056fa49b0948dd13e6216",
+    "parents": [
+      "42cff1653603cadc800009ea270bdcbde3c54716"
+    ],
+    "date": "2026-09-30T17:40:08+02:00",
+    "title": "REPLAN_K=10",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C012_b644810.diff",
+    "diff_sha256": "1d9d990f02bbfcef7451bf20afec39b7006fcddcef6dc2d9078a61bfedc989d9",
+    "events": [
+      {
+        "event": "E0476",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "56c1679ddd1ea330741e0054cdd1d46f589bb3b630e174a8a79ad6c224f27093",
+    "version": "evidence/versions/C012_b644810_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C013",
+    "commit": "f5b0c5696ea29ad06067deeeb66db607394daf62",
+    "parents": [
+      "b644810ea5d0889315f056fa49b0948dd13e6216"
+    ],
+    "date": "2026-09-30T17:48:52+02:00",
+    "title": "2-step lookahead (LOOK=8)",
+    "files": [
+      "approach.py",
+      "timeit_plan.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C013_f5b0c56.diff",
+    "diff_sha256": "79224d78f688a92b18870d8db2e988cc767e3e386d74b45f450b4487e64374df",
+    "events": [
+      {
+        "event": "E0528",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "73f9d4d23db002e769bf06595fe4a6a13e9dbecba20862306e7dc2e05eced2a2",
+    "version": "evidence/versions/C013_f5b0c56_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C014",
+    "commit": "b1a7b714c3cc9e000e66438b0a499fe3eea2beb6",
+    "parents": [
+      "f5b0c5696ea29ad06067deeeb66db607394daf62"
+    ],
+    "date": "2026-09-30T18:03:53+02:00",
+    "title": "Time budget guard and exception safety",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C014_b1a7b71.diff",
+    "diff_sha256": "8858094615aa6d391f6406e97174fd4c6387d96656529ccb3157187ad8d5cc3b",
+    "events": [
+      {
+        "event": "E0558",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "9a12e3f2fbe2ce588ae6d67548f0c5f6ad29de997a0f93a6a5ccc18a0c886920",
+    "version": "evidence/versions/C014_b1a7b71_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C015",
+    "commit": "159e97d0e232a1540838b9cfd81902a7f4235ba9",
+    "parents": [
+      "b1a7b714c3cc9e000e66438b0a499fe3eea2beb6"
+    ],
+    "date": "2026-09-30T18:03:59+02:00",
+    "title": "fix indentation",
+    "files": [
+      "approach.py",
+      "res_1000.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C015_159e97d.diff",
+    "diff_sha256": "3f54d029b1ca30f002f8b10e062ff5d69ba146f5cff53344029bca685a35ca43",
+    "events": [
+      {
+        "event": "E0586",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "1c7a1e116aa698e0365e12f7f930c1fc981eabdca97d1b8b511d31b195c95360",
+    "version": "evidence/versions/C015_159e97d_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C016",
+    "commit": "b52486c74a756f308ecc27a8d0f14350395baa54",
+    "parents": [
+      "159e97d0e232a1540838b9cfd81902a7f4235ba9"
+    ],
+    "date": "2026-09-30T18:26:27+02:00",
+    "title": "results 1000-1300: 300/300",
+    "files": [
+      "res_1000.txt"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C016_b52486c.diff",
+    "diff_sha256": "c377fbcbc6f5407002b0e206badfa180a8a2a6a278674ffd90e471405b9c31bc",
+    "events": [
+      {
+        "event": "E0644",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C017",
+    "commit": "c6a9370a7e45170cfb6a4578874266b55f59f134",
+    "parents": [
+      "b52486c74a756f308ecc27a8d0f14350395baa54"
+    ],
+    "date": "2026-09-30T18:36:01+02:00",
+    "title": "Exception safety in get_action",
+    "files": [
+      "approach.py",
+      "dbg.py",
+      "sw_ANGW1.6.txt",
+      "sw_ANGW3.0.txt",
+      "sw_REPLANK15.txt",
+      "sw_REPLANK6.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C017_c6a9370.diff",
+    "diff_sha256": "ef37981eb6668396cd9dff8ff4486a32de325ab1f87593cefaa30cb9236d6d12",
+    "events": [
+      {
+        "event": "E0729",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "0489e655d724de4d070a907a43542e714b8097e0c3aeafea2200530f5f4ef01e",
+    "version": "evidence/versions/C017_c6a9370_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C018",
+    "commit": "9deee5d63426610c436c6adb8fd6dd53c248de01",
+    "parents": [
+      "c6a9370a7e45170cfb6a4578874266b55f59f134"
+    ],
+    "date": "2026-09-30T18:57:14+02:00",
+    "title": "MARGIN class attr; res 5000-5300 300/300",
+    "files": [
+      "approach.py",
+      "res_5000.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C018_9deee5d.diff",
+    "diff_sha256": "9b466d606321aaa81014758d6b331d664449763d61c11a43bcd5c2ecb22bfb9f",
+    "events": [
+      {
+        "event": "E0813",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "c72397eb310407a329d87707139b6cdb26a32ba27197cec1020f778a852f96c8",
+    "version": "evidence/versions/C018_9deee5d_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C019",
+    "commit": "936a3d271afdec81ccc81a3a57d8e0bd2311fd58",
+    "parents": [
+      "9deee5d63426610c436c6adb8fd6dd53c248de01"
+    ],
+    "date": "2026-09-30T19:03:57+02:00",
+    "title": "Final sweeps",
+    "files": [
+      "sw_m0008002005.txt",
+      "sw_m0015005008.txt",
+      "sw_m0018004009.txt"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C019_936a3d2.diff",
+    "diff_sha256": "d279bbf17521ff5a326efd437dd63f9d7687a952a6db33d58a70ff5fd4435834",
+    "events": [
+      {
+        "event": "E0816",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  }
+]

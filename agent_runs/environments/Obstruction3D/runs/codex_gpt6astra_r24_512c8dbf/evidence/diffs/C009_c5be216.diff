@@ -1,0 +1,13 @@
+diff --git a/probe_ik.py b/probe_ik.py
+index e9e702e..5a5d640 100644
+--- a/probe_ik.py
++++ b/probe_ik.py
+@@ -11,7 +11,7 @@ def move(q,by):
+   delta=q-vals(s,r,fs);a=np.zeros(11);a[3:10]=np.clip(delta,-.15,.15);a[1]=np.clip(by-s.get(r,'pos_base_y'),-.15,.15)
+   if np.max(np.abs(a))<1e-5:return True
+   old=s;s,*_=E.step(a)
+-  if np.max(np.abs(vals(s,r,fs)-vals(old,r,fs)))<1e-7 and abs(s.get(r,'pos_base_y')-s.get(old,r,'pos_base_y'))<1e-7:
++  if np.max(np.abs(vals(s,r,fs)-vals(old,r,fs)))<1e-7 and abs(s.get(r,'pos_base_y')-old.get(r,'pos_base_y'))<1e-7:
+    print('blocked',np.round(vals(s,r,fs),3));return False
+  return False
+ for d in [.18,.12,.06,.24]:

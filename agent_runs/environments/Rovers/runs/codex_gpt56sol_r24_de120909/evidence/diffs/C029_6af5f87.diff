@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 56e95c6..bf0301b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -118,7 +118,7 @@ class GeneratedApproach:
+             x,y,hx,hy = rect
+             if abs(q[0]-x) <= hx+1e-5 and abs(q[1]-y) <= hy+1e-5:
+                 continue
+-            if self._seg_rect(p, q, rect, .01): return False
++            if self._seg_rect(p, q, rect, .10): return False
+         return True
+ 
+     def _astar(self, start, goals, rects, tolerance=.18):

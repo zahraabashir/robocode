@@ -1,0 +1,49 @@
+diff --git a/approach.py b/approach.py
+index 9ab1875..f76f45f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -333,7 +333,7 @@ class GeneratedApproach:
+             sx, sy = g(sm, "x"), g(sm, "y")
+             off = math.hypot(sx - lx, sy - ly)
+             if off <= 0.065:
+-                send &= ~(((bear >= -7) & (bear <= 31) & (Dl >= 1.5)) |
++                send &= ~(((bear >= -7) & (bear <= 31.0 + 1.6 * np.maximum(0.0, Dl - 2.7)) & (Dl >= 1.5)) |
+                           ((bear >= 83) & (bear <= 109) & (Dl >= 0.55)))
+             elif off <= 0.14:
+                 between = (sx - lx) * (CX - lx) + (sy - ly) * (CY - ly) > 0
+diff --git a/batch_list.py b/batch_list.py
+new file mode 100644
+index 0000000..a0aa16c
+--- /dev/null
++++ b/batch_list.py
+@@ -0,0 +1,22 @@
++import sys, time, subprocess
++from concurrent.futures import ProcessPoolExecutor
++def run(seed):
++    import numpy as np
++    from env_client import make_env
++    from approach import GeneratedApproach
++    env = make_env(); obs, info = env.reset(seed=seed, options=({"object_count":int(sys.argv[3])} if len(sys.argv)>3 else None))
++    t0=time.time()
++    ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++    steps=0; term=False
++    while not term and steps < 300:
++        a = ap.get_action(obs); obs, r, term, trunc, info = env.step(a); steps += 1
++    env.close()
++    return ap.log, seed, info.get('object_count'), steps, term, ap.nreplan, time.time()-t0
++if __name__=='__main__':
++    a,b=int(sys.argv[1]),int(sys.argv[2])
++    with ProcessPoolExecutor(8) as ex:
++        res=list(ex.map(run, [int(x) for x in open("near_seeds.txt").read().split()]))
++    import numpy as np
++    for r in res:
++        if not r[4] or r[5]>0 or r[6]>10: print(r)
++    print('solved',sum(r[4] for r in res),'/',len(res),'mean steps',np.mean([r[3] for r in res]), 'max time', max(r[6] for r in res))
+diff --git a/near_seeds.txt b/near_seeds.txt
+new file mode 100644
+index 0000000..49e50a1
+--- /dev/null
++++ b/near_seeds.txt
+@@ -0,0 +1 @@
++357 369 432 508 549 576 582 614 677 683 706 877 960 973 1030 1039 1069 1101 1111 1125 1134 1139 1154 1212 1352 1490 1519 1704 1706 1758 1808 1834 1849 1861 1955 1962 1966 2049 2295 2298 2380 2434 2546 2569 2590 2625 2680 2688 2900 2976 
+\ No newline at end of file

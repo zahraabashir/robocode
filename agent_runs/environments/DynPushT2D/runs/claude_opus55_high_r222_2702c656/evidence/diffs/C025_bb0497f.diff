@@ -1,0 +1,33 @@
+diff --git a/approach.py b/approach.py
+index 9db0b87..40abfdf 100644
+--- a/approach.py
++++ b/approach.py
+@@ -114,6 +114,10 @@ class GeneratedApproach:
+         return 0.5 * (lo + hi)
+ 
+     def reset(self, state, info):
++        self.best_em = 1e9
++        self.stall = 0
++        self.lookahead = True
++        self.rot_la = True
+         self.banned = set()
+         self.approach_steps = 0
+         self.nav_fail = 0
+@@ -464,6 +468,17 @@ class GeneratedApproach:
+ 
+     def _act(self, obs, B, rp):
+         if self.mode == 'plan':
++            em = float(np.hypot(obs[29] - obs[0], obs[30] - obs[1])) + 0.3 * abs(wrap(self.goal_theta(obs) - obs[2]))
++            if em < self.best_em - 0.005:
++                self.best_em = em
++                self.stall = 0
++            else:
++                self.stall += 1
++                if self.stall >= 8:
++                    self.lookahead = not self.lookahead
++                    self.rot_la = self.lookahead
++                    self.stall = 0
++                    self.best_em = em
+             res = self.choose(obs)
+             if res is None:
+                 return np.zeros(2)

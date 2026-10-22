@@ -1,0 +1,89 @@
+diff --git a/approach.py b/approach.py
+index c4c10c8..1a0bff5 100644
+--- a/approach.py
++++ b/approach.py
+@@ -18,7 +18,7 @@ SEL = {"sample": -5 / 6, "calibrate": -0.5, "image": -1 / 6, "noop": 0.0,
+ # geometry margins
+ WALL_X = 0.25
+ MOUND_CLEAR = 0.19
+-PILLAR_CLEAR = 0.31
++PILLAR_CLEAR = 0.165
+ LANDER_CLEAR = 0.76
+ OBJ_RANGE = 1.975
+ LANDER_RANGE = 3.965
+@@ -145,7 +145,9 @@ class GeneratedApproach:
+             dy = np.maximum(np.abs(GY - m["y"]) - m["half_y"], 0)
+             free &= np.sqrt(dx * dx + dy * dy) >= MOUND_CLEAR
+         for p in self.pillars:
+-            free &= np.hypot(GX - p["x"], GY - p["y"]) >= PILLAR_CLEAR
++            ax = np.maximum(np.abs(GX - p["x"]) - 0.1, 0)
++            ay = np.maximum(np.abs(GY - p["y"]) - 0.1, 0)
++            free &= np.hypot(ax, ay) >= PILLAR_CLEAR
+         lx, ly = self.lander
+         free &= np.hypot(GX - lx, GY - ly) >= LANDER_CLEAR
+         self.free = free
+@@ -188,7 +190,7 @@ class GeneratedApproach:
+         for r in self.rovers:
+             hx, hy, _ = self.home[r]
+             init = np.full((N, N), INF)
+-            hm = (np.hypot(GX - hx, GY - hy) <= 0.2) & self.free_r[r]
++            hm = (np.hypot(GX - hx, GY - hy) <= 0.235) & self.free_r[r]
+             hi, hj = to_cell(hx, hy)
+             hm[hi, hj] = True
+             init[hm] = 0.0
+@@ -406,7 +408,7 @@ class GeneratedApproach:
+             if math.hypot(dx, dy) < 0.178:
+                 return False
+         for p in self.pillars:
+-            if math.hypot(x - p["x"], y - p["y"]) < 0.28:
++            if math.hypot(max(abs(x - p["x"]) - 0.1, 0), max(abs(y - p["y"]) - 0.1, 0)) < 0.15:
+                 return False
+         if math.hypot(x - self.lander[0], y - self.lander[1]) < 0.72:
+             return False
+diff --git a/real_batch2.txt b/real_batch2.txt
+new file mode 100644
+index 0000000..7ba0b2e
+--- /dev/null
++++ b/real_batch2.txt
+@@ -0,0 +1,41 @@
++0 3 25 True 25 3.23
++1 2 20 True 20 2.3
++2 3 21 True 21 2.32
++3 3 22 True 22 1.97
++4 3 21 True 21 2.35
++5 3 24 True 24 2.89
++6 2 21 True 21 2.79
++7 3 21 True 21 2.94
++8 3 21 True 21 2.03
++9 2 22 True 22 2.1
++10 3 22 True 22 2.37
++11 1 19 True 19 1.5
++12 2 23 True 23 2.3
++13 3 25 True 25 2.8
++14 1 30 True 30 2.1
++15 3 23 True 23 2.56
++16 2 21 True 21 2.27
++17 3 21 True 21 2.72
++18 3 22 True 22 2.05
++19 2 25 True 25 2.35
++20 3 27 True 27 2.43
++21 1 20 True 20 1.67
++22 3 23 True 23 2.75
++23 1 18 True 18 1.8
++24 2 19 True 19 1.94
++25 2 20 True 20 1.82
++26 3 22 True 22 2.11
++27 1 21 True 21 1.04
++28 2 23 True 23 2.04
++29 3 22 True 22 2.13
++30 1 21 True 21 1.55
++31 2 25 True 25 2.18
++32 3 20 True 20 1.76
++33 3 23 True 23 2.07
++34 1 20 True 20 1.85
++35 1 19 True 19 1.5
++36 2 21 True 21 1.66
++37 1 19 True 19 1.23
++38 1 20 True 20 1.35
++39 3 23 True 23 1.79
++TOTAL 875 fails 0 maxplan 3.23

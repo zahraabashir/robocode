@@ -1,0 +1,29 @@
+diff --git a/probe_count10_seed8.py b/probe_count10_seed8.py
+new file mode 100644
+index 0000000..8e55816
+--- /dev/null
++++ b/probe_count10_seed8.py
+@@ -0,0 +1,10 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import time
++E=make_env();s,inf=E.reset(seed=8,options={'object_count':10});p=GeneratedApproach(E.action_space,E.observation_space,{});p.reset(s,inf);start=time.time();last=None
++for k in range(1000):
++ a=p.get_action(s);s,r,term,tr,_=E.step(a);ro=s.get_object_from_name('robot');held=s.get(ro,'grasp_active');key=(p.goal,p.yaw,held)
++ if key!=last or k%50==0:
++  print(k,p.goal,p.phase,'yaw',p.yaw,'height',p.height,'retries',p.retries,'held',held,flush=True);last=key
++ if term or tr or time.time()-start>57:break
++print('RESULT',k+1,term,tr,time.time()-start,p.goal,p.phase,p.yaw,p.height,flush=True);E.close()
+diff --git a/sweep_final_default.log b/sweep_final_default.log
+index cfe1195..d6e0a47 100644
+--- a/sweep_final_default.log
++++ b/sweep_final_default.log
+@@ -7,3 +7,8 @@
+ {"seed": 36, "count": null, "success": true, "steps": 82, "phase": "release", "goal": "target_block", "seconds": 1.44, "grasp": 0.0}
+ {"seed": 37, "count": null, "success": true, "steps": 42, "phase": "release", "goal": "target_block", "seconds": 0.79, "grasp": 0.0}
+ {"seed": 38, "count": null, "success": true, "steps": 41, "phase": "release", "goal": "target_block", "seconds": 0.92, "grasp": 0.0}
++{"seed": 39, "count": null, "success": true, "steps": 121, "phase": "release", "goal": "target_block", "seconds": 2.19, "grasp": 0.0}
++{"seed": 40, "count": null, "success": true, "steps": 84, "phase": "release", "goal": "target_block", "seconds": 1.58, "grasp": 0.0}
++{"seed": 41, "count": null, "success": true, "steps": 87, "phase": "release", "goal": "target_block", "seconds": 1.38, "grasp": 0.0}
++{"seed": 42, "count": null, "success": true, "steps": 43, "phase": "release", "goal": "target_block", "seconds": 0.85, "grasp": 0.0}
++{"seed": 43, "count": null, "success": true, "steps": 80, "phase": "release", "goal": "target_block", "seconds": 1.66, "grasp": 0.0}

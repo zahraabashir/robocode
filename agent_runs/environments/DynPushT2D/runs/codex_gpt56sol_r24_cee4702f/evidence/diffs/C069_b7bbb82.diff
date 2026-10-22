@@ -1,0 +1,24 @@
+diff --git a/approach.py b/approach.py
+index dfe391d..4f58a52 100644
+--- a/approach.py
++++ b/approach.py
+@@ -142,6 +142,7 @@ class GeneratedApproach:
+             elif pd > 0.018:
+                 self.push_dir = dp / max(pd, 1e-9)
+                 self.mode = "move_far"
++                self.start_pd = pd
+                 com0 = obj + self._world(np.array([0.0, -0.36*lv]), theta)
+                 com0 = com0 + np.array([-self.push_dir[1], self.push_dir[0]])*self.line_offset
+                 far0 = np.clip(com0 - self.push_dir*0.82, 0.105, 4.895)
+@@ -214,6 +215,11 @@ class GeneratedApproach:
+             disturbed = (np.linalg.norm(obj-self.start_pose[:2]) > 0.012 or
+                          abs(self._angle(theta-self.start_pose[2])) > 0.018)
+             if disturbed:
++                if pd < self.start_pd - 0.002 and abs(ae) < 0.16:
++                    self.mode, self.nav = "move_push", []
++                    self.count = 0
++                    self.start_pose = np.array([obj[0], obj[1], theta])
++                    return self._safe((com + self.push_dir*0.20)-robot, 0.024)
+                 self.mode, self.nav = "choose", []
+                 return self._safe(robot-obj, 0.035)
+             while self.nav and np.linalg.norm(robot - self.nav[0]) < 0.045:

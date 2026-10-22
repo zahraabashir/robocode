@@ -1,0 +1,28 @@
+diff --git a/approach.py b/approach.py
+index 85c350e..7d6dcc9 100644
+--- a/approach.py
++++ b/approach.py
+@@ -71,6 +71,7 @@ class GeneratedApproach:
+         self.g = Geom(s[12], s[13], s[14])
+         self.plan = []
+         self.last_pose = None
++        self.margin = (0.012, 0.03, 0.07)
+ 
+     # ---------------- helpers ----------------
+     def err(self, ref, th, goal):
+@@ -83,9 +84,12 @@ class GeneratedApproach:
+         c, s = np.cos(th), np.sin(th)
+         comx = ref[..., 0] - s * g.C[1]
+         comy = ref[..., 1] + c * g.C[1]
+-        e_ref = np.hypot(ref[..., 0] - gref[0], ref[..., 1] - gref[1])
+-        e_com = np.hypot(comx - gcom[0], comy - gcom[1])
+-        return e_ref + e_com + 0.6 * np.abs(dth)
++        m = self.margin
++        e_ref = np.hypot(np.maximum(np.abs(ref[..., 0] - gref[0]) - m[0], 0),
++                         np.maximum(np.abs(ref[..., 1] - gref[1]) - m[0], 0))
++        e_com = np.hypot(np.maximum(np.abs(comx - gcom[0]) - m[1], 0),
++                         np.maximum(np.abs(comy - gcom[1]) - m[1], 0))
++        return e_ref + e_com + 0.6 * np.maximum(np.abs(dth) - m[2], 0)
+ 
+     def seg_free(self, pose, a, b, clear):
+         if a is self.start_pt:

@@ -1,0 +1,86 @@
+diff --git a/approach.py b/approach.py
+index 32bb7d0..9511a9f 100644
+--- a/approach.py
++++ b/approach.py
+@@ -16,8 +16,8 @@ WALL_IN = 0.2271 + 0.004
+ ARENA = 2.2729 - 0.004
+ PILLAR_R = 0.245
+ MOUND_R = 0.185
+-LANDER_XMIN = -1.195
+-LANDER_YMIN = -1.455
++LANDER_XMIN = -1.15
++LANDER_YMIN = -1.42
+ OBJ_RANGE = 1.985
+ LANDER_RANGE = 3.985
+ SAMPLE_R = 0.242
+@@ -139,7 +139,7 @@ class Scene:
+ class RoverPlanner:
+     """Grid + regions for one rover."""
+ 
+-    def __init__(self, idx, home, scene, other_pos_list, cur_th=None):
++    def __init__(self, idx, home, scene, other_pos_list, cur_th=None, bad=()):
+         self.idx = idx
+         self.home = home  # (x, y, th)
+         hx, hy, th = home
+@@ -162,6 +162,8 @@ class RoverPlanner:
+         for (cx, cy, ax, ay) in scene.mounds:
+             free &= box_dist(X, Y, cx, cy, ax, ay) > MOUND_R
+         free &= (X >= LANDER_XMIN) | (Y >= LANDER_YMIN)
++        for (bx, by) in bad:
++            free &= np.hypot(X - bx, Y - by) > 0.03
+         free[self.hi, self.hj] = True
+         self.free = free
+         self.home_reg = (np.hypot(X - hx, Y - hy) <= HOME_R) & free
+@@ -286,6 +288,7 @@ class GeneratedApproach:
+         self.expect = [None, None]
+         self.prev_sc = sc
+         self.log = []
++        self.bad = [[], []]
+         self._plan(state)
+ 
+     # ------------------------------------------------------------------
+@@ -297,7 +300,7 @@ class GeneratedApproach:
+         occl = [(ohome[0], ohome[1])]
+         if math.hypot(other["x"] - ohome[0], other["y"] - ohome[1]) > 0.05:
+             occl.append((other["x"], other["y"]))
+-        P = RoverPlanner(ri, self.homes[name], sc, occl, r["th"])
++        P = RoverPlanner(ri, self.homes[name], sc, occl, r["th"], self.bad[ri])
+         self_planner = P
+         start = P.cell_of(r["x"], r["y"])
+         P.free[start] = True
+@@ -603,6 +606,7 @@ class GeneratedApproach:
+                     abs(float(_wrap(r["th"] - e[3]))) > 1e-3:
+                 dev = True
+                 self.log.append(("move", ri, e, r["x"], r["y"]))
++                self.bad[ri].append((e[0], e[1]))
+             op, arg = e[2] if e[2] else (None, None)
+             pr = self.prev_sc.rovers["rover%d" % ri]
+             if op == "img":
+diff --git a/prof.out b/prof.out
+new file mode 100644
+index 0000000..cd1aa12
+Binary files /dev/null and b/prof.out differ
+diff --git a/res_rot.json b/res_rot.json
+new file mode 100644
+index 0000000..521b3bc
+--- /dev/null
++++ b/res_rot.json
+@@ -0,0 +1 @@
++[[0, 3, true, 25, 0, 1.51, 4.1], [1, 2, true, 18, 0, 2.08, 3.6], [2, 3, true, 19, 0, 2.39, 4.0], [3, 3, true, 21, 0, 2.8, 5.5], [4, 3, true, 20, 0, 0.78, 3.9], [5, 3, true, 23, 0, 6.86, 7.3], [6, 2, true, 19, 0, 4.94, 5.1], [7, 3, true, 22, 0, 8.4, 10.0], [8, 3, true, 20, 0, 6.7, 7.4], [9, 2, true, 22, 0, 5.64, 6.4], [10, 3, true, 21, 0, 9.62, 10.2], [11, 1, true, 19, 0, 2.66, 2.8], [12, 2, true, 22, 0, 4.64, 6.0], [13, 3, true, 24, 0, 8.35, 8.9], [14, 1, true, 29, 0, 2.05, 3.6], [15, 3, true, 24, 0, 8.94, 12.0], [16, 2, true, 22, 0, 2.7, 4.2], [17, 3, true, 20, 0, 12.15, 15.6], [18, 3, true, 22, 0, 5.72, 5.9], [19, 2, true, 25, 0, 4.41, 5.7], [20, 3, true, 27, 0, 5.53, 8.9], [21, 1, true, 19, 0, 3.92, 5.8], [22, 3, true, 21, 0, 6.34, 8.6], [23, 1, true, 17, 0, 3.42, 6.0], [24, 2, true, 18, 0, 2.46, 5.1], [25, 2, true, 18, 0, 2.97, 5.5], [26, 3, true, 21, 0, 4.29, 7.2], [27, 1, true, 21, 0, 1.35, 4.5], [28, 2, true, 21, 0, 1.94, 4.8], [29, 3, true, 20, 0, 2.32, 6.7], [30, 1, true, 20, 0, 1.04, 5.7], [31, 2, true, 25, 0, 0.64, 5.1], [32, 3, true, 18, 0, 0.68, 5.6], [33, 3, true, 22, 0, 1.06, 7.7], [34, 1, true, 18, 0, 0.57, 5.4], [35, 1, true, 18, 0, 0.41, 5.3], [36, 2, true, 20, 0, 0.47, 6.5], [37, 1, true, 18, 0, 0.5, 5.8], [38, 1, true, 20, 0, 0.54, 5.2], [39, 3, true, 22, 0, 0.72, 5.6], [40, 2, true, 21, 0, 0.81, 5.8], [41, 2, true, 19, 0, 0.42, 6.0], [42, 1, true, 20, 0, 0.39, 5.2], [43, 2, true, 24, 0, 1.25, 7.4], [44, 3, true, 20, 0, 1.45, 5.8], [45, 3, true, 21, 0, 1.48, 5.9], [46, 2, true, 18, 0, 0.41, 3.6], [47, 1, true, 20, 0, 0.36, 4.3], [48, 1, true, 19, 0, 0.35, 4.2], [49, 1, true, 20, 0, 0.51, 4.5], [50, 3, true, 21, 0, 1.42, 5.7], [51, 2, true, 20, 0, 1.04, 4.8], [52, 3, true, 22, 0, 1.45, 4.8], [53, 3, true, 19, 0, 3.09, 6.0], [54, 1, true, 19, 0, 1.55, 3.3], [55, 3, true, 27, 0, 8.28, 10.2], [56, 2, true, 23, 0, 3.06, 6.0], [57, 1, true, 16, 0, 2.11, 4.4], [58, 2, true, 23, 0, 3.87, 5.5], [59, 3, false, 1000, 983, 9.5, 78.7], [60, 1, true, 22, 0, 3.06, 4.6], [61, 2, true, 20, 0, 3.58, 4.2], [62, 2, true, 22, 0, 4.64, 5.4], [63, 2, true, 22, 0, 5.94, 6.1], [64, 2, true, 22, 0, 5.49, 7.1], [65, 1, true, 17, 0, 4.18, 5.3], [66, 3, true, 21, 0, 4.42, 5.4], [67, 3, true, 21, 0, 5.35, 6.9], [68, 2, true, 19, 0, 3.92, 5.5], [69, 1, true, 20, 0, 2.55, 3.8], [70, 2, true, 20, 0, 4.69, 4.9], [71, 3, false, 1000, 982, 8.83, 68.1], [72, 3, true, 20, 0, 9.8, 9.9], [73, 3, true, 20, 0, 4.66, 4.8], [74, 1, true, 20, 0, 4.17, 4.6], [75, 2, true, 18, 0, 4.82, 4.9], [76, 2, true, 22, 0, 5.62, 6.1], [77, 1, true, 18, 0, 3.32, 3.5], [78, 3, true, 21, 0, 5.08, 5.3], [79, 1, true, 23, 0, 4.62, 5.0], [80, 3, true, 20, 0, 12.84, 13.0], [81, 1, true, 18, 0, 4.85, 5.0], [82, 3, true, 19, 0, 6.73, 6.9], [83, 3, true, 21, 0, 6.36, 6.5], [84, 2, true, 22, 0, 5.84, 6.2], [85, 3, true, 19, 0, 9.64, 10.0], [86, 3, true, 21, 0, 6.34, 7.2], [87, 2, true, 23, 0, 5.51, 7.5], [88, 2, true, 18, 0, 4.56, 5.8], [89, 3, true, 29, 0, 3.28, 4.9], [90, 2, true, 20, 0, 4.2, 4.7], [91, 3, true, 22, 0, 3.46, 3.6], [92, 2, true, 23, 0, 4.12, 4.3], [93, 3, true, 22, 0, 7.77, 7.9], [94, 1, true, 20, 0, 3.86, 4.0], [95, 2, true, 21, 0, 6.26, 6.9], [96, 3, true, 21, 0, 4.55, 4.7], [97, 1, true, 27, 0, 5.47, 6.6], [98, 2, true, 22, 0, 4.26, 4.9], [99, 3, true, 22, 0, 6.09, 6.2], [100, 3, true, 23, 0, 5.72, 5.9], [101, 1, true, 17, 0, 2.29, 2.4], [102, 2, true, 21, 0, 5.4, 6.3], [103, 2, true, 21, 0, 4.41, 4.9], [104, 3, true, 20, 0, 7.19, 7.5], [105, 1, true, 20, 0, 2.46, 2.7], [106, 2, true, 19, 0, 3.46, 4.2], [107, 1, true, 20, 0, 2.94, 3.1], [108, 1, true, 18, 0, 4.06, 4.2], [109, 2, true, 19, 0, 5.79, 7.7], [110, 2, true, 20, 0, 5.98, 8.6], [111, 2, true, 20, 0, 4.65, 6.0], [112, 1, true, 18, 0, 4.19, 4.6], [113, 1, true, 19, 0, 2.88, 3.0], [114, 1, true, 18, 0, 2.98, 6.1], [115, 2, true, 21, 0, 1.23, 3.6], [116, 1, true, 21, 0, 0.93, 2.5], [117, 1, true, 25, 0, 1.67, 1.8], [118, 2, true, 19, 0, 2.61, 2.7], [119, 2, true, 21, 0, 2.57, 2.7]]
+\ No newline at end of file
+diff --git a/timeit_.py b/timeit_.py
+new file mode 100644
+index 0000000..919a709
+--- /dev/null
++++ b/timeit_.py
+@@ -0,0 +1,10 @@
++import sys, time
++from env_client import make_env
++from approach import GeneratedApproach
++import cProfile, pstats
++env=make_env(); obs,info=env.reset(seed=int(sys.argv[1])); env.close()
++ap=GeneratedApproach(None,None,{})
++t=time.time()
++cProfile.run('ap.reset(obs,info)','prof.out')
++print('time',time.time()-t)
++pstats.Stats('prof.out').sort_stats('cumtime').print_stats(12)

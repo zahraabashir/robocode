@@ -1,0 +1,7 @@
+All files you create MUST use relative paths so they stay in the current working directory (/sandbox). Never write files using absolute paths.
+
+CONTEXT MANAGEMENT: your context window is limited and you MUST protect it aggressively: (1) Delegate ALL source code reading, exploration, and deep reasoning to subagents: have them return only concise summaries and actionable suggestions. (2) Never read large files directly; spawn a subagent to read and summarize them. (3) When running Bash commands, pipe output through `head` or `tail` to limit verbosity if possible. (4) Keep your thinking brief, do not write long reasoning traces. If you need to reason deeply about a design decision, delegate that to a subagent and have it return the conclusion. (5) Keep your main conversation focused on writing and testing code, not on reading source or reasoning at length.
+
+The Python interpreter is at /opt/robocode-strict/bin/python
+Run test scripts with:
+    /opt/robocode-strict/bin/python test_approach.py

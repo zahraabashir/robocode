@@ -1,0 +1,50 @@
+diff --git a/approach.py b/approach.py
+index 90147c6..5e85c01 100644
+--- a/approach.py
++++ b/approach.py
+@@ -19,7 +19,7 @@ class GeneratedApproach:
+         obs=[o for o in self.objects if o not in [self.block,self.region] and np.all(np.abs(self.pos(state,o)[:2]-rp[:2]) < self.size(state,o)[:2]+rs[:2]+.012)]
+         obs.sort(key=lambda o:-self.pos(state,o)[2])
+         self.todo=obs+[self.block];self.index=0;self.phase='above';self.t=0;self.stall=0;self.last=None
+-        self.attempts={};self.attempt=0;self.wrist=np.pi/2;self.failed_places=[];self.obj=self.todo[0];self.destination=self.choose_destination(state)
++        self.last_released=None;self.attempts={};self.attempt=0;self.wrist=np.pi/2;self.failed_places=[];self.obj=self.todo[0];self.destination=self.choose_destination(state)
+     def choose_destination(self,state):
+         self.placing_goal=self.obj==self.block and not any(o!=self.block for o in self.todo[self.index+1:])
+         if self.placing_goal:
+@@ -89,9 +89,19 @@ class GeneratedApproach:
+                 self.obj=actual;self.destination=self.choose_destination(state);bp=self.pos(state,self.obj)
+             self.phase='lift';self.lift_xy=bp[:2].copy()
+         if self.phase=='release' and not held:
++            self.last_released=self.obj
+             self.index+=1
+             if self.index>=len(self.todo):self.index=len(self.todo)-1
+             self.attempt=0;self.wrist=np.pi/2;self.failed_places=[];self.obj=self.todo[self.index];self.destination=self.choose_destination(state);self.phase='above';bp=self.pos(state,self.obj)
++        if not held and self.phase=='above' and self.stall>=3 and self.last_released is not None:
++            released=self.last_released
++            oldpos=self.pos(state,released)
++            if np.linalg.norm(oldpos[:2]-model[:2])<.04:
++                self.todo.insert(self.index,released);self.obj=released
++                self.failed_places.append(oldpos[:2].copy());self.destination=self.choose_destination(state)
++                self.phase='grasp';self.attempt=0;self.wrist=qnow[6];self.stall=0
++                a=np.zeros(11,dtype=np.float32);a[10]=-1
++                return a
+         if held and self.phase=='lower' and not self.placing_goal and self.stall>=3:
+             self.failed_places.append(self.destination[:2].copy());self.destination=self.choose_destination(state);self.phase='lift';self.lift_xy=bp[:2].copy();self.stall=0
+         for _ in range(4):
+diff --git a/probe_escape_reclose.out b/probe_escape_reclose.out
+new file mode 100644
+index 0000000..aba8e85
+--- /dev/null
++++ b/probe_escape_reclose.out
+@@ -0,0 +1,11 @@
++STALLED 148 obj obstruction0 model [0.11988448269304469, -0.227046997372531, 0.13899999873564506] signature [-0.5001155138015747, -0.22804692387580872, 0.0, 0.6475113034248352, -3.141592502593994, -1.5943396091461182, 0.0, -0.8997417688369751, 1.5707963705062866]
++NEAR obstruction17 [0.12675714492797852, -0.2796808183193207, 0.09376610070466995] [0.014055830426514149, 0.018691936507821083, 0.018766101449728012]
++NEAR obstruction29 [0.1800907999277115, -0.1283237487077713, 0.09960343688726425] [0.013570431619882584, 0.012746535241603851, 0.02460344135761261]
++NEAR obstruction3 [0.11988447606563568, -0.227046936750412, 0.08870194107294083] [0.016884466633200645, 0.013889214023947716, 0.012701930478215218]
++NEAR obstruction41 [0.1450808346271515, -0.1250598132610321, 0.0914498046040535] [0.01841130293905735, 0.011880945414304733, 0.016449805349111557]
++NEAR obstruction8 [0.16071473062038422, -0.3303195536136627, 0.10226240754127502] [0.013088573701679707, 0.012698368169367313, 0.027262404561042786]
++RECLOSE 1.0 ['obstruction3']
++LIFT 0.18 model [0.49999994522727714, 0.0010000414018106465, 0.17999997772391033]
++LIFT 0.24 model [0.5000000160440505, 0.0009999312645461748, 0.24000001731711207]
++LIFT 0.3 model [0.5000000169138609, 0.0010000381728343499, 0.30000002008895343]
++RESULT True steps 266 phase release obj target_block stall 0

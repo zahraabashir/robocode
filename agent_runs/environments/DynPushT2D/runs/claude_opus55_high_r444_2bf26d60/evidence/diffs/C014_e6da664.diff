@@ -1,0 +1,23 @@
+diff --git a/approach.py b/approach.py
+index 6e93ab8..2b33e81 100644
+--- a/approach.py
++++ b/approach.py
+@@ -160,7 +160,8 @@ class GeneratedApproach:
+         self.action_space = action_space
+         self.goal_bonus = 0.05
+         self.overhead = 2.0
+-        self.wa = 0.6
++        self.wa = 0.4
++        self.cost_mode = 0
+         self.M = 0
+         self.infl = R_ROBOT + 0.015
+         self.H2 = 30
+@@ -189,6 +190,8 @@ class GeneratedApproach:
+         pose = np.atleast_2d(pose)
+         dp = pose[:, :2] - self.goal[:2]
+         da = np.abs(wrap_arr(pose[:, 2] - self.goal[2]))
++        if self.cost_mode == 1:
++            return np.sqrt(dp[:, 0] ** 2 + dp[:, 1] ** 2 + (self.wa * da) ** 2)
+         return np.hypot(dp[:, 0], dp[:, 1]) + self.wa * da
+ 
+     def solved(self, pose):

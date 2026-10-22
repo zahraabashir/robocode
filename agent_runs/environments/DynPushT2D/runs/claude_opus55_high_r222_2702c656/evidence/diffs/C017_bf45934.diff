@@ -1,0 +1,15 @@
+diff --git a/approach.py b/approach.py
+index ee1cbc8..b296456 100644
+--- a/approach.py
++++ b/approach.py
+@@ -431,6 +431,10 @@ class GeneratedApproach:
+                 else:
+                     self.banned.clear()
+             if done:
++                if self.push_steps > 1:
++                    moved = np.linalg.norm(B.p - self.push_start[0]) + abs(B.th - self.push_start[1])
++                    if moved > 0.01:
++                        self.banned.clear()
+                 self.mode = 'plan'
+                 return None
+             cp = B.to_world(p - n * (R_ROBOT - 0.002))

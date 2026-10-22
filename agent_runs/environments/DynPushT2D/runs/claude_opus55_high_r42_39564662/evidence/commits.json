@@ -1,0 +1,304 @@
+[
+  {
+    "id": "C001",
+    "commit": "73bb6a884d79735052e12d28b166d686dbe4be31",
+    "parents": [],
+    "date": "2026-09-28T18:47:13+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".claude/settings.json",
+      ".claude/validate_sandbox.py",
+      ".gitignore",
+      "CLAUDE.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_73bb6a8.diff",
+    "diff_sha256": "e72d7b8a86c9a97ab7ad1ecd162b36f1e9665e998ebcd038e75b7f0115ec33a4",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "c66d154cb4c7da49470d7e7a6e1aab4762c8fb29",
+    "parents": [
+      "73bb6a884d79735052e12d28b166d686dbe4be31"
+    ],
+    "date": "2026-09-28T18:58:21+02:00",
+    "title": "Model-based greedy push planner v1",
+    "files": [
+      "approach.py",
+      "probe.py",
+      "probe2.py",
+      "probe3.py",
+      "probe4.py",
+      "probe_dyn_X.npy",
+      "probe_dyn_a.py",
+      "probe_dyn_b.py",
+      "probe_dyn_c.py",
+      "probe_dyn_collect.py",
+      "probe_dyn_data_1.npy",
+      "probe_dyn_data_2.npy",
+      "probe_dyn_data_3.npy",
+      "probe_dyn_data_4.npy",
+      "probe_dyn_e.py",
+      "probe_dyn_first.py",
+      "probe_dyn_fit.py",
+      "probe_dyn_geo.py",
+      "probe_dyn_lib.py",
+      "probe_geom_1.py",
+      "probe_geom_2.py",
+      "probe_geom_3.py",
+      "probe_geom_4.py",
+      "test_approach.py",
+      "test_model.py",
+      "tmodel.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C002_c66d154.diff",
+    "diff_sha256": "a73c01e6fe1ec40d695f8990578f533f9bee57ff1d5495e1d55f8f13c6f59046",
+    "events": [
+      {
+        "event": "E0260",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "4dde5c83f901d339d1bb8e2ec73e770aa743a94af6d8ba8165711c14987f8e58",
+    "version": "evidence/versions/C002_c66d154_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "076d2b66df7c445182abc5067bd3ceeb37c099de",
+    "parents": [
+      "c66d154cb4c7da49470d7e7a6e1aab4762c8fb29"
+    ],
+    "date": "2026-09-28T19:00:44+02:00",
+    "title": "retreat after push before navigating",
+    "files": [
+      "approach.py",
+      "dbg.py",
+      "res_0.txt",
+      "res_1.txt",
+      "res_2.txt",
+      "res_3.txt",
+      "res_4.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C003_076d2b6.diff",
+    "diff_sha256": "5eed72542d9927db331f3d28eeef2d9e6eb74a3e82d7f42308159e012eaf5cc8",
+    "events": [
+      {
+        "event": "E0307",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "3ea78e69578ffcf5b6830caaf3e416c50ca00192cf6bca8d45d4f1f13d57a7ea",
+    "version": "evidence/versions/C003_076d2b6_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C004",
+    "commit": "ea6e8e1a3fec197e2119decbe19f20a16b311566",
+    "parents": [
+      "076d2b66df7c445182abc5067bd3ceeb37c099de"
+    ],
+    "date": "2026-09-28T19:04:12+02:00",
+    "title": "K_ANG=0.8 (fixes rotation local minima, fewer steps)",
+    "files": [
+      "approach.py",
+      "sw_0.8_0_50.txt",
+      "sw_0.8_50_100.txt",
+      "sw_1.2_0_50.txt",
+      "sw_1.2_50_100.txt",
+      "sw_1.6_0_50.txt",
+      "sw_1.6_50_100.txt",
+      "sweep.py"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C004_ea6e8e1.diff",
+    "diff_sha256": "97ca9d79378696ea3ad942b3f0f2aac62bf0b4dc0b277584a65efd9442ea3209",
+    "events": [
+      {
+        "event": "E0334",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "936799b208940c7a79949d5b6a51d7ba6bb9fe4e17aa6b55e7fab6d48095f000",
+    "version": "evidence/versions/C004_ea6e8e1_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "b032fa735ad676b62b2f0711aab3d268a931b0d6",
+    "parents": [
+      "ea6e8e1a3fec197e2119decbe19f20a16b311566"
+    ],
+    "date": "2026-09-28T19:08:44+02:00",
+    "title": "2-step lookahead planner",
+    "files": [
+      "approach.py",
+      "big_200_250.txt",
+      "big_250_300.txt",
+      "big_300_350.txt",
+      "big_350_400.txt",
+      "big_400_450.txt",
+      "big_450_500.txt",
+      "big_500_550.txt",
+      "big_550_600.txt",
+      "sweep.py"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C005_b032fa7.diff",
+    "diff_sha256": "3a79c66423c4f11b1af19d396e9696c32a4ca2545e7c6c7214763f7116c5aa5a",
+    "events": [
+      {
+        "event": "E0363",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "54b9099ca75b8c4cf9345a8325f3edf2bef7251991ad6cd0e307076602863a34",
+    "version": "evidence/versions/C005_b032fa7_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C006",
+    "commit": "c6944f5164653d9d2b124b34eec874e29f72ad04",
+    "parents": [
+      "b032fa735ad676b62b2f0711aab3d268a931b0d6"
+    ],
+    "date": "2026-09-28T19:11:18+02:00",
+    "title": "block-frame push family",
+    "files": [
+      "approach.py",
+      "la_0_0_25.txt",
+      "la_0_25_50.txt",
+      "la_0_50_75.txt",
+      "la_0_75_100.txt",
+      "la_8_0_25.txt",
+      "la_8_25_50.txt",
+      "la_8_50_75.txt",
+      "la_8_75_100.txt",
+      "sweep.py"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C006_c6944f5.diff",
+    "diff_sha256": "d4f7d8e4598f46a5b37eb8b9bb40b8ade8aa73c522fd7b73458ca86d50dcc743",
+    "events": [
+      {
+        "event": "E0389",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "e174eba17147691532144ae26599e3a1a094d3840872cf8c61a17e0a8e4f12f1",
+    "version": "evidence/versions/C006_c6944f5_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "341c0e1db6b2cf4f32c26b5b4de2c9117fce7b36",
+    "parents": [
+      "c6944f5164653d9d2b124b34eec874e29f72ad04"
+    ],
+    "date": "2026-09-28T19:14:12+02:00",
+    "title": "lookahead 16",
+    "files": [
+      "approach.py",
+      "la16_0_25.txt",
+      "la16_25_50.txt",
+      "la16_50_75.txt",
+      "la16_75_100.txt",
+      "lf_0_0_25.txt",
+      "lf_0_25_50.txt",
+      "lf_0_50_75.txt",
+      "lf_0_75_100.txt",
+      "lf_1_0_25.txt",
+      "lf_1_25_50.txt",
+      "lf_1_50_75.txt",
+      "lf_1_75_100.txt",
+      "sweep.py"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C007_341c0e1.diff",
+    "diff_sha256": "cceb8623d5ad775168243c3e85bd095cab3c0918b04e6a753162eb3517d738d0",
+    "events": [
+      {
+        "event": "E0408",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "840eab27d8efab4385417b32dfc51f735890998aa94725e5032a49f872e25b30",
+    "version": "evidence/versions/C007_341c0e1_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C008",
+    "commit": "96fd518c4e5419032fa809e389603a27cb160873",
+    "parents": [
+      "341c0e1db6b2cf4f32c26b5b4de2c9117fce7b36"
+    ],
+    "date": "2026-09-28T19:17:32+02:00",
+    "title": "exception-safe get_action, cleanup",
+    "files": [
+      "approach.py",
+      "v_600_650.txt",
+      "v_650_700.txt",
+      "v_700_750.txt",
+      "v_750_800.txt",
+      "v_800_850.txt",
+      "v_850_900.txt",
+      "v_900_950.txt",
+      "v_950_1000.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C008_96fd518.diff",
+    "diff_sha256": "9a6b2c637d9a0e572c582f46c9ad4e19c136322a8b3bac2e9f322952a8c142e0",
+    "events": [
+      {
+        "event": "E0420",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "29f8431ff242ce7c29185715af751003018e8df8250ed06aaf2f7141d0a0108f",
+    "version": "evidence/versions/C008_96fd518_approach.py",
+    "same_policy_as_earlier": []
+  }
+]

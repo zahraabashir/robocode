@@ -1,0 +1,15 @@
+diff --git a/probe_dynamic_radio.py b/probe_dynamic_radio.py
+index ac087e9..a79110b 100644
+--- a/probe_dynamic_radio.py
++++ b/probe_dynamic_radio.py
+@@ -12,6 +12,10 @@ for seed in [1212,549]:
+    print(seed,t,'send',p(0),p(1),success,'pending',pending(),flush=True)
+    if t>22 and not success and s.get(a.rovers[1],'at_home')>.5:break
+  else:e.close();continue
++ for k in range(15):
++  target=np.array([.9,0]) if seed==1212 else np.array([.7,.1]);d=np.clip(target-p(0),-.2,.2);act=np.zeros(8);act[:2]=d;act[3]=.5;s,*_=e.step(act)
++  print(seed,'known',p(0),p(1),'pending',pending(),flush=True)
++  if np.max(np.abs(d))<.005:break
+  for dest in [(-1,-1.51),(-1,-1),(-.6,-1),(-1,-1.75)]:
+   for k in range(20):
+    d=np.clip(np.array(dest)-p(1),-.2,.2);act=np.zeros(8);act[3]=.5;act[4:6]=d

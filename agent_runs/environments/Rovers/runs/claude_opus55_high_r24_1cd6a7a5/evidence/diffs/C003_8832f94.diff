@@ -1,0 +1,99 @@
+diff --git a/approach.py b/approach.py
+index 4db1072..95fd02e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -3,7 +3,7 @@ import numpy as np
+ 
+ H = 0.1            # lattice spacing (a step can move up to 2 cells per axis)
+ R_STEP = 2         # cells per step
+-IMG_R = 1.96       # imaging range (true ~2.0)
++IMG_R = 1.85       # imaging range (conservative)
+ SAMP_R = 0.235     # sampling range (true 0.25)
+ SEND_R = 3.85      # send range (true ~4.0)
+ BAND = {"sample": -5 / 6, "calibrate": -0.5, "image": -1 / 6, "noop": 1 / 6,
+diff --git a/dbg.py b/dbg.py
+new file mode 100644
+index 0000000..60c15ae
+--- /dev/null
++++ b/dbg.py
+@@ -0,0 +1,21 @@
++import sys
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++seed = int(sys.argv[1])
++env = make_env()
++obs, info = env.reset(seed=seed)
++ap = GeneratedApproach(env.action_space, env.observation_space, {})
++ap.reset(obs, info)
++print("tasks", ap.tasks, "mytasks", ap.my_tasks)
++for i in range(2): print(i, "visits", ap.plans[i]['visits'], "path", [tuple(np.round(ap.planners[i].pos(c),2)) for c in ap.plans[i]['path']][:40])
++
++for step in range(int(sys.argv[2]) if len(sys.argv)>2 else 60):
++    a = ap.get_action(obs)
++    obs, r, term, trunc, info = env.step(a)
++    g = obs.get
++    rs = [(round(g(rv,'x'),2), round(g(rv,'y'),2), int(g(rv,'store_full')), int(g(rv,'calibrated'))) for rv in ap.sc.rovers]
++    objs = [(int(g(o,'have_image_rover0')), int(g(o,'have_image_rover1')), int(g(o,'received_image'))) for o in ap.sc.objectives]
++    sm = [(int(g(s,'analyzed_rover0')), int(g(s,'analyzed_rover1')), int(g(s,'received_analysis'))) for s in ap.sc.samples]
++    print(step, np.round(a,2).tolist(), rs, objs, sm, term)
++    if term: break
+diff --git a/probe_img.py b/probe_img.py
+new file mode 100644
+index 0000000..d6a9a56
+--- /dev/null
++++ b/probe_img.py
+@@ -0,0 +1,7 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=2)
++T = {t.name:t for t in env.observation_space.types}
++for o in obs.get_objects(T['objective']): print(o.name, obs.get(o,'x'), obs.get(o,'y'))
++for o in obs.get_objects(T['obstacle']): print(o.name, round(obs.get(o,'x'),2), round(obs.get(o,'y'),2), obs.get(o,'half_x'))
+diff --git a/probe_img2.py b/probe_img2.py
+new file mode 100644
+index 0000000..87efb3c
+--- /dev/null
++++ b/probe_img2.py
+@@ -0,0 +1,25 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++T=None
++def run(target, nimg):
++    global T
++    obs, info = env.reset(seed=2)
++    T = {t.name:t for t in env.observation_space.types}
++    r1 = obs.get_object_from_name('rover1')
++    objs = sorted(obs.get_objects(T['objective']), key=lambda o:o.name)
++    def pos(): return np.array([obs.get(r1,'x'), obs.get(r1,'y')])
++    # go straight up x=-1 to y=target y, then x
++    for wp in [(-1.0, target[1]), target]:
++        for _ in range(30):
++            d = np.clip(np.array(wp)-pos(), -0.2, 0.2)
++            if np.abs(d).max() < 1e-6: break
++            obs,*_ = env.step(np.array([0,0,0,1/6, d[0],d[1],0,1/6],dtype=np.float32))
++    print('at', pos().round(3))
++    for k in range(nimg):
++        for op in [-0.5, -1/6]:
++            obs,*_ = env.step(np.array([0,0,0,1/6, 0,0,0,op],dtype=np.float32))
++        print(' after img', k, [(int(obs.get(o,'have_image_rover1'))) for o in objs], 'cal', obs.get(r1,'calibrated'))
++run((-1.1,0.5), 3)
++run((-1.5,0.25), 3)
++run((-1.57,0.31), 3)
+diff --git a/probe_vis_0.py b/probe_vis_0.py
+new file mode 100644
+index 0000000..e2dd86d
+--- /dev/null
++++ b/probe_vis_0.py
+@@ -0,0 +1,9 @@
++from env_client import make_env
++import sys
++env=make_env()
++for seed in [int(s) for s in sys.argv[1:]]:
++    obs,info=env.reset(seed=seed)
++    print('SEED',seed)
++    for o in obs:
++        f=obs.type_features[o.type]
++        print(o.type.name,o.name,{k:round(float(v),3) for k,v in zip(f,obs.data[o]) if not k.startswith('have_') and k not in('r','g','b')})

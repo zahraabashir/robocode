@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index bd237ad..faf35ae 100644
+--- a/approach.py
++++ b/approach.py
+@@ -57,7 +57,7 @@ class GeneratedApproach:
+         _,_,w,h=self.rect(s,obj)
+         cx=left-offsetx;cy=bottom-offsety
+         parts=[(left,bottom,left+w,bottom+h),
+-               (cx-.037,cy-.207,cx+.037,cy-.193),
++               (cx-.055,cy-.225,cx+.055,cy-.185),
+                (cx-.008,cy-.2,cx+.008,cy)]
+         blocked=[]
+         for other in s.get_objects(self.ot):

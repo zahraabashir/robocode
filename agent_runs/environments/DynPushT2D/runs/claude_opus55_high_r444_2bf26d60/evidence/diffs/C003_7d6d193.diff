@@ -1,0 +1,64 @@
+diff --git a/approach.py b/approach.py
+index 4420811..07b2344 100644
+--- a/approach.py
++++ b/approach.py
+@@ -7,7 +7,7 @@ import numpy as np
+ R_ROBOT = 0.1
+ WALL_LO = 0.0
+ WALL_HI = 5.0
+-MAXD = 0.05
++MAXD = 0.049
+ 
+ 
+ def wrap(a):
+@@ -18,14 +18,14 @@ def local_poly(w, lh, lv):
+     """T polygon in the block frame, CCW order."""
+     a, h = lh / 2.0, w / 2.0
+     return np.array([
+-        [-a, h], [-a, -h], [-h, -h], [-h, -lv], [h, -lv], [h, -h], [a, -h], [a, h],
++        [-a, 0], [-a, -w], [-h, -w], [-h, -w - lv], [h, -w - lv], [h, -w], [a, -w], [a, 0],
+     ])
+ 
+ 
+ def rects_local(w, lh, lv):
+     a, h = lh / 2.0, w / 2.0
+     # (xmin, xmax, ymin, ymax)
+-    return [(-a, a, -h, h), (-h, h, -lv, -h)]
++    return [(-a, a, -w, 0.0), (-h, h, -w - lv, -w)]
+ 
+ 
+ def to_world(pts, pose):
+@@ -65,14 +65,13 @@ class TModel:
+         self.poly = local_poly(w, lh, lv)
+         # geometric centroid
+         a1 = lh * w
+-        a2 = (lv - w / 2) * w
+-        cy = (a2 * (-(lv + w / 2) / 2)) / (a1 + a2)
++        a2 = lv * w
++        cy = (a1 * (-w / 2) + a2 * (-w - lv / 2)) / (a1 + a2)
+         self.com = np.array([0.0, cy if com[1] is None else com[1]])
+         if rho2 is None:
+             # radius of gyration^2 about com (uniform density)
+-            i1 = a1 * (lh ** 2 + w ** 2) / 12 + a1 * (0 - self.com[1]) ** 2
+-            l2 = lv - w / 2
+-            i2 = a2 * (l2 ** 2 + w ** 2) / 12 + a2 * (-(lv + w / 2) / 2 - self.com[1]) ** 2
++            i1 = a1 * (lh ** 2 + w ** 2) / 12 + a1 * (-w / 2 - self.com[1]) ** 2
++            i2 = a2 * (lv ** 2 + w ** 2) / 12 + a2 * (-w - lv / 2 - self.com[1]) ** 2
+             rho2 = (i1 + i2) / (a1 + a2)
+         self.rho2 = rho2
+         self.mu = mu
+@@ -253,10 +252,11 @@ class GeneratedApproach:
+         a, h = self.lh / 2, self.w / 2
+         e = infl + 0.05
+         lv = self.lv
++        w = self.w
+         nodes_local = np.array([
+-            [-a - e, h + e], [a + e, h + e], [a + e, -h - e], [-a - e, -h - e],
+-            [h + e, -h - e], [-h - e, -h - e], [h + e, -lv - e], [-h - e, -lv - e],
+-            [0, h + e], [0, -lv - e],
++            [-a - e, e], [a + e, e], [a + e, -w - e], [-a - e, -w - e],
++            [h + e, -w - e], [-h - e, -w - e], [h + e, -w - lv - e], [-h - e, -w - lv - e],
++            [0, e], [0, -w - lv - e],
+         ])
+         nodes = list(to_world(nodes_local, pose))
+         nodes = [p for p in nodes if np.all(p > WALL_LO + R_ROBOT) and np.all(p < WALL_HI - R_ROBOT)]

@@ -1,0 +1,63 @@
+diff --git a/approach.py b/approach.py
+index 70199e3..915f4cc 100644
+--- a/approach.py
++++ b/approach.py
+@@ -79,6 +79,8 @@ class GeneratedApproach:
+         self.action_space = action_space
+         self.pos_tol = 0.012
+         self.ang_tol = math.radians(3.5)
++        self.lam = 0.3
++        self.lam_t = 0.3
+ 
+     def goal_theta(self, obs):
+         g = float(obs[31])
+@@ -142,6 +144,7 @@ class GeneratedApproach:
+ 
+     def choose(self, obs):
+         B = Block(obs)
++        self.rp = np.array(obs[16:18], dtype=float)
+         g = np.array([obs[29], obs[30]])
+         gth = self.goal_theta(obs)
+         err = g - B.p
+@@ -163,6 +166,7 @@ class GeneratedApproach:
+                     continue
+                 nw = B.dir_world(n)
+                 s = abs(tq) * 0.5 + (float(nw @ err) / (dist + 1e-9)) * min(dist, 1.0)
++                s -= self.lam * self.path_len(B, self.rp, B.to_world(p - n * (R_ROBOT + 0.04)))
+                 m = self.wall_margin(B, nw * 0.3)
+                 if m < 0.25:
+                     s -= 10 + (0.25 - m) * 10
+@@ -203,15 +207,25 @@ class GeneratedApproach:
+             s = float(nw @ err)
+             if k == 'f':
+                 s = s * 0.6 - 0.01
++            if s > 0.02:
++                s -= self.lam_t * self.path_len(B, self.rp, B.to_world(p - n * (R_ROBOT + 0.04)))
+             if s > bs:
+                 bs, best = s, pr
+         return best
+ 
+     # ------------------------------------------------------------ navigation
++    def path_len(self, B, rp, target):
++        self._last_len = None
++        wp = self.nav_step(B, rp, target)
++        if wp is None:
++            return 1e3
++        return self._last_len
++
+     def nav_step(self, B, rp, target):
+         infl = R_ROBOT + 0.015
+         d0 = B.dist(rp)
+         if not B.seg_hits(rp, target, min(infl, d0 - 0.003)):
++            self._last_len = float(np.linalg.norm(target - rp))
+             return target
+         # waypoints around inflated rects
+         e = R_ROBOT + 0.05
+@@ -249,6 +263,7 @@ class GeneratedApproach:
+             # no path; move away from block
+             return None
+         j = N - 1
++        self._last_len = distv[N - 1]
+         while prev[j] != 0:
+             j = prev[j]
+         return nodes[j]

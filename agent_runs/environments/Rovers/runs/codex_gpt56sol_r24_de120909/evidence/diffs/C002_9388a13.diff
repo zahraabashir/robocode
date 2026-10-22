@@ -1,0 +1,747 @@
+diff --git a/approach.py b/approach.py
+new file mode 100644
+index 0000000..ce70d8d
+--- /dev/null
++++ b/approach.py
+@@ -0,0 +1,190 @@
++"""Geometry-aware policy for the black-box Rovers environment."""
++import math
++import heapq
++import numpy as np
++
++
++class GeneratedApproach:
++    # Centres of sample, calibrate, image, noop, send, drop selector bands.
++    OPS = {"sample": -5/6, "calibrate": -1/2, "image": -1/6,
++           "noop": 1/6, "send": 1/2, "drop": 5/6}
++
++    def __init__(self, action_space, observation_space, primitives):
++        self.action_space = action_space
++        self.space = observation_space
++        self.types = {t.name: t for t in observation_space.types}
++
++    def _get(self, s, typ):
++        return s.get_objects(self.types[typ])
++
++    def reset(self, state, info):
++        self.names = [[o.name for o in self._get(state, "rover")][i] for i in range(2)]
++        self.home = []
++        for n in self.names:
++            r = state.get_object_from_name(n)
++            self.home.append((state.get(r, "x"), state.get(r, "y")))
++        self.phase = ["work", "work"]
++        self.paths = [[], []]
++        self.targets = [None, None]
++        self.stalls = [0, 0]
++        self.lastpos = list(self.home)
++
++    def _rects(self, s):
++        ans = []
++        for o in self._get(s, "obstacle"):
++            ans.append((s.get(o,"x"), s.get(o,"y"), s.get(o,"half_x"), s.get(o,"half_y")))
++        # Lander is a physical obstacle; use a conservative footprint.
++        for o in self._get(s, "lander"):
++            ans.append((s.get(o,"x"), s.get(o,"y"), .32, .32))
++        return ans
++
++    @staticmethod
++    def _seg_rect(a, b, rect, pad=0.0):
++        # Slab intersection, including boundaries.
++        x, y, hx, hy = rect
++        lo, hi = 0.0, 1.0
++        for p, q, mn, mx in ((a[0], b[0], x-hx-pad, x+hx+pad),
++                             (a[1], b[1], y-hy-pad, y+hy+pad)):
++            d = q-p
++            if abs(d) < 1e-9:
++                if p < mn or p > mx: return False
++            else:
++                u, v = (mn-p)/d, (mx-p)/d
++                if u > v: u, v = v, u
++                lo, hi = max(lo,u), min(hi,v)
++                if lo > hi: return False
++        return True
++
++    def _free(self, p, rects, pad=.24):
++        if p[0] < -2.30 or p[0] > 2.30 or p[1] < -2.30 or p[1] > 2.30:
++            return False
++        return not any(abs(p[0]-x) <= hx+pad and abs(p[1]-y) <= hy+pad
++                       for x,y,hx,hy in rects)
++
++    def _los(self, p, q, rects):
++        # Ignore an obstacle containing the target (objective's own mound).
++        for rect in rects:
++            x,y,hx,hy = rect
++            if abs(q[0]-x) <= hx+1e-5 and abs(q[1]-y) <= hy+1e-5:
++                continue
++            if self._seg_rect(p, q, rect, .01): return False
++        return True
++
++    def _astar(self, start, goals, rects):
++        if not goals: return []
++        step = .20
++        # Lattice anchored at current location, keeping actions exactly feasible.
++        def pos(k): return (start[0]+k[0]*step, start[1]+k[1]*step)
++        goal = min(goals, key=lambda g: (g[0]-start[0])**2+(g[1]-start[1])**2)
++        def h(k):
++            p=pos(k); return max(abs(p[0]-goal[0]),abs(p[1]-goal[1]))/step
++        openq=[(h((0,0)),0,(0,0))]; parent={}; cost={(0,0):0}
++        end=None
++        for _ in range(12000):
++            if not openq: break
++            _,g,k=heapq.heappop(openq)
++            if g != cost.get(k): continue
++            p=pos(k)
++            if any((p[0]-q[0])**2+(p[1]-q[1])**2 <= .10**2 for q in goals):
++                end=k; break
++            for dx,dy in ((1,0),(-1,0),(0,1),(0,-1),(1,1),(1,-1),(-1,1),(-1,-1)):
++                nk=(k[0]+dx,k[1]+dy); np_=pos(nk)
++                if not self._free(np_,rects): continue
++                # Endpoint checking suffices for convex inflated rectangles at this resolution,
++                # except diagonal corner cutting.
++                if not self._free((p[0]+dx*step,p[1]),rects) and dx and dy: continue
++                if not self._free((p[0],p[1]+dy*step),rects) and dx and dy: continue
++                ng=g+1
++                if ng < cost.get(nk,10**9):
++                    cost[nk]=ng; parent[nk]=k; heapq.heappush(openq,(ng+h(nk),ng,nk))
++        if end is None: return []
++        ks=[]
++        while end != (0,0): ks.append(end); end=parent[end]
++        ks.reverse()
++        return [pos(k) for k in ks]
++
++    def _candidates(self, s, q, radius, require_los=True):
++        rects=self._rects(s); out=[]
++        # Fine angular rings give plenty of robust visibility choices.
++        for rad in (min(radius*.72,1.55), min(radius*.88,1.82), radius*.55):
++            for j in range(32):
++                a=2*math.pi*j/32
++                p=(q[0]+rad*math.cos(a),q[1]+rad*math.sin(a))
++                if self._free(p,rects) and (not require_los or self._los(p,q,rects)):
++                    out.append(p)
++        return out
++
++    def _choose_task(self, s, i, pos):
++        r=s.get_object_from_name(self.names[i])
++        rects=self._rects(s)
++        # Finish any held sample result, then empty store.
++        if s.get(r,"store_full") > .5:
++            land=self._get(s,"lander")[0]; q=(s.get(land,"x"),s.get(land,"y"))
++            if math.dist(pos,q) <= 3.85 and self._los(pos,q,rects): return ("send",pos)
++            cs=self._candidates(s,q,3.8,True); return ("nav_send", min(cs,key=lambda p:math.dist(pos,p)) if cs else self.home[i])
++        # Split objectives deterministically between the rovers.
++        need=[]
++        for j,o in enumerate(self._get(s,"objective")):
++            if j%2==i and s.get(o,"received_image") < .5:
++                q=(s.get(o,"x"),s.get(o,"y")); need.append((o,q))
++        if need:
++            # If we have an unsent image and can see lander, send opportunistically.
++            land=self._get(s,"lander")[0]; lq=(s.get(land,"x"),s.get(land,"y"))
++            if any(s.get(o,"have_image_rover%d"%i)>.5 for o in self._get(s,"objective")):
++                if math.dist(pos,lq)<=3.85 and self._los(pos,lq,rects): return ("send",pos)
++            best=None
++            for o,q in need:
++                # Already photographed by this rover: only needs sending.
++                if s.get(o,"have_image_rover%d"%i)>.5: continue
++                if math.dist(pos,q)<=1.90 and self._los(pos,q,rects):
++                    return (("image" if s.get(r,"calibrated")>.5 else "calibrate"),pos)
++                cs=self._candidates(s,q,1.9,True)
++                if cs:
++                    p=min(cs,key=lambda x:math.dist(pos,x)); val=math.dist(pos,p)
++                    if best is None or val<best[0]: best=(val,p)
++            if best: return ("nav_image",best[1])
++            # All local images taken: go radio.
++            cs=self._candidates(s,lq,3.8,True); return ("nav_send",min(cs,key=lambda p:math.dist(pos,p)) if cs else self.home[i])
++        # One rover takes stone, the other soil, choosing nearest unreceived sample.
++        soil=bool(i)
++        samples=[o for o in self._get(s,"sample") if bool(s.get(o,"is_soil")>.5)==soil and s.get(o,"received_analysis")<.5]
++        if samples:
++            candidates=[]
++            for o in samples:
++                q=(s.get(o,"x"),s.get(o,"y"))
++                if s.get(o,"analyzed_rover%d"%i)>.5:
++                    land=self._get(s,"lander")[0]; lq=(s.get(land,"x"),s.get(land,"y"))
++                    if math.dist(pos,lq)<=3.85 and self._los(pos,lq,rects): return ("send",pos)
++                    cs=self._candidates(s,lq,3.8,True)
++                    return ("nav_send",min(cs,key=lambda p:math.dist(pos,p)) if cs else self.home[i])
++                q=(s.get(o,"x"),s.get(o,"y"))
++                candidates.append((math.dist(pos,q),q))
++            q=min(candidates)[1]
++            if math.dist(pos,q)<=.24: return ("sample",pos)
++            return ("nav_sample",q)
++        # No pending work of our nominal class: help with anything globally missing.
++        return ("home",self.home[i])
++
++    def get_action(self, state):
++        a=np.zeros(8,dtype=np.float32)
++        rects=self._rects(state)
++        for i in range(2):
++            r=state.get_object_from_name(self.names[i]); pos=(state.get(r,"x"),state.get(r,"y"))
++            task,target=self._choose_task(state,i,pos)
++            op=task if task in self.OPS else "noop"
++            if task.startswith("nav") or task=="home":
++                key=(task,round(target[0],2),round(target[1],2))
++                if self.targets[i]!=key or not self.paths[i] or self.stalls[i]>=2:
++                    radius=.24 if task=="nav_sample" else .12
++                    goals=[target] if radius<.2 else self._candidates(state,target,radius,False)+[target]
++                    self.paths[i]=self._astar(pos,goals,rects)
++                    self.targets[i]=key; self.stalls[i]=0
++                while self.paths[i] and math.dist(pos,self.paths[i][0])<.05: self.paths[i].pop(0)
++                if self.paths[i]:
++                    wp=self.paths[i][0]
++                    a[4*i]=max(-.2,min(.2,wp[0]-pos)); a[4*i+1]=max(-.2,min(.2,wp[1]-pos))
++            a[4*i+3]=self.OPS[op]
++            moved=math.dist(pos,self.lastpos[i])>.03
++            self.stalls[i]=0 if moved or (abs(a[4*i])+abs(a[4*i+1])<.01) else self.stalls[i]+1
++            self.lastpos[i]=pos
++        return a
+diff --git a/inspect_env.py b/inspect_env.py
+new file mode 100644
+index 0000000..52e8152
+--- /dev/null
++++ b/inspect_env.py
+@@ -0,0 +1,11 @@
++from env_client import make_env
++
++for seed in range(4):
++    env = make_env()
++    s, info = env.reset(seed=seed)
++    print("SEED", seed, "max", env.max_steps, "info", info)
++    for name in sorted(s.get_object_names()):
++        o = s.get_object_from_name(name)
++        fs = s.type_features[o.type]
++        print(name, dict(zip(fs, [s.get(o, f) for f in fs])))
++    env.close()
+diff --git a/probe_layouts.out b/probe_layouts.out
+new file mode 100644
+index 0000000..be055d5
+--- /dev/null
++++ b/probe_layouts.out
+@@ -0,0 +1,367 @@
++SEED 0 max_steps 1000 info {'object_count': 3}
++names 24 {'sample1', 'obstacle1', 'obstacle11', 'obstacle8', 'obstacle0', 'rover1', 'obstacle7', 'objective0', 'obstacle10', 'obstacle2', 'sample5', 'objective2', 'obstacle6', 'obstacle3', 'obstacle9', 'sample2', 'obstacle4', 'sample3', 'obstacle5', 'rover0', 'lander', 'sample0', 'objective1', 'sample4'}
++ TYPE lander n 1
++   lander {'x': -1.899999976158142, 'y': -2.0, 'z': 0.0030000784900039434}
++ TYPE objective n 3
++   objective0 {'x': 0.6602243185043335, 'y': 1.9191694259643555, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective1 {'x': 1.9636701345443726, 'y': 2.109961986541748, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective2 {'x': -1.8657476902008057, 'y': 2.1903953552246094, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++ TYPE sample n 6
++   sample0 {'x': -1.6931731700897217, 'y': 0.9708871245384216, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample1 {'x': -1.192281723022461, 'y': 2.3732709884643555, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample2 {'x': 0.19003422558307648, 'y': 1.4868561029434204, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample3 {'x': -1.386987328529358, 'y': 0.15173353254795074, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample4 {'x': -0.27064311504364014, 'y': -2.040459394454956, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample5 {'x': -0.9967090487480164, 'y': 0.7318636775016785, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++ TYPE rover n 2
++   rover0 {'x': 1.0, 'y': -1.75, 'theta': 3.1415927410125732, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++   rover1 {'x': -1.0, 'y': -1.75, 'theta': 0.0, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++ TYPE obstacle n 12
++   obstacle0 {'x': 2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle1 {'x': -2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle10 {'x': -1.808438777923584, 'y': -1.5490243434906006, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle11 {'x': -2.3528029918670654, 'y': -0.02079753205180168, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle2 {'x': 0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle3 {'x': -0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle4 {'x': 0.2724447250366211, 'y': 1.2091444730758667, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle5 {'x': -0.8076643943786621, 'y': 0.1918671876192093, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle6 {'x': -0.13526616990566254, 'y': -0.6399457454681396, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle7 {'x': -1.3539739847183228, 'y': 0.5535165071487427, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle8 {'x': 1.3540021181106567, 'y': 2.2589950561523438, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle9 {'x': 0.6542917490005493, 'y': -0.19871839880943298, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++SEED 1 max_steps 1000 info {'object_count': 2}
++names 23 {'sample1', 'obstacle1', 'obstacle11', 'obstacle8', 'obstacle0', 'rover1', 'obstacle7', 'objective0', 'obstacle10', 'obstacle2', 'sample5', 'obstacle6', 'obstacle3', 'obstacle9', 'sample2', 'obstacle4', 'sample3', 'obstacle5', 'rover0', 'lander', 'sample0', 'objective1', 'sample4'}
++ TYPE lander n 1
++   lander {'x': -1.899999976158142, 'y': -2.0, 'z': 0.0030000784900039434}
++ TYPE objective n 2
++   objective0 {'x': 2.117588520050049, 'y': 1.9229792356491089, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective1 {'x': -2.114065170288086, 'y': 2.0957462787628174, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++ TYPE sample n 6
++   sample0 {'x': -2.1286683082580566, 'y': 0.17148301005363464, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample1 {'x': -1.4853466749191284, 'y': -1.3669425249099731, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample2 {'x': -2.213594436645508, 'y': 0.5535051226615906, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample3 {'x': 0.5465056300163269, 'y': -1.348296880722046, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample4 {'x': 2.296544075012207, 'y': 1.3868496417999268, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample5 {'x': -1.403843641281128, 'y': 1.7180376052856445, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++ TYPE rover n 2
++   rover0 {'x': 1.0, 'y': -1.75, 'theta': 3.1415927410125732, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++   rover1 {'x': -1.0, 'y': -1.75, 'theta': 0.0, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++ TYPE obstacle n 12
++   obstacle0 {'x': 2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle1 {'x': -2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle10 {'x': 0.31049302220344543, 'y': 0.5678908228874207, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle11 {'x': 0.23704051971435547, 'y': -0.1867079883813858, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle2 {'x': 0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle3 {'x': -0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle4 {'x': 0.33527684211730957, 'y': -1.010396122932434, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle5 {'x': -1.3300279378890991, 'y': -0.6791890859603882, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle6 {'x': -0.4819117486476898, 'y': -0.3552263081073761, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle7 {'x': 0.2668764293193817, 'y': 0.9906727075576782, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle8 {'x': -1.002398133277893, 'y': 0.43533992767333984, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle9 {'x': 2.192112684249878, 'y': -2.2338356971740723, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++SEED 2 max_steps 1000 info {'object_count': 3}
++names 24 {'sample1', 'obstacle1', 'obstacle11', 'obstacle8', 'obstacle0', 'rover1', 'obstacle7', 'objective0', 'obstacle10', 'obstacle2', 'sample5', 'objective2', 'obstacle6', 'obstacle3', 'obstacle9', 'sample2', 'obstacle4', 'sample3', 'obstacle5', 'rover0', 'lander', 'sample0', 'objective1', 'sample4'}
++ TYPE lander n 1
++   lander {'x': -1.899999976158142, 'y': -2.0, 'z': 0.0030000784900039434}
++ TYPE objective n 3
++   objective0 {'x': 0.4399506747722626, 'y': 1.8454203605651855, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective1 {'x': -2.1755123138427734, 'y': 1.8365923166275024, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective2 {'x': -0.4921627342700958, 'y': 1.8822369575500488, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++ TYPE sample n 6
++   sample0 {'x': -1.260940432548523, 'y': 1.4199334383010864, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample1 {'x': -2.227665662765503, 'y': -0.20427893102169037, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample2 {'x': -1.6537846326828003, 'y': 2.02565598487854, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample3 {'x': 0.3442700207233429, 'y': -1.0490632057189941, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample4 {'x': -1.795253872871399, 'y': -0.9030962586402893, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample5 {'x': 0.27009862661361694, 'y': -0.1309989094734192, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++ TYPE rover n 2
++   rover0 {'x': 1.0, 'y': -1.75, 'theta': 3.1415927410125732, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++   rover1 {'x': -1.0, 'y': -1.75, 'theta': 0.0, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++ TYPE obstacle n 12
++   obstacle0 {'x': 2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle1 {'x': -2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle10 {'x': -0.21526943147182465, 'y': -0.5559921264648438, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle11 {'x': 0.7348376512527466, 'y': 0.4442424476146698, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle2 {'x': 0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle3 {'x': -0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle4 {'x': 2.1178300380706787, 'y': -0.9612797498703003, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle5 {'x': -1.7171909809112549, 'y': 0.9063087105751038, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle6 {'x': 1.639979600906372, 'y': 0.7337386012077332, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle7 {'x': 1.7862882614135742, 'y': -0.5400499105453491, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle8 {'x': -0.9069060683250427, 'y': 1.2679052352905273, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle9 {'x': -2.1559410095214844, 'y': -1.0042955875396729, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++SEED 3 max_steps 1000 info {'object_count': 3}
++names 24 {'sample1', 'obstacle1', 'obstacle11', 'obstacle8', 'obstacle0', 'rover1', 'obstacle7', 'objective0', 'obstacle10', 'obstacle2', 'sample5', 'objective2', 'obstacle6', 'obstacle3', 'obstacle9', 'sample2', 'obstacle4', 'sample3', 'obstacle5', 'rover0', 'lander', 'sample0', 'objective1', 'sample4'}
++ TYPE lander n 1
++   lander {'x': -1.899999976158142, 'y': -2.0, 'z': 0.0030000784900039434}
++ TYPE objective n 3
++   objective0 {'x': 1.9244773387908936, 'y': 2.0533640384674072, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective1 {'x': 0.5048069953918457, 'y': 2.0269014835357666, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective2 {'x': -2.0648295879364014, 'y': 2.040855884552002, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++ TYPE sample n 6
++   sample0 {'x': 1.8120503425598145, 'y': 0.7380498647689819, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample1 {'x': 1.7172051668167114, 'y': 0.06407832354307175, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample2 {'x': 2.3241500854492188, 'y': 0.9441180229187012, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample3 {'x': 1.8121854066848755, 'y': -1.1380623579025269, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample4 {'x': -0.9907154440879822, 'y': 2.1148152351379395, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample5 {'x': -2.379605531692505, 'y': -0.9457017779350281, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++ TYPE rover n 2
++   rover0 {'x': 1.0, 'y': -1.75, 'theta': 3.1415927410125732, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++   rover1 {'x': -1.0, 'y': -1.75, 'theta': 0.0, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++ TYPE obstacle n 12
++   obstacle0 {'x': 2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle1 {'x': -2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle10 {'x': 1.4495865106582642, 'y': 0.6304627656936646, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle11 {'x': 0.8851555585861206, 'y': 1.204131007194519, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle2 {'x': 0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle3 {'x': -0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle4 {'x': -1.5387417078018188, 'y': -0.8219141960144043, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle5 {'x': 0.44155824184417725, 'y': -0.022902123630046844, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle6 {'x': 0.2903352677822113, 'y': -0.2776281535625458, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle7 {'x': 1.9210973978042603, 'y': 2.3438620567321777, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle8 {'x': -2.040555715560913, 'y': 0.3285779356956482, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle9 {'x': -1.6183394193649292, 'y': -1.390781283378601, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++SEED 4 max_steps 1000 info {'object_count': 3}
++names 24 {'sample1', 'obstacle1', 'obstacle11', 'obstacle8', 'obstacle0', 'rover1', 'obstacle7', 'objective0', 'obstacle10', 'obstacle2', 'sample5', 'objective2', 'obstacle6', 'obstacle3', 'obstacle9', 'sample2', 'obstacle4', 'sample3', 'obstacle5', 'rover0', 'lander', 'sample0', 'objective1', 'sample4'}
++ TYPE lander n 1
++   lander {'x': -1.899999976158142, 'y': -2.0, 'z': 0.0030000784900039434}
++ TYPE objective n 3
++   objective0 {'x': 0.6825451254844666, 'y': 1.8741904497146606, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective1 {'x': 1.8373348712921143, 'y': 2.1531083583831787, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective2 {'x': -1.8025481700897217, 'y': 1.9246771335601807, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++ TYPE sample n 6
++   sample0 {'x': -0.2556298077106476, 'y': 1.2273503541946411, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample1 {'x': -1.5983179807662964, 'y': -0.9514265656471252, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample2 {'x': 1.543015718460083, 'y': 1.4166061878204346, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample3 {'x': -0.8331830501556396, 'y': 2.272369623184204, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample4 {'x': 1.5832135677337646, 'y': -0.7248134016990662, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample5 {'x': -1.7574530839920044, 'y': -0.4015559256076813, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++ TYPE rover n 2
++   rover0 {'x': 1.0, 'y': -1.75, 'theta': 3.1415927410125732, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++   rover1 {'x': -1.0, 'y': -1.75, 'theta': 0.0, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++ TYPE obstacle n 12
++   obstacle0 {'x': 2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle1 {'x': -2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle10 {'x': 1.7166746854782104, 'y': 1.215036153793335, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle11 {'x': 1.355916976928711, 'y': -0.639632523059845, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle2 {'x': 0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle3 {'x': -0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle4 {'x': -1.8589937686920166, 'y': 0.44547125697135925, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle5 {'x': -1.3587859869003296, 'y': 1.0556634664535522, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle6 {'x': -0.9720496535301208, 'y': 1.3049595355987549, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle7 {'x': 1.249559760093689, 'y': 2.3779003620147705, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle8 {'x': 0.1178240180015564, 'y': 0.3486069142818451, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle9 {'x': -1.9206608533859253, 'y': 1.2813137769699097, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++SEED 5 max_steps 1000 info {'object_count': 3}
++names 24 {'sample1', 'obstacle1', 'obstacle11', 'obstacle8', 'obstacle0', 'rover1', 'obstacle7', 'objective0', 'obstacle10', 'obstacle2', 'sample5', 'objective2', 'obstacle6', 'obstacle3', 'obstacle9', 'sample2', 'obstacle4', 'sample3', 'obstacle5', 'rover0', 'lander', 'sample0', 'objective1', 'sample4'}
++ TYPE lander n 1
++   lander {'x': -1.899999976158142, 'y': -2.0, 'z': 0.0030000784900039434}
++ TYPE objective n 3
++   objective0 {'x': 1.9212899208068848, 'y': 1.8827879428863525, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective1 {'x': -0.411826491355896, 'y': 1.9438259601593018, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective2 {'x': -1.9596754312515259, 'y': 2.1125600337982178, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++ TYPE sample n 6
++   sample0 {'x': 2.1506261825561523, 'y': -2.236929178237915, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample1 {'x': -1.0157957077026367, 'y': 1.8226312398910522, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample2 {'x': 1.209559679031372, 'y': 2.0007026195526123, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample3 {'x': 2.0523154735565186, 'y': -1.8467820882797241, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample4 {'x': 1.1003532409667969, 'y': -0.8151493072509766, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample5 {'x': -0.17822851240634918, 'y': -2.1917858123779297, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++ TYPE rover n 2
++   rover0 {'x': 1.0, 'y': -1.75, 'theta': 3.1415927410125732, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++   rover1 {'x': -1.0, 'y': -1.75, 'theta': 0.0, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++ TYPE obstacle n 12
++   obstacle0 {'x': 2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle1 {'x': -2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle10 {'x': 0.861774206161499, 'y': -0.2673511505126953, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle11 {'x': -1.7443859577178955, 'y': -1.3858054876327515, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle2 {'x': 0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle3 {'x': -0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle4 {'x': 0.698523998260498, 'y': 0.18819178640842438, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle5 {'x': -0.8571684956550598, 'y': 0.2665146589279175, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle6 {'x': 0.7266861200332642, 'y': -0.41026800870895386, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle7 {'x': 1.1491450071334839, 'y': -1.1285814046859741, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle8 {'x': 2.29902720451355, 'y': -1.7032335996627808, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle9 {'x': -1.9301033020019531, 'y': -0.27923136949539185, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++SEED 6 max_steps 1000 info {'object_count': 2}
++names 23 {'sample1', 'obstacle1', 'obstacle11', 'obstacle8', 'obstacle0', 'rover1', 'obstacle7', 'objective0', 'obstacle10', 'obstacle2', 'sample5', 'obstacle6', 'obstacle3', 'obstacle9', 'sample2', 'obstacle4', 'sample3', 'obstacle5', 'rover0', 'lander', 'sample0', 'objective1', 'sample4'}
++ TYPE lander n 1
++   lander {'x': -1.899999976158142, 'y': -2.0, 'z': 0.0030000784900039434}
++ TYPE objective n 2
++   objective0 {'x': 0.6754189729690552, 'y': 1.9155398607254028, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective1 {'x': -0.616466224193573, 'y': 1.9193686246871948, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++ TYPE sample n 6
++   sample0 {'x': 0.9487950801849365, 'y': 1.8743493556976318, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample1 {'x': 1.3928444385528564, 'y': -0.5552215576171875, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample2 {'x': -0.46584615111351013, 'y': -1.2343082427978516, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample3 {'x': -1.4402183294296265, 'y': 0.5656703114509583, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample4 {'x': -2.2347750663757324, 'y': -0.7940686941146851, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample5 {'x': -1.618239164352417, 'y': 2.2083945274353027, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++ TYPE rover n 2
++   rover0 {'x': 1.0, 'y': -1.75, 'theta': 3.1415927410125732, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++   rover1 {'x': -1.0, 'y': -1.75, 'theta': 0.0, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++ TYPE obstacle n 12
++   obstacle0 {'x': 2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle1 {'x': -2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle10 {'x': -0.2593466341495514, 'y': -2.247386932373047, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle11 {'x': -1.003123164176941, 'y': 0.9469658136367798, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle2 {'x': 0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle3 {'x': -0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle4 {'x': -2.3479177951812744, 'y': 2.1812400817871094, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle5 {'x': -1.5802319049835205, 'y': -0.3195483982563019, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle6 {'x': 1.0960665941238403, 'y': 0.6989491581916809, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle7 {'x': 1.2770472764968872, 'y': 1.2630878686904907, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle8 {'x': 1.7658292055130005, 'y': 1.4306260347366333, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle9 {'x': 1.532206416130066, 'y': -0.3089228868484497, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++SEED 7 max_steps 1000 info {'object_count': 3}
++names 24 {'sample1', 'obstacle1', 'obstacle11', 'obstacle8', 'obstacle0', 'rover1', 'obstacle7', 'objective0', 'obstacle10', 'obstacle2', 'sample5', 'objective2', 'obstacle6', 'obstacle3', 'obstacle9', 'sample2', 'obstacle4', 'sample3', 'obstacle5', 'rover0', 'lander', 'sample0', 'objective1', 'sample4'}
++ TYPE lander n 1
++   lander {'x': -1.899999976158142, 'y': -2.0, 'z': 0.0030000784900039434}
++ TYPE objective n 3
++   objective0 {'x': 0.34952637553215027, 'y': 1.9588342905044556, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective1 {'x': 1.829329490661621, 'y': 1.8274201154708862, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective2 {'x': -0.5388090014457703, 'y': 1.8302867412567139, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++ TYPE sample n 6
++   sample0 {'x': 2.1423048973083496, 'y': -0.26697438955307007, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample1 {'x': 1.7090951204299927, 'y': 0.04669347032904625, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample2 {'x': 2.3548946380615234, 'y': 2.2761428356170654, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample3 {'x': 0.6676969528198242, 'y': 1.0815653800964355, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample4 {'x': -1.8840984106063843, 'y': 0.37141507863998413, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample5 {'x': 1.0145654678344727, 'y': 1.2299681901931763, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++ TYPE rover n 2
++   rover0 {'x': 1.0, 'y': -1.75, 'theta': 3.1415927410125732, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++   rover1 {'x': -1.0, 'y': -1.75, 'theta': 0.0, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++ TYPE obstacle n 12
++   obstacle0 {'x': 2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle1 {'x': -2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle10 {'x': 1.234261393547058, 'y': 0.04434873163700104, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle11 {'x': -0.6932554841041565, 'y': 1.0566117763519287, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle2 {'x': 0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle3 {'x': -0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle4 {'x': -0.4931207001209259, 'y': -0.6309523582458496, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle5 {'x': 0.7972133159637451, 'y': 1.0064725875854492, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle6 {'x': -0.3712671995162964, 'y': 0.7869153022766113, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle7 {'x': -0.8229485750198364, 'y': 0.3480057120323181, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle8 {'x': -1.828883409500122, 'y': 1.1798979043960571, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle9 {'x': 1.5414416790008545, 'y': -1.132764220237732, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++SEED 8 max_steps 1000 info {'object_count': 3}
++names 24 {'sample1', 'obstacle1', 'obstacle11', 'obstacle8', 'obstacle0', 'rover1', 'obstacle7', 'objective0', 'obstacle10', 'obstacle2', 'sample5', 'objective2', 'obstacle6', 'obstacle3', 'obstacle9', 'sample2', 'obstacle4', 'sample3', 'obstacle5', 'rover0', 'lander', 'sample0', 'objective1', 'sample4'}
++ TYPE lander n 1
++   lander {'x': -1.899999976158142, 'y': -2.0, 'z': 0.0030000784900039434}
++ TYPE objective n 3
++   objective0 {'x': -0.3965030312538147, 'y': 2.1256392002105713, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective1 {'x': 1.857717514038086, 'y': 2.1887311935424805, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective2 {'x': -1.8016111850738525, 'y': 1.8543975353240967, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++ TYPE sample n 6
++   sample0 {'x': 1.4873863458633423, 'y': -0.12068790197372437, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample1 {'x': -2.15095853805542, 'y': 0.2470843642950058, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample2 {'x': -2.3156490325927734, 'y': 0.596152663230896, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample3 {'x': 2.1039977073669434, 'y': 0.1862383335828781, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample4 {'x': -0.874420166015625, 'y': 0.12193363159894943, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample5 {'x': -2.1206912994384766, 'y': 1.319748044013977, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++ TYPE rover n 2
++   rover0 {'x': 1.0, 'y': -1.75, 'theta': 3.1415927410125732, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++   rover1 {'x': -1.0, 'y': -1.75, 'theta': 0.0, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++ TYPE obstacle n 12
++   obstacle0 {'x': 2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle1 {'x': -2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle10 {'x': -1.9354742765426636, 'y': 0.3947531282901764, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle11 {'x': 0.599370539188385, 'y': 1.2821154594421387, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle2 {'x': 0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle3 {'x': -0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle4 {'x': -0.9911293387413025, 'y': 0.8287094831466675, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle5 {'x': 1.1889575719833374, 'y': 2.0945098400115967, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle6 {'x': 2.3602755069732666, 'y': -1.5905033349990845, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle7 {'x': -1.051819920539856, 'y': 1.2043700218200684, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle8 {'x': -0.16158358752727509, 'y': -0.08824300765991211, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle9 {'x': 1.259828805923462, 'y': 0.6431530117988586, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++SEED 9 max_steps 1000 info {'object_count': 2}
++names 23 {'sample1', 'obstacle1', 'obstacle11', 'obstacle8', 'obstacle0', 'rover1', 'obstacle7', 'objective0', 'obstacle10', 'obstacle2', 'sample5', 'obstacle6', 'obstacle3', 'obstacle9', 'sample2', 'obstacle4', 'sample3', 'obstacle5', 'rover0', 'lander', 'sample0', 'objective1', 'sample4'}
++ TYPE lander n 1
++   lander {'x': -1.899999976158142, 'y': -2.0, 'z': 0.0030000784900039434}
++ TYPE objective n 2
++   objective0 {'x': -2.1803736686706543, 'y': 2.1017825603485107, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective1 {'x': -0.5382619500160217, 'y': 2.0994715690612793, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++ TYPE sample n 6
++   sample0 {'x': 0.7171162962913513, 'y': -0.8487573266029358, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample1 {'x': 1.3344111442565918, 'y': -0.4573226273059845, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample2 {'x': -1.533219575881958, 'y': -0.18037037551403046, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample3 {'x': -1.5739545822143555, 'y': 2.245443820953369, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample4 {'x': -0.2904849946498871, 'y': -1.6218717098236084, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample5 {'x': 1.0769057273864746, 'y': 2.1338231563568115, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++ TYPE rover n 2
++   rover0 {'x': 1.0, 'y': -1.75, 'theta': 3.1415927410125732, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++   rover1 {'x': -1.0, 'y': -1.75, 'theta': 0.0, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++ TYPE obstacle n 12
++   obstacle0 {'x': 2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle1 {'x': -2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle10 {'x': 0.9782406091690063, 'y': 1.2767870426177979, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle11 {'x': 1.5264748334884644, 'y': 2.130880832672119, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle2 {'x': 0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle3 {'x': -0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle4 {'x': -2.118025302886963, 'y': 0.49105244874954224, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle5 {'x': -0.7618707418441772, 'y': -1.1441105604171753, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle6 {'x': -0.3413566052913666, 'y': 0.20937201380729675, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle7 {'x': 1.4674433469772339, 'y': 0.32685938477516174, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle8 {'x': -1.4525147676467896, 'y': -1.2227517366409302, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle9 {'x': -1.432167649269104, 'y': -0.13217264413833618, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++SEED 10 max_steps 1000 info {'object_count': 3}
++names 24 {'sample1', 'obstacle1', 'obstacle11', 'obstacle8', 'obstacle0', 'rover1', 'obstacle7', 'objective0', 'obstacle10', 'obstacle2', 'sample5', 'objective2', 'obstacle6', 'obstacle3', 'obstacle9', 'sample2', 'obstacle4', 'sample3', 'obstacle5', 'rover0', 'lander', 'sample0', 'objective1', 'sample4'}
++ TYPE lander n 1
++   lander {'x': -1.899999976158142, 'y': -2.0, 'z': 0.0030000784900039434}
++ TYPE objective n 3
++   objective0 {'x': -0.3925993740558624, 'y': 1.9287258386611938, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective1 {'x': 0.468386709690094, 'y': 1.815531849861145, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++   objective2 {'x': 1.9908298254013062, 'y': 1.94472336769104, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++ TYPE sample n 6
++   sample0 {'x': -1.2423176765441895, 'y': -2.304168701171875, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample1 {'x': 1.1733624935150146, 'y': 1.3862577676773071, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample2 {'x': 1.5047764778137207, 'y': 1.2253191471099854, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample3 {'x': 0.4079228341579437, 'y': -0.5915204882621765, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample4 {'x': -2.029278516769409, 'y': -1.5321757793426514, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample5 {'x': 0.7326945662498474, 'y': 1.4535070657730103, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++ TYPE rover n 2
++   rover0 {'x': 1.0, 'y': -1.75, 'theta': 3.1415927410125732, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++   rover1 {'x': -1.0, 'y': -1.75, 'theta': 0.0, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++ TYPE obstacle n 12
++   obstacle0 {'x': 2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle1 {'x': -2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle10 {'x': 0.38144704699516296, 'y': -1.6358813047409058, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle11 {'x': -0.28399938344955444, 'y': -0.7855584621429443, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle2 {'x': 0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle3 {'x': -0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle4 {'x': -0.9373608231544495, 'y': 0.39532485604286194, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle5 {'x': -1.2283709049224854, 'y': 0.45192721486091614, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle6 {'x': 2.3068339824676514, 'y': 0.23645123839378357, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle7 {'x': -1.9426652193069458, 'y': 0.20236629247665405, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle8 {'x': -0.9029765725135803, 'y': 1.0501313209533691, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle9 {'x': -1.1456115245819092, 'y': -0.7056430578231812, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++SEED 11 max_steps 1000 info {'object_count': 1}
++names 22 {'sample1', 'obstacle1', 'obstacle11', 'obstacle8', 'obstacle0', 'rover1', 'obstacle7', 'objective0', 'obstacle10', 'obstacle2', 'sample5', 'obstacle6', 'obstacle3', 'obstacle9', 'sample2', 'obstacle4', 'sample3', 'obstacle5', 'rover0', 'lander', 'sample0', 'sample4'}
++ TYPE lander n 1
++   lander {'x': -1.899999976158142, 'y': -2.0, 'z': 0.0030000784900039434}
++ TYPE objective n 1
++   objective0 {'x': -2.0966074466705322, 'y': 2.0041697025299072, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}
++ TYPE sample n 6
++   sample0 {'x': -1.9329649209976196, 'y': 0.16039203107357025, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample1 {'x': 2.0293328762054443, 'y': 0.24305954575538635, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample2 {'x': 1.6306571960449219, 'y': 1.2362234592437744, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample3 {'x': 0.6768538951873779, 'y': -0.917472243309021, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample4 {'x': -1.949135184288025, 'y': 2.3489339351654053, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++   sample5 {'x': -2.3791942596435547, 'y': 1.0255407094955444, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}
++ TYPE rover n 2
++   rover0 {'x': 1.0, 'y': -1.75, 'theta': 3.1415927410125732, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++   rover1 {'x': -1.0, 'y': -1.75, 'theta': 0.0, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}
++ TYPE obstacle n 12
++   obstacle0 {'x': 2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle1 {'x': -2.0, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle10 {'x': -1.311220407485962, 'y': 1.8670309782028198, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle11 {'x': -0.7415972352027893, 'y': -0.7925357222557068, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle2 {'x': 0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle3 {'x': -0.5, 'y': 2.0, 'z': 0.05000000074505806, 'half_x': 0.25, 'half_y': 0.25, 'half_z': 0.05000000074505806}
++   obstacle4 {'x': 1.2984998226165771, 'y': 1.0159571170806885, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle5 {'x': -0.8423476815223694, 'y': 2.1227071285247803, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle6 {'x': 1.8918756246566772, 'y': -0.46649399399757385, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle7 {'x': 0.5674732327461243, 'y': 0.9071117043495178, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle8 {'x': 1.440147042274475, 'y': -0.19332359731197357, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
++   obstacle9 {'x': 0.48372581601142883, 'y': -2.1444954872131348, 'z': 0.20100000500679016, 'half_x': 0.05000000074505806, 'half_y': 0.05000000074505806, 'half_z': 0.20000000298023224}
+diff --git a/probe_layouts.py b/probe_layouts.py
+new file mode 100644
+index 0000000..1b25142
+--- /dev/null
++++ b/probe_layouts.py
+@@ -0,0 +1,19 @@
++from env_client import make_env
++
++
++def f(state, obj, name):
++    return float(state.get(obj, name))
++
++
++for seed in range(12):
++    env = make_env()
++    state, info = env.reset(seed=seed)
++    print("SEED", seed, "max_steps", env.max_steps, "info", info)
++    print("names", len(state.get_object_names()), state.get_object_names())
++    for typ in env.observation_space.types:
++        objs = state.get_objects(typ)
++        print(" TYPE", typ.name if hasattr(typ, "name") else typ, "n", len(objs))
++        for o in objs:
++            vals = {x: f(state, o, x) for x in env.observation_space.type_features[typ]}
++            print("  ", o.name if hasattr(o, "name") else o, vals)
++    env.close()
+diff --git a/probe_ops.py b/probe_ops.py
+new file mode 100644
+index 0000000..5424503
+--- /dev/null
++++ b/probe_ops.py
+@@ -0,0 +1,91 @@
++from env_client import make_env
++import numpy as np
++
++
++def snap(state):
++    out = {}
++    for name in state.get_object_names():
++        obj = state.get_object_from_name(name)
++        feats = {}
++        # Public type metadata is awkward to recover from obj, so query known fields.
++        for f in ("x", "y", "z", "theta", "store_full", "calibrated", "at_home",
++                  "is_soil", "analyzed_rover0", "analyzed_rover1", "received_analysis",
++                  "have_image_rover0", "have_image_rover1", "received_image",
++                  "half_x", "half_y", "half_z"):
++            try:
++                feats[f] = float(state.get(obj, f))
++            except Exception:
++                pass
++        out[name] = feats
++    return out
++
++
++def main():
++    env = make_env()
++    s, info = env.reset(seed=0)
++    print("max_steps", env.max_steps, "action", env.action_space.shape,
++          env.action_space.low.tolist(), env.action_space.high.tolist(), env.action_space.dtype)
++    print("types", env.observation_space.types)
++    print("features", env.observation_space.type_features)
++    print("names", s.get_object_names())
++    for k, v in snap(s).items():
++        print(k, v)
++    print("info", info)
++    env.close()
++
++
++def rover_values(s, i=0):
++    r = s.get_object_from_name("rover%d" % i)
++    return tuple(float(s.get(r, f)) for f in
++                 ("x", "y", "theta", "store_full", "calibrated", "at_home"))
++
++
++def move_to(env, s, xy, rover=0, selector=0.0):
++    for _ in range(100):
++        vals = rover_values(s, rover)
++        dx = max(-0.2, min(0.2, xy[0] - vals[0]))
++        dy = max(-0.2, min(0.2, xy[1] - vals[1]))
++        if abs(dx) < 1e-5 and abs(dy) < 1e-5:
++            return s
++        a = np.zeros(8, dtype=np.float32)
++        off = rover * 4
++        a[off:off + 4] = (dx, dy, 0.0, selector)
++        s, _, term, trunc, _ = env.step(a)
++        if term or trunc:
++            return s
++    return s
++
++
++def sample_trial(selector, pre_offset=0.20, motion=0.0):
++    env = make_env()
++    s, _ = env.reset(seed=0)
++    sample = s.get_object_from_name("sample4")
++    sx, sy = float(s.get(sample, "x")), float(s.get(sample, "y"))
++    # Approach from east through clear southern region.
++    s = move_to(env, s, (sx + pre_offset, sy))
++    before = rover_values(s)
++    a = np.zeros(8, np.float32)
++    a[:4] = (-motion, 0, 0, selector)
++    s, rew, term, trunc, _ = env.step(a)
++    after = rover_values(s)
++    analyzed = float(s.get(sample, "analyzed_rover0"))
++    env.close()
++    return before, after, analyzed, rew, term, trunc
++
++
++def trials():
++    print("SAMPLE SELECTORS")
++    for sel in (-1.0, -0.999, -2/3 - 1e-4, -2/3, -2/3 + 1e-4,
++                -0.5, -1/3, 0.0, 1/3, 2/3, 1.0):
++        print(sel, sample_trial(sel))
++    print("SAMPLE DISTANCE / MOTION ORDER")
++    for off, motion in ((0.249, 0), (0.251, 0), (0.26, .02), (.24, -.02)):
++        print(off, motion, sample_trial(-5/6, off, motion))
++
++
++if __name__ == "__main__":
++    import sys
++    if len(sys.argv) > 1:
++        trials()
++    else:
++        main()
+diff --git a/probe_summary.py b/probe_summary.py
+new file mode 100644
+index 0000000..3d0eace
+--- /dev/null
++++ b/probe_summary.py
+@@ -0,0 +1,33 @@
++from collections import Counter
++from env_client import make_env
++
++counts = Counter()
++ranges = {}
++assignments = Counter()
++for seed in range(100):
++    env = make_env()
++    s, info = env.reset(seed=seed)
++    counts[info["object_count"]] += 1
++    ots = {str(t): t for t in env.observation_space.types}
++    # Some implementations stringify types as their bare names.
++    for typ in env.observation_space.types:
++        name = getattr(typ, "name", str(typ))
++        for o in s.get_objects(typ):
++            for feat in env.observation_space.type_features[typ]:
++                v = float(s.get(o, feat))
++                key = (name, feat)
++                if key not in ranges:
++                    ranges[key] = [v, v]
++                else:
++                    ranges[key][0] = min(ranges[key][0], v)
++                    ranges[key][1] = max(ranges[key][1], v)
++            if name == "objective":
++                x, y = float(s.get(o, "x")), float(s.get(o, "y"))
++                center = min(((2,2),(-2,2),(.5,2),(-.5,2)), key=lambda p:(x-p[0])**2+(y-p[1])**2)
++                assignments[center] += 1
++    env.close()
++print("counts", counts)
++print("objective mound assignments", assignments)
++for k in sorted(ranges):
++    if k[1] in ("x", "y", "z", "half_x", "half_y", "half_z", "theta"):
++        print(k, tuple(round(v,4) for v in ranges[k]))

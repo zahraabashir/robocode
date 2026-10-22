@@ -1,0 +1,23 @@
+diff --git a/test_many.py b/test_many.py
+index 434c107..1547b8e 100644
+--- a/test_many.py
++++ b/test_many.py
+@@ -1,11 +1,13 @@
+-import concurrent.futures
++import concurrent.futures,sys
+ from env_client import make_env
+ from approach import GeneratedApproach
+-def run(seed,count=0):
++count=int(sys.argv[1]) if len(sys.argv)>1 else 0
++seeds=list(map(int,sys.argv[2:])) if len(sys.argv)>2 else list(range(20))
++def run(seed):
+  e=make_env();s,i=e.reset(seed=seed,options={'object_count':count});p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,i)
+- for t in range(350):
++ for t in range(e.max_steps):
+   s,_,d,tr,_=e.step(p.get_action(s))
+   if d or tr:break
+  e.close();return seed,t+1,d,p.mode
+-with concurrent.futures.ThreadPoolExecutor(max_workers=10) as ex:
+- for x in ex.map(run,range(20)):print(x,flush=True)
++with concurrent.futures.ThreadPoolExecutor(max_workers=min(4,len(seeds))) as ex:
++ for x in ex.map(run,seeds):print('COUNT',count,*x,flush=True)

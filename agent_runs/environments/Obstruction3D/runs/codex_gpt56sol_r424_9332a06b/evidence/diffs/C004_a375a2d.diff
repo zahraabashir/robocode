@@ -1,0 +1,137 @@
+diff --git a/approach.py b/approach.py
+index 94a75b2..fdfc4e2 100644
+--- a/approach.py
++++ b/approach.py
+@@ -12,6 +12,8 @@ class GeneratedApproach:
+     def reset(self, state, info):
+         self.t = 0
+         self.target_y = self._v(state, "target_block", "pose_y")
++        self.target_q = np.array([0.0, 0.177, -np.pi, -2.267, 0.0, -0.673,
++                                  np.pi / 2])
+ 
+     @staticmethod
+     def _v(state, name, feature):
+@@ -21,7 +23,10 @@ class GeneratedApproach:
+         self.t += 1
+         a = np.zeros(self.action_space.shape, dtype=self.action_space.dtype)
+         robot_y = self._v(state, "robot", "pos_base_y")
+-        a[1] = np.clip(self.target_y - robot_y, -0.2, 0.2)
+-        if self.t >= 3:
++        a[1] = np.clip(self.target_y - 0.00135 - robot_y, -0.2, 0.2)
++        robot = state.get_object_from_name("robot")
++        joints = np.array([state.get(robot, "joint_%d" % j) for j in range(1, 8)])
++        a[3:10] = np.clip(self.target_q - joints, -0.2, 0.2)
++        if self.t >= 6:
+             a[10] = -1.0
+         return a
+diff --git a/probe_geometry_clearance.py b/probe_geometry_clearance.py
+new file mode 100644
+index 0000000..865498b
+--- /dev/null
++++ b/probe_geometry_clearance.py
+@@ -0,0 +1,35 @@
++from collections import Counter
++from env_client import make_env
++
++
++def box(s, n):
++    o = s.get_object_from_name(n)
++    return tuple(float(s.get(o, f)) for f in
++                 ("pose_x", "pose_y", "half_extent_x", "half_extent_y"))
++
++
++def signed_axis_gaps(a, b):
++    return abs(a[0]-b[0])-a[2]-b[2], abs(a[1]-b[1])-a[3]-b[3]
++
++
++env = make_env()
++ncounts = Counter()
++br = []
++bo = []
++rratios = []
++for seed in range(300):
++    s, info = env.reset(seed=1000+seed)
++    reg, blk = box(s, "target_region"), box(s, "target_block")
++    ncounts[info["object_count"]] += 1
++    br.append(signed_axis_gaps(reg, blk))
++    rratios.append((blk[2]/reg[2], blk[3]/reg[3]))
++    for n in s.get_object_names():
++        if n.startswith("obstruction"):
++            bo.append(signed_axis_gaps(blk, box(s, n)))
++print("counts", ncounts)
++print("block/region axis gap minima", min(x[0] for x in br), min(x[1] for x in br))
++print("block/region overlap both", sum(x < 0 and y < 0 for x, y in br))
++print("block/obstruction axis gap minima", min(x[0] for x in bo), min(x[1] for x in bo))
++print("block/obstruction overlap both", sum(x < 0 and y < 0 for x, y in bo))
++print("extent ratios", min(x for x,y in rratios), max(x for x,y in rratios), min(y for x,y in rratios), max(y for x,y in rratios))
++env.close()
+diff --git a/probe_geometry_heights.py b/probe_geometry_heights.py
+new file mode 100644
+index 0000000..adca344
+--- /dev/null
++++ b/probe_geometry_heights.py
+@@ -0,0 +1,23 @@
++from collections import Counter
++from env_client import make_env
++
++env = make_env()
++c = Counter()
++samples = []
++for seed in range(300):
++    s, _ = env.reset(seed=seed)
++    for n in s.get_object_names():
++        if not n.startswith("obstruction"):
++            continue
++        o = s.get_object_from_name(n)
++        bottom = float(s.get(o, "pose_z") - s.get(o, "half_extent_z"))
++        r = s.get_object_from_name("target_region")
++        dx = abs(float(s.get(o,"pose_x") - s.get(r,"pose_x")))
++        dy = abs(float(s.get(o,"pose_y") - s.get(r,"pose_y")))
++        kind = round(bottom, 3)
++        c[kind] += 1
++        if len(samples) < 10 and kind == .075:
++            samples.append((seed,n,bottom,dx,dy))
++print(c)
++print("table samples", samples)
++env.close()
+diff --git a/probe_grasp_agent.py b/probe_grasp_agent.py
+new file mode 100644
+index 0000000..8589ddc
+--- /dev/null
++++ b/probe_grasp_agent.py
+@@ -0,0 +1,35 @@
++import itertools
++import numpy as np
++from env_client import make_env
++
++
++def v(s, n, f): return float(s.get(s.get_object_from_name(n), f))
++
++
++patterns = [
++    (0, 0, 1), (0, 0, -1), (1, 0, 0), (-1, 0, 0),
++    (0, 1, 0), (0, -1, 0), (1, 0, 1), (-1, 0, -1),
++    (1, 1, 1), (-1, -1, -1), (1, -1, 1), (-1, 1, -1),
++]
++for pat in patterns:
++    env = make_env(); s, _ = env.reset(seed=0)
++    ty = v(s, "target_block", "pose_y")
++    base = (v(s,"target_block","pose_x"), ty, v(s,"target_block","pose_z"))
++    # align laterally
++    a=np.zeros(11,np.float32); a[1]=np.clip(ty-v(s,"robot","pos_base_y"),-.2,.2)
++    s,*_=env.step(a)
++    found = None; maxmove=0
++    for t in range(120):
++        a=np.zeros(11,np.float32)
++        # Oscillate every 20 steps to scan rather than pin at limit.
++        sg = 1 if (t//20)%2==0 else -1
++        a[4]=.12*pat[0]*sg; a[6]=.12*pat[1]*sg; a[8]=.12*pat[2]*sg; a[10]=-1
++        s,r,te,tr,info=env.step(a)
++        xyz=(v(s,"target_block","pose_x"),v(s,"target_block","pose_y"),v(s,"target_block","pose_z"))
++        maxmove=max(maxmove, sum((xyz[i]-base[i])**2 for i in range(3))**.5)
++        if v(s,"robot","grasp_active") or v(s,"target_block","grasp_active"):
++            found=(t,xyz,[v(s,"robot",f"joint_{i}") for i in range(1,8)],
++                   [v(s,"robot",f"grasp_tf_{c}") for c in "xyz"])
++            break
++    print("PAT",pat,"found",found,"maxmove",round(maxmove,5),"final joints",[round(v(s,"robot",f"joint_{i}"),3) for i in range(1,8)])
++    env.close()

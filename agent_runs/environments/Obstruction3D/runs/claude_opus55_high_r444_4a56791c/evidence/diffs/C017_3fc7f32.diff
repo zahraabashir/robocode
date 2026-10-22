@@ -1,0 +1,208 @@
+diff --git a/approach.py b/approach.py
+index 4578392..50cdb85 100644
+--- a/approach.py
++++ b/approach.py
+@@ -112,7 +112,7 @@ class GeneratedApproach:
+             qs = np.array(q0, dtype=float)
+             if attempt > 0:
+                 qs = qs + self.rng.uniform(-0.4, 0.4, 7)
+-            q, ok = kin.ik(self.base, qs, np.asarray(p, float), R, iters=100, tol=1e-5)
++            q, ok = kin.ik(self.base, qs, np.asarray(p, float), R, iters=100, tol=1e-5, lim=JLIM - 0.02)
+             if ok and np.all(np.abs(q) <= JLIM):
+                 return q, True
+             if best is None:
+@@ -339,11 +339,11 @@ class GeneratedApproach:
+             q = q0
+             plan = []
+             if p0[2] < zt - 0.005:
+-                qs, q, _ = self._cart_path(q, p0, start, T[:3, :3], step=0.05)
++                qs, q, _ = self._cart_path(q, p0, start, T[:3, :3], step=0.015)
+                 plan += self._seg(qs)
+-            qs, q, ok1 = self._cart_path(q, start, above, R, step=0.08, R_from=T[:3, :3])
++            qs, q, ok1 = self._cart_path(q, start, above, R, step=0.04, R_from=T[:3, :3])
+             plan += self._seg(qs)
+-            qs, q, ok2 = self._cart_path(q, above, np.array([gx, gy, zg]), R, step=0.05)
++            qs, q, ok2 = self._cart_path(q, above, np.array([gx, gy, zg]), R, step=0.015)
+             plan += self._seg(qs)
+             plan += [('grip', -1.0), ('check', 'grasp')]
+             c = self._plan_cost(q0, plan) + (0 if (ok1 and ok2) else 100)
+@@ -407,6 +407,7 @@ class GeneratedApproach:
+             plan = []
+             # escape laterally from touching neighbours before lifting
+             e = np.zeros(2)
++            touch = False
+             Ho = o.footprint()
+             for n, b in objs.items():
+                 if n == name or b.top <= o.bottom + 2e-3 or b.bottom >= o.top - 2e-3:
+@@ -419,24 +420,37 @@ class GeneratedApproach:
+                     v = np.zeros(2)
+                     v[ax] = np.sign(dxy[ax]) if dxy[ax] != 0 else 1.0
+                     e += v
+-            nf = self.fail_count.get(name, 0)
+-            if nf > 0 and np.linalg.norm(e) > 0:
+-                ang = [0, 0.6, -0.6, 1.2, -1.2][nf % 5]
+-                c_, s_ = np.cos(ang), np.sin(ang)
+-                e = np.array([c_ * e[0] - s_ * e[1], s_ * e[0] + c_ * e[1]])
+-            if np.linalg.norm(e) > 0:
+-                e = e / np.linalg.norm(e)
+-                p1 = p0 + np.array([e[0] * 0.008, e[1] * 0.008, 0.002])
+-                qs, q, _ = self._cart_path(q, p0, p1, T[:3, :3], step=0.01)
++                    touch = True
++            if touch:
++                nbrs = [b for n, b in objs.items() if n != name and b.top > o.bottom + 2e-3 and b.bottom < o.top - 2e-3]
++                opts = []
++                for k in range(16):
++                    ang = 2 * np.pi * k / 16
++                    d = np.array([np.cos(ang), np.sin(ang)])
++                    for dist in (0.003, 0.005, 0.008, 0.012):
++                        sep = min([np.max(np.abs(o.p[:2] + dist * d - b.p[:2]) - (Ho + b.footprint())) for b in nbrs] + [1.0])
++                        opts.append((-min(sep, 0.005) + 0.05 * dist, k, d * dist, sep))
++                opts.sort(key=lambda t: t[0])
++                nf = self.fail_count.get(name, 0)
++                pick = opts[nf % len(opts)]
++                ev = pick[2]
++                p1 = p0 + np.array([ev[0], ev[1], 0.002])
++                qs, q, _ = self._cart_path(q, p0, p1, T[:3, :3], step=0.004)
+                 plan += self._seg(qs)
+                 p0 = p1
++                if pick[3] < 0.004 or nf > 0:
++                    for k in range(3):
++                        p1 = p0 + np.array([0, 0, 0.008])
++                        qs, q, _ = self._cart_path(q, p0, p1, T[:3, :3], step=0.004)
++                        plan += self._seg(qs)
++                        p0 = p1
+             up = np.array([p0[0], p0[1], lift_z])
+             above = np.array([Tt[0, 3], Tt[1, 3], lift_z])
+-            qs, q, _ = self._cart_path(q, p0, up, T[:3, :3], step=0.05)
++            qs, q, _ = self._cart_path(q, p0, up, T[:3, :3], step=0.015)
+             plan += self._seg(qs)
+-            qs, q, _ = self._cart_path(q, up, above, R, step=0.08, R_from=T[:3, :3])
++            qs, q, _ = self._cart_path(q, up, above, R, step=0.04, R_from=T[:3, :3])
+             plan += self._seg(qs)
+-            qs, q, _ = self._cart_path(q, above, Tt[:3, 3], R, step=0.05)
++            qs, q, _ = self._cart_path(q, above, Tt[:3, 3], R, step=0.015)
+             plan += self._seg(qs)
+             plan += [('grip', 1.0), ('check', 'release')]
+             c = self._plan_cost(q_init, plan)
+@@ -487,7 +501,7 @@ class GeneratedApproach:
+         q = self._q(state)
+         T = self._tool(q)
+         p0 = T[:3, 3]
+-        qs, _, _ = self._cart_path(q, p0, np.array([p0[0], p0[1], max(p0[2] + 0.03, Z_SAFE)]), T[:3, :3], step=0.05)
++        qs, _, _ = self._cart_path(q, p0, np.array([p0[0], p0[1], max(p0[2] + 0.03, Z_SAFE)]), T[:3, :3], step=0.015)
+         self.plan = self._seg(qs)
+ 
+     # ---------------------------------------------------------------- acting
+diff --git a/r7v2.txt b/r7v2.txt
+index 68f3674..e69de29 100644
+--- a/r7v2.txt
++++ b/r7v2.txt
+@@ -1,30 +0,0 @@
+-0 (True, 98, 7, 54.41223621368408)
+-1 (True, 104, 7, 75.31856060028076)
+-2 (True, 74, 7, 49.93993282318115)
+-3 (True, 77, 7, 52.8530216217041)
+-4 (False, 1000, 7, 218.94374346733093)
+-5 (True, 114, 7, 86.38529539108276)
+-6 (True, 106, 7, 64.2974042892456)
+-7 (True, 122, 7, 79.57644891738892)
+-8 (True, 85, 7, 54.00593376159668)
+-9 (True, 87, 7, 56.628342151641846)
+-10 (True, 69, 7, 46.50450921058655)
+-11 (True, 76, 7, 51.43114638328552)
+-12 (True, 107, 7, 67.82582974433899)
+-13 (True, 129, 7, 91.70317268371582)
+-14 (True, 61, 7, 38.008939027786255)
+-15 (True, 119, 7, 93.79446053504944)
+-16 (True, 62, 7, 38.62404942512512)
+-17 (True, 75, 7, 46.38465428352356)
+-18 (True, 92, 7, 57.090057134628296)
+-19 (True, 88, 7, 58.803157567977905)
+-20 (True, 95, 7, 62.33549380302429)
+-21 (True, 109, 7, 74.3672263622284)
+-22 (True, 76, 7, 49.72415852546692)
+-23 (True, 107, 7, 64.89277505874634)
+-24 (True, 77, 7, 46.78782272338867)
+-25 (True, 49, 7, 36.578845500946045)
+-26 (True, 69, 7, 36.91229772567749)
+-27 (True, 71, 7, 33.56934118270874)
+-28 (True, 103, 7, 28.971372842788696)
+-success 29 / 30 mean steps 88.51724137931035 max time 218.94374346733093
+diff --git a/rdv2.txt b/rdv2.txt
+new file mode 100644
+index 0000000..2ed1bf5
+--- /dev/null
++++ b/rdv2.txt
+@@ -0,0 +1,72 @@
++0 (True, 49, 2, 44.65753626823425)
++1 (True, 38, 1, 21.186123609542847)
++2 (True, 66, 2, 57.75160527229309)
++4 (True, 59, 2, 50.24415946006775)
++5 (True, 53, 2, 46.16478967666626)
++6 (True, 37, 1, 20.326173543930054)
++7 (True, 39, 2, 26.76628804206848)
++8 (True, 43, 2, 43.95758414268494)
++9 (True, 25, 1, 21.770167589187622)
++10 (True, 28, 2, 29.55744743347168)
++12 (True, 32, 1, 29.08803963661194)
++13 (True, 41, 2, 39.67139220237732)
++15 (True, 29, 2, 26.388429641723633)
++16 (True, 27, 1, 23.87075400352478)
++17 (True, 45, 2, 54.42944002151489)
++18 (True, 38, 2, 37.27797603607178)
++19 (True, 27, 1, 24.010403633117676)
++20 (True, 55, 2, 60.94573783874512)
++21 (True, 21, 0, 22.378713130950928)
++22 (True, 30, 2, 32.95614266395569)
++25 (True, 36, 1, 36.96371579170227)
++26 (True, 33, 2, 34.67341351509094)
++27 (True, 25, 0, 24.828604221343994)
++28 (True, 49, 1, 51.44413161277771)
++31 (True, 39, 1, 32.03095841407776)
++32 (True, 47, 2, 58.34464073181152)
++33 (True, 45, 2, 62.76429796218872)
++36 (True, 24, 1, 29.247500896453857)
++38 (True, 15, 0, 23.458435535430908)
++39 (True, 45, 2, 52.62647604942322)
++40 (True, 75, 1, 96.66923713684082)
++41 (True, 29, 1, 28.586360931396484)
++43 (True, 26, 1, 22.42523980140686)
++44 (True, 30, 2, 36.01871132850647)
++45 (True, 44, 2, 46.51904630661011)
++46 (True, 26, 1, 31.43686842918396)
++50 (True, 46, 2, 40.128849029541016)
++51 (True, 29, 1, 27.790140867233276)
++52 (True, 64, 2, 70.9896650314331)
++53 (True, 44, 2, 46.5516517162323)
++55 (True, 56, 2, 57.09167718887329)
++58 (True, 21, 1, 25.080037832260132)
++59 (True, 55, 2, 71.23579120635986)
++61 (True, 30, 1, 30.14669418334961)
++62 (True, 29, 1, 34.10112380981445)
++63 (True, 27, 1, 24.44920825958252)
++64 (True, 32, 1, 32.68348264694214)
++65 (True, 27, 0, 26.728271961212158)
++66 (True, 41, 2, 43.42152118682861)
++67 (True, 48, 2, 57.42696690559387)
++70 (True, 35, 1, 37.85807991027832)
++71 (True, 52, 2, 56.0893611907959)
++72 (True, 51, 2, 60.09363770484924)
++73 (True, 37, 2, 35.012733697891235)
++75 (True, 26, 1, 27.053276538848877)
++76 (True, 40, 1, 40.37609887123108)
++78 (True, 28, 2, 24.771350860595703)
++80 (True, 39, 2, 45.06876516342163)
++82 (True, 39, 2, 34.693543434143066)
++83 (True, 29, 2, 30.512681484222412)
++85 (True, 44, 2, 44.677146911621094)
++86 (True, 45, 2, 46.307608127593994)
++87 (True, 37, 1, 31.606425762176514)
++88 (True, 30, 1, 23.946342706680298)
++89 (True, 54, 2, 48.46833086013794)
++90 (True, 27, 1, 22.381341695785522)
++91 (True, 32, 2, 33.97594165802002)
++92 (True, 28, 1, 22.89961051940918)
++93 (True, 43, 2, 31.299214601516724)
++95 (True, 33, 1, 21.54423999786377)
++96 (True, 47, 2, 21.919421434402466)
++success 100 / 100 mean steps 32.78 max time 96.66923713684082

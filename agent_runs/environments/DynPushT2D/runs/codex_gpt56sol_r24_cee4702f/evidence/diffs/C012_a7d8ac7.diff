@@ -1,0 +1,53 @@
+diff --git a/probe_dynamics.py b/probe_dynamics.py
+index 3c8404b..93810ab 100644
+--- a/probe_dynamics.py
++++ b/probe_dynamics.py
+@@ -166,6 +166,41 @@ def coast_after_push(seed):
+     env.close()
+ 
+ 
++def tangent_at_contact(seed, tangent_sign):
++    """Reach first contact, then combine inward and tangential robot motion."""
++    env = make_env()
++    obs, _ = env.reset(seed=seed)
++    initial = obs.copy()
++    contact_state = None
++    for _ in range(100):
++        vec = obs[0:2] - obs[16:18]
++        act = 0.049 * vec / max(float(np.linalg.norm(vec)), 1e-9)
++        obs, _, term, trunc, _ = env.step(act.astype(np.float32))
++        if np.linalg.norm(obs[0:2] - initial[0:2]) > 1e-5:
++            contact_state = obs.copy()
++            break
++        if term or trunc:
++            break
++    if contact_state is not None:
++        for _ in range(10):
++            inward = obs[0:2] - obs[16:18]
++            inward /= max(float(np.linalg.norm(inward)), 1e-9)
++            tangent = tangent_sign * np.array([-inward[1], inward[0]])
++            act = 0.034 * inward + 0.034 * tangent
++            obs, _, term, trunc, _ = env.step(act.astype(np.float32))
++            if term or trunc:
++                break
++        result = (
++            np.round(obs[0:2] - contact_state[0:2], 5).tolist(),
++            round(angle_wrap(float(obs[2] - contact_state[2])), 5),
++            np.round(obs[16:18] - contact_state[16:18], 5).tolist(),
++        )
++    else:
++        result = None
++    print("TANGENT", seed, tangent_sign, result)
++    env.close()
++
++
+ if __name__ == "__main__":
+     env = make_env()
+     print("SPACES", env.observation_space.shape, env.action_space.low, env.action_space.high)
+@@ -175,3 +210,6 @@ if __name__ == "__main__":
+         free_motion(probe_seed)
+         ram_center(probe_seed)
+     coast_after_push(0)
++    for probe_seed in (0, 1):
++        tangent_at_contact(probe_seed, -1)
++        tangent_at_contact(probe_seed, 1)

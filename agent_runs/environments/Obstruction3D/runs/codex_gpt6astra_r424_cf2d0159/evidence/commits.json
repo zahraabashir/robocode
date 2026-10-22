@@ -1,0 +1,1314 @@
+[
+  {
+    "id": "C001",
+    "commit": "20e2fa374093b65c0687d970ad0bf8ab378a6b51",
+    "parents": [],
+    "date": "2026-09-21T18:24:11+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".gitignore",
+      "AGENTS.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_20e2fa3.diff",
+    "diff_sha256": "f77f951c1738af4e4d6a9db503baf11695c2f789f7c96faba6e404ee7c40220c",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "c755e5ca6455b2b192aaebe0aa3e53b392373679",
+    "parents": [
+      "20e2fa374093b65c0687d970ad0bf8ab378a6b51"
+    ],
+    "date": "2026-09-21T18:24:50+02:00",
+    "title": "Add valid baseline policy and initial observation probe",
+    "files": [
+      "approach.py",
+      "probe_initial.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C002_c755e5c.diff",
+    "diff_sha256": "cddf4971b9a1d86d514450e48e60d23d03f5787fc4f0e6a1dbada2d61032af04",
+    "events": [
+      {
+        "event": "E0009",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "05c59f7f22326e998a95a34a6d8c1f0072a109888d807e4df4112216837ababa",
+    "version": "evidence/versions/C002_c755e5c_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "bf4f741335e0bee4404a9bbfa3765f702be3163f",
+    "parents": [
+      "c755e5ca6455b2b192aaebe0aa3e53b392373679"
+    ],
+    "date": "2026-09-21T18:24:59+02:00",
+    "title": "Add independent probe of initial states and action effects",
+    "files": [
+      "probe_dynamics.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C003_bf4f741.diff",
+    "diff_sha256": "75f030204efef7b635585e39319e68feaa2d0611496fb0bb0c61e8b6d45cd842",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C004",
+    "commit": "e54c7a20d4a80d22714f4fe4120e5d8b962664c6",
+    "parents": [
+      "bf4f741335e0bee4404a9bbfa3765f702be3163f"
+    ],
+    "date": "2026-09-21T18:25:32+02:00",
+    "title": "Probe base workspace and empirical gripper reach",
+    "files": [
+      "probe_base.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C004_e54c7a2.diff",
+    "diff_sha256": "17aa4532fbd4d3c535625c3f9f45a139b6319ac088653ee0bb23906385670d3b",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C005",
+    "commit": "d66d4bb0d5150c58e4fcdc43659ab577a2c4b07c",
+    "parents": [
+      "e54c7a20d4a80d22714f4fe4120e5d8b962664c6"
+    ],
+    "date": "2026-09-21T18:25:59+02:00",
+    "title": "Add empirical robot kinematics hypothesis for probing",
+    "files": [
+      "probe_base.log",
+      "probe_fk.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C005_d66d4bb.diff",
+    "diff_sha256": "82a8c8f8afa0b6a362901a30524b32657d16092c1b3e0f38584f97be857ece4a",
+    "events": [
+      {
+        "event": "E0020",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C006",
+    "commit": "54e4c53dd006e6d2713e8b6438f89fe94ed871dc",
+    "parents": [
+      "d66d4bb0d5150c58e4fcdc43659ab577a2c4b07c"
+    ],
+    "date": "2026-09-21T18:26:41+02:00",
+    "title": "Probe analytic inverse kinematics against grasp behavior",
+    "files": [
+      "probe_grasp_ik.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C006_54e4c53.diff",
+    "diff_sha256": "7ff060c9c2c1b39683bbb3bca043142075f1abb6f2d8cc466daf405d9578caba",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C007",
+    "commit": "1917d0ef36dd1e3904599ea03b5255e6f6822ac6",
+    "parents": [
+      "54e4c53dd006e6d2713e8b6438f89fe94ed871dc"
+    ],
+    "date": "2026-09-21T18:27:00+02:00",
+    "title": "Implement kinematic pickup and placement candidate for live calibration",
+    "files": [
+      "approach.py",
+      "probe_grasp_ik.log",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C007_1917d0e.diff",
+    "diff_sha256": "90f077d30865b7039ba56f1acf354b257c8884bc020bb6b8755c0dbc2fde6185",
+    "events": [
+      {
+        "event": "E0022",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "df9f23344be5499ba7fb704f73e7cb8f730c5c57dd1a45e089c01bf9db21062c",
+    "version": "evidence/versions/C007_1917d0e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C008",
+    "commit": "3149ba1a3cc0c04d82de271f9dc0dc98f7a21527",
+    "parents": [
+      "1917d0ef36dd1e3904599ea03b5255e6f6822ac6"
+    ],
+    "date": "2026-09-21T18:27:33+02:00",
+    "title": "Scan alignment while continuously attempting grasps",
+    "files": [
+      "probe_grasp_ik.log",
+      "probe_grasp_scan.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C008_3149ba1.diff",
+    "diff_sha256": "0631092c04258698a7b4ce03194894b7d5982d01a293801f064b657985f687e3",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C009",
+    "commit": "3e18da44c28d9874c59b3083cc1f56b16ce3c987",
+    "parents": [
+      "3149ba1a3cc0c04d82de271f9dc0dc98f7a21527"
+    ],
+    "date": "2026-09-21T18:28:01+02:00",
+    "title": "Add detailed blocked-descent diagnostic",
+    "files": [
+      "probe_grasp_scan.log",
+      "probe_path.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C009_3e18da4.diff",
+    "diff_sha256": "5822f057d99537eb6b818a38b7d0e6421700037b0cfdbcbf06185d587547a9be",
+    "events": [
+      {
+        "event": "E0028",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C010",
+    "commit": "386889598896133c8b08cd980af5797d22057504",
+    "parents": [
+      "3e18da44c28d9874c59b3083cc1f56b16ce3c987"
+    ],
+    "date": "2026-09-21T18:28:22+02:00",
+    "title": "Probe vertical fine-step close grasp trajectories",
+    "files": [
+      "probe_grasp_scan.log",
+      "probe_vertical.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C010_3868895.diff",
+    "diff_sha256": "20494d4ae7aa6cd2fdcb25b6f9bbab223883b78d4807e624dc9ef3702c9301cf",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C011",
+    "commit": "790ba42b580a33d84599457ec5aa82bc78b9e535",
+    "parents": [
+      "386889598896133c8b08cd980af5797d22057504"
+    ],
+    "date": "2026-09-21T18:28:50+02:00",
+    "title": "Use vertical Cartesian descent waypoints and proportional joint steps",
+    "files": [
+      "approach.py",
+      "probe_vertical.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C011_790ba42.diff",
+    "diff_sha256": "0a09e0bcc4b949dd778b4966fcd78e458c8bc985fbaff1646a728528881d64d9",
+    "events": [
+      {
+        "event": "E0035",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "bc049b2d1c6a2115a8d5103fab4332c4eda08645bb2fede06be46d9b7dad43e7",
+    "version": "evidence/versions/C011_790ba42_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C012",
+    "commit": "9fecd8e16174dd7a28e1cb708eb55b5965db5303",
+    "parents": [
+      "790ba42b580a33d84599457ec5aa82bc78b9e535"
+    ],
+    "date": "2026-09-21T18:29:06+02:00",
+    "title": "Test stationary close across wider planar alignment offsets",
+    "files": [
+      "probe_vertical.log"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C012_9fecd8e.diff",
+    "diff_sha256": "a43b73d989885286a7e496bccc3888439205a1d84c495f7a96ff41abcf135eea",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C013",
+    "commit": "0f6ad9eda60c7052b951124c7709c78b2c233878",
+    "parents": [
+      "9fecd8e16174dd7a28e1cb708eb55b5965db5303"
+    ],
+    "date": "2026-09-21T18:29:17+02:00",
+    "title": "Add stationary-close grasp probe",
+    "files": [
+      "probe_stationary.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C013_0f6ad9e.diff",
+    "diff_sha256": "779f8e0add9a0474f9d144753746daa6197d423ccdd14fa48ab807852213e844",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C014",
+    "commit": "3431bb0b4d5997798fe2588da444af560520822e",
+    "parents": [
+      "0f6ad9eda60c7052b951124c7709c78b2c233878"
+    ],
+    "date": "2026-09-21T18:29:34+02:00",
+    "title": "Add isolated gripper semantics probe",
+    "files": [
+      "probe_close.py",
+      "probe_stationary.log"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C014_3431bb0.diff",
+    "diff_sha256": "76c6d905a8af9363a89c798a5deadc4b21720a93a790a56238f6b03583b8532a",
+    "events": [
+      {
+        "event": "E0039",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C015",
+    "commit": "6d3a8c09922e3f05de21dd2738024ff7713aca18",
+    "parents": [
+      "3431bb0b4d5997798fe2588da444af560520822e"
+    ],
+    "date": "2026-09-21T18:29:57+02:00",
+    "title": "Probe wide gripper-offset rasters in empty scenes",
+    "files": [
+      "probe_raster.py",
+      "probe_stationary.log"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C015_6d3a8c0.diff",
+    "diff_sha256": "04978839e9c3fcd02e4e634d595bda67a195d64799ac4d44ad77099b528c861b",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C016",
+    "commit": "79ae0d93ad0487db54bad6dfbd671036a72bfa03",
+    "parents": [
+      "6d3a8c09922e3f05de21dd2738024ff7713aca18"
+    ],
+    "date": "2026-09-21T18:30:26+02:00",
+    "title": "Probe gripper yaw and stationary grasps on unobstructed scenes",
+    "files": [
+      "probe_raster.log",
+      "probe_stationary.log",
+      "probe_yaw.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C016_79ae0d9.diff",
+    "diff_sha256": "f5a2365d6a7027dfb44fefbd52cfe47a3a18481e7d74346c0703d6c0128d354d",
+    "events": [
+      {
+        "event": "E0047",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C017",
+    "commit": "f28c923f45363ac046b659daca4617e1a6d3bfa5",
+    "parents": [
+      "79ae0d93ad0487db54bad6dfbd671036a72bfa03"
+    ],
+    "date": "2026-09-21T18:30:47+02:00",
+    "title": "Verify posture convergence before a broader offset scan",
+    "files": [
+      "probe_raster.log",
+      "probe_raster2.py",
+      "probe_yaw.log"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C017_f28c923.diff",
+    "diff_sha256": "17e051221a8df9e9a60d7e6847cfd866fb13b245e4a439005b626774c56cb8ed",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C018",
+    "commit": "3287a804d76331842d4e0a3fffb87a3f4e19637d",
+    "parents": [
+      "f28c923f45363ac046b659daca4617e1a6d3bfa5"
+    ],
+    "date": "2026-09-21T18:30:48+02:00",
+    "title": "Add independent tilted and horizontal grasp reference probe",
+    "files": [
+      "probe_sidegrasp.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C018_3287a80.diff",
+    "diff_sha256": "91623695662b2df0481b2393663a38bda0d4ec7d85b93b00ba1d904351287afb",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C019",
+    "commit": "71be32a0f1977038bbcfcc85dd4b4bf123cd72bc",
+    "parents": [
+      "3287a804d76331842d4e0a3fffb87a3f4e19637d"
+    ],
+    "date": "2026-09-21T18:32:29+02:00",
+    "title": "Verify discovered tilted grasp pose and held object identity",
+    "files": [
+      "probe_raster.log",
+      "probe_raster2.log",
+      "probe_sidegrasp.log",
+      "probe_sideverify.py",
+      "probe_yaw.log"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C019_71be32a.diff",
+    "diff_sha256": "ef0d6c3e38489151721bce6fd82265d2f0d9ea2706362b0c9e87f9c12f79760f",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C020",
+    "commit": "5e39ecd2e23e967b801e60bd8496501720ad1ea3",
+    "parents": [
+      "71be32a0f1977038bbcfcc85dd4b4bf123cd72bc"
+    ],
+    "date": "2026-09-21T18:33:00+02:00",
+    "title": "Probe tilted grasps to identify orientation or approach constraints",
+    "files": [
+      "probe_sideverify.log",
+      "probe_tilt.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C020_5e39ecd.diff",
+    "diff_sha256": "3c2288f28d916a29a831fac6ad4a671c2dd386592fa0bd636bde70bcd81b7413",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C021",
+    "commit": "c1d41ec9c4a552dd02b7e3dab44f4e53e1838f1a",
+    "parents": [
+      "5e39ecd2e23e967b801e60bd8496501720ad1ea3"
+    ],
+    "date": "2026-09-21T18:33:24+02:00",
+    "title": "Collect actual end effector transforms from successful grasp under joint perturbations",
+    "files": [
+      "probe_fk_samples.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C021_c1d41ec.diff",
+    "diff_sha256": "56b750098d4da55b65e1cf0f96e936826601d3a6ddb02d81ddd265fd55ca632a",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C022",
+    "commit": "4f373081dfe3f17a906cf100d3081d0605b565ec",
+    "parents": [
+      "c1d41ec9c4a552dd02b7e3dab44f4e53e1838f1a"
+    ],
+    "date": "2026-09-21T18:33:42+02:00",
+    "title": "Probe reproducible grasp posture and orientation-preserving lift",
+    "files": [
+      "fk_samples.json",
+      "probe_fixed.py",
+      "probe_fk_samples.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C022_4f37308.diff",
+    "diff_sha256": "913fd8ac1327e1fc18a6dc5af2871835c8152e49f0c15be06e8eb570e0689400",
+    "events": [
+      {
+        "event": "E0054",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C023",
+    "commit": "eb76e316279520ad34fa074a6be700900898f6bc",
+    "parents": [
+      "4f373081dfe3f17a906cf100d3081d0605b565ec"
+    ],
+    "date": "2026-09-21T18:34:03+02:00",
+    "title": "Fit end-effector forward kinematics from observed grasped poses",
+    "files": [
+      "fit_fk.py"
+    ],
+    "file_roles": [
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C023_eb76e31.diff",
+    "diff_sha256": "c947b550f7989fb7fa4c754899211358464300fcc908f8ee066acc5c127c8600",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C024",
+    "commit": "872e7c0d77b4da5194111bdbbfd586d2199a026f",
+    "parents": [
+      "eb76e316279520ad34fa074a6be700900898f6bc"
+    ],
+    "date": "2026-09-21T18:34:14+02:00",
+    "title": "Save grasp calibration samples and test lift and release dynamics",
+    "files": [
+      "fk_corrections.json",
+      "probe_lift_drop.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C024_872e7c0.diff",
+    "diff_sha256": "16c3580209f20053f96e6e4f37d21dd15305bf7f4475be300eed94cde77484dd",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C025",
+    "commit": "9c79ff5e79aa6e6257ff665d815a20e07b274a5d",
+    "parents": [
+      "872e7c0d77b4da5194111bdbbfd586d2199a026f"
+    ],
+    "date": "2026-09-21T18:34:43+02:00",
+    "title": "Add calibrated FK with robot mounting and gripper offsets",
+    "files": [
+      "kinematics_fit.py",
+      "probe_lift_drop.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C025_9c79ff5.diff",
+    "diff_sha256": "9570200dc442947c337a4d6e01543524c1c1edd450b7ed4df6a99e03a16f32e1",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C026",
+    "commit": "f747d212d2f33367fc270680d9249054bfd1e017",
+    "parents": [
+      "9c79ff5e79aa6e6257ff665d815a20e07b274a5d"
+    ],
+    "date": "2026-09-21T18:34:54+02:00",
+    "title": "Check precise lower-and-release after fixed-pose grasp",
+    "files": [
+      "probe_lift_place.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C026_f747d21.diff",
+    "diff_sha256": "172c354235b55513122b3786426664e42a4f950ff8f91ebe295de0cdfe45e8e5",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C027",
+    "commit": "c015253bfa6acc1ee217672be7d9da4bc654fb70",
+    "parents": [
+      "f747d212d2f33367fc270680d9249054bfd1e017"
+    ],
+    "date": "2026-09-21T18:35:11+02:00",
+    "title": "Validate corrected FK with vertical grasp approach",
+    "files": [
+      "probe_calibrated.py",
+      "probe_lift_place.log"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C027_c015253.diff",
+    "diff_sha256": "0e1d053b9f4d8dc4a36cb7957912fccb27caf250fba9b5d84c89341b6cf66f2d",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C028",
+    "commit": "1bb21982fc9fed880e32a85ab3d8c03bfa6d0a06",
+    "parents": [
+      "c015253bfa6acc1ee217672be7d9da4bc654fb70"
+    ],
+    "date": "2026-09-21T18:35:41+02:00",
+    "title": "Validate discovered fixed grasp posture on twenty default-count seeds",
+    "files": [
+      "probe_fixed_multiseed.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C028_1bb2198.diff",
+    "diff_sha256": "34ec77142de61ba9c4b069cafb27f179f3d8d5bd56d9641bf1e3b0a5e325a2c8",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C029",
+    "commit": "64f7f8b173fbcc92e2e49ea07eabf4ce0cd4438e",
+    "parents": [
+      "1bb21982fc9fed880e32a85ab3d8c03bfa6d0a06"
+    ],
+    "date": "2026-09-21T18:36:20+02:00",
+    "title": "Use calibrated kinematics for vertical grasp transport and precise placement",
+    "files": [
+      "approach.py",
+      "probe_fixed_multiseed.log",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C029_64f7f8b.diff",
+    "diff_sha256": "947f50dc6bcd6e4f176846182fc2458a8f37069e1b261531c9f82560ef40ff9c",
+    "events": [
+      {
+        "event": "E0062",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "a4f72506d8dfdeccdc3c43687fe0256629e504b4c7ee5e2210418ddfe95ff8be",
+    "version": "evidence/versions/C029_64f7f8b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C030",
+    "commit": "50197d374a6dbf49b9440a024aa455dc0d5e4618",
+    "parents": [
+      "64f7f8b173fbcc92e2e49ea07eabf4ce0cd4438e"
+    ],
+    "date": "2026-09-21T18:36:43+02:00",
+    "title": "Add unobstructed placement validation",
+    "files": [
+      "test_empty.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C030_50197d3.diff",
+    "diff_sha256": "e7d76a95e184ae44d4e4b585a375350d91d2da0107134671833721dd8ce70184",
+    "events": [
+      {
+        "event": "E0064",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C031",
+    "commit": "5ec7c2565c882194ef1cf79837952e8f3cb4dc79",
+    "parents": [
+      "50197d374a6dbf49b9440a024aa455dc0d5e4618"
+    ],
+    "date": "2026-09-21T18:37:19+02:00",
+    "title": "Clear region obstructions before transporting target block",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C031_5ec7c25.diff",
+    "diff_sha256": "ffa4cfd4d41aeecb5fedfcc824ce4919bf2e008f48c1d822f3592bcb584d8c11",
+    "events": [
+      {
+        "event": "E0069",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "e25dea48eb2a1ebcac29ec91010e5579c2aa02f4b8849691ae4475d84c31451d",
+    "version": "evidence/versions/C031_5ec7c25_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C032",
+    "commit": "838828c08280a32aa45c1072c5960cfb20c2c44f",
+    "parents": [
+      "5ec7c2565c882194ef1cf79837952e8f3cb4dc79"
+    ],
+    "date": "2026-09-21T18:37:43+02:00",
+    "title": "Leave one millimeter placement clearance to avoid contact rejection",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C032_838828c.diff",
+    "diff_sha256": "91ef83721e5846f60baa8f0f1ca03c5c02dd57570f8132978fbb9ba26167fb0d",
+    "events": [
+      {
+        "event": "E0071",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "b9c6a7c6a7b9d28bdcb31371917196cda681bc2598deab158b3b799ae6442bb1",
+    "version": "evidence/versions/C032_838828c_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C033",
+    "commit": "93210b17392f2b06104c947644076600f9cd9d36",
+    "parents": [
+      "838828c08280a32aa45c1072c5960cfb20c2c44f"
+    ],
+    "date": "2026-09-21T18:38:02+02:00",
+    "title": "Probe placement goal vertical tolerance around contact plane",
+    "files": [
+      "probe_goal_tolerance.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C033_93210b1.diff",
+    "diff_sha256": "89ef60ac3f694ace8495dbef4616716f98b939aab8739168079556d7017e266f",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C034",
+    "commit": "4aa713a905c5a33994c398252c43d096c7c8017d",
+    "parents": [
+      "93210b17392f2b06104c947644076600f9cd9d36"
+    ],
+    "date": "2026-09-21T18:38:29+02:00",
+    "title": "Place cleared obstructions on free supported table locations",
+    "files": [
+      "approach.py",
+      "probe_seed2.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C034_4aa713a.diff",
+    "diff_sha256": "d92670a331cb2bc860b86fc4d8db99edc29d8dd6c01da1686f7026590700e662",
+    "events": [
+      {
+        "event": "E0075",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "bd875b9414985c5d39bbb2eac187856bf16133eb551b922f24983ee29d73e08c",
+    "version": "evidence/versions/C034_4aa713a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C035",
+    "commit": "5016c6dd125a11c49d22f97b0b09bce4f53d8b4e",
+    "parents": [
+      "4aa713a905c5a33994c398252c43d096c7c8017d"
+    ],
+    "date": "2026-09-21T18:39:12+02:00",
+    "title": "Probe yaw and lateral offsets for grasping clustered seed two obstructions",
+    "files": [
+      "probe_cluster_grasp.py",
+      "test_clear.log"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C035_5016c6d.diff",
+    "diff_sha256": "1dd4ac5fc9618eeb5672172e67efebb719536b75236ec0f94bc9be1f4977818f",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C036",
+    "commit": "7c3af8a9faec044d828e62875bc352f3e40c2086",
+    "parents": [
+      "5016c6dd125a11c49d22f97b0b09bce4f53d8b4e"
+    ],
+    "date": "2026-09-21T18:39:33+02:00",
+    "title": "Add multi-seed policy regression runner with stall reporting",
+    "files": [
+      "probe_cluster_grasp.log",
+      "test_sweep.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C036_7c3af8a.diff",
+    "diff_sha256": "52f39fe81c379fbf75eec3b77c62198fa31362eeebcf97471b63fe12acfb3840",
+    "events": [
+      {
+        "event": "E0089",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C037",
+    "commit": "8d534b75b8e3bb35f0eb1b6c8260162022a5899c",
+    "parents": [
+      "7c3af8a9faec044d828e62875bc352f3e40c2086"
+    ],
+    "date": "2026-09-21T18:40:19+02:00",
+    "title": "Reopen gripper during descent so failed grasps can be retried",
+    "files": [
+      "approach.py",
+      "probe_cluster_grasp.log",
+      "sweep_count0.log",
+      "sweep_count1.log",
+      "sweep_count10.log",
+      "sweep_count5.log",
+      "sweep_initial.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C037_8d534b7.diff",
+    "diff_sha256": "ff9b290154a1fa397855f8cd7028496822411bfaadc194a4f3b11e7374e42f09",
+    "events": [
+      {
+        "event": "E0090",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6f50f39736e04083f87aa34191e70daf2edc8123592323c1d1b06a0daf94750e",
+    "version": "evidence/versions/C037_8d534b7_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C038",
+    "commit": "f8e2688ef384ac6cb263f8f7abf8134f2803a61e",
+    "parents": [
+      "8d534b75b8e3bb35f0eb1b6c8260162022a5899c"
+    ],
+    "date": "2026-09-21T18:42:06+02:00",
+    "title": "Keep base clear of table and use object height for pickup clearance",
+    "files": [
+      "approach.py",
+      "probe_cluster_grasp.log",
+      "sweep_count0.log",
+      "sweep_count1.log",
+      "sweep_count10.log",
+      "sweep_count5.log",
+      "sweep_initial.log",
+      "sweep_reopen.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C038_f8e2688.diff",
+    "diff_sha256": "4a5b3b2503ca25c565fea5d2c63719bc766841ffc35bac10d4654c4b104e1a1f",
+    "events": [
+      {
+        "event": "E0094",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "6cca7746129e592aaead3adbb05d424882ec69a1f81117310be783effd8200c7",
+    "version": "evidence/versions/C038_f8e2688_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C039",
+    "commit": "01f3e9ed6eff4b4545f43446a6a02444f3b8c2f7",
+    "parents": [
+      "f8e2688ef384ac6cb263f8f7abf8134f2803a61e"
+    ],
+    "date": "2026-09-21T18:43:23+02:00",
+    "title": "Probe stalled descent closing and wrist yaw on dense five-obstacle scene",
+    "files": [
+      "probe_dense_recovery.py",
+      "sweep_current.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C039_01f3e9e.diff",
+    "diff_sha256": "a5908970cac1a24f23ee3828c8779c5ec14a535c1660df7762ed5cc0ebd5ac44",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C040",
+    "commit": "f1bc33b13864cfd5c60169c3d8c8806672946bae",
+    "parents": [
+      "01f3e9ed6eff4b4545f43446a6a02444f3b8c2f7"
+    ],
+    "date": "2026-09-21T18:43:46+02:00",
+    "title": "Attempt grasps before collision and recover from rejected descents",
+    "files": [
+      "approach.py",
+      "probe_dense_recovery.log",
+      "sweep_current.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C040_f1bc33b.diff",
+    "diff_sha256": "f8452443e047a0bb9d6f53afa4d2a7434e2e189d62354d7eecb65ae5f300ba10",
+    "events": [
+      {
+        "event": "E0099",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "58e96e45ec3a9dc60088556bef6d9cc21aba41f60d8be798e51359e86e3cb29c",
+    "version": "evidence/versions/C040_f1bc33b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C041",
+    "commit": "0e326783349f9bec3ef3e2be12a81fb7d6e1a24b",
+    "parents": [
+      "f1bc33b13864cfd5c60169c3d8c8806672946bae"
+    ],
+    "date": "2026-09-21T18:44:16+02:00",
+    "title": "Validate earlier grasp attempts on dense seed two",
+    "files": [
+      "probe_latest_dense.py",
+      "sweep_current.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C041_0e32678.diff",
+    "diff_sha256": "a2728a34837a9b270a122b818210425bf0c0df2ed106e3aa6a6dc1859a72d252",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C042",
+    "commit": "4ae052370888a59551c9c1c21119c3471493f2ca",
+    "parents": [
+      "0e326783349f9bec3ef3e2be12a81fb7d6e1a24b"
+    ],
+    "date": "2026-09-21T18:44:34+02:00",
+    "title": "Retry blocked pickups with alternate gripper orientations above clutter",
+    "files": [
+      "approach.py",
+      "probe_latest_dense.log",
+      "sweep_current.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C042_4ae0523.diff",
+    "diff_sha256": "0006a3ff92344ad9719f894c1991086a06298c2b98951decdeb12913e1218812",
+    "events": [
+      {
+        "event": "E0103",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "68d975a43614f498d4ae2af49ae69856c83c22884cf57d7a483c6b3dbe2ca425",
+    "version": "evidence/versions/C042_4ae0523_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C043",
+    "commit": "7629d1ac512995c3fc8922d5d8304b63add4431b",
+    "parents": [
+      "4ae052370888a59551c9c1c21119c3471493f2ca"
+    ],
+    "date": "2026-09-21T18:45:56+02:00",
+    "title": "Reset drop plans between episodes and retain tasks after incidental grasps",
+    "files": [
+      "approach.py",
+      "probe_latest_dense.log",
+      "sweep_current.log",
+      "sweep_dense_retry.log",
+      "sweep_final_count5.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C043_7629d1a.diff",
+    "diff_sha256": "9e6989776d0d066f42d9d8d71561d9a6b09e90a67b81ad9f0ea141e0234bb2b4",
+    "events": [
+      {
+        "event": "E0110",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "e6190993eab699582e37a6ed697beda3066fac76f306d4513f44e5a85802a7f1",
+    "version": "evidence/versions/C043_7629d1a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C044",
+    "commit": "1f1586bf41aece7737cbfda96632e3cc46be117c",
+    "parents": [
+      "7629d1ac512995c3fc8922d5d8304b63add4431b"
+    ],
+    "date": "2026-09-21T18:47:00+02:00",
+    "title": "Add regression test reusing one policy across varied resets",
+    "files": [
+      "sweep_final_count5.log",
+      "test_reuse.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C044_1f1586b.diff",
+    "diff_sha256": "f0494c92eec02aec49f9109b8ce20ced5e28b9d24c028a82e7dc76fdaf0ad55f",
+    "events": [
+      {
+        "event": "E0116",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C045",
+    "commit": "13083406612a6fa095a968f5b1824a3dae2fee60",
+    "parents": [
+      "1f1586bf41aece7737cbfda96632e3cc46be117c"
+    ],
+    "date": "2026-09-21T18:47:51+02:00",
+    "title": "Probe recovery directions from blocked grasped lifts",
+    "files": [
+      "probe_lift_recovery.py",
+      "sweep_final_count10.log",
+      "sweep_final_count5.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C045_1308340.diff",
+    "diff_sha256": "b2a72e1d7834f5e5036b90f5ecb519b0ff48538eb6b2754dca6b8b5d6aef7c82",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C046",
+    "commit": "7703c3d92de791cad7c98ede2bdda80276badc03",
+    "parents": [
+      "13083406612a6fa095a968f5b1824a3dae2fee60"
+    ],
+    "date": "2026-09-21T18:49:25+02:00",
+    "title": "Retreat from nearby blocks when a grasped object cannot lift",
+    "files": [
+      "approach.py",
+      "probe_lift_recovery.log",
+      "sweep_final_count10.log",
+      "sweep_final_default.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C046_7703c3d.diff",
+    "diff_sha256": "ea8142f848aee18575e31094c397478df17efcc01731116dbdb10aa5e76384e8",
+    "events": [
+      {
+        "event": "E0131",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "cfe5fa2655a5e4c3f2f5a6514640f3df09f326a35485df7ef06ee5e5593378f6",
+    "version": "evidence/versions/C046_7703c3d_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C047",
+    "commit": "c8099be0c889378efa94312fbcece09d41d9f44b",
+    "parents": [
+      "7703c3d92de791cad7c98ede2bdda80276badc03"
+    ],
+    "date": "2026-09-21T18:50:01+02:00",
+    "title": "Change grasp orientation after repeated misses even without motion rejection",
+    "files": [
+      "approach.py",
+      "sweep_final_default.log",
+      "sweep_lift_fixed.log"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C047_c8099be.diff",
+    "diff_sha256": "07e0fe1c195fe13a9757f116193e3d57f77942705b24ecb94ed39a23254a7fba",
+    "events": [
+      {
+        "event": "E0133",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "9a7164b7e27580f5483640bab86fd4f0a560186cf33c36cf870be048599fa901",
+    "version": "evidence/versions/C047_c8099be_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C048",
+    "commit": "5a459e0cc14dfe07a7600a3e8b69937d64d92b6d",
+    "parents": [
+      "c8099be0c889378efa94312fbcece09d41d9f44b"
+    ],
+    "date": "2026-09-21T18:50:22+02:00",
+    "title": "Add targeted ten-obstacle seed eight retry validation",
+    "files": [
+      "probe_count10_seed8.py",
+      "sweep_final_default.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C048_5a459e0.diff",
+    "diff_sha256": "ba7cc82addeb8125e66fc722772363d76abdf81e4888d366ea6c3f828505651c",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C049",
+    "commit": "df8a4566747aac3e255ae502f0a8b679803e55c6",
+    "parents": [
+      "5a459e0cc14dfe07a7600a3e8b69937d64d92b6d"
+    ],
+    "date": "2026-09-21T18:50:39+02:00",
+    "title": "Use a small initial lift before sliding away from nearly touching blocks",
+    "files": [
+      "approach.py",
+      "probe_count10_seed8.log",
+      "sweep_final_default.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C049_df8a456.diff",
+    "diff_sha256": "058730f9dd8dd4b4d7b3b251bdc68ab65bbdc04a177066c1fc5eb3ed1af2c3e9",
+    "events": [
+      {
+        "event": "E0139",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "8fd224ff44224cfdb926b89064a606a2f600d37ca509dbb5bc8eb2f4887ba581",
+    "version": "evidence/versions/C049_df8a456_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C050",
+    "commit": "7c8fdc523d4b666fa2aa4ba96d8650c7db459f54",
+    "parents": [
+      "df8a4566747aac3e255ae502f0a8b679803e55c6"
+    ],
+    "date": "2026-09-21T18:52:14+02:00",
+    "title": "Inspect remaining blockers around dense seed eight failed object",
+    "files": [
+      "probe_count10_seed8.log",
+      "probe_dense_neighbors.py",
+      "sweep_final_default.log",
+      "sweep_lift_fixed2.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C050_7c8fdc5.diff",
+    "diff_sha256": "d0d456a4f3e717b1dd972d5d120e30987a3757a78d75f3a128d706e86910ded0",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C051",
+    "commit": "e3958121158265e24363199597e56c863b0e8cc2",
+    "parents": [
+      "7c8fdc523d4b666fa2aa4ba96d8650c7db459f54"
+    ],
+    "date": "2026-09-21T18:52:30+02:00",
+    "title": "Offset the grasp point after orientation retries fail on small blocks",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C051_e395812.diff",
+    "diff_sha256": "a50f1e53be146e5fa41dbf8b3698505a2448e1f067bbe46bf088720a6fb63e9e",
+    "events": [
+      {
+        "event": "E0146",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "fae2d5e57bb03621318af485a59514930b7a31eca609ece6ccc6b87343ca051b",
+    "version": "evidence/versions/C051_e395812_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C052",
+    "commit": "3aa4a0ba96c15459a056038cb8ad1921c7b91988",
+    "parents": [
+      "e3958121158265e24363199597e56c863b0e8cc2"
+    ],
+    "date": "2026-09-21T18:52:59+02:00",
+    "title": "Postpone enclosed obstructions until surrounding blocks are cleared",
+    "files": [
+      "approach.py",
+      "probe_count10_seed8_latest.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C052_3aa4a0b.diff",
+    "diff_sha256": "66b7a4a63a845666beb5d69587ee68a95fa4727b858f5a096c8051df470bbaed",
+    "events": [
+      {
+        "event": "E0148",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "703e11c4a7b1a401a8825237045264eee42875587ce6b35f8b9fbdc3d8e9d262",
+    "version": "evidence/versions/C052_3aa4a0b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C053",
+    "commit": "0a66ed8da0059372e854997a4f1b5265185d3599",
+    "parents": [
+      "3aa4a0ba96c15459a056038cb8ad1921c7b91988"
+    ],
+    "date": "2026-09-21T18:53:55+02:00",
+    "title": "Save dense-scene validation and final policy reset regression",
+    "files": [
+      "probe_count10_seed8_reorder.log",
+      "test_reuse.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C053_0a66ed8.diff",
+    "diff_sha256": "412b9afc0cefa0955db8e41b904e8b5db47b65ba37602b26b16c758a85d27a85",
+    "events": [
+      {
+        "event": "E0153",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C054",
+    "commit": "9a515a32ae3e3a0dbaf15d4585a2dbcc5d01181e",
+    "parents": [
+      "0a66ed8da0059372e854997a4f1b5265185d3599"
+    ],
+    "date": "2026-09-21T18:54:38+02:00",
+    "title": "Record validation results and successful cross-reset regression",
+    "files": [
+      "VALIDATION.md",
+      "reuse_final.log"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C054_9a515a3.diff",
+    "diff_sha256": "7e9571cb3794ac2d06c486d0454b43bfba2e3935d4cd059bacf3b830914b76e4",
+    "events": [
+      {
+        "event": "E0157",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {}
+  }
+]

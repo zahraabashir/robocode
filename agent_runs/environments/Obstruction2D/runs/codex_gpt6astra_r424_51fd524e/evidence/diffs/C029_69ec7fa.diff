@@ -1,0 +1,131 @@
+diff --git a/approach.py b/approach.py
+index faf35ae..774cf04 100644
+--- a/approach.py
++++ b/approach.py
+@@ -2,6 +2,12 @@ import math
+ import numpy as np
+ 
+ class GeneratedApproach:
++    """Geometric pick-and-place controller for a variable-size object set.
++
++    All scene geometry comes from the object-centric observation. The robot
++    remains upright with its arm pointing down; obstructions are moved only
++    when they interfere with the complete final placement configuration.
++    """
+     def __init__(self, action_space, observation_space, primitives):
+         self.action_space = action_space
+         self.observation_space = observation_space
+@@ -16,11 +22,6 @@ class GeneratedApproach:
+         self.surface = state.get_objects(self.st)[0]
+         self.phase = 'select'
+         self.obj = None
+-        self.n = 0
+-        self.stashed = []
+-
+-    def val(self, s, o, f):
+-        return s.get(o, f)
+ 
+     def rect(self, s, o):
+         return [s.get(o,f) for f in ('x','y','width','height')]
+@@ -106,7 +107,7 @@ class GeneratedApproach:
+             while bottom+h<=ceiling and not base_clear(left,bottom):bottom+=.01
+             if bottom+h<=ceiling and bottom-self.offsety<=.89:stacks.append((left,bottom))
+         if stacks:return min(stacks,key=lambda a:(a[1],abs(a[0]-x)))
+-        # Rare densely packed scenes: retain reachable coordinates for recovery.
++        # If geometric candidates are exhausted, retain a legal base position.
+         return float(np.clip(x,low,high)),max(.101,ceiling-h)
+ 
+     def get_action(self, s):
+@@ -132,19 +133,16 @@ class GeneratedApproach:
+             x,y,w,h=self.rect(s,self.obj)
+             if self.phase == 'above':
+                 if ry<self.emptyheight-.001: return self.action(s,y=self.emptyheight)
+-                grasp_shift=min(0,1.516-(self.destx+w/2)) if self.obj==self.block else 0
+                 grasp_x=self.target_grasp if self.obj==self.block else self.grasp_position(s,self.obj,x+w/2)
+                 if abs(rx-grasp_x)>.001: return self.action(s,x=grasp_x,y=self.emptyheight)
+-                self.phase='down'; self.n=0; self.last_down=None
++                self.phase='down'; self.last_down=None
+             if self.phase == 'down':
+-                self.n+=1
+                 goal=y+h+.2+.006
+                 if ry>goal+.001 and (self.last_down is None or abs(ry-self.last_down)>.00001):
+                     self.last_down=ry
+                     return self.action(s,y=goal,vac=1)
+-                self.pick_y=y; self.phase='lift';self.n=0
++                self.pick_y=y; self.phase='lift'
+             if self.phase == 'lift':
+-                self.n+=1
+                 if ry<self.carryheight-.001:return self.action(s,y=self.carryheight,vac=1)
+                 if y < self.pick_y+.02:
+                     self.phase='down'; self.last_down=None
+@@ -163,7 +161,7 @@ class GeneratedApproach:
+             if self.phase == 'place':
+                 goal=self.dropy-self.offsety
+                 if abs(ry-goal)>.001:return self.action(s,y=goal,vac=1)
+-                self.stashed.append(self.obj);self.phase='retreat'
++                self.phase='retreat'
+                 return self.action(s,vac=0)
+             if self.phase=='retreat':
+                 if ry<self.emptyheight-.001:return self.action(s,y=self.emptyheight,vac=0)
+diff --git a/sweep_300_700.log b/sweep_300_700.log
+new file mode 100644
+index 0000000..8635201
+--- /dev/null
++++ b/sweep_300_700.log
+@@ -0,0 +1,56 @@
++300 OK 28
++301 OK 47
++302 OK 54
++303 OK 80
++305 OK 29
++304 OK 51
++307 OK 38
++306 OK 62
++310 OK 24
++308 OK 57
++309 OK 79
++311 OK 50
++313 OK 27
++312 OK 50
++314 OK 37
++315 OK 27
++316 OK 29
++317 OK 17
++318 OK 48
++320 OK 21
++322 OK 27
++321 OK 44
++319 OK 72
++323 OK 43
++325 OK 23
++324 OK 84
++328 OK 21
++326 OK 52
++327 OK 34
++329 OK 63
++331 OK 22
++330 OK 56
++333 OK 17
++334 OK 24
++332 OK 51
++335 OK 23
++338 OK 21
++336 OK 54
++339 OK 37
++337 OK 62
++340 OK 16
++343 OK 27
++341 OK 56
++344 OK 28
++345 OK 36
++342 OK 77
++348 OK 32
++347 OK 49
++346 OK 94
++349 OK 40
++352 OK 38
++350 OK 42
++353 OK 31
++351 OK 92
++355 OK 29
++356 OK 29

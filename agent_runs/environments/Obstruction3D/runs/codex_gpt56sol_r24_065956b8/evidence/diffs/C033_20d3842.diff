@@ -1,0 +1,56 @@
+diff --git a/approach.py b/approach.py
+index 4b89bd0..b9d5ddd 100644
+--- a/approach.py
++++ b/approach.py
+@@ -132,12 +132,32 @@ class GeneratedApproach:
+ 
+         if self.phase == "choose":
+             self._choose_task(state)
+-            self.goal_q = self._solve(self._xyz(state, self.object), q)
+-            self.phase, self.phase_steps = "pick", 0
++            self.carry_rotation = None
++            self.pick_xyz = self._xyz(state, self.object)
++            self.goal_q = self._solve(self.pick_xyz + (0, 0, .18), q)
++            self.phase, self.phase_steps = "prepick", 0
++
++        if self.phase == "prepick":
++            if np.max(np.abs(self.goal_q-q)) < .012 or self.phase_steps > 40:
++                self.carry_rotation = _fk(q)[:3, :3].copy()
++                self.pick_z = [self.pick_xyz[2]+d for d in (.10, .05, 0)]
++                self.pick_index = 0
++                waypoint = self.pick_xyz.copy(); waypoint[2] = self.pick_z[0]
++                self.goal_q = self._solve(waypoint, q)
++                self.phase, self.phase_steps = "pick", 0
++            else:
++                return self._act_to(q, self.goal_q, 1.0)
+ 
+         if self.phase == "pick":
+-            if np.max(np.abs(self.goal_q-q)) < .012 or self.phase_steps > 35:
+-                self.phase, self.phase_steps = "close", 0
++            if np.max(np.abs(self.goal_q-q)) < .012 or self.phase_steps > 30:
++                self.pick_index += 1
++                if self.pick_index >= len(self.pick_z):
++                    self.phase, self.phase_steps = "close", 0
++                else:
++                    waypoint = self.pick_xyz.copy(); waypoint[2] = self.pick_z[self.pick_index]
++                    self.goal_q = self._solve(waypoint, q)
++                    self.phase_steps = 0
++                    return self._act_to(q, self.goal_q, 1.0)
+             else:
+                 return self._act_to(q, self.goal_q, 1.0)
+ 
+@@ -147,9 +167,11 @@ class GeneratedApproach:
+                 self.carry_rotation = _fk(q)[:3, :3].copy()
+                 self.phase, self.phase_steps = "lift", 0
+             elif self.phase_steps > 5:
+-                # Re-read its pose in case the open gripper nudged it.
+-                self.goal_q = self._solve(self._xyz(state, self.object), q)
+-                self.phase, self.phase_steps = "pick", 0
++                # Retry through a collision-safe overhead approach.
++                self.carry_rotation = None
++                self.pick_xyz = self._xyz(state, self.object)
++                self.goal_q = self._solve(self.pick_xyz + (0, 0, .18), q)
++                self.phase, self.phase_steps = "prepick", 0
+                 return self._act_to(q, self.goal_q, 1.0)
+             else:
+                 return self._act_to(q, q, -1.0)

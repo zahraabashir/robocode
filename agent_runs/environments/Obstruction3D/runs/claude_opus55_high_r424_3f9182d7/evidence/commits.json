@@ -1,0 +1,926 @@
+[
+  {
+    "id": "C001",
+    "commit": "6188fccd811088b0f02f75fd3551bc378e15dd50",
+    "parents": [],
+    "date": "2026-09-30T20:08:16+02:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".claude/settings.json",
+      ".claude/validate_sandbox.py",
+      ".gitignore",
+      "CLAUDE.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_6188fcc.diff",
+    "diff_sha256": "bac958868ac7fd6ecf667c6497f6937df581bc592d2dae25337e185dc328cc2c",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "62c9e4056ea3130b5ffab63f9d4363c78985eacd",
+    "parents": [
+      "6188fccd811088b0f02f75fd3551bc378e15dd50"
+    ],
+    "date": "2026-09-30T20:20:32+02:00",
+    "title": "Initial kinematics (kortex FK/IK), exploration scripts, skeleton pick-place approach",
+    "files": [
+      "approach.py",
+      "calib_0.py",
+      "dbg/approach.py",
+      "dbg/cfg.json",
+      "dbg/kin.py",
+      "explore0.py",
+      "explore1.py",
+      "explore2.py",
+      "explore3.py",
+      "explore4.py",
+      "explore5.py",
+      "explore6.py",
+      "explore7.py",
+      "explore8.py",
+      "explore9.py",
+      "fk.py",
+      "grid0_-0.04,-0.02.txt",
+      "grid0_-0.08,-0.06.txt",
+      "grid0_0.0,0.02.txt",
+      "grid0_0.04,0.06.txt",
+      "grid0_0.08.txt",
+      "grid1_-0.04,-0.02.txt",
+      "grid1_-0.08,-0.06.txt",
+      "grid1_0.0,0.02.txt",
+      "grid1_0.04,0.06.txt",
+      "grid1_0.08.txt",
+      "kin.py",
+      "probe.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C002_62c9e40.diff",
+    "diff_sha256": "bf5e27bf21922300edaba494f799af0833e20d3da2a92d8047b83528b0a09831",
+    "events": [
+      {
+        "event": "E0146",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "01328dd97c0501060cdc56f3c8c714bf7e890496d6e052575ff7d5cc7b9935a6",
+    "version": "evidence/versions/C002_62c9e40_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "d6db4fc3270cc809eea1acd23aef24d2876c28a9",
+    "parents": [
+      "62c9e4056ea3130b5ffab63f9d4363c78985eacd"
+    ],
+    "date": "2026-09-30T20:54:07+02:00",
+    "title": "Use calibrated kinematics (arm offset, TCP=0.12), grasp/place via grasp_tf, release retries",
+    "files": [
+      "approach.py",
+      "calib_1.py",
+      "calib_10.py",
+      "calib_11.py",
+      "calib_12.py",
+      "calib_13.py",
+      "calib_14.py",
+      "calib_15.py",
+      "calib_2.py",
+      "calib_3.py",
+      "calib_4.py",
+      "calib_5.py",
+      "calib_6.py",
+      "calib_7.py",
+      "calib_8.py",
+      "calib_9.py",
+      "calib_u.py",
+      "dbg/c2_1_-1.5708.txt",
+      "dbg/c2_1_0.txt",
+      "dbg/c2_1_1.5708.txt",
+      "dbg/c2_1_3.1416.txt",
+      "dbg/c2_3_-1.5708.txt",
+      "dbg/c2_3_0.txt",
+      "dbg/c2_3_1.5708.txt",
+      "dbg/c2_3_3.1416.txt",
+      "dbg/c5_1_0_-0.02.txt",
+      "dbg/c5_1_0_-0.04.txt",
+      "dbg/c5_1_0_-0.06.txt",
+      "dbg/c5_1_0_-0.08.txt",
+      "dbg/c5_1_0_-0.10.txt",
+      "dbg/c5_1_0_-0.12.txt",
+      "dbg/c5_1_0_-0.14.txt",
+      "dbg/c5_1_0_-0.16.txt",
+      "dbg/c5_1_0_0.00.txt",
+      "dbg/c5_1_0_0.02.txt",
+      "dbg/c5_1_0_0.04.txt",
+      "dbg/c5_1_0_0.06.txt",
+      "dbg/c5_1_0_0.08.txt",
+      "dbg/c5_1_0_0.10.txt",
+      "dbg/c5_1_0_0.12.txt",
+      "dbg/c5_1_0_0.14.txt",
+      "dbg/c5_1_0_0.16.txt",
+      "dbg/c5b_0_-0.01.txt",
+      "dbg/c5b_0_-0.02.txt",
+      "dbg/c5b_0_-0.03.txt",
+      "dbg/c5b_0_-0.04.txt",
+      "dbg/c5b_0_-0.05.txt",
+      "dbg/c5b_0_-0.06.txt",
+      "dbg/c5b_0_-0.07.txt",
+      "dbg/c5b_0_-0.08.txt",
+      "dbg/c5b_0_0.00.txt",
+      "dbg/c5b_0_0.01.txt",
+      "dbg/c5b_0_0.02.txt",
+      "dbg/c5b_0_0.03.txt",
+      "dbg/c5b_0_0.04.txt",
+      "dbg/c5b_0_0.05.txt",
+      "dbg/c5b_0_0.06.txt",
+      "dbg/c5b_0_0.07.txt",
+      "dbg/c5b_0_0.08.txt",
+      "dbg/c5b_1.5708_-0.01.txt",
+      "dbg/c5b_1.5708_-0.02.txt",
+      "dbg/c5b_1.5708_-0.03.txt",
+      "dbg/c5b_1.5708_-0.04.txt",
+      "dbg/c5b_1.5708_-0.05.txt",
+      "dbg/c5b_1.5708_-0.06.txt",
+      "dbg/c5b_1.5708_-0.07.txt",
+      "dbg/c5b_1.5708_-0.08.txt",
+      "dbg/c5b_1.5708_0.00.txt",
+      "dbg/c5b_1.5708_0.01.txt",
+      "dbg/c5b_1.5708_0.02.txt",
+      "dbg/c5b_1.5708_0.03.txt",
+      "dbg/c5b_1.5708_0.04.txt",
+      "dbg/c5b_1.5708_0.05.txt",
+      "dbg/c5b_1.5708_0.06.txt",
+      "dbg/c5b_1.5708_0.07.txt",
+      "dbg/c5b_1.5708_0.08.txt",
+      "dbg/fitp.npy",
+      "dbg/g1.npy",
+      "dbg/g5.npy",
+      "dbg/g6.npy",
+      "dbg/kin_orig.py",
+      "kin.py",
+      "stats.py"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C003_d6db4fc.diff",
+    "diff_sha256": "f9496c8f28527223bd59e92c3f85c6acbb3226a8f65d208f0e7372c82e0d24f2",
+    "events": [
+      {
+        "event": "E0422",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "9a64c5bbb8c983587f8c61dd39646858019af34d7dde7a117c55569e42df96f9",
+    "version": "evidence/versions/C003_d6db4fc_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C004",
+    "commit": "ae6fc4bc5410cf1faf89745b115c1baf8970b8d2",
+    "parents": [
+      "d6db4fc3270cc809eea1acd23aef24d2876c28a9"
+    ],
+    "date": "2026-09-30T21:00:57+02:00",
+    "title": "Cartesian straight-line waypoint execution",
+    "files": [
+      "approach.py",
+      "trace.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C004_ae6fc4b.diff",
+    "diff_sha256": "c95a170c6544b2ac8f44074bb9ad4a6d6fd40f564bc01031c2d247baaf0dcbef",
+    "events": [
+      {
+        "event": "E0434",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "bed81ba06b6350fa77f0bd89287922a13974f40d84719f7956e8f52137a4f41a",
+    "version": "evidence/versions/C004_ae6fc4b_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "03653b71da0d39f05fb0ae8ea71dd1767c3f04fe",
+    "parents": [
+      "ae6fc4bc5410cf1faf89745b115c1baf8970b8d2"
+    ],
+    "date": "2026-09-30T21:01:21+02:00",
+    "title": "fix waypoint index tracking",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C005_03653b7.diff",
+    "diff_sha256": "07a0a67e27caa751d810993fab0684ad53ec157537db5100298701dd3ab4d6ee",
+    "events": [
+      {
+        "event": "E0439",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "222a4bc8bc3c7222cce4d387606f0f4288fb216b7eed8d94886479335ca1c20f",
+    "version": "evidence/versions/C005_03653b7_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C006",
+    "commit": "18af7ccf645cff0944bdb70f7f7ff9f67300d67b",
+    "parents": [
+      "03653b71da0d39f05fb0ae8ea71dd1767c3f04fe"
+    ],
+    "date": "2026-09-30T21:11:28+02:00",
+    "title": "grasp height centre+0.035",
+    "files": [
+      "approach.py",
+      "gsweep.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C006_18af7cc.diff",
+    "diff_sha256": "135a9c577d7e3c235981bcca9b85046ae5c4988c75de8f26f2e81250c4015e8f",
+    "events": [
+      {
+        "event": "E0489",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "aeb90aa5d387ec8d30a17c1c155afca84378521c5583eb028c7770e73156dc4c",
+    "version": "evidence/versions/C006_18af7cc_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "81d1da0b4ed93714e6c822279c1dcc60aaac8e08",
+    "parents": [
+      "18af7ccf645cff0944bdb70f7f7ff9f67300d67b"
+    ],
+    "date": "2026-09-30T21:17:12+02:00",
+    "title": "finger clearance-aware grasp yaw, place yaw from grasp_tf",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C007_81d1da0.diff",
+    "diff_sha256": "61a1beb8db9b1088f8dfe3ea870871f02cc5030cc4d9fa087110d695b63e9ae3",
+    "events": [
+      {
+        "event": "E0506",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "b0677c05b0b74705e9a22c4a97052046563fd3fd827a3e832297b3a608ed4dcf",
+    "version": "evidence/versions/C007_81d1da0_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C008",
+    "commit": "0611c4d0e4abc0a37eb8dfc37d893ad16da13255",
+    "parents": [
+      "81d1da0b4ed93714e6c822279c1dcc60aaac8e08"
+    ],
+    "date": "2026-09-30T21:22:29+02:00",
+    "title": "fine small steps near objects (grasp descent, lift, place)",
+    "files": [
+      "approach.py",
+      "esc.py",
+      "show.py"
+    ],
+    "file_roles": [
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C008_0611c4d.diff",
+    "diff_sha256": "e45cd7c5a79879a75d636dcfa02ea88d3ecf4bdcd804bb84094c86f746ed0712",
+    "events": [
+      {
+        "event": "E0540",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "4dc4853d7a6a8d1a744139e6d0e415b1f9a803277863c34f481f8ef9523644bf",
+    "version": "evidence/versions/C008_0611c4d_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C009",
+    "commit": "9816a620e4dcb548d88b227bb7966936106f2bae",
+    "parents": [
+      "0611c4d0e4abc0a37eb8dfc37d893ad16da13255"
+    ],
+    "date": "2026-09-30T21:28:25+02:00",
+    "title": "replan with held object, bad spot memory, narrower spot range",
+    "files": [
+      "approach.py",
+      "trace2.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C009_9816a62.diff",
+    "diff_sha256": "1e21dbedc60035dda9f578a52686253416aa80964f158dc62cb1c87e34437f40",
+    "events": [
+      {
+        "event": "E0552",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "ea6583e86d7b282d4c3d4941648e7a96556f197098f460d4747f6572740d4ac0",
+    "version": "evidence/versions/C009_9816a62_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C010",
+    "commit": "8e6d34373c8a87c92f8299e230ce5dfa362faf04",
+    "parents": [
+      "9816a620e4dcb548d88b227bb7966936106f2bae"
+    ],
+    "date": "2026-09-30T21:40:46+02:00",
+    "title": "choose most accessible obstruction first; failure counts",
+    "files": [
+      "approach.py",
+      "show2.py",
+      "test_count.py",
+      "trace2.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C010_8e6d343.diff",
+    "diff_sha256": "94af20668663a5451eb6cd4069d0b21067c2c30f55c5a060fb397da1fe8425c8",
+    "events": [
+      {
+        "event": "E0612",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "900d9e4a540735a1f40902a820d66f26e41b8f6f6929f3bb117ec0fc5e8710ae",
+    "version": "evidence/versions/C010_8e6d343_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C011",
+    "commit": "32060165ae2c2824b3a231de977b40a0238c7176",
+    "parents": [
+      "8e6d34373c8a87c92f8299e230ce5dfa362faf04"
+    ],
+    "date": "2026-09-30T21:41:57+02:00",
+    "title": "prefer axis-aligned grasps strongly",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C011_3206016.diff",
+    "diff_sha256": "0206dd9e5ebf574f95607fccb17fff8fa2aa2e96b9b879f0b8cffb5a067a2f5b",
+    "events": [
+      {
+        "event": "E0646",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "d0318cb58aa33382446f63816febdc5437d121582fac20048341e6719f8bc7b9",
+    "version": "evidence/versions/C011_3206016_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C012",
+    "commit": "f7501d3205e66cc1de0f0f918f554118ae1affa6",
+    "parents": [
+      "32060165ae2c2824b3a231de977b40a0238c7176"
+    ],
+    "date": "2026-09-30T21:53:10+02:00",
+    "title": "grasp dz 0.04",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C012_f7501d3.diff",
+    "diff_sha256": "27f3c4eb782b2c1e0f8554f11d382beb4b4a4669ae5c37ea2b1a508d7d190554",
+    "events": [
+      {
+        "event": "E0674",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "bc9f5897abc13890458c6194a2690b49c72de078df4085fc8163cdb7d84875ac",
+    "version": "evidence/versions/C012_f7501d3_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C013",
+    "commit": "0989e5bd2d0d007150dfe4253a912565632c16b9",
+    "parents": [
+      "f7501d3205e66cc1de0f0f918f554118ae1affa6"
+    ],
+    "date": "2026-09-30T22:03:00+02:00",
+    "title": "revert to 60/60 version (access/aligned changes didn't help)",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C013_0989e5b.diff",
+    "diff_sha256": "c87b5ee2a7a9a9638a0f1cdfd1f00466988992330ec568b7e419a4c54f25a45b",
+    "events": [
+      {
+        "event": "E0687",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "ea6583e86d7b282d4c3d4941648e7a96556f197098f460d4747f6572740d4ac0",
+    "version": "evidence/versions/C013_0989e5b_approach.py",
+    "same_policy_as_earlier": [
+      "C009"
+    ]
+  },
+  {
+    "id": "C014",
+    "commit": "50044fb994e62f2ded74d19e09ad7547dfa3a0c6",
+    "parents": [
+      "0989e5bd2d0d007150dfe4253a912565632c16b9"
+    ],
+    "date": "2026-09-30T22:03:28+02:00",
+    "title": "in-place grasp depth retries",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C014_50044fb.diff",
+    "diff_sha256": "8aae03fdd5a18bd89a4f13ecde271f71f12d2089af2369af82a26c56edb39d00",
+    "events": [
+      {
+        "event": "E0707",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "710d4d840228e94e1cc4cd83a4f9bccb54b198bb44b938a92440f6c6018480a8",
+    "version": "evidence/versions/C014_50044fb_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C015",
+    "commit": "71151aeac4a2e60b76302a8809ee11a780782a0e",
+    "parents": [
+      "50044fb994e62f2ded74d19e09ad7547dfa3a0c6"
+    ],
+    "date": "2026-09-30T22:29:18+02:00",
+    "title": "retry rejected coarse moves with fine steps",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C015_71151ae.diff",
+    "diff_sha256": "be01eb9c172d9807576062ce7704fb9663a004e6cf99b9a103a362a86980fa0d",
+    "events": [
+      {
+        "event": "E0778",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "7a7f0bbd1baf8da1d3807ab0848c1865a76b7397b1a7349d477528d5ff82dc02",
+    "version": "evidence/versions/C015_71151ae_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C016",
+    "commit": "c5d29bf85619c55e3f2bff7f08f8ca1fab24cdf8",
+    "parents": [
+      "71151aeac4a2e60b76302a8809ee11a780782a0e"
+    ],
+    "date": "2026-09-30T22:34:27+02:00",
+    "title": "count approach rejections as grasp failures, cycle yaw candidates, deprioritize failing objects",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C016_c5d29bf.diff",
+    "diff_sha256": "9769fe2c12b9d48dbab6cc26de2058d6c3293b3c4a127cc47c4d6e758f1fbdfd",
+    "events": [
+      {
+        "event": "E0813",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "42462916c74d0c7afe713d33bb2998064aa024b32f1caa7488f8251b5ea6ab4e",
+    "version": "evidence/versions/C016_c5d29bf_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C017",
+    "commit": "1731ff2620aa4b40eefd2481d716414a77afeeb2",
+    "parents": [
+      "c5d29bf85619c55e3f2bff7f08f8ca1fab24cdf8"
+    ],
+    "date": "2026-09-30T22:51:59+02:00",
+    "title": "target grasp yaw considers finger clearance at the place pose",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C017_1731ff2.diff",
+    "diff_sha256": "d3d3b88a9bebe71ef3df2a7fdbf98da70a07fa5aa2024bbeffb48d317213c6dd",
+    "events": [
+      {
+        "event": "E0873",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "c4aed98bc9a70a077278e2ab4ad84cca6627643960212fd30d562fd1715614f8",
+    "version": "evidence/versions/C017_1731ff2_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C018",
+    "commit": "99399cddd2a2cfd765934e93e105a7e01d5ae223",
+    "parents": [
+      "1731ff2620aa4b40eefd2481d716414a77afeeb2"
+    ],
+    "date": "2026-09-30T22:52:55+02:00",
+    "title": "release-failure fallback: re-place elsewhere, clear near-region obstructions",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C018_99399cd.diff",
+    "diff_sha256": "1ec22179b5d799e3e5e7ad42d05440ec001aee97e8180bf303bb06985ef404b2",
+    "events": [
+      {
+        "event": "E0883",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "bae71f124ce55e7ea4cf5251ad25b7363027a64ddb93eb8e7da4f0cd644052bb",
+    "version": "evidence/versions/C018_99399cd_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C019",
+    "commit": "9c018b1fc83045d1cc3b3a179293c071493e10f7",
+    "parents": [
+      "99399cddd2a2cfd765934e93e105a7e01d5ae223"
+    ],
+    "date": "2026-09-30T22:58:20+02:00",
+    "title": "finger clearance: only objects reaching fingertip height matter",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C019_9c018b1.diff",
+    "diff_sha256": "2dc5ac6bd33904dcf9d4d7bc741fb7d585b635a71ce46c3f32f7dd5a98b5eb3b",
+    "events": [
+      {
+        "event": "E0918",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "ebbd3be951546f9a5278e114cbec5497807ebfde11c33ee5c5db275318d49d32",
+    "version": "evidence/versions/C019_9c018b1_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C020",
+    "commit": "104631d52b516b8be2d2d5cd3635bedcb050c2d8",
+    "parents": [
+      "9c018b1fc83045d1cc3b3a179293c071493e10f7"
+    ],
+    "date": "2026-09-30T23:01:36+02:00",
+    "title": "prefer blocking obstructions with a clear aligned grasp",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C020_104631d.diff",
+    "diff_sha256": "34aee53668f001e0d5d5eb8b37b3d648c03903c241803b92de38d3f13ca80f1f",
+    "events": [
+      {
+        "event": "E0926",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "e82d38528249461fd8e1311517f08ef98fcb69042e60280c5a048fa40d6fbc33",
+    "version": "evidence/versions/C020_104631d_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C021",
+    "commit": "c6d49bbcd14d7d3f03a760459ed66ff0e5847fd0",
+    "parents": [
+      "104631d52b516b8be2d2d5cd3635bedcb050c2d8"
+    ],
+    "date": "2026-09-30T23:03:09+02:00",
+    "title": "restore fingertip clearance threshold",
+    "files": [
+      "approach.py",
+      "res1.txt",
+      "res2.txt",
+      "res3.txt",
+      "show3.py"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C021_c6d49bb.diff",
+    "diff_sha256": "9ff375a8c13285269f8649974948b3baa6bce90316c56f7e465fac439c74a8df",
+    "events": [
+      {
+        "event": "E0948",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "3d17f171d5b4d50317d527f64634123ae0a5a656386b5caec343bc7ff53b62e6",
+    "version": "evidence/versions/C021_c6d49bb_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C022",
+    "commit": "98402a6b6080870e69842542bd5d7d21648c1c03",
+    "parents": [
+      "c6d49bbcd14d7d3f03a760459ed66ff0e5847fd0"
+    ],
+    "date": "2026-09-30T23:08:50+02:00",
+    "title": "per-object yaw cycling; skip depth retries when descent blocked high",
+    "files": [
+      "approach.py",
+      "clr.py",
+      "res3.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C022_98402a6.diff",
+    "diff_sha256": "9ae76ee688298cdd730abad375d8ad6137b80843d99ab2a52cabf541a3bafe0e",
+    "events": [
+      {
+        "event": "E0966",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "c69abf85a911563ec82130d97db7ba23e929394946023ac2387d5feeffbd8519",
+    "version": "evidence/versions/C022_98402a6_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C023",
+    "commit": "96188c98039031db46bf6387a822d4c8c3e727c3",
+    "parents": [
+      "98402a6b6080870e69842542bd5d7d21648c1c03"
+    ],
+    "date": "2026-09-30T23:27:13+02:00",
+    "title": "dedupe grasp yaw candidates modulo pi",
+    "files": [
+      "approach.py",
+      "res4.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C023_96188c9.diff",
+    "diff_sha256": "bab26a5f36afb41458b3a8e13bdf3d8d9eaa05006d328ffff835a0be27b11b2c",
+    "events": [
+      {
+        "event": "E1032",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "386afe34e8dd29e868a453090db45ea90e98085f3e13f4259c847f9bb59f3ee9",
+    "version": "evidence/versions/C023_96188c9_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C024",
+    "commit": "b927adaa3c5585700978d3163cdc13f66b5510bb",
+    "parents": [
+      "96188c98039031db46bf6387a822d4c8c3e727c3"
+    ],
+    "date": "2026-09-30T23:46:33+02:00",
+    "title": "coarse approach/lift/place moves with fine fallback on rejection",
+    "files": [
+      "approach.py",
+      "res5.txt",
+      "timeit.py"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C024_b927ada.diff",
+    "diff_sha256": "45ad42e79491bdc861117b76d7130afc548cf2eea8316745b86d4a4c10f4651c",
+    "events": [
+      {
+        "event": "E1113",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "8ed6181008be393d03299b3d9ad4f937571c590cdec99c0cef02debc71008146",
+    "version": "evidence/versions/C024_b927ada_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C025",
+    "commit": "1fc5850028b864e9ac5f165f06642b9f98b9acda",
+    "parents": [
+      "b927adaa3c5585700978d3163cdc13f66b5510bb"
+    ],
+    "date": "2026-09-30T23:53:26+02:00",
+    "title": "drop intermediate waypoints",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C025_1fc5850.diff",
+    "diff_sha256": "84c0111a02d204fdca3f04d7643a378e10b825649f4da29e5b3d19397bca75b1",
+    "events": [
+      {
+        "event": "E1136",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "62df4bb88ac455dc90526eed21869eb2b6d2c90cee7ea002f14228036f66dbba",
+    "version": "evidence/versions/C025_1fc5850_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C026",
+    "commit": "73e7580acf97b5ea571fc2b90c79a9f7d1a0c8a5",
+    "parents": [
+      "1fc5850028b864e9ac5f165f06642b9f98b9acda"
+    ],
+    "date": "2026-10-01T00:00:24+02:00",
+    "title": "dynamic transit heights",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C026_73e7580.diff",
+    "diff_sha256": "340a62f86514760752d808ed7b0fb60df29541c5e287a469cd31d0707438de1c",
+    "events": [
+      {
+        "event": "E1153",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "915b12c5b62c470db7b7b5759e321b9a7aa38be067fd482a549c58e7bfb1e5e3",
+    "version": "evidence/versions/C026_73e7580_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C027",
+    "commit": "9d0edffc76deda9336c9825378bcf8be10da0046",
+    "parents": [
+      "73e7580acf97b5ea571fc2b90c79a9f7d1a0c8a5"
+    ],
+    "date": "2026-10-01T00:06:49+02:00",
+    "title": "fine mode only for first 6 waypoints",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C027_9d0edff.diff",
+    "diff_sha256": "6471e83e447954b0c8cd9dc5e0a8eb25d959f8ef548a98a78341236f41032c0b",
+    "events": [
+      {
+        "event": "E1178",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "eb4b526270476cd74dbf38b9fc5f225a665a76fae217a9aa3464b20804210a6e",
+    "version": "evidence/versions/C027_9d0edff_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C028",
+    "commit": "f0d925adba353feb89e984d0bcfb872cf39d2b87",
+    "parents": [
+      "9d0edffc76deda9336c9825378bcf8be10da0046"
+    ],
+    "date": "2026-10-01T00:13:46+02:00",
+    "title": "joint-space interpolation for high transits",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C028_f0d925a.diff",
+    "diff_sha256": "bc2f95d1fff03bb7daf9c4d2134873d0c9237ffca04f91aa0ffc8aad2e5b96e8",
+    "events": [
+      {
+        "event": "E1199",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "e758ac76388e3a3173af2f1785063dad1f0e5c02caa16e01a8846c1ff226f6cc",
+    "version": "evidence/versions/C028_f0d925a_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C029",
+    "commit": "c30325a2d8738f93028e2d4f1812e5d43113e44c",
+    "parents": [
+      "f0d925adba353feb89e984d0bcfb872cf39d2b87"
+    ],
+    "date": "2026-10-01T00:56:28+02:00",
+    "title": "test results/scripts",
+    "files": [
+      "res6.txt",
+      "res7.txt"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C029_c30325a.diff",
+    "diff_sha256": "999e8c8a97f66037fd0cb66991719a05cf239823d5a21c5dddb2720594c1fbb8",
+    "events": [
+      {
+        "event": "E1309",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  }
+]

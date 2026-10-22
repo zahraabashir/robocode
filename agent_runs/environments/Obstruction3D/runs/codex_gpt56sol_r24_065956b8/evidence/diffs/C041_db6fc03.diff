@@ -1,0 +1,52 @@
+diff --git a/approach.py b/approach.py
+index fc34ca8..0fcc1bc 100644
+--- a/approach.py
++++ b/approach.py
+@@ -148,19 +148,16 @@ class GeneratedApproach:
+                 # Pinch near the top: center-height grasps can put fingertips
+                 # into the target plate or an immediately adjacent blocker.
+                 self.pick_xyz[2] += .3*self._get(state, self.object, "half_extent_z")
+-            if self.object == "target_block":
+-                u = np.clip((self.pick_xyz[0]-.3359817)/(.4644086-.3359817), 0, 1)
+-                self.anchor_q = np.array((0, .25+.2*u, -np.pi, -2.30+.2*u,
+-                                          0, -.47+.2*u, np.pi/2))
+-                self.anchor_bx = self.pick_xyz[0]-.4559817 if self.pick_xyz[0] <= .3359817 else -.12
+-                self.anchor_by = self.pick_xyz[1]
+-                self.goal_q = _HOME.copy()
+-                self.phase, self.phase_steps = "target_home", 0
+-            else:
+-                self.goal_q = _HOME.copy()
+-                self.pick_bx = self.pick_xyz[0]-.4559817 if self.pick_xyz[0] <= .3359817 else -.12
+-                self.pick_by = self.pick_xyz[1]
+-                self.phase, self.phase_steps = "prepick_base", 0
++            # A calibrated vertical grasp pose plus base translation is more
++            # collision-robust than interpolating through a low joint-space IK
++            # path. It works for both target-sized and small obstruction blocks.
++            u = np.clip((self.pick_xyz[0]-.3359817)/(.4644086-.3359817), 0, 1)
++            self.anchor_q = np.array((0, .25+.2*u, -np.pi, -2.30+.2*u,
++                                      0, -.47+.2*u, np.pi/2))
++            self.anchor_bx = self.pick_xyz[0]-.4559817 if self.pick_xyz[0] <= .3359817 else -.12
++            self.anchor_by = self.pick_xyz[1]
++            self.goal_q = _HOME.copy()
++            self.phase, self.phase_steps = "target_home", 0
+ 
+         if self.phase == "prepick_base":
+             bxerr, byerr = self.pick_bx-self.base_x, self.pick_by-self.base_y
+@@ -230,14 +227,10 @@ class GeneratedApproach:
+                 self.pick_xyz = self._xyz(state, self.object)
+                 if self.object.startswith("obstruction"):
+                     self.pick_xyz[2] += .3*self._get(state, self.object, "half_extent_z")
+-                if self.object == "target_block":
+-                    self.goal_q = _HOME.copy()
+-                    self.phase, self.phase_steps = "target_home", 0
+-                else:
+-                    # In a dense cluster, try a neighbor first; removing either
+-                    # one often makes the original vertical grasp collision-free.
++                if self.object != "target_block":
+                     self.deferred.add(self.object)
+-                    self.phase, self.phase_steps = "retract", 0
++                self.goal_q = _HOME.copy()
++                self.phase, self.phase_steps = "target_home", 0
+                 return self._act_to(q, self.goal_q, 1.0)
+             else:
+                 return self._act_to(q, q, -1.0)

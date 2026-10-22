@@ -1,0 +1,748 @@
+[
+  {
+    "id": "C001",
+    "commit": "39f2416e46c94798ea3bc0fd19574168db1e9eee",
+    "parents": [],
+    "date": "2026-09-21T12:39:56-04:00",
+    "title": "initial sandbox setup",
+    "files": [
+      ".gitignore",
+      "AGENTS.md",
+      "env_client.py",
+      "env_spaces.json"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C001_39f2416.diff",
+    "diff_sha256": "54db096028caca93d470bac910982a3abcd8b13e9f7e1bc46a85e42c62565a9d",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C002",
+    "commit": "f0e88a9f913851b76ee468f5484e8214cb6d530c",
+    "parents": [
+      "39f2416e46c94798ea3bc0fd19574168db1e9eee"
+    ],
+    "date": "2026-09-21T16:40:38Z",
+    "title": "Save initial feedback pushing policy as baseline",
+    "files": [
+      "approach.py",
+      "probe_dynamics.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C002_f0e88a9.diff",
+    "diff_sha256": "b28a1dba60c276276b2cbc9ee0c79236d88fce3bfe842ccc58739b4d15ccbe54",
+    "events": [
+      {
+        "event": "E0012",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "aa86a5a9ab40cd5e8af73213ee5f7cab750d80e5f203abf7ea4ca895d61985c3",
+    "version": "evidence/versions/C002_f0e88a9_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C003",
+    "commit": "ef5d590a4dc768e495757cc215886bd3721efecb",
+    "parents": [
+      "f0e88a9f913851b76ee468f5484e8214cb6d530c"
+    ],
+    "date": "2026-09-21T16:40:52Z",
+    "title": "Add reproducible seed evaluation and state traces",
+    "files": [
+      "probe_dynamics.py",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C003_ef5d590.diff",
+    "diff_sha256": "d3beafad3e6ff65c6a4987f87df3b781550421dc1148de3dd5de51c9a0a48d7f",
+    "events": [
+      {
+        "event": "E0014",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C004",
+    "commit": "92663cac5b0d716337cc8999876e4806e84fbfd4",
+    "parents": [
+      "ef5d590a4dc768e495757cc215886bd3721efecb"
+    ],
+    "date": "2026-09-21T16:40:59Z",
+    "title": "Keep actions safely inside strict environment bounds",
+    "files": [
+      "approach.py",
+      "probe_dynamics.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C004_92663ca.diff",
+    "diff_sha256": "68c1d9bea78ed8a91b73c4be019fd5ea2e9063264d89c2f60dfa167c248ef7c0",
+    "events": [
+      {
+        "event": "E0016",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "5115ccc3265566f960fbffdb2845c72828eb31237c9966a21bd83f2ba1b79ec5",
+    "version": "evidence/versions/C004_92663ca_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C005",
+    "commit": "d61475bd543dadfc8bc6d1726dbb2cb04ccc30cf",
+    "parents": [
+      "92663cac5b0d716337cc8999876e4806e84fbfd4"
+    ],
+    "date": "2026-09-21T16:42:07Z",
+    "title": "Add bounded COM response probing experiment",
+    "files": [
+      "probe_com.py",
+      "probe_geometry.py",
+      "probe_geometry2.py",
+      "trace_0.json",
+      "trace_1.json",
+      "trace_2.json"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C005_d61475b.diff",
+    "diff_sha256": "1d87267f28cb769cf1bea90a950ac2a113324dc6555dfb291a917c660f3c4e8c",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C006",
+    "commit": "b806e23bada7df27264f5704ab67d08eb3110f3a",
+    "parents": [
+      "d61475bd543dadfc8bc6d1726dbb2cb04ccc30cf"
+    ],
+    "date": "2026-09-21T16:42:35Z",
+    "title": "Implement contact selection and obstacle-aware navigation for T pushing",
+    "files": [
+      ".gitignore",
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C006_b806e23.diff",
+    "diff_sha256": "1e6a2e8b13b455040173ca5162bcca936b7c1b71835b6ad59296d31c9d5acc2b",
+    "events": [
+      {
+        "event": "E0021",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "eee45d454d6140c0d641d8632b2da9c676c77e59c8713227a283a485254b8d7b",
+    "version": "evidence/versions/C006_b806e23_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C007",
+    "commit": "1a8fbecebd8a9e3e1f498af7d078fdd4c98a4145",
+    "parents": [
+      "b806e23bada7df27264f5704ab67d08eb3110f3a"
+    ],
+    "date": "2026-09-21T16:42:42Z",
+    "title": "Correct sign of measured inertia in COM probe",
+    "files": [
+      "probe_com.py",
+      "trace_0.json",
+      "trace_1.json"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C007_1a8fbec.diff",
+    "diff_sha256": "4c0286337f2fa8dbca6c863645f80e60e0ada4005af302fc0418f79d6baa7c5b",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C008",
+    "commit": "8405e4ca5447cc4608b382bbea86f32f117b9299",
+    "parents": [
+      "1a8fbecebd8a9e3e1f498af7d078fdd4c98a4145"
+    ],
+    "date": "2026-09-21T16:43:12Z",
+    "title": "Use measured T geometry and empirically fitted origin-based contact model",
+    "files": [
+      "approach.py",
+      "trace_2.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C008_8405e4c.diff",
+    "diff_sha256": "21396e85fde3bd94eef3db853c70e8a4704d572574a6f40d5e423708f929e40b",
+    "events": [
+      {
+        "event": "E0026",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "189ecc06db0c9f470bd2eaef09ecba0786db624d55186df86b75be70fb201c83",
+    "version": "evidence/versions/C008_8405e4c_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C009",
+    "commit": "884e9041a89934d8f760338550922f1c939e9474",
+    "parents": [
+      "8405e4ca5447cc4608b382bbea86f32f117b9299"
+    ],
+    "date": "2026-09-21T16:43:24Z",
+    "title": "Probe side contacts to resolve physical rotation center",
+    "files": [
+      "probe_side.py",
+      "trace_0.json",
+      "trace_1.json",
+      "trace_2.json"
+    ],
+    "file_roles": [
+      "diagnostic/test"
+    ],
+    "diff": "evidence/diffs/C009_884e904.diff",
+    "diff_sha256": "b734d8b20e448efeee68bb024310e6b8ec598c1c02cfdb1d642596638b6cc6e5",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C010",
+    "commit": "1008ed5bcca3c68ce183723b4df2be69f66b1918",
+    "parents": [
+      "884e9041a89934d8f760338550922f1c939e9474"
+    ],
+    "date": "2026-09-21T16:44:12Z",
+    "title": "Model sticking contact about measured center of mass and avoid unreachable contacts",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C010_1008ed5.diff",
+    "diff_sha256": "a6c634a8480aefd3ec08e38120758ba4cb0e8966bd5b02000c32129a4a30cae1",
+    "events": [
+      {
+        "event": "E0032",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "507b42b7b0aa0cfb4e6afc2afb55e60277915ac88004d8fdb184914208be3d4b",
+    "version": "evidence/versions/C010_1008ed5_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C011",
+    "commit": "4b7d2245f2e93486fe32abaeb7297f45120fd23f",
+    "parents": [
+      "1008ed5bcca3c68ce183723b4df2be69f66b1918"
+    ],
+    "date": "2026-09-21T16:44:52Z",
+    "title": "Exclude contact points blocked by the other arm of the T",
+    "files": [
+      "approach.py",
+      "trace_0.json",
+      "trace_1.json",
+      "trace_2.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy"
+    ],
+    "diff": "evidence/diffs/C011_4b7d224.diff",
+    "diff_sha256": "f38694e244a67e7f6b2cb2ccfbafdf056cdfdd4819e60732d5059baaf8aa4558",
+    "events": [
+      {
+        "event": "E0036",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "83c353f93591afc0950dce48958929e2cf6d8e64facf43bd64ee8d4cf59902ba",
+    "version": "evidence/versions/C011_4b7d224_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C012",
+    "commit": "fd7be625adc98d6bd9fe2dca17941eb81da76b19",
+    "parents": [
+      "4b7d2245f2e93486fe32abaeb7297f45120fd23f"
+    ],
+    "date": "2026-09-21T16:45:33Z",
+    "title": "Keep transient episode traces out of version control",
+    "files": [
+      "geometry_validation.txt",
+      "results_batch1.txt",
+      "trace_0.json",
+      "trace_1.json",
+      "trace_2.json"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C012_fd7be62.diff",
+    "diff_sha256": "d78c218cba0297aa50f87f4c6479f8f4e4e27ed41efffcc1ddf7949031cc01e4",
+    "events": [
+      {
+        "event": "E0048",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C013",
+    "commit": "d7e96fc7e87000b86f66ed45827fdadbd25d910d",
+    "parents": [
+      "fd7be625adc98d6bd9fe2dca17941eb81da76b19"
+    ],
+    "date": "2026-09-21T16:46:15Z",
+    "title": "Record broad validation and retain traces for failed episodes",
+    "files": [
+      "geometry_validation.txt",
+      "results_batch1.txt",
+      "test_approach.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C013_d7e96fc.diff",
+    "diff_sha256": "6357f7b4548c598c568c7cfdfa8c65d7f95229f04d4d017f7eec60f354543f88",
+    "events": [
+      {
+        "event": "E0075",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C014",
+    "commit": "ecaea55794dd3697553b99c41db8e9fb534d6102",
+    "parents": [
+      "d7e96fc7e87000b86f66ed45827fdadbd25d910d"
+    ],
+    "date": "2026-09-21T16:46:40Z",
+    "title": "Prototype oblique contact pushes for independent efficiency comparison",
+    "files": [
+      "candidate_angles.py",
+      "make_angles.py",
+      "results_batch2.txt",
+      "test_angles.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C014_ecaea55.diff",
+    "diff_sha256": "bbffbdbc2172600178c8eae4ee5b0cd1c807ad4f850b8b756dfaa7a328709fef",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C015",
+    "commit": "669c73166a607a69ff6cc98749390c878c2e0ee6",
+    "parents": [
+      "ecaea55794dd3697553b99c41db8e9fb534d6102"
+    ],
+    "date": "2026-09-21T16:47:08Z",
+    "title": "Save isolated contact-selection variants and common-seed sweep runner",
+    "files": [
+      "angles_validation.txt",
+      "policy_baselineprobe.py",
+      "policy_distance010.py",
+      "policy_distance060.py",
+      "policy_switch12.py",
+      "policy_switch20.py",
+      "policy_weight015.py",
+      "policy_weight060.py",
+      "results_batch2.txt",
+      "sweep_probe.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C015_669c731.diff",
+    "diff_sha256": "9c63478cafe45942ab3593f726a69bd805645792dc82db9b0fb551a153dd408a",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C016",
+    "commit": "1f7d183dbf38dc6f4127b4d7430ce457b981616d",
+    "parents": [
+      "669c73166a607a69ff6cc98749390c878c2e0ee6"
+    ],
+    "date": "2026-09-21T16:47:38Z",
+    "title": "Prototype per-contact optimized oblique pushes with lateral feedback",
+    "files": [
+      "angles_validation.txt",
+      "candidate_optimized.py",
+      "make_optimized.py",
+      "results_batch2.txt",
+      "sweep_baselineprobe.log",
+      "sweep_distance010.log",
+      "sweep_distance060.log",
+      "sweep_switch12.log",
+      "sweep_switch20.log",
+      "sweep_weight015.log",
+      "sweep_weight060.log",
+      "test_optimized.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C016_1f7d183.diff",
+    "diff_sha256": "cb8d7ffe50d768360b0fef5702acf38eb68b20d5fa58636e9bd3972f82f804d7",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C017",
+    "commit": "318de3f737868054ce01bd58fde48c9ccc42666c",
+    "parents": [
+      "1f7d183dbf38dc6f4127b4d7430ce457b981616d"
+    ],
+    "date": "2026-09-21T16:48:03Z",
+    "title": "Recover from jammed contacts and keep retreat points inside workspace",
+    "files": [
+      "angles_results.json",
+      "angles_validation.txt",
+      "approach.py",
+      "baseline_normal.py",
+      "optimized_validation.txt",
+      "results_batch2.txt",
+      "results_policy_weight015_0_20.json",
+      "sweep_baselineprobe.log",
+      "sweep_distance010.log",
+      "sweep_distance060.log",
+      "sweep_switch12.log",
+      "sweep_switch20.log",
+      "sweep_weight015.log",
+      "sweep_weight060.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C017_318de3f.diff",
+    "diff_sha256": "4b73cf1e74b2137192eb55aaa7f3a61cecb53bd7ac7dd6da3551ab0f6b466690",
+    "events": [
+      {
+        "event": "E0072",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "7171838c0934f64dd8b25f41fb4804a794933542ce8916d3007da9624b597e03",
+    "version": "evidence/versions/C017_318de3f_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C018",
+    "commit": "9b8dfbc2c53b2ac715474c0f339e5dbc745abe0c",
+    "parents": [
+      "318de3f737868054ce01bd58fde48c9ccc42666c"
+    ],
+    "date": "2026-09-21T16:49:12Z",
+    "title": "Record common-seed tuning results and validate lower orientation weight on 70 seeds",
+    "files": [
+      "optimized_results.json",
+      "optimized_validation.txt",
+      "results_batch2.txt",
+      "results_policy_baselineprobe_0_20.json",
+      "results_policy_distance010_0_20.json",
+      "results_policy_distance060_0_20.json",
+      "results_policy_switch12_0_20.json",
+      "results_policy_switch20_0_20.json",
+      "results_policy_weight015_20_50.json",
+      "results_policy_weight060_0_20.json",
+      "sweep_baselineprobe.log",
+      "sweep_distance010.log",
+      "sweep_distance060.log",
+      "sweep_switch12.log",
+      "sweep_switch20.log",
+      "sweep_weight015_more.log",
+      "sweep_weight060.log"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C018_9b8dfbc.diff",
+    "diff_sha256": "eb32e2da2ad7ffafc8dcec4e021493ee1500ce8cca6681464542f7d8569f3289",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C019",
+    "commit": "520c6d3b9ca3a4dd247bc734e93bcc865292fb37",
+    "parents": [
+      "9b8dfbc2c53b2ac715474c0f339e5dbc745abe0c"
+    ],
+    "date": "2026-09-21T16:49:39Z",
+    "title": "Choose tangential push direction analytically to reduce travel and corrections",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C019_520c6d3.diff",
+    "diff_sha256": "e7406db7b6cf477463fdb073d84efe29dfcd9d78332f61cf81d7e8b58bb7e6ec",
+    "events": [
+      {
+        "event": "E0083",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "7c94f205740a0431eea443b161947ff02da940bca0f1cee24b6bd16eef307e4b",
+    "version": "evidence/versions/C019_520c6d3_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C020",
+    "commit": "d56bc8cb1b6611fc7c74a9c8d64bb669aa71c37a",
+    "parents": [
+      "520c6d3b9ca3a4dd247bc734e93bcc865292fb37"
+    ],
+    "date": "2026-09-21T16:49:47Z",
+    "title": "Save lower orientation weight variant of optimized pushing policy",
+    "files": [
+      "candidate_optimized_weight015.py"
+    ],
+    "file_roles": [
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C020_d56bc8c.diff",
+    "diff_sha256": "6dbbc8dcf03240c236b737e5fe4148c65324bdb5adc600348d63d83739e7c727",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C021",
+    "commit": "174d9244598e2e3402b0dcd330eb6ff0d6ac81ff",
+    "parents": [
+      "d56bc8cb1b6611fc7c74a9c8d64bb669aa71c37a"
+    ],
+    "date": "2026-09-21T16:50:44Z",
+    "title": "Add deterministic random holdout validation for boundary robustness",
+    "files": [
+      "results_candidate_optimized_144_1.json",
+      "results_candidate_optimized_30_50.json",
+      "results_candidate_optimized_weight015_144_1.json",
+      "results_candidate_optimized_weight015_30_50.json",
+      "results_optimized400.txt",
+      "sweep_candidate_optimized_144.log",
+      "sweep_candidate_optimized_30.log",
+      "sweep_candidate_optimized_weight015_144.log",
+      "sweep_candidate_optimized_weight015_30.log",
+      "test_holdout.py"
+    ],
+    "file_roles": [
+      "diagnostic/test",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C021_174d924.diff",
+    "diff_sha256": "4f8577ec226e32a1c061acc6bfba1c425dc6fc6752d1148a81d6895de8ce4896",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C022",
+    "commit": "dfea16fa97d3b04dbb9628d0741e15474b7c7670",
+    "parents": [
+      "174d9244598e2e3402b0dcd330eb6ff0d6ac81ff"
+    ],
+    "date": "2026-09-21T16:50:47Z",
+    "title": "Record optimized-angle orientation-weight comparison and boundary failures",
+    "files": [
+      "results_optimized400.txt"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C022_dfea16f.diff",
+    "diff_sha256": "f427db3a088a62556bb4951d21c5242f0aaeffc4108c703cbca44da262df93a9",
+    "events": [],
+    "annotation": {}
+  },
+  {
+    "id": "C023",
+    "commit": "b2797a7a34b7f3185668dfe1a1655f6dd912126f",
+    "parents": [
+      "dfea16fa97d3b04dbb9628d0741e15474b7c7670"
+    ],
+    "date": "2026-09-21T16:51:58Z",
+    "title": "Add boundary and initial-overlap stress seed selection",
+    "files": [
+      "holdout_results.json",
+      "holdout_validation.txt",
+      "results_optimized400.txt",
+      "stress_seeds.py"
+    ],
+    "file_roles": [
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C023_b2797a7.diff",
+    "diff_sha256": "dca33437c0a525f15140ec403d6ecbc94689645584969176b79724a9b003122c",
+    "events": [
+      {
+        "event": "E0098",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {}
+  },
+  {
+    "id": "C024",
+    "commit": "b2df26e3f8c02fe9685284053b61a2c7b6c54aa7",
+    "parents": [
+      "b2797a7a34b7f3185668dfe1a1655f6dd912126f"
+    ],
+    "date": "2026-09-21T16:52:30Z",
+    "title": "Detect stalled unintended contact during navigation as well as deliberate pushing",
+    "files": [
+      "approach.py",
+      "results_optimized400.txt",
+      "stress_seeds.json"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C024_b2df26e.diff",
+    "diff_sha256": "7ddc9131b2f1fac4df3c1ce99737a63f9f8070abbd7f4ecc8fb4cef906709d1f",
+    "events": [
+      {
+        "event": "E0102",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "caf5f8381e1bf68eae2050cbbc93e04730c289e2d62a00effad955e5803944e1",
+    "version": "evidence/versions/C024_b2df26e_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C025",
+    "commit": "3a1698483345aac5590bcaef79867f662dc2598f",
+    "parents": [
+      "b2df26e3f8c02fe9685284053b61a2c7b6c54aa7"
+    ],
+    "date": "2026-09-21T16:53:43Z",
+    "title": "Add goal-aware boundary clearance to avoid trapping the T against walls",
+    "files": [
+      "approach.py",
+      "candidate_recovery.py",
+      "results_optimized400.txt",
+      "results_stress.txt"
+    ],
+    "file_roles": [
+      "policy",
+      "setup/other",
+      "support code (role needs review)"
+    ],
+    "diff": "evidence/diffs/C025_3a16984.diff",
+    "diff_sha256": "f3a22c7ee334024d0095e522592f18b77b723301446d3b7ea6f74e5c067897b4",
+    "events": [
+      {
+        "event": "E0114",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "d26e863f3e9648ff8a351ea182930f5b8b21fb779b2a999ac67b0df12c21ddc7",
+    "version": "evidence/versions/C025_3a16984_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C026",
+    "commit": "7c03f3d38f7378e5ffe70042fd87ac9ce0aebcb8",
+    "parents": [
+      "3a1698483345aac5590bcaef79867f662dc2598f"
+    ],
+    "date": "2026-09-21T16:54:33Z",
+    "title": "Document empirical contact control before full regression validation",
+    "files": [
+      "approach.py"
+    ],
+    "file_roles": [
+      "policy"
+    ],
+    "diff": "evidence/diffs/C026_7c03f3d.diff",
+    "diff_sha256": "abfac127e241aba9dfddba1214e9d28dfcc099b9438750fe8d94d2ae9f26ea52",
+    "events": [
+      {
+        "event": "E0153",
+        "evidence": "commit title in command; output may not confirm creation"
+      }
+    ],
+    "annotation": {},
+    "policy_sha256": "3dbbda02979672e5c23a61ec92227a1c8850e312c9342dfd06f9c9d7eb7c3eee",
+    "version": "evidence/versions/C026_7c03f3d_approach.py",
+    "same_policy_as_earlier": []
+  },
+  {
+    "id": "C027",
+    "commit": "6adbc34c71602e613d0ae66376ba015ed5a81141",
+    "parents": [
+      "7c03f3d38f7378e5ffe70042fd87ac9ce0aebcb8"
+    ],
+    "date": "2026-09-21T16:57:59Z",
+    "title": "Record final 563-seed validation with all episodes solved",
+    "files": [
+      "final_holdout_progress.txt",
+      "holdout_results.json",
+      "results_final400.txt",
+      "results_final_stress.txt",
+      "validation_summary.json"
+    ],
+    "file_roles": [
+      "setup/other"
+    ],
+    "diff": "evidence/diffs/C027_6adbc34.diff",
+    "diff_sha256": "666efe956b81c622332f26bf2605c8376140c542c9ff2ff4f2dbe5fc5c5f965b",
+    "events": [
+      {
+        "event": "E0158",
+        "evidence": "commit hash in recorded output"
+      }
+    ],
+    "annotation": {}
+  }
+]

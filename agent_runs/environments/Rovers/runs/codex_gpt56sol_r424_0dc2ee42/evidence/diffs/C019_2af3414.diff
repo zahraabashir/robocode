@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index d6fc49a..387fec2 100644
+--- a/approach.py
++++ b/approach.py
+@@ -255,7 +255,7 @@ class GeneratedApproach:
+                 sob = self._sample_obj(state, i)
+                 analyzed = sob is None or self._v(state, sob, "analyzed_rover%d" % i) > 0.5
+                 if analyzed:
+-                    self.phase[i] = "images" if i == 0 else "send"
++                    self.phase[i] = "images"
+                     self.targets[i] = None
+                 elif self._dist(positions[i], self._xy(state, sob)) <= 0.2495:
+                     self._set_op(action, i, SAMPLE)

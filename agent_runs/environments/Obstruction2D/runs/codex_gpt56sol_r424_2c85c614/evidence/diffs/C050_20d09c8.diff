@@ -1,0 +1,64 @@
+diff --git a/approach.py b/approach.py
+index 82b4498..b38adba 100644
+--- a/approach.py
++++ b/approach.py
+@@ -60,6 +60,7 @@ class GeneratedApproach:
+         # through an earlier parked one on the way out of the goal region.
+         candidates.sort(key=lambda x: (abs(x - sx), abs(x - tx)), reverse=True)
+         self.parking = {}
++        self.parking_y = {}
+         used = []
+         first_rank = {}
+         for rank, name in enumerate(self.todo):
+@@ -68,7 +69,7 @@ class GeneratedApproach:
+         self.target_park = tx
+         if crowded:
+             self.target_park = candidates[0]
+-            used.append((self.target_park, tw))
++            used.append((self.target_park, tw, target_name))
+         for o in obstacles:
+             ow = state.get(o, "width")
+             goal_clearance = sw / 2 + tw / 2 + ow / 2 + 0.10
+@@ -79,7 +80,8 @@ class GeneratedApproach:
+                      and all(abs(x - state.get(q, "x")) >
+                              (ow + state.get(q, "width")) / 2 + 0.14 for q in future)
+                      and all(abs(x - px) > (ow + pw) / 2 + 0.12
+-                             for px, pw in used)]
++                             for px, pw, _ in used)]
++            park_y = 0.30
+             if valid:
+                 px = valid[0]
+             else:
+@@ -91,11 +93,19 @@ class GeneratedApproach:
+                                 ((ow + state.get(q, "width")) / 2 + 0.14)
+                                 for q in future]
+                     margins += [abs(x - qx) - ((ow + qw) / 2 + 0.12)
+-                                for qx, qw in used]
++                                for qx, qw, _ in used]
+                     return min(margins)
+-                px = max(candidates, key=slot_slack)
++                blocker_slots = [(qx, name) for qx, _, name in used if name != target_name]
++                if blocker_slots:
++                    px, _ = max(blocker_slots, key=lambda item: abs(item[0] - sx))
++                    level = sum(abs(qx - px) < 0.01 for qx, _, name in used
++                                if name != target_name)
++                    park_y = 0.30 + 0.20 * level
++                else:
++                    px = max(candidates, key=slot_slack)
+             self.parking[o.name] = px
+-            used.append((px, ow))
++            self.parking_y[o.name] = park_y
++            used.append((px, ow, o.name))
+         self.final_index = len(self.todo) - 1
+         xs = [state.get(state.get_object_from_name(n), "x") for n in state.get_object_names()]
+         self.initial_x = {n: state.get(state.get_object_from_name(n), "x")
+@@ -181,7 +191,8 @@ class GeneratedApproach:
+                 self.attached = True
+             # A modest vertical park is enough to clear the ground while still
+             # leaving room above it for a later verified re-grasp.
+-            park_y = 0.45 if (obj.type.name == "target_block" and not is_target) else 0.30
++            park_y = (0.45 if obj.type.name == "target_block"
++                      else self.parking_y.get(obj.name, 0.30))
+             parked_high_enough = (not is_target and self.attached and oy >= park_y)
+             lift_limit = self.safe_y if is_target else 0.74
+             if ry < lift_limit and not parked_high_enough:

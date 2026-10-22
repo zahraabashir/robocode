@@ -1,0 +1,133 @@
+diff --git a/debug2.txt b/debug2.txt
+index 694f79a..971a325 100644
+--- a/debug2.txt
++++ b/debug2.txt
+@@ -23,3 +23,13 @@
+  -0.     -1.    ] stall 90
+ 120 grasp obstruction1:Kinematic3DCuboid pos [0.1476 0.1024 0.1028] model [0.1476 0.1024 0.166 ] a [ 0.     -0.      0.      0.      0.0109  0.     -0.0099  0.      0.0208
+  -0.     -1.    ] stall 100
++130 grasp obstruction1:Kinematic3DCuboid pos [0.1476 0.1024 0.1028] model [0.1476 0.1024 0.166 ] a [ 0.     -0.      0.      0.      0.0109  0.     -0.0099  0.      0.0208
++ -0.     -1.    ] stall 110
++140 grasp obstruction1:Kinematic3DCuboid pos [0.1476 0.1024 0.1028] model [0.1476 0.1024 0.166 ] a [ 0.     -0.      0.      0.      0.0109  0.     -0.0099  0.      0.0208
++ -0.     -1.    ] stall 120
++150 grasp obstruction1:Kinematic3DCuboid pos [0.1476 0.1024 0.1028] model [0.1476 0.1024 0.166 ] a [ 0.     -0.      0.      0.      0.0109  0.     -0.0099  0.      0.0208
++ -0.     -1.    ] stall 130
++160 grasp obstruction1:Kinematic3DCuboid pos [0.1476 0.1024 0.1028] model [0.1476 0.1024 0.166 ] a [ 0.     -0.      0.      0.      0.0109  0.     -0.0099  0.      0.0208
++ -0.     -1.    ] stall 140
++170 grasp obstruction1:Kinematic3DCuboid pos [0.1476 0.1024 0.1028] model [0.1476 0.1024 0.166 ] a [ 0.     -0.      0.      0.      0.0109  0.     -0.0099  0.      0.0208
++ -0.     -1.    ] stall 150
+diff --git a/kin.py b/kin.py
+index a9ab955..b5be755 100644
+--- a/kin.py
++++ b/kin.py
+@@ -1,6 +1,5 @@
+ import numpy as np
+ from scipy.spatial.transform import Rotation
+-from scipy.optimize import least_squares
+ ORIGINS=[([0,0,.15643],np.pi),([0,.005375,-.12838],np.pi/2),([0,-.21038,-.006375],-np.pi/2),([0,.006375,-.21038],np.pi/2),([0,-.20843,-.006375],-np.pi/2),([0,0,-.10593],np.pi/2),([0,-.10593,0],-np.pi/2)]
+ MATS=[Rotation.from_euler('x',a).as_matrix() for p,a in ORIGINS]
+ Q0=np.array([0,-.35,-np.pi,-2.5,0,-.87,np.pi/2])
+@@ -13,10 +12,12 @@ def fk(q,d=.18):
+  return t-r[:,2]*d,r
+ 
+ def ik(x,z,d=.18):
+- def fun(v):
+-  q=Q0.copy();q[[1,3,5]]=v
+-  p,r=fk(q,d)
+-  return [p[0]-x,p[2]-z,r[0,2]]
+- fit=least_squares(fun,Q0[[1,3,5]],bounds=([-2,-2.57,-2],[2,2.57,2]),xtol=1e-10,gtol=1e-10,ftol=1e-10)
+- q=Q0.copy();q[[1,3,5]]=fit.x
+- return q
++    # Closed-form planar elbow solution with a vertically aligned wrist.
++    l1,l2=.42076,.31436
++    zz=z-(.28481-.10593-d)
++    c=np.clip((x*x+zz*zz-l1*l1-l2*l2)/(2*l1*l2),-1.,1.)
++    beta=np.arccos(c)
++    shoulder=np.arctan2(x,zz)-np.arctan2(l2*np.sin(beta),l1+l2*c)
++    q=Q0.copy()
++    q[1]=shoulder;q[3]=-beta;q[5]=shoulder+beta-np.pi
++    return q
+diff --git a/retry_results.txt b/retry_results.txt
+new file mode 100644
+index 0000000..317991c
+--- /dev/null
++++ b/retry_results.txt
+@@ -0,0 +1,28 @@
++2 0 above block [ 0.189 -0.335  0.1  ] held 0.0
++2 8 align block [ 0.189 -0.335  0.1  ] held 0.0
++2 10 grasp block [ 0.189 -0.335  0.1  ] held 0.0
++2 23 above block [ 0.189 -0.335  0.1  ] held 0.0
++2 30 align block [ 0.189 -0.335  0.1  ] held 0.0
++2 40 grasp block [ 0.189 -0.335  0.1  ] held 0.0
++2 51 lift block [ 0.189 -0.335  0.1  ] held 1.0
++2 59 carry block [ 0.189 -0.335  0.1  ] held 1.0
++2 61 lower block [ 0.189 -0.335  0.1  ] held 1.0
++2 71 release block [ 0.189 -0.335  0.1  ] held 1.0
++2 73 above block [ 0.189 -0.335  0.1  ] held 0.0
++2 81 align block [ 0.189 -0.335  0.1  ] held 0.0
++2 91 grasp block [ 0.189 -0.335  0.1  ] held 0.0
++2 101 lift block [ 0.189 -0.335  0.1  ] held 1.0
++2 110 carry block [ 0.189 -0.335  0.1  ] held 1.0
++2 112 lower block [ 0.189 -0.335  0.1  ] held 1.0
++2 122 release block [ 0.189 -0.335  0.1  ] held 1.0
++2 124 above block [ 0.189 -0.335  0.1  ] held 0.0
++2 132 align block [ 0.189 -0.335  0.1  ] held 0.0
++2 135 grasp block [ 0.189 -0.335  0.1  ] held 0.0
++2 145 lift block [ 0.189 -0.335  0.125] held 1.0
++2 153 carry block [ 0.189 -0.335  0.3  ] held 1.0
++2 157 lower block [0.159 0.074 0.3  ] held 1.0
++2 166 release block [0.159 0.074 0.111] held 1.0
++RESULT 2 {'object_count': 2} 168 True 36.86 phase release
++10 0 above block [0.361 0.259 0.1  ] held 0.0
++10 8 align block [0.361 0.259 0.1  ] held 0.0
++10 10 grasp block [0.361 0.259 0.1  ] held 0.0
+diff --git a/test_results.txt b/test_results.txt
+index 0aeca3f..8a600af 100644
+--- a/test_results.txt
++++ b/test_results.txt
+@@ -50,3 +50,37 @@ RESULT 5 {'object_count': 2} 125 True 14.87 phase release
+ 6 8 align block [ 0.36  -0.128  0.1  ] held 0.0
+ 6 12 grasp block [ 0.36  -0.128  0.1  ] held 0.0
+ 6 21 lift block [ 0.36  -0.128  0.1  ] held 1.0
++6 29 carry block [ 0.36  -0.128  0.1  ] held 1.0
++6 31 lower block [ 0.36  -0.128  0.1  ] held 1.0
++6 40 release block [ 0.36  -0.128  0.1  ] held 1.0
++6 42 above block [ 0.36  -0.128  0.1  ] held 0.0
++6 49 align block [ 0.36  -0.128  0.1  ] held 0.0
++6 53 grasp block [ 0.36  -0.128  0.1  ] held 0.0
++6 61 lift block [ 0.36  -0.128  0.125] held 1.0
++6 69 carry block [ 0.36  -0.128  0.3  ] held 1.0
++6 73 lower block [0.259 0.36  0.3  ] held 1.0
++6 82 release block [0.259 0.36  0.111] held 1.0
++RESULT 6 {'object_count': 1} 84 True 25.36 phase release
++7 0 above block [0.133 0.233 0.1  ] held 0.0
++7 8 align block [0.133 0.233 0.1  ] held 0.0
++7 10 grasp block [0.133 0.233 0.1  ] held 0.0
++7 22 lift block [0.133 0.233 0.1  ] held 1.0
++7 30 carry block [0.133 0.233 0.1  ] held 1.0
++7 32 lower block [0.133 0.233 0.1  ] held 1.0
++7 42 release block [0.133 0.233 0.1  ] held 1.0
++7 44 above block [0.133 0.233 0.1  ] held 0.0
++7 52 align block [0.133 0.233 0.1  ] held 0.0
++7 56 grasp block [0.133 0.233 0.1  ] held 0.0
++7 66 lift block [0.133 0.233 0.125] held 1.0
++7 74 carry block [0.133 0.233 0.3  ] held 1.0
++7 78 lower block [ 0.211 -0.141  0.3  ] held 1.0
++7 87 release block [ 0.211 -0.141  0.111] held 1.0
++RESULT 7 {'object_count': 2} 89 True 18.19 phase release
++8 0 above block [ 0.278 -0.092  0.1  ] held 0.0
++8 8 align block [ 0.278 -0.092  0.1  ] held 0.0
++8 11 grasp block [ 0.278 -0.092  0.1  ] held 0.0
++8 21 lift block [ 0.278 -0.092  0.1  ] held 1.0
++8 29 carry block [ 0.278 -0.092  0.1  ] held 1.0
++8 31 lower block [ 0.278 -0.092  0.1  ] held 1.0
++8 41 release block [ 0.278 -0.092  0.1  ] held 1.0
++8 43 above block [ 0.278 -0.092  0.1  ] held 0.0
+diff --git a/test_sweep_agent.out b/test_sweep_agent.out
+index e69de29..1875faa 100644
+--- a/test_sweep_agent.out
++++ b/test_sweep_agent.out
+@@ -0,0 +1,3 @@
++{"seed": 20, "count": 2, "success": true, "steps": 132, "sec": 35.41}
++{"seed": 21, "count": 0, "success": true, "steps": 42, "sec": 7.63}
++{"seed": 22, "count": 2, "success": true, "steps": 88, "sec": 14.99}

@@ -1,0 +1,59 @@
+diff --git a/approach.py b/approach.py
+index bea2eb7..646bda0 100644
+--- a/approach.py
++++ b/approach.py
+@@ -33,6 +33,7 @@ class GeneratedApproach:
+         self.stuck = 0
+         self.escape = 0
+         self.done = set()
++        self.released = None
+ 
+     # ------------------------------------------------------------------
+     def _parse(self, s):
+@@ -325,13 +326,25 @@ class GeneratedApproach:
+                 parts = self._parts(robot)
+                 obst = self._obst(objs, exclude=(obj["name"],))
+                 act, arrived = self._move(robot, gx, gty, parts, obst, 0.0)
++                self.released = None
+                 if not arrived:
++                    lands = (abs(robot["x"] + float(act[0]) - gx) < 1e-5
++                             and abs(robot["y"] + float(act[1]) - gty) < 3e-5
++                             and abs(float(act[2])) < 1e-4 and abs(float(act[3])) < 1e-4)
++                    if lands:
++                        act[4] = 1.0
++                        self.mode = "grasp"
+                     return act
++                if robot["vac"] < 0.5:
++                    self.mode = "grasp"
++                    return self._act(0, 0, 0, 0, 1.0)
+                 self.mode = "grasp"
+-                self.grasp_y = obj["y"]
+-                return self._act(0, 0, 0, 0, 1.0)
++                continue
+             if self.mode == "grasp":
+                 obj = objs[self.cur]
++                if robot["vac"] < 0.5:
++                    self.mode = "pick"
++                    continue
+                 self.g_actual = robot["x"] - obj["cx"]
+                 self.depth = robot["y"] - obj["y"]
+                 if self.cur == "target_block":
+@@ -365,9 +378,18 @@ class GeneratedApproach:
+                     self.mode = "pick"
+                     return self._act(0, 0, 0, 0, 0.0)
+                 if not arrived:
++                    lands = (abs(robot["x"] + float(act[0]) - tx) < 1e-5
++                             and abs(robot["y"] + float(act[1]) - ty) < 3e-5
++                             and abs(float(act[2])) < 1e-4 and abs(float(act[3])) < 1e-4)
++                    if lands and self.cur != "target_block":
++                        act[4] = 0.0
++                        self.mode = "pick"
++                        self.cur = None
++                        self.last_pose = None
+                     return act
+                 self.mode = "pick"
+                 self.cur = None
++                self.last_pose = None
+                 return self._act(0, 0, 0, 0, 0.0)
+         return self._act(0, 0, 0, 0, robot["vac"])
+ 

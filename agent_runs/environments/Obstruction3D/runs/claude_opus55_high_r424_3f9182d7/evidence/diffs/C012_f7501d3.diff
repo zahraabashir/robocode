@@ -1,0 +1,22 @@
+diff --git a/approach.py b/approach.py
+index 2e997d2..2e3486b 100644
+--- a/approach.py
++++ b/approach.py
+@@ -127,7 +127,7 @@ class GeneratedApproach:
+             clr = self._finger_clearance(s, obj, yaw, others)
+             aligned = abs(np.sin(2 * rel)) < 1e-6
+             score = min(clr, 0.02) - 0.002 * abs(_wrap(yaw - cy)) - 0.01 * span \
+-                - (0.0 if aligned else 0.03)
++                - (0.0 if aligned else 0.01)
+             if not aligned and clr < 0.004:
+                 continue
+             cands.append((score, _wrap(yaw)))
+@@ -144,7 +144,7 @@ class GeneratedApproach:
+         h = _he(s, obj)
+         yaw = self._grasp_yaw(s, obj, q, base, others, place_yaw is not None)
+         self.place_yaw = place_yaw
+-        gz = p[2] + 0.035  # TCP height for grasp (object centre 2-5 cm below TCP works)
++        gz = p[2] + 0.04  # TCP height for grasp: object centre 4cm below TCP is most reliable
+         place_center = np.array([place_xy[0], place_xy[1], support_top + h[2] + 0.002])
+         return [
+             ('move', np.array([p[0], p[1], max(SAFE_Z, gz + 0.05)]), yaw, False),

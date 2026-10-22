@@ -1,0 +1,23 @@
+diff --git a/approach.py b/approach.py
+index cb23b47..e998528 100644
+--- a/approach.py
++++ b/approach.py
+@@ -23,7 +23,7 @@ LANDER_RANGE = 3.95
+ SAMPLE_R = 0.235
+ PILLAR_INFL_OBJ = 0.03
+ PILLAR_INFL_LAND = 0.04
+-ROVER_OCC_R = 0.27
++ROVER_OCC_R = 0.36
+ CAM_OFF = (-0.087, -0.0125)
+ OBJ_BACK_DEG = 108.0     # if |rel bearing| > this, pillars don't occlude objectives
+ LAND_BACK_DEG = 110.0    # same quirk for lander (sending)
+@@ -181,7 +181,8 @@ class RoverPlanner:
+             self.any_vis |= v
+         # lander visibility
+         lx, ly = scene.lander
+-        v = np.hypot(lx - X, ly - Y) <= LANDER_RANGE
++        v = (np.hypot(lx - X, ly - Y) <= LANDER_RANGE) & \
++            (np.hypot(lx - self.camx, ly - self.camy) <= LANDER_RANGE)
+         occ = np.zeros(X.shape, dtype=bool)
+         for (cx, cy, ax, ay) in scene.pillars:
+             e = PILLAR_INFL_LAND

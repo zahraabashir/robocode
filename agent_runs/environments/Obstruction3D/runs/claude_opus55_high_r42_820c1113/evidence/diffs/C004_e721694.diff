@@ -1,0 +1,135 @@
+diff --git a/approach.py b/approach.py
+index 6f1e4fd..62d9060 100644
+--- a/approach.py
++++ b/approach.py
+@@ -8,7 +8,7 @@ TABLE_Z = 0.075
+ TABLE_X = (0.10, 0.50)
+ TABLE_Y = (-0.40, 0.40)
+ SAFE_Z = 0.30          # tool height for transport
+-GRASP_DZ = 0.015       # tool height above object top when closing
++GRASP_DZ = 0.025       # tool height above object top when closing
+ PLACE_EPS = 0.0015     # clearance above support surface when releasing
+ MAX_DQ = 0.2
+ JLIM = {1: 2.41, 3: 2.66, 5: 2.23}   # limited joints (0-indexed): 2,4,6 in 1-index
+@@ -121,7 +121,8 @@ class GeneratedApproach:
+                              surf=rp[2] + rhe[2], yaw_dest=None)
+         n = self.task['name']
+         p, he = self.objs[n]
+-        self.task['yaw'] = self._yaw_for(p[:2])
++        att = self.fail.get(('grasp', n), 0)
++        self.task['yaw'] = self._choose_yaw(n, p[:2], p[2] + he[2] + GRASP_DZ - 0.05, att)
+         self.task['yaw_place'] = self._match_yaw(self.task['yaw'], self._yaw_for(self.task['dest']))
+         self.phase = 'to_pick'
+         tool = fk(self.base, self.q)[:3, 3]
+@@ -134,6 +135,44 @@ class GeneratedApproach:
+         path += self._line(pick_above, np.array([p[0], p[1], p[2] + he[2] + GRASP_DZ]), 0.05)
+         self._set_path(path, self.task['yaw'])
+ 
++    def _footprint_hits(self, name, xy, yaw, bottom):
++        """Count collisions of gripper footprint (at xy, yaw, lowest z=bottom) with other objects."""
++        c, s_ = np.cos(yaw), np.sin(yaw)
++        ax = np.array([c, s_]); ay = np.array([-s_, c])
++        gx, gy = 0.065, 0.03
++        hits = 0.0
++        for n, (p, he) in self.objs.items():
++            if n == name or n == 'target_region':
++                continue
++            if p[2] + he[2] < bottom:
++                continue
++            d = p[:2] - xy
++            # SAT between rotated rect (gx,gy) and AABB he
++            sep = False
++            for axis, r1 in ((np.array([1.0, 0]), abs(ax[0]) * gx + abs(ay[0]) * gy),
++                             (np.array([0, 1.0]), abs(ax[1]) * gx + abs(ay[1]) * gy)):
++                if abs(d @ axis) > r1 + (he[0] if axis[0] else he[1]):
++                    sep = True
++            for axis, r1 in ((ax, gx), (ay, gy)):
++                r2 = abs(axis[0]) * he[0] + abs(axis[1]) * he[1]
++                if abs(d @ axis) > r1 + r2:
++                    sep = True
++            if not sep:
++                hits += 1
++        return hits
++
++    def _choose_yaw(self, name, xy, bottom, attempt=0):
++        rad = self._yaw_for(xy)
++        best, bv = rad, 1e9
++        for k in range(12):
++            y = rad + k * np.pi / 12
++            y = y if k < 7 else y - np.pi   # prefer small deviation either side
++            dev = min(abs(wrap(y - rad)), abs(wrap(y - rad + np.pi)))
++            v = self._footprint_hits(name, xy, y, bottom) * 10 + dev
++            if v < bv:
++                bv, best = v, y
++        return best + attempt * np.pi / 2
++
+     def _yaw_for(self, xy):
+         mx = self.base[0] + 0.12 * np.cos(self.base[2])
+         my = self.base[1] + 0.12 * np.sin(self.base[2])
+@@ -250,19 +289,12 @@ class GeneratedApproach:
+                 self.path += [(p_, y1) for p_ in pts3]
+                 return None
+             self.wait += 1
+-            if self.wait > 3:
+-                # grasp failed: re-plan (lift first)
+-                self.wait = 0
+-                self.phase = 'plan'
+-                return None
+             if self.wait == 1:
+                 return self._act(grip=-1.0)
+-            # nudge down a bit and retry
+-            tool = fk(self.base, self.q)[:3, 3]
+-            self.path = [(tool - np.array([0, 0, 0.01]), self.task['yaw'])]
+-            dq = self._track()
+-            self.wait = 0 if dq is None else self.wait
+-            return self._act(dq, grip=-1.0)
++            self.wait = 0
++            self.fail[('grasp', n)] = self.fail.get(('grasp', n), 0) + 1
++            self.phase = 'plan'
++            return None
+         if ph == 'to_place':
+             if not self.grasped:
+                 self.phase = 'plan'
+diff --git a/dbg.py b/dbg.py
+new file mode 100644
+index 0000000..6b42f0a
+--- /dev/null
++++ b/dbg.py
+@@ -0,0 +1,15 @@
++import sys, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++from kin import fk
++seed=int(sys.argv[1]); N=int(sys.argv[2])
++env = make_env(); obs, info = env.reset(seed=seed)
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++for t in range(N):
++    a = ap.get_action(obs)
++    obs, r, te, tr, info = env.step(a)
++    n = ap.task['name'] if ap.task else None
++    tool = fk(ap.base, ap.q)[:3,3]
++    top = ap.objs[n][0][2]+ap.objs[n][1][2] if n else 0
++    print(t, ap.phase, n, 'tool', tool.round(3), 'obj', ap.objs[n][0].round(3) if n else '', 'top', round(top,3), 'grip', a[10], 'g', ap.grasped, 'dq', np.abs(a[3:10]).max().round(3))
++    if te: print('DONE'); break
+diff --git a/ptest.py b/ptest.py
+new file mode 100644
+index 0000000..2f97a1e
+--- /dev/null
++++ b/ptest.py
+@@ -0,0 +1,16 @@
++import sys
++from multiprocessing import Pool
++from test_approach import run
++def f(s):
++    try:
++        ok,n,tc,ap=run(s); return (s,ok,n,tc,ap.phase,ap.task['name'] if ap.task else None, ap.objs and len(ap._obstructions()))
++    except Exception as e:
++        return (s,False,-1,0,'EXC',repr(e)[:200],0)
++if __name__=='__main__':
++    a,b=int(sys.argv[1]),int(sys.argv[2]); npar=int(sys.argv[3]) if len(sys.argv)>3 else 8
++    with Pool(npar) as p:
++        res=p.map(f, range(a,b))
++    for r in res:
++        if not r[1]: print('FAIL', r)
++    ok=[r for r in res if r[1]]
++    print(f'success {len(ok)}/{len(res)}  mean steps(success) {sum(r[2] for r in ok)/max(1,len(ok)):.1f}  max compute {max(r[3] for r in res):.1f}s')

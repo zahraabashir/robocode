@@ -1,0 +1,13 @@
+diff --git a/probe_geometry.py b/probe_geometry.py
+index e0421d0..51daa3e 100644
+--- a/probe_geometry.py
++++ b/probe_geometry.py
+@@ -8,7 +8,7 @@ def snapshot(state, env):
+     for typ in env.observation_space.types:
+         vals = []
+         for obj in state.get_objects(typ):
+-            fs = env.observation_space.type_features[typ.name]
++            fs = env.observation_space.type_features[typ]
+             vals.append((obj.name, {f: float(state.get(obj, f)) for f in fs}))
+         out[typ.name] = vals
+     return out

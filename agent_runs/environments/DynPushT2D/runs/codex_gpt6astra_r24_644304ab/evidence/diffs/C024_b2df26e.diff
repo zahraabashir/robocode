@@ -1,0 +1,89 @@
+diff --git a/approach.py b/approach.py
+index 7fcf760..1522961 100644
+--- a/approach.py
++++ b/approach.py
+@@ -90,7 +90,8 @@ class GeneratedApproach:
+         self.cooldown=np.maximum(self.cooldown-1,0)
+         error=s[29:31]-s[:2]
+         cost=np.dot(error,error)+.35*wrap(s[31]-s[2])**2
+-        self.history.append((cost,self.pushing))
++        moved=self.last is not None and (np.linalg.norm(s[:2]-self.last[:2])>.002 or abs(wrap(s[2]-self.last[2]))>.004)
++        self.history.append((cost,self.pushing or moved))
+         if len(self.history)>35: self.history.pop(0)
+         if len(self.history)==35 and sum(h[1] for h in self.history)>10 and cost>self.history[0][0]-.005:
+             if self.contact is not None:
+diff --git a/results_optimized400.txt b/results_optimized400.txt
+index b66290c..f77209c 100644
+--- a/results_optimized400.txt
++++ b/results_optimized400.txt
+@@ -262,3 +262,62 @@
+ 261 success True steps 84 err [-0.0211, 0.001, -0.0552] time 0.184
+ 262 success True steps 174 err [-0.0126, 0.0079, -0.0265] time 0.396
+ 263 success True steps 160 err [0.0197, -0.0412, -0.0334] time 0.372
++264 success True steps 116 err [0.0016, 0.0061, 0.0269] time 0.362
++265 success True steps 152 err [-0.0086, 0.0002, -0.0469] time 0.99
++266 success True steps 139 err [-0.0134, 0.0069, -0.0421] time 0.917
++267 success True steps 179 err [0.0002, 0.006, -0.0493] time 1.246
++268 success True steps 145 err [-0.0293, 0.0213, 0.0502] time 0.967
++269 success True steps 216 err [-0.0113, -0.009, 0.0236] time 1.442
++270 success True steps 111 err [-0.0098, -0.0012, 0.0872] time 0.738
++271 success True steps 111 err [-0.0013, 0.0036, 0.0207] time 0.716
++272 success True steps 138 err [0.0057, -0.0001, -0.0204] time 0.899
++273 success True steps 73 err [0.011, -0.0128, -0.0293] time 0.475
++274 success True steps 115 err [0.017, -0.0116, -0.056] time 0.774
++275 success True steps 43 err [-0.0056, -0.0093, -0.1242] time 0.28
++276 success True steps 102 err [0.0303, -0.016, -0.0585] time 0.69
++277 success True steps 122 err [0.0056, 0.0045, 0.0142] time 0.804
++278 success True steps 158 err [-0.0171, -0.0032, 0.0201] time 1.032
++279 success True steps 189 err [-0.0046, -0.0026, -0.0313] time 1.049
++280 success True steps 174 err [-0.0075, 0.0003, 0.0269] time 0.451
++281 success True steps 123 err [-0.0052, -0.0036, 0.0447] time 0.286
++282 success True steps 245 err [0.0005, -0.0079, -0.0341] time 0.585
++283 success True steps 125 err [0.0098, -0.0414, -0.0389] time 0.288
++284 success True steps 193 err [0.0083, -0.0284, -0.0039] time 0.443
++285 success True steps 134 err [0.0011, -0.0094, 0.0159] time 0.289
++286 success True steps 49 err [0.0069, -0.0169, 0.0283] time 0.113
++287 success True steps 138 err [-0.0204, -0.0087, 0.0054] time 0.318
++288 success True steps 142 err [-0.0269, -0.0177, 0.0809] time 0.339
++289 success True steps 229 err [0.0119, 0.0073, 0.0155] time 0.514
++290 success True steps 129 err [-0.0088, -0.0224, -0.0243] time 0.303
++291 success True steps 159 err [-0.0244, 0.012, 0.0278] time 0.361
++292 success True steps 158 err [0.0053, -0.0043, -0.0232] time 0.362
++293 success True steps 150 err [-0.0006, 0.0057, -0.0283] time 0.323
++294 success True steps 158 err [-0.0096, 0.0142, -0.0055] time 0.375
++295 success True steps 135 err [-0.0201, -0.0033, 0.0168] time 0.322
++296 success True steps 147 err [0.0027, 0.0088, -0.0208] time 0.367
++297 success True steps 73 err [0.0003, 0.0007, -0.0231] time 0.169
++298 success True steps 186 err [0.0069, 0.0016, 0.0192] time 0.438
++299 success True steps 115 err [0.0453, -0.0071, -0.0104] time 0.27
++300 success True steps 184 err [-0.011, 0.01, -0.0111] time 0.415
++301 success True steps 175 err [0.0066, 0.0047, 0.0116] time 0.405
++302 success True steps 181 err [-0.0261, 0.008, -0.0929] time 0.416
++303 success True steps 162 err [-0.021, 0.0045, -0.0048] time 0.38
++304 success True steps 143 err [-0.0261, 0.0066, 0.0142] time 0.346
++305 success True steps 160 err [-0.0163, -0.0288, 0.0049] time 0.377
++306 success True steps 190 err [-0.0046, -0.0007, -0.0115] time 0.447
++307 success True steps 186 err [-0.0018, -0.0035, -0.02] time 0.432
++308 success True steps 203 err [-0.0073, 0.0175, 0.0133] time 0.491
++309 success True steps 141 err [0.0213, -0.003, 0.0124] time 0.329
++310 success True steps 140 err [0.0137, 0.0234, 0.0342] time 0.32
++311 success True steps 170 err [-0.029, -0.0159, -0.031] time 0.388
++312 success True steps 150 err [-0.0048, -0.0091, -0.0212] time 0.355
++313 success True steps 59 err [-0.0193, -0.0031, 0.0391] time 0.131
++314 success True steps 100 err [-0.0157, -0.0107, -0.0196] time 0.233
++315 success True steps 437 err [-0.025, -0.0387, 0.0161] time 1.05
++316 success True steps 130 err [-0.0086, -0.0221, 0.0039] time 0.294
++317 success True steps 191 err [0.007, -0.0156, -0.0032] time 0.431
++318 success True steps 144 err [0.0009, 0.0045, -0.0253] time 0.334
++319 success True steps 175 err [-0.0066, -0.0121, -0.0136] time 0.431
++320 success True steps 59 err [-0.0055, -0.0, 0.0569] time 0.124
++321 success True steps 188 err [0.0121, -0.0049, 0.0812] time 0.444
++322 success True steps 95 err [-0.0142, -0.0098, 0.0055] time 0.204
+diff --git a/stress_seeds.json b/stress_seeds.json
+new file mode 100644
+index 0000000..75dedc4
+--- /dev/null
++++ b/stress_seeds.json
+@@ -0,0 +1 @@
++[2009, 2025, 2035, 2052, 2053, 2088, 2111, 2117, 2178, 2236, 2321, 2371, 2387, 2390, 2397, 2413, 2414, 2538, 2614, 2636, 2679, 2686, 2749, 2813, 2817, 2857, 2896, 2898, 2954, 2979, 3008, 3135, 3151, 3254, 3279, 3296, 3326, 3381, 3392, 3393, 3425, 3426, 3459, 3603, 3608, 3610, 3617, 3621, 3633, 3637, 3645, 3647, 3737, 3780, 3799, 3803, 3815, 3846, 3854, 3860, 3867, 3964, 3996]
+\ No newline at end of file

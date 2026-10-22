@@ -1,0 +1,74 @@
+diff --git a/geometry_validation.txt b/geometry_validation.txt
+index e69de29..aa5bd3c 100644
+--- a/geometry_validation.txt
++++ b/geometry_validation.txt
+@@ -0,0 +1,11 @@
++1000 success True steps 161 err [0.0132, 0.0109, 0.0066] time 0.42
++1001 success True steps 161 err [0.0012, 0.0084, 0.0111] time 0.447
++1002 success True steps 155 err [0.0102, -0.0041, -0.0239] time 0.494
++1003 success True steps 193 err [-0.0226, -0.0247, 0.0232] time 0.441
++1004 success True steps 134 err [-0.0323, -0.0132, 0.0113] time 0.337
++1005 success True steps 131 err [-0.0264, -0.0041, 0.0285] time 0.32
++1006 success True steps 211 err [-0.0139, -0.0001, 0.0029] time 0.514
++1007 success True steps 189 err [-0.0047, -0.0015, -0.0317] time 0.447
++1008 success True steps 95 err [-0.0181, 0.0278, 0.012] time 0.216
++1009 success True steps 148 err [-0.0054, 0.005, 0.0039] time 0.455
++1010 success True steps 122 err [-0.0171, -0.0037, 0.0271] time 0.298
+diff --git a/results_batch1.txt b/results_batch1.txt
+index b620f9d..b0907bd 100644
+--- a/results_batch1.txt
++++ b/results_batch1.txt
+@@ -60,3 +60,41 @@
+ 69 success True steps 86 err [-0.0113, -0.0082, 0.0757] time 0.172
+ 70 success True steps 159 err [0.0204, -0.0233, 0.1209] time 0.344
+ 71 success True steps 124 err [-0.0151, 0.0113, -0.0628] time 0.318
++72 success True steps 146 err [-0.0044, -0.0083, 0.0766] time 0.401
++73 success True steps 129 err [-0.0112, 0.0037, 0.0314] time 0.42
++74 success True steps 107 err [0.0061, -0.0236, 0.0824] time 0.241
++75 success True steps 229 err [0.0044, -0.0087, -0.0373] time 0.637
++76 success True steps 101 err [-0.0002, -0.0037, -0.0163] time 0.229
++77 success True steps 156 err [-0.0153, 0.0027, -0.0554] time 0.415
++78 success True steps 173 err [-0.0145, -0.0032, -0.0055] time 0.409
++79 success True steps 186 err [0.0203, 0.0037, -0.0032] time 0.419
++80 success True steps 107 err [-0.0052, 0.0275, -0.0847] time 0.328
++81 success True steps 126 err [0.0014, -0.0029, 0.0152] time 0.289
++82 success True steps 186 err [-0.0231, -0.0114, 0.1032] time 0.507
++83 success True steps 145 err [-0.0197, -0.0129, 0.0077] time 0.305
++84 success True steps 121 err [-0.0004, -0.0129, -0.0155] time 0.252
++85 success True steps 192 err [-0.019, -0.0136, 0.0223] time 0.424
++86 success True steps 127 err [0.001, 0.0147, 0.0302] time 0.251
++87 success True steps 159 err [-0.0079, 0.0095, -0.0108] time 0.34
++88 success True steps 239 err [0.0046, -0.0037, 0.0094] time 0.492
++89 success True steps 36 err [-0.0001, -0.0272, 0.0267] time 0.078
++90 success True steps 164 err [0.0026, 0.0048, -0.028] time 0.361
++91 success True steps 173 err [0.0138, 0.0014, 0.0151] time 0.359
++92 success True steps 130 err [-0.0155, -0.0289, -0.119] time 0.258
++93 success True steps 93 err [0.0025, -0.0091, -0.0069] time 0.185
++94 success True steps 141 err [-0.0141, -0.0061, 0.0188] time 0.285
++95 success True steps 45 err [-0.0075, -0.0198, -0.0185] time 0.095
++96 success True steps 166 err [-0.0114, 0.0202, -0.0108] time 0.346
++97 success True steps 138 err [0.0086, -0.0192, 0.0222] time 0.304
++98 success True steps 137 err [-0.0323, 0.0192, -0.0406] time 0.288
++99 success True steps 186 err [0.0018, 0.0021, -0.0599] time 0.378
++100 success True steps 127 err [-0.0033, -0.0121, -0.0108] time 0.259
++101 success True steps 133 err [-0.0275, 0.0175, -0.0085] time 0.264
++102 success True steps 126 err [0.0243, -0.0026, -0.0152] time 0.268
++103 success True steps 180 err [-0.0207, -0.0014, 0.0404] time 0.395
++104 success True steps 105 err [0.0116, 0.003, 0.0428] time 0.219
++105 success True steps 145 err [-0.027, -0.0146, -0.0027] time 0.306
++106 success True steps 186 err [-0.0082, -0.006, -0.0019] time 0.389
++107 success True steps 101 err [0.0033, 0.0057, 0.0119] time 0.212
++108 success True steps 146 err [-0.0057, 0.0022, 0.014] time 0.323
++109 success True steps 192 err [-0.0011, 0.0093, -0.003] time 0.386
+diff --git a/test_approach.py b/test_approach.py
+index b722425..9275668 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -14,5 +14,6 @@ for seed in seeds:
+         if done or trunc: break
+     err=s[29:32]-s[:3]; err[2]=(err[2]+np.pi)%(2*np.pi)-np.pi
+     print(seed,'success',done,'steps',t+1,'err',np.round(err,4).tolist(),'time',round(time.monotonic()-start,3),flush=True)
+-    with open('trace_%s.json'%seed,'w') as f: json.dump(trace,f)
++    if not done:
++        with open('trace_%s.json'%seed,'w') as f: json.dump(trace,f)
+     env.close()

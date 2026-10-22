@@ -1,0 +1,323 @@
+diff --git a/approach.py b/approach.py
+new file mode 100644
+index 0000000..738ce82
+--- /dev/null
++++ b/approach.py
+@@ -0,0 +1,183 @@
++import numpy as np
++
++W, H = 1.618, 1.0
++FLOOR = 0.1
++DOWN = -np.pi / 2
++
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.low = np.asarray(action_space.low, dtype=np.float64)
++        self.high = np.asarray(action_space.high, dtype=np.float64)
++        self.reset(None, None)
++
++    def reset(self, state, info):
++        self.phase = "lift"
++        self.obj_name = None
++        self.drop_x = None
++        self.last_robot = None
++        self.stuck = 0
++
++    # ---------------- helpers ----------------
++    def _rect(self, s, o):
++        g = lambda f: float(s.get(o, f))
++        return dict(name=o.name, x=g("x"), y=g("y"), w=g("width"), h=g("height"))
++
++    def _parse(self, s):
++        r = s.get_objects(self._rtype(s))[0]
++        g = lambda f: float(s.get(r, f))
++        robot = dict(x=g("x"), y=g("y"), th=g("theta"), arm=g("arm_joint"),
++                     vac=g("vacuum"), gw=g("gripper_width"), gh=g("gripper_height"),
++                     rad=g("base_radius"), maxarm=g("arm_length"))
++        objs = {}
++        surf = block = None
++        for n in s.get_object_names():
++            o = n if not isinstance(n, str) else s.get_object_from_name(n)
++            tn = o.type.name if hasattr(o.type, "name") else str(o.type)
++            if tn == "crv_robot":
++                continue
++            rr = self._rect(s, o)
++            rr["type"] = tn
++            if tn == "target_surface":
++                surf = rr
++            else:
++                objs[rr["name"]] = rr
++                if tn == "target_block":
++                    block = rr
++        return robot, objs, surf, block
++
++    def _rtype(self, s):
++        for n in s.get_object_names():
++            o = n if not isinstance(n, str) else s.get_object_from_name(n)
++            tn = o.type.name if hasattr(o.type, "name") else str(o.type)
++            if tn == "crv_robot":
++                return o.type
++        raise RuntimeError
++
++    def _act(self, dx=0.0, dy=0.0, dth=0.0, darm=0.0, vac=0.0):
++        a = np.array([dx, dy, dth, darm, vac], dtype=np.float64)
++        a = np.clip(a, self.low, self.high)
++        return a.astype(np.float32)
++
++    def _choose_next(self, objs, surf, robot):
++        # obstructions that conflict with placing the block on the surface
++        sx0, sx1 = surf["x"], surf["x"] + surf["w"]
++        cands = []
++        for o in objs.values():
++            if o["type"] == "target_block":
++                continue
++            if o["x"] < sx1 + 0.005 and o["x"] + o["w"] > sx0 - 0.005 and o["y"] < FLOOR + 0.3:
++                cands.append(o)
++        if cands:
++            cands.sort(key=lambda o: -(o["y"] + o["h"]))
++            return cands[0]["name"]
++        return "target_block"
++
++    def _drop_x(self, objs, surf, held, block):
++        w = held["w"]
++        occ = [(surf["x"] - 0.02, surf["x"] + surf["w"] + 0.02)]
++        for o in objs.values():
++            if o["name"] == held["name"]:
++                continue
++            occ.append((o["x"], o["x"] + o["w"]))
++        margin = 0.03
++        best, bestc = None, 1e9
++        cur = held["x"] + w / 2
++        for c in np.arange(0.1 + 1e-3, W - 0.1, 0.005):
++            l, r = c - w / 2 - margin, c + w / 2 + margin
++            if l < 0 or r > W:
++                continue
++            if any(l < b and r > a for a, b in occ):
++                continue
++            cost = abs(c - cur)
++            if cost < bestc:
++                best, bestc = c, cost
++        if best is None:
++            best = 0.1 + 1e-3 if surf["x"] > W / 2 else W - 0.1 - 1e-3
++        return best
++
++    # ---------------- main ----------------
++    def get_action(self, state):
++        robot, objs, surf, block = self._parse(state)
++        arm_t = robot["maxarm"]
++        max_top = max([o["y"] + o["h"] for o in objs.values()] + [FLOOR])
++        held = objs.get(self.obj_name) if self.obj_name else None
++
++        # posture correction first
++        dth = np.clip(DOWN - robot["th"], -0.19, 0.19)
++        darm = np.clip(arm_t - robot["arm"], -0.1, 0.1)
++
++        def goto(tx, ty, vac):
++            return self._act(tx - robot["x"], ty - robot["y"], dth, darm, vac)
++
++        def near(a, b, tol=1e-4):
++            return abs(a - b) < tol
++
++        grip_off = arm_t + robot["gw"]  # robot_y - gripper bottom
++        hh = held["h"] if (held and robot["vac"] > 0.5) else 0.0
++        travel_y = min(H - robot["rad"] - 1e-3,
++                       max(max_top + robot["rad"] + 0.03, max_top + 0.03 + grip_off + hh))
++
++        for _ in range(10):
++            ph = self.phase
++            if ph == "lift":
++                if self.obj_name is None:
++                    self.obj_name = self._choose_next(objs, surf, robot)
++                    held = objs[self.obj_name]
++                if robot["y"] < travel_y - 1e-4 or not near(robot["arm"], arm_t) or not near(robot["th"], DOWN):
++                    return goto(robot["x"], max(travel_y, robot["y"]), 0.0)
++                self.phase = "goto"
++                continue
++            if ph == "goto":
++                tgt = objs[self.obj_name]
++                cx = tgt["x"] + tgt["w"] / 2
++                if not near(robot["x"], cx):
++                    return goto(cx, robot["y"], 0.0)
++                self.phase = "descend"
++                continue
++            if ph == "descend":
++                tgt = objs[self.obj_name]
++                ty = tgt["y"] + tgt["h"] + grip_off + 2e-4
++                if not near(robot["y"], ty, 5e-5):
++                    return goto(robot["x"], ty, 0.0)
++                self.phase = "grasp"
++                return goto(robot["x"], robot["y"], 1.0)
++            if ph == "grasp":
++                self.phase = "lift_held"
++                self.grasp_y = objs[self.obj_name]["y"]
++                continue
++            if ph == "lift_held":
++                if robot["y"] < travel_y - 1e-4:
++                    return goto(robot["x"], travel_y, 1.0)
++                tgt = objs[self.obj_name]
++                if tgt["y"] < self.grasp_y + 1e-3:
++                    # grasp failed; retry
++                    self.phase = "lift"
++                    self.obj_name = None
++                    return goto(robot["x"], robot["y"], 0.0)
++                if self.obj_name == "target_block":
++                    self.drop_x = surf["x"] + surf["w"] / 2
++                else:
++                    self.drop_x = self._drop_x(objs, surf, tgt, block)
++                self.phase = "carry"
++                continue
++            if ph == "carry":
++                tgt = objs[self.obj_name]
++                cx = tgt["x"] + tgt["w"] / 2
++                tx = robot["x"] + (self.drop_x - cx)
++                if not near(cx, self.drop_x):
++                    return goto(tx, robot["y"], 1.0)
++                self.phase = "lower"
++                continue
++            if ph == "lower":
++                tgt = objs[self.obj_name]
++                ty = robot["y"] - (tgt["y"] - (FLOOR + 2e-3))
++                if not near(tgt["y"], FLOOR + 2e-3, 5e-4):
++                    return goto(robot["x"], ty, 1.0)
++                self.phase = "release"
++                continue
++            if ph == "release":
++                self.phase = "lift"
++                self.obj_name = None
++                return goto(robot["x"], robot["y"], 0.0)
++        return goto(robot["x"], robot["y"], robot["vac"])
+diff --git a/explore.py b/explore.py
+new file mode 100644
+index 0000000..12fe97d
+--- /dev/null
++++ b/explore.py
+@@ -0,0 +1,13 @@
++from env_client import make_env
++env = make_env()
++F={'crv_robot':["x", "y", "theta", "base_radius", "arm_joint", "arm_length", "vacuum", "gripper_height", "gripper_width"]}
++R=["x", "y", "theta", "static", "color_r", "color_g", "color_b", "z_order", "width", "height"]
++def dump(obs):
++    for n in sorted(obs.get_object_names(), key=str):
++        o = obs.get_object_from_name(n) if isinstance(n,str) else n
++        fs = F.get(o.type.name if hasattr(o.type,'name') else str(o.type), R)
++        print(" ", n, {f: round(float(obs.get(o,f)),3) for f in fs})
++for seed in range(4):
++    obs, info = env.reset(seed=seed)
++    print("seed", seed); dump(obs)
++env.close()
+diff --git a/probe.py b/probe.py
+new file mode 100644
+index 0000000..157e6e2
+--- /dev/null
++++ b/probe.py
+@@ -0,0 +1,19 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=0)
++def rb(o):
++    r=o.get_object_from_name('robot'); return [round(float(o.get(r,f)),3) for f in ["x","y","theta","arm_joint","vacuum"]]
++def blk(o,n='target_block'):
++    b=o.get_object_from_name(n); return [round(float(o.get(b,f)),3) for f in ["x","y","theta"]]
++print(rb(obs))
++for a in [[0.05,0,0,0,0],[0,-0.05,0,0,0],[0,0,0.196,0,0],[0,0,-0.196,0,0],[0,0,0,0.1,0],[0,0,0,0.1,0],[0,0,0,-0.1,0]]:
++    obs,r,t,tr,_=env.step(np.array(a,dtype=np.float32)); print(a, rb(obs), r,t,tr)
++# move down until stop
++for i in range(20):
++    obs,r,t,tr,_=env.step(np.array([0,-0.05,0,0,0],dtype=np.float32))
++print("after down", rb(obs))
++for i in range(20):
++    obs,r,t,tr,_=env.step(np.array([-0.05,0,0,0,0],dtype=np.float32))
++print("after left", rb(obs))
++env.close()
+diff --git a/probe2.py b/probe2.py
+new file mode 100644
+index 0000000..abbfa01
+--- /dev/null
++++ b/probe2.py
+@@ -0,0 +1,27 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=0)
++def rb(o):
++    r=o.get_object_from_name('robot'); return [round(float(o.get(r,f)),4) for f in ["x","y","theta","arm_joint","vacuum"]]
++def blk(o,n='target_block'):
++    b=o.get_object_from_name(n); return [round(float(o.get(b,f)),4) for f in ["x","y","theta"]]
++def st(a):
++    global obs
++    obs,r,t,tr,_=env.step(np.array(a,dtype=np.float32)); return t
++# go to x=0.489
++while abs(rb(obs)[0]-0.489)>1e-4:
++    d=np.clip(0.489-rb(obs)[0],-0.05,0.05); st([d,0,0,0,0])
++print(rb(obs))
++for i in range(80):
++    y0=rb(obs)[1]; st([0,-0.01,0,0,0])
++    if abs(rb(obs)[1]-y0)<1e-6: print("stopped at",rb(obs)); break
++print(rb(obs), blk(obs))
++st([0,0,0,0,1]); print("vac", rb(obs), blk(obs))
++for i in range(5): st([0,0.05,0,0,1])
++print("lift", rb(obs), blk(obs))
++st([0.05,0,0.1,0.1,1]); print("move", rb(obs), blk(obs))
++st([0,0,0,0,0]); print("release", rb(obs), blk(obs))
++for i in range(3): st([0,0,0,0,0])
++print("after", rb(obs), blk(obs))
++env.close()
+diff --git a/probe3.py b/probe3.py
+new file mode 100644
+index 0000000..f7ce152
+--- /dev/null
++++ b/probe3.py
+@@ -0,0 +1,14 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=1)
++def rb(o):
++    r=o.get_object_from_name('robot'); return [round(float(o.get(r,f)),4) for f in ["x","y","theta","arm_joint","vacuum"]]
++def st(a):
++    global obs
++    obs,r,t,tr,_=env.step(np.array(a,dtype=np.float32)); return t
++for d,a in [("right",[0.01,0,0,0,0]),("up",[0,0.01,0,0,0])]:
++    for i in range(200):
++        y0=rb(obs); st(a)
++        if rb(obs)==y0: print(d,"stopped",rb(obs)); break
++env.close()
+diff --git a/test_approach.py b/test_approach.py
+new file mode 100644
+index 0000000..1370d4d
+--- /dev/null
++++ b/test_approach.py
+@@ -0,0 +1,31 @@
++import sys, time
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++from concurrent.futures import ThreadPoolExecutor
++
++def run(seed):
++    env = make_env()
++    ap = GeneratedApproach(env.action_space, env.observation_space, {})
++    obs, info = env.reset(seed=seed)
++    ap.reset(obs, info)
++    t0 = time.time()
++    for step in range(env.max_steps):
++        a = ap.get_action(obs)
++        obs, r, term, trunc, info = env.step(a)
++        if term:
++            env.close(); return seed, True, step + 1, time.time() - t0
++        if trunc:
++            break
++    env.close()
++    return seed, False, env.max_steps, time.time() - t0
++
++if __name__ == "__main__":
++    s0 = int(sys.argv[1]) if len(sys.argv) > 1 else 0
++    n = int(sys.argv[2]) if len(sys.argv) > 2 else 20
++    with ThreadPoolExecutor(8) as ex:
++        res = list(ex.map(run, range(s0, s0 + n)))
++    for r in res:
++        if not r[1]: print("FAIL", r)
++    ok = [r for r in res if r[1]]
++    print(f"success {len(ok)}/{len(res)}, mean steps (succ) {np.mean([r[2] for r in ok]) if ok else 0:.1f}")

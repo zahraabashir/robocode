@@ -1,0 +1,68 @@
+diff --git a/approach.py b/approach.py
+index b54f1d2..c42469d 100644
+--- a/approach.py
++++ b/approach.py
+@@ -36,9 +36,11 @@ class GeneratedApproach:
+         turn = 1.0 if angle_error > 0.0 else -1.0
+         tangent = np.array([-stem_dir[1], stem_dir[0]]) * turn
+ 
+-        if self.mode.startswith("rotate") and abs(angle_error) < 0.075:
++        if self.mode.startswith("rotate") and abs(angle_error) < 0.065:
+             self.mode = "approach"
+             self.push_dir = direction.copy()
++        elif not self.mode.startswith("rotate") and abs(angle_error) > 0.16:
++            self.mode = "rotate_approach"
+ 
+         if self.mode == "rotate_approach":
+             target = tip - tangent * 0.24
+@@ -54,7 +56,8 @@ class GeneratedApproach:
+             self.push_dir = direction.copy()
+             # Approximate COM is down the stem; pushing through it reduces spin.
+             com = obj + stem_dir * (0.22 * lv)
+-            stand = com - self.push_dir * 1.05
++            stand = com - self.push_dir * 0.78
++            stand = np.clip(stand, 0.13, 4.87)
+             target = stand
+             if np.linalg.norm(robot - stand) < 0.045:
+                 self.mode = "push"
+diff --git a/candidate_strategy.py b/candidate_strategy.py
+index b32a766..209d428 100644
+--- a/candidate_strategy.py
++++ b/candidate_strategy.py
+@@ -27,13 +27,13 @@ class CandidateStrategy:
+         n = float(np.linalg.norm(v))
+         return v / n if n > 1e-9 else np.zeros(2)
+ 
+-    def _move(self, robot, target, gain=1.0):
++    def _move(self, robot, target, gain=1.0, maxnorm=0.049):
+         # The server also enforces a Euclidean displacement cap despite the Box
+         # metadata being per-axis, so diagonal commands must be normalized.
+         action = np.clip((target - robot) * gain, self.low, self.high)
+         norm = float(np.linalg.norm(action))
+-        if norm > 0.049:
+-            action *= 0.049 / norm
++        if norm > maxnorm:
++            action *= maxnorm / norm
+         return action
+ 
+     def _select(self, s):
+@@ -117,13 +117,16 @@ class CandidateStrategy:
+         if self.phase == "push":
+             ae = wrap_angle(float(s[31] - s[2]))
+             pe = float(np.linalg.norm(s[29:31] - c))
+-            done = ((self.mode == "rotate" and (abs(ae) < 0.065 or self.ticks > 7)) or
+-                    (self.mode == "translate" and (pe < 0.020 or abs(ae) > 0.16 or self.ticks > 90)))
++            omega = float(s[5])
++            done = ((self.mode == "rotate" and
++                     (abs(ae) < 0.075 or omega * self.side > 0.12 or self.ticks > 4)) or
++                    (self.mode == "translate" and
++                     (pe < 0.020 or abs(ae) > 0.14 or self.ticks > 35)))
+             if done:
+                 self.phase = "select"
+             # Aim through the selected contact, then continue in the desired force direction.
+             aim = contact + force * 0.35
+-            return self._move(robot, aim)
++            return self._move(robot, aim, maxnorm=(0.006 if self.mode == "rotate" else 0.010))
+ 
+         return np.zeros(2)
+ 

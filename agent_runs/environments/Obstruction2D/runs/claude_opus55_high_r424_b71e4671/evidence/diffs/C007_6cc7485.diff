@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index f574aae..cc4a540 100644
+--- a/approach.py
++++ b/approach.py
+@@ -230,6 +230,8 @@ class GeneratedApproach:
+                 if ty > YMAX:
+                     continue
+                 dpose = (tx, ty)
++                if float(self._safe(np.array([tx]), boxes_h, others)[0]) > ty + 1e-6:
++                    continue
+                 nob = (left, left + w, DROP_BOT + h)
+                 obs_after = [(q[0], q[1], q[3]) for m, q in cur.items()
+                              if m != n and m not in pending] + [nob]

@@ -1,0 +1,43 @@
+diff --git a/approach.py b/approach.py
+index c27d16f..381b531 100644
+--- a/approach.py
++++ b/approach.py
+@@ -176,8 +176,9 @@ class RoverPlanner:
+         for (cx, cy, ax, ay) in scene.mounds:
+             free &= box_dist(X, Y, cx, cy, ax, ay) > MOUND_R
+         free &= (X >= LANDER_XMIN) | (Y >= LANDER_YMIN)
+-        for (bx, by) in bad:
+-            free &= np.hypot(X - bx, Y - by) > 0.03
++        for b in bad:
++            if len(b) == 2:
++                free &= np.hypot(X - b[0], Y - b[1]) > 0.03
+         free[self.hi, self.hj] = True
+         self.free = free
+         self.home_reg = (np.hypot(X - hx, Y - hy) <= HOME_R) & free
+@@ -264,6 +265,16 @@ class RoverPlanner:
+                 occ2 |= seg_hits_disk(cx_, cy_, lx, ly, px, py, ROVER_OCC_R)
+             land &= v & ((~occ) | back) & ~occ2
+             land_free &= v & ((~occ) | back)
++        for b in bad:
++            if len(b) == 4:
++                near = np.hypot(X - b[0], Y - b[1]) <= 0.08
++                if b[2] == "send":
++                    land &= ~near
++                    land_free &= ~near
++                elif b[2] == "img" and b[3] is not None and b[3] < len(self.vis):
++                    self.vis[b[3]] = self.vis[b[3]] & ~near
++                elif b[2] == "cal":
++                    self.any_vis &= ~near
+         self.land = land
+         self.land_free = land_free
+         self.camx_i, self.camy_i = camx_i, camy_i
+@@ -735,6 +746,9 @@ class GeneratedApproach:
+                 for s in sc.samples:
+                     if s["an"][ri] and not s["recv"]:
+                         dev = True
++            if dev and op in ("send", "img", "cal") and \
++                    abs(r["x"] - e[0]) <= 1e-3 and abs(r["y"] - e[1]) <= 1e-3:
++                self.bad[ri].append((e[0], e[1], op, arg))
+             if dev:
+                 self.log.append(("dev", ri, e, round(r["x"], 3), round(r["y"], 3), r["cal"], pr["cal"],
+                                  [ob["img"][ri] for ob in sc.objectives]))

@@ -1,0 +1,17 @@
+diff --git a/approach.py b/approach.py
+index b47903e..f0e6663 100644
+--- a/approach.py
++++ b/approach.py
+@@ -48,8 +48,10 @@ class GeneratedApproach:
+         if model_x>.38:
+             # Far-side cuboids need a more extended elbow.  These poses
+             # retain enough finger clearance to release after transport.
+-            triples=[(.50,-2.05,-.40),(.50,-1.90,-.80),
+-                     (.60,-2.05,-.40),(.60,-1.90,-.80)]+triples
++            far=[(.50,-2.05,-.40),(.50,-1.90,-.80),
++                 (.60,-2.05,-.40),(.60,-1.90,-.80)]
++            if name=="target_block": far=[far[1],far[3],far[2],far[0]]
++            triples=far+triples
+         if forward_retracted:
+             # The centered pose closes to finger_state ~= .1 on this branch and
+             # cannot reopen. Use offset grasps with useful finger clearance.

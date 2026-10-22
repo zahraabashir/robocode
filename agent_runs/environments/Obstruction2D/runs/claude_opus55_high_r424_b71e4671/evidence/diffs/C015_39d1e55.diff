@@ -1,0 +1,65 @@
+diff --git a/approach.py b/approach.py
+index 792fff8..0a1970c 100644
+--- a/approach.py
++++ b/approach.py
+@@ -2,6 +2,7 @@
+ greedy Chebyshev (simultaneous dx/dy) controller that keeps the robot
+ assembly above all obstacles via a look-ahead clearance cone."""
+ import itertools
++import time
+ import numpy as np
+ 
+ WORLD_MAX_X = 1.618
+@@ -194,8 +195,9 @@ class GeneratedApproach:
+         cand = [n for n, r in orects.items()
+                 if r[1] > sr[0] - 0.1 and r[0] < sr[1] + 0.1]
+         plans = []
++        t0 = time.time()
+         for k in range(len(cand) + 1):
+-            if plans and k > 2:
++            if plans and (k > 2 or time.time() - t0 > 15.0):
+                 break
+             for R in itertools.permutations(cand, k):
+                 plans += self._plan_subset(start, R, orects, br, (sr[0], sr[1]), boxes0)
+@@ -205,6 +207,8 @@ class GeneratedApproach:
+         best = None
+         a0 = _g(state, robot, "arm_joint")
+         for cost, legs, specs in plans[:self.n_sim]:
++            if best is not None and time.time() - t0 > 20.0:
++                break
+             steps = self._sim_plan(start, a0, specs)
+             key = (steps, cost)
+             if best is None or key < best[0]:
+diff --git a/res_0_300_v5.txt b/res_0_300_v5.txt
+new file mode 100644
+index 0000000..887d050
+--- /dev/null
++++ b/res_0_300_v5.txt
+@@ -0,0 +1 @@
++solved 300/300  mean steps 30.2 max time 42.0s
+diff --git a/resettime.py b/resettime.py
+new file mode 100644
+index 0000000..6b56648
+--- /dev/null
++++ b/resettime.py
+@@ -0,0 +1,10 @@
++import sys, time
++from env_client import make_env
++from approach import GeneratedApproach
++a,b=int(sys.argv[1]),int(sys.argv[2])
++env=make_env(); ts=[]
++for s in range(a,b):
++    obs,info=env.reset(seed=s)
++    ap=GeneratedApproach(env.action_space,env.observation_space,{})
++    t0=time.time(); ap.reset(obs,info); ts.append((time.time()-t0,s))
++ts.sort(); print("max",[(round(t,2),s) for t,s in ts[-5:]],"mean",sum(t for t,_ in ts)/len(ts))
+diff --git a/test_approach.py b/test_approach.py
+index 1d45dff..5c8e411 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -34,4 +34,5 @@ if __name__ == "__main__":
+     for s, (te, n, c, ph, dt) in zip(seeds, res):
+         ok += bool(te)
+         if not te: print("FAIL seed", s, "n_obj", c, "leg", ph, flush=True)
++    slow=sorted([(r[4],seeds[i]) for i,r in enumerate(res)])[-3:]; print("slowest idx",slow)
+     print(f"solved {ok}/{len(res)}  mean steps {np.mean([r[1] for r in res if r[0]]) if ok else 0:.1f} max time {max(r[4] for r in res):.1f}s")

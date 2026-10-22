@@ -1,0 +1,23 @@
+diff --git a/approach.py b/approach.py
+index 913b162..78120fd 100644
+--- a/approach.py
++++ b/approach.py
+@@ -106,7 +106,8 @@ class GeneratedApproach:
+                 d=.04*self.cal_sign; a += self.B[:,self.cal_i]*d; a[10]=-1.
+                 self.last_pos=feat; self.last_delta=d; return a
+         if self.mode=="release":
+-            if self.release_t<30:
++            limit=30 if self.object_name=="target_block" else 60
++            if self.release_t<limit:
+                 if self.object_name=="target_block":
+                     g=np.array([self.release_x,self.dest[1],max(.20,pos[2]+.025)])
+                 else:
+@@ -123,8 +124,6 @@ class GeneratedApproach:
+         arrived=(np.linalg.norm(poserr)<tol)
+         if self.waypoint==2:
+             arrived=(np.linalg.norm(poserr[:2])<.004 and pos[2]<self.rest_z+.012)
+-            if self.object_name!="target_block":
+-                arrived=(abs(poserr[1])<.025 and pos[2]<self.rest_z+.035)
+         if arrived and np.linalg.norm(feat[3:])<.025:
+             self.waypoint+=1
+             # Dropping from the clear waypoint avoids wedging the fingers against

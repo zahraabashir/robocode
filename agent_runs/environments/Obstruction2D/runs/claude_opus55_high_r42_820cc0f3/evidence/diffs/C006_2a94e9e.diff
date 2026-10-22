@@ -1,0 +1,191 @@
+diff --git a/approach.py b/approach.py
+index c75bbff..8023419 100644
+--- a/approach.py
++++ b/approach.py
+@@ -124,6 +124,12 @@ class GeneratedApproach:
+         sgn = 1.0 if B[0] >= A[0] else -1.0
+         hs = np.arange(max(A[1], B[1]), Y_MAX + 1e-9, 0.01)
+         hs = np.append(hs, Y_MAX)
++        h_min = Y_MAX
++        for h in hs:
++            if self._path_free([(A[0], h), (B[0], h)], obstacles, carried, margin_map, m):
++                h_min = h
++                break
++        hs = hs[hs >= h_min - 1e-9]
+         for h in hs:
+             for k1 in (1.0, 0.5, 0.0):
+                 for k2 in (1.0, 0.5, 0.0):
+@@ -142,7 +148,7 @@ class GeneratedApproach:
+         for s, _, i in scored:
+             p = cands[i]
+             checked += 1
+-            if checked > 400:
++            if checked > 3000:
+                 break
+             if self._path_free(p, obstacles, carried, margin_map, m):
+                 return p
+@@ -155,6 +161,7 @@ class GeneratedApproach:
+         self.stall = 0
+         self.last_pos = None
+         self.target_name = None
++        self.block_dest = None
+ 
+     def _grasp_x(self, b, others):
+         half = self.robot["gh"] / 2.0
+@@ -205,6 +212,8 @@ class GeneratedApproach:
+                 continue
+             if any(x0 < i1 and x0 + w > i0 for i0, i1 in ivs):
+                 continue
++            if self._column_hit(dict(b, x=x0, y=FLOOR + PLACE_GAP), extra=0.02):
++                continue
+             P = (bx, FLOOR + PLACE_GAP + off)
+             cost = _cheb(gpos, P) + _cheb(P, next_pos)
+             if best is None or cost < best[0]:
+@@ -214,23 +223,59 @@ class GeneratedApproach:
+         # fallback: stack on top of some other object away from surface
+         best = None
+         for o in others:
+-            if any(o["x"] < i1 and o["x"] + o["w"] > i0 for i0, i1 in forbid):
+-                continue
+             top = o["y"] + o["h"]
+             x0 = o["x"] + o["w"] / 2 - w / 2
++            if self._column_hit(dict(b, x=x0, y=top + PLACE_GAP), extra=0.02):
++                continue
+             if best is None or top < best[0]:
+                 best = (top, x0)
+         if best is not None:
+             return best[1], best[0]
+         return None
+ 
++    def _column_info(self, dest_x):
++        b = self.block
++        gx_rel = b["w"] / 2
++        gy_rel = b["h"] + self._grip_off() + GAP
++        bx = dest_x + gx_rel
++        py = FLOOR + 0.012 + gy_rel
++        pts = np.stack([np.full(40, bx), np.linspace(py, Y_MAX, 40)], axis=1)
++        carried = (-gx_rel, b["w"] - gx_rel, -gy_rel, b["h"] - gy_rel)
++        return pts, carried
++
++    def _column_hit(self, o, extra=0.0, dest_x=None):
++        if dest_x is None:
++            dest_x = self.block_dest
++        pts, carried = self._column_info(dest_x)
++        return self._collides(pts, [o], carried, {"__floor__": -1.0}, 0.01 + extra)
++
++    def _choose_block_dest(self):
++        s = self.surface
++        b = self.block
++        lo = s["x"] + 0.003
++        hi = s["x"] + s["w"] - b["w"] - 0.003
++        center = s["x"] + (s["w"] - b["w"]) / 2
++        if hi <= lo:
++            return center
++        best = None
++        for dx in np.linspace(lo, hi, 25):
++            nb = 0
++            for o in self.obst.values():
++                if self._column_hit(o, dest_x=dx):
++                    nb += 1
++            cost = nb * 100 + abs(dx - center) * 0.1
++            if best is None or cost < best[0]:
++                best = (cost, dx)
++        return best[1]
++
+     def _make_plan(self):
+         """Returns list of segments: each (waypoint list, vac, kind)."""
+         s = self.surface
+         s0, s1 = s["x"], s["x"] + s["w"]
+         movable = self._all_movable()
+-        blockers = [b for n, b in self.obst.items()
+-                    if b["x"] < s1 + 0.005 and b["x"] + b["w"] > s0 - 0.005]
++        if self.block_dest is None:
++            self.block_dest = self._choose_block_dest()
++        blockers = [o for o in self.obst.values() if self._column_hit(o)]
+         rx, ry = self.robot["x"], self.robot["y"]
+         if blockers:
+             tgt = min(blockers, key=lambda b: abs(b["x"] + b["w"] / 2 - rx))
+@@ -253,14 +298,13 @@ class GeneratedApproach:
+         off = gy - tgt["y"]
+         gx_rel = gx - tgt["x"]
+         if is_block:
+-            dest_x = s0 + (s["w"] - tgt["w"]) / 2
++            dest_x = self.block_dest
+             dest_y = FLOOR + 0.012 - PLACE_GAP
+         else:
+             b = self.block
+             bgx = b["x"] + b["w"] / 2
+             next_pos = (bgx, b["y"] + b["h"] + self._grip_off() + GAP)
+-            forbid = [(s0 - 0.03, s1 + 0.03)]
+-            spot = self._free_spot(tgt, others, forbid, gx_rel, gpos, next_pos)
++            spot = self._free_spot(tgt, others, [], gx_rel, gpos, next_pos)
+             if spot is None:
+                 spot = (tgt["x"], min(0.6, tgt["y"] + 0.3))
+             dest_x, dest_y = spot
+diff --git a/dbg2.py b/dbg2.py
+new file mode 100644
+index 0000000..6e7b81c
+--- /dev/null
++++ b/dbg2.py
+@@ -0,0 +1,29 @@
++import sys
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++seed, count, T = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
++env = make_env()
++obs, info = env.reset(seed=seed, options={'object_count': count})
++ap = GeneratedApproach(env.action_space, env.observation_space, {})
++ap.reset(obs, info)
++for t in range(T):
++    a = ap.get_action(obs)
++    obs, r, term, trunc, info = env.step(a)
++ap._parse(obs)
++print('dest', ap.block_dest, 'surface', ap.surface)
++for n,b in ap._all_movable().items(): print(n, {k:round(v,3) for k,v in b.items() if k!='name'}, 'hit', ap._column_hit(b))
++tgt=ap.block; gx=0.8293184079229832; gy=tgt['y']+tgt['h']+ap._grip_off()+0.0015
++carried = (tgt["x"] - gx, tgt["x"] + tgt["w"] - gx, tgt["y"] - gy, tgt["y"] + tgt["h"] - gy)
++others=list(ap.obst.values())
++B=(ap.block_dest+gx-tgt['x'], 0.112+gy-tgt['y'])
++print('B', B)
++for o in others+[ap.FLOOR_BOX]:
++    print(o['name'], ap._collides(np.array([B]), [o], carried, {}, 0.004), ap._collides(np.array([(gx,gy)]), [o], carried, {}, 0.004))
++print(ap._collides(np.array([B]), [], carried, {}, 0.004))
++A=(gx,gy)
++p=ap._plan_path(A,B,others,carried); print(p)
++for h in [0.65,0.7,0.8]:
++    path=[A,(A[0],h),(B[0],h),B]
++    for i in range(3):
++        print(h,i,ap._path_free(path[i:i+2],others,carried,{o['name']:0.0 for o in others+[ap.FLOOR_BOX]},0.004))
+diff --git a/test_approach.py b/test_approach.py
+index 48f12cf..17ddc6a 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -2,6 +2,7 @@ import sys, time
+ import numpy as np
+ from env_client import make_env
+ from approach import GeneratedApproach
++TMAX=0
+ def run(seed, count=None, verbose=False):
+     env = make_env()
+     kw = {}
+@@ -10,10 +11,12 @@ def run(seed, count=None, verbose=False):
+     ap = GeneratedApproach(env.action_space, env.observation_space, {})
+     ap.reset(obs, info)
+     n_obj = info.get('object_count')
++    global TMAX
++    t0=time.time()
+     for t in range(env.max_steps):
+         a = ap.get_action(obs)
+         obs, r, term, trunc, info = env.step(a)
+-        if term: env.close(); return True, t+1, n_obj
++        if term: env.close(); TMAX=max(TMAX, time.time()-t0); return True, t+1, n_obj
+         if trunc: break
+     env.close(); return False, env.max_steps, n_obj
+ if __name__ == '__main__':
+@@ -24,4 +27,4 @@ if __name__ == '__main__':
+         succ, n, c = run(s, count)
+         ok += succ; steps.append(n)
+         if not succ: print('FAIL seed', s, 'count', c)
+-    print(f'success {ok}/{s1-s0}, mean steps {np.mean(steps):.1f}')
++    print(f'success {ok}/{s1-s0}, mean steps {np.mean(steps):.1f} max ep time {TMAX:.1f}s')

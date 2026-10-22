@@ -1,0 +1,51 @@
+diff --git a/approach.py b/approach.py
+index 37b0767..e06bda3 100644
+--- a/approach.py
++++ b/approach.py
+@@ -170,6 +170,9 @@ class GeneratedApproach:
+                 else:mask=self.masks[task]
+                 self.paths[r],_=self.route(p,mask,pos[1-r])
+                 if task[0]=='home':self.paths[r].append(self.home[r].copy())
++                elif not self.paths[r]:
++                    self.tasks[r]=None
++                    self.choose(s,r,p,pos[1-r]);task=self.tasks[r]
+                 self.fail[r]=0
+             path=self.paths[r]
+             while path and np.max(np.abs(path[0]-p))<.025:path.pop(0)
+diff --git a/probe_lander.py b/probe_lander.py
+new file mode 100644
+index 0000000..b5251fd
+--- /dev/null
++++ b/probe_lander.py
+@@ -0,0 +1,31 @@
++from env_client import make_env
++import numpy as np
++
++def p(s):
++ o=s.get_object_from_name('rover1');return np.array([s.get(o,'x'),s.get(o,'y')])
++def st(e,s,dx=0,dy=0):
++ a=np.zeros(8);a[4:6]=[dx,dy];t,*_=e.step(a);return t
++
++def goto(e,s,target):
++ for _ in range(50):
++  d=np.clip(np.array(target)-p(s),-.1,.1)
++  if np.linalg.norm(d)<1e-5:break
++  old=p(s);s=st(e,s,*d)
++  if np.allclose(old,p(s)):break
++ return s
++for x in [-2.25,-2.2,-2.1,-2,-1.9,-1.8,-1.7,-1.6,-1.5,-1.4,-1.3,-1.2,-1.1]:
++ e=make_env();s,_=e.reset(seed=29)
++ s=goto(e,s,[-1,-1]);s=goto(e,s,[x,-1])
++ for _ in range(160):
++  old=p(s);s=st(e,s,dy=-.01)
++  if np.allclose(old,p(s)):break
++ print('vertical',x,p(s))
++ e.close()
++for y in [-2.25,-2.2,-2.1,-2,-1.9,-1.8,-1.7,-1.6,-1.5,-1.4,-1.3]:
++ e=make_env();s,_=e.reset(seed=29)
++ s=goto(e,s,[-1,y])
++ for _ in range(140):
++  old=p(s);s=st(e,s,dx=-.01)
++  if np.allclose(old,p(s)):break
++ print('horizontal',y,p(s))
++ e.close()

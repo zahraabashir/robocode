@@ -1,0 +1,1922 @@
+diff --git a/approach.py b/approach.py
+index 1f918f2..5ab4177 100644
+--- a/approach.py
++++ b/approach.py
+@@ -42,6 +42,8 @@ class GeneratedApproach:
+         self.high = np.array(action_space.high, dtype=np.float32)
+ 
+     # ------------------------------------------------------------------
++    K_RERANK = 20
++
+     def reset(self, state, info):
+         self.state = state
+         self.gen = self._plan()
+@@ -141,8 +143,141 @@ class GeneratedApproach:
+                 return False
+         return True
+ 
+-    def _plan_path(self, x1, y1, obstacles, crel):
+-        x0, y0, _, _ = self._rpos()
++    def _free_pts(self, X, Y, obstacles, crel, m=0.008):
++        X = np.asarray(X, dtype=float); Y = np.asarray(Y, dtype=float)
++        free = (X >= RX_MIN - 1e-6) & (X <= RX_MAX + 1e-6) & (Y <= ROBOT_Y_MAX + 1e-6)
++        if crel is not None:
++            free &= (Y + crel[1]) >= FLOOR - 1e-3
++        for b in obstacles:
++            ddx = np.maximum(np.maximum(b[0] - X, 0.0), X - b[2])
++            ddy = np.maximum(np.maximum(b[1] - Y, 0.0), Y - b[3])
++            free &= (ddx * ddx + ddy * ddy) >= (BASE_R + m) ** 2
++            e = 0.001
++            ov = (X - GH / 2 < b[2] + e) & (b[0] < X + GH / 2 + e) & (Y - TIP < b[3] + e) & (b[1] < Y + e)
++            free &= ~ov
++            if crel is not None:
++                e = m * 0.6
++                ov = (X + crel[0] < b[2] + e) & (b[0] < X + crel[2] + e) & \
++                     (Y + crel[1] < b[3] + e) & (b[1] < Y + crel[3] + e)
++                free &= ~ov
++        return free
++
++    def _dp_path(self, x0, y0, x1, y1, obstacles, crel):
++        """DP over x-columns / y-levels. Returns (cost, waypoints) or None."""
++        res = 0.005
++        ylo = 0.3
++        nl = int(round((ROBOT_Y_MAX - ylo) / res)) + 1
++        levels = ylo + res * np.arange(nl)
++        K = int(round(0.05 / res))
++        j0 = int(min(nl - 1, max(0, math.ceil((y0 - ylo) / res - 1e-6))))
++        j1 = int(min(nl - 1, max(0, math.ceil((y1 - ylo) / res - 1e-6))))
++        dx = x1 - x0
++        N = int(math.ceil(abs(dx) / 0.05 - 1e-6))
++        # columns at half steps
++        cols = x0 + dx * (np.arange(2 * N + 1) / max(1, 2 * N)) if N > 0 else np.array([x0])
++        XX = np.repeat(cols[:, None], nl, axis=1)
++        YY = np.repeat(levels[None, :], len(cols), axis=0)
++        F = self._free_pts(XX, YY, obstacles, crel)
++        INF = 1e9
++        # vertical cost matrix within a column
++        J = np.arange(nl)
++        vc = np.ceil(np.abs(J[:, None] - J[None, :]) / K)
++
++        def vert_relax(cost, free):
++            # segments of contiguous free cells
++            seg = np.cumsum(~free)
++            same = (seg[:, None] == seg[None, :]) & free[:, None] & free[None, :]
++            M = np.where(same, cost[None, :] + vc, INF)
++            arg = np.argmin(M, axis=1)
++            return M[J, arg], arg
++
++        cost = np.full(nl, INF)
++        if not F[0, j0]:
++            # allow starting cell even if flagged (numerical contact)
++            F[0, j0] = True
++        cost[j0] = 0.0
++        costs = []
++        backs = []
++        c, arg = vert_relax(cost, F[0])
++        costs.append(c); backs.append(("v", arg))
++        for i in range(1, N + 1):
++            fm = F[2 * i - 1]; fe = F[2 * i]
++            new = np.full(nl, INF)
++            parent = np.full(nl, -1)
++            prev = costs[-1]
++            for d in range(-K, K + 1):
++                # from j to j+d; midpoint level j + d/2
++                src_j = np.arange(max(0, -d), min(nl, nl - d))
++                dst_j = src_j + d
++                mid = src_j + d / 2.0
++                mlo = np.floor(mid).astype(int); mhi = np.ceil(mid).astype(int)
++                ok = fe[dst_j] & fm[mlo] & fm[mhi] & (prev[src_j] < INF)
++                cand = prev[src_j] + 1.0
++                better = ok & (cand < new[dst_j])
++                new[dst_j[better]] = cand[better]
++                parent[dst_j[better]] = src_j[better]
++            if i == N and not fe[j1]:
++                fe = fe.copy(); fe[j1] = True
++            c, arg = vert_relax(new, fe)
++            costs.append(new); backs.append(("h", parent))
++            costs[-1] = c; backs.append(("v", arg))
++            # note: backs holds pairs per column after the first
++        final = costs[-1]
++        if final[j1] >= INF:
++            return None
++        # backtrack
++        pts = []
++        j = j1
++        ci = N
++        bi = len(backs) - 1
++        while bi >= 0:
++            kind, arr = backs[bi]
++            if kind == "v":
++                jp = int(arr[j])
++                # vertical moves from jp to j at column ci
++                if jp != j:
++                    steps = int(math.ceil(abs(j - jp) / K))
++                    for s_ in range(steps, 0, -1):
++                        jj = jp + int(round((j - jp) * s_ / steps))
++                        pts.append((float(cols[2 * ci]), float(levels[jj])))
++                j = jp
++            else:
++                jp = int(arr[j])
++                pts.append((float(cols[2 * ci]), float(levels[j])))
++                j = jp
++                ci -= 1
++            bi -= 1
++        pts.reverse()
++        # dedupe and fix endpoints
++        out = []
++        for p in pts:
++            if not out or abs(out[-1][0] - p[0]) > 1e-9 or abs(out[-1][1] - p[1]) > 1e-9:
++                out.append(p)
++        if out and abs(out[0][0] - x0) < 1e-9 and abs(out[0][1] - levels[j0]) < 1e-9:
++            # first waypoint is the snapped start
++            if abs(levels[j0] - y0) < 1e-9:
++                out = out[1:]
++        if out and abs(out[-1][0] - x1) < 1e-6 and abs(out[-1][1] - levels[j1]) <= res + 1e-9:
++            out[-1] = (x1, y1)
++        else:
++            out.append((x1, y1))
++        return float(final[j1]), out
++
++    def _plan_path(self, x1, y1, obstacles, crel, start=None):
++        if start is None:
++            x0, y0, _, _ = self._rpos()
++        else:
++            x0, y0 = start
++        r = self._dp_path(x0, y0, x1, y1, obstacles, crel)
++        if r is not None:
++            return r[1]
++        return self._plan_path_old(x1, y1, obstacles, crel, (x0, y0))
++
++    def _plan_path_old(self, x1, y1, obstacles, crel, start=None):
++        if start is None:
++            x0, y0, _, _ = self._rpos()
++        else:
++            x0, y0 = start
+         p0 = (x0, y0)
+         if self._seg_free(p0, (x1, y1), obstacles, crel):
+             return [(x1, y1)]
+@@ -165,6 +300,14 @@ class GeneratedApproach:
+                 return path
+         return [(x0, ROBOT_Y_MAX), (x1, ROBOT_Y_MAX), (x1, y1)]
+ 
++    def _path_cost(self, p0, p1, obstacles, crel):
++        path = self._plan_path(p1[0], p1[1], obstacles, crel, start=p0)
++        pts = [p0] + path
++        c = 0.0
++        for i in range(len(pts) - 1):
++            c += math.ceil(max(abs(pts[i + 1][0] - pts[i][0]), abs(pts[i + 1][1] - pts[i][1])) / 0.05 - 1e-6)
++        return c
++
+     def _move(self, x1, y1, carried=None, last_vac=None):
+         """Plan & execute a collision-free path. carried: grasped object or None."""
+         x0, y0, _, _ = self._rpos()
+@@ -265,12 +408,12 @@ class GeneratedApproach:
+         self.vac = 1.0
+         return True
+ 
+-    def _place_at(self, o, target_left, target_bottom, check=True):
++    def _place_at(self, o, target_left, target_bottom, check=True, release=False):
+         x, y, _, _ = self._rpos()
+         b0 = _rect_bbox(self.state, o)
+         rx = x + (target_left - b0[0])
+         ry = y - (b0[1] - target_bottom)
+-        gen = self._move(rx, ry, o)
++        gen = self._move(rx, ry, o, last_vac=(0.0 if release else None))
+         first = True
+         while True:
+             try:
+@@ -294,23 +437,39 @@ class GeneratedApproach:
+         s = self.state
+         sb = _rect_bbox(s, surf)
+         bb = _rect_bbox(s, block)
+-        bw = bb[2] - bb[0]
++        bw, bh = bb[2] - bb[0], bb[3] - bb[1]
++        bottom = sb[3] + 0.014
+         Llo = sb[0] + min(0.004, max(0.0, (sb[2] - sb[0] - bw) / 2))
+         Lhi = sb[2] - bw - min(0.004, max(0.0, (sb[2] - sb[0] - bw) / 2))
+         Lc = sb[0] + (sb[2] - sb[0] - bw) / 2
+         if Lhi < Llo:
+             Llo = Lhi = Lc
+-        best = None
++        obbs = [_rect_bbox(s, o) for o in obst]
++        gs = []
+         for g in self._grasp_cands((0.0, 0.0, bw, 1.0)):
+-            for L in sorted(np.linspace(Llo, Lhi, 21).tolist() + [Lc], key=lambda v: abs(v - Lc)):
+-                if RX_MIN <= L + g <= RX_MAX:
+-                    best = (L, g)
+-                    break
+-            if best is not None:
++            if all(abs(g - g2) > 0.004 for g2 in gs):
++                gs.append(g)
++            if len(gs) >= 7:
+                 break
++        Ls = np.linspace(Llo, Lhi, 25).tolist() + [Lc]
++        best = None
++        for gi, g in enumerate(gs):
++            for L in Ls:
++                rx = L + g
++                if not (RX_MIN <= rx <= RX_MAX):
++                    continue
++                fbb = (L, bottom, L + bw, bottom + bh)
++                ry = bottom + bh + TIP + 0.003
++                nb = 0
++                for ob in obbs:
++                    if not self._descent_free(rx, ry, fbb, [ob], margin=0.015):
++                        nb += 1
++                cost = nb * 100.0 + abs(L - bb[0]) / 0.05 + gi * 0.01 + abs(L - Lc) * 0.01
++                if best is None or cost < best[0]:
++                    best = (cost, L, g)
+         if best is None:
+-            best = (Lc, bw / 2)
+-        return best[0], sb[3] + 0.008, sb, best[1]
++            return Lc, bottom, sb, bw / 2
++        return best[1], bottom, sb, best[2]
+ 
+     def _blocking(self):
+         """Obstructions that interfere with placing the block on the surface."""
+@@ -327,8 +486,6 @@ class GeneratedApproach:
+             ob = _rect_bbox(s, o)
+             if not self._descent_free(rx, ry, final_bb, [ob], margin=0.015):
+                 res.append(o)
+-            elif ob[0] < sb[2] and ob[2] > sb[0] and ob[1] < sb[3] + 0.05:
+-                res.append(o)
+         return res
+ 
+     def _final_sweep(self):
+@@ -357,12 +514,16 @@ class GeneratedApproach:
+         bb = _rect_bbox(s, block)
+         brx = bb[0] + g
+         bry = bb[3] + TIP + 0.003
+-        levels = [(FLOOR + 0.005, 0.0)]
+-        for b in others:
+-            if b[3] + 0.005 + h < 0.42:
+-                levels.append((b[3] + 0.005, 1.0 + b[3]))
+-        best = None
+-        xs = np.arange(WORLD_X[0] + 0.002, WORLD_X[1] - w - 0.002, 0.005)
++        levels = [(v, 0.0) for v in np.arange(FLOOR + 0.005, 0.36 - h, 0.02)]
++        # remaining blockers' pickup columns must stay free
++        cols = []
++        for ob2 in self._blocking():
++            if ob2 == o:
++                continue
++            b2 = _rect_bbox(s, ob2)
++            cols.append(((b2[0] + b2[2]) / 2, b2[3] + TIP + 0.003, b2))
++        cands = []
++        xs = np.arange(WORLD_X[0] + 0.002, WORLD_X[1] - w - 0.002, 0.01)
+         for bottom, pen in levels:
+             for lx in xs:
+                 rx = lx + goff
+@@ -380,16 +541,40 @@ class GeneratedApproach:
+                     continue
+                 if not self._descent_free(frx, fry, fbb, [cand], margin=0.02):
+                     continue
+-                if not self._descent_free(brx, bry, None, [cand], margin=0.02):
++                if not self._descent_free(brx, bry, bb, [cand], margin=0.02):
++                    continue
++                if any(not self._descent_free(cx2, cy2, b2, [cand], margin=0.01)
++                       for cx2, cy2, b2 in cols):
+                     continue
+                 ry = bottom + h + hang
+                 if not self._descent_free(rx, ry, cand, others, margin=0.012):
+                     continue
+-                cost = abs(rx - x) + pen
+-                if best is None or cost < best[0]:
+-                    best = (cost, lx, bottom)
+-        if best is None:
++                cost = max(abs(rx - x), abs(ry - y)) + max(abs(rx - brx), abs(ry - bry)) + pen
++                cands.append((cost, lx, bottom, rx, ry, cand))
++        if not cands:
+             return None
++        cands.sort(key=lambda c: c[0])
++        binned = {}
++        for c in cands:
++            k = int(c[3] / 0.08)
++            if k not in binned:
++                binned[k] = c
++        cands = sorted(binned.values(), key=lambda c: c[0])
++        # rerank a few best candidates by planned path costs
++        surf_bb = sb
++        crel_o = (ob[0] - x, ob[1] - y, ob[2] - x, ob[3] - y)
++        crel_b = (bb[0] - brx, bb[1] - bry, bb[2] - brx, bb[3] - bry)
++        best = None
++        for cost, lx, bottom, rx, ry, cand in cands[:self.K_RERANK]:
++            obs1 = others + [surf_bb]
++            c1 = self._path_cost((x, y), (rx, ry), obs1, crel_o)
++            obs2 = [bx for bx in others] + [cand, surf_bb]
++            c2 = self._path_cost((rx, ry + 0.01), (brx, bry), obs2, None)
++            obs3 = [bx for bx in others if bx != bb] + [cand, surf_bb]
++            c3 = self._path_cost((brx, bry), (frx, fry), obs3, crel_b)
++            tot = c1 + c2 + c3
++            if best is None or tot < best[0]:
++                best = (tot, lx, bottom)
+         return best[1], best[2]
+ 
+     def _plan(self):
+@@ -416,9 +601,11 @@ class GeneratedApproach:
+                     spot = (_rect_bbox(self.state, o)[0], FLOOR + 0.005)
+                     failures += 1
+                 left, bottom = spot
+-                ok = yield from self._place_at(o, left, bottom)
++                ok = yield from self._place_at(o, left, bottom, release=True)
++                if self.vac > 0.5:
++                    self.vac = 0.0
++                    yield self._act()
+                 self.vac = 0.0
+-                yield self._act()
+                 if not ok:
+                     failures += 1
+                     continue
+diff --git a/approach_prev.py b/approach_prev.py
+new file mode 100644
+index 0000000..1f918f2
+--- /dev/null
++++ b/approach_prev.py
+@@ -0,0 +1,447 @@
++import math
++import numpy as np
++
++WORLD_X = (0.0, 1.618)
++ROBOT_Y_MAX = 0.895
++FLOOR = 0.1
++ARM = 0.2          # extended arm length we use
++GW = 0.01          # gripper width (along arm)
++GH = 0.07          # gripper height (perpendicular)
++BASE_R = 0.1
++RX_MIN = 0.1 + 0.002
++RX_MAX = 1.618 - 0.1 - 0.002
++TIP = ARM + GW     # distance from robot center to gripper tip (pointing down)
++
++
++def _rect_bbox(state, o):
++    x = float(state.get(o, "x")); y = float(state.get(o, "y"))
++    w = float(state.get(o, "width")); h = float(state.get(o, "height"))
++    th = float(state.get(o, "theta"))
++    if abs(th) < 1e-6:
++        return (x, y, x + w, y + h)
++    c, s = math.cos(th), math.sin(th)
++    pts = [(x, y), (x + w * c, y + w * s), (x - h * s, y + h * c),
++           (x + w * c - h * s, y + w * s + h * c)]
++    xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
++    return (min(xs), min(ys), max(xs), max(ys))
++
++
++def _circle_rect_dist(cx, cy, b):
++    dx = max(b[0] - cx, 0.0, cx - b[2])
++    dy = max(b[1] - cy, 0.0, cy - b[3])
++    return math.hypot(dx, dy)
++
++
++def _overlap(a, b, m=0.0):
++    return a[0] < b[2] + m and b[0] < a[2] + m and a[1] < b[3] + m and b[1] < a[3] + m
++
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.low = np.array(action_space.low, dtype=np.float32)
++        self.high = np.array(action_space.high, dtype=np.float32)
++
++    # ------------------------------------------------------------------
++    def reset(self, state, info):
++        self.state = state
++        self.gen = self._plan()
++        self.vac = 0.0
++
++    def get_action(self, state):
++        self.state = state
++        try:
++            a = next(self.gen)
++        except StopIteration:
++            self.gen = self._plan()
++            try:
++                a = next(self.gen)
++            except StopIteration:
++                a = np.zeros(5, dtype=np.float32)
++        a = np.clip(np.asarray(a, dtype=np.float32), self.low, self.high)
++        return a
++
++    # ------------------------------------------------------------------
++    def _objs(self):
++        s = self.state
++        robot = None; block = None; surf = None; obst = []
++        for n in sorted(s.get_object_names()):
++            o = s.get_object_from_name(n)
++            tn = o.type.name
++            if tn == "crv_robot":
++                robot = o
++            elif tn == "target_block":
++                block = o
++            elif tn == "target_surface":
++                surf = o
++            else:
++                obst.append(o)
++        return robot, block, surf, obst
++
++    def _rpos(self):
++        r = self._objs()[0]
++        s = self.state
++        return (float(s.get(r, "x")), float(s.get(r, "y")),
++                float(s.get(r, "theta")), float(s.get(r, "arm_joint")))
++
++    # ------------------------------------------------------------------
++    def _act(self, dx=0.0, dy=0.0, dth=0.0, darm=0.0):
++        return np.array([dx, dy, dth, darm, self.vac], dtype=np.float32)
++
++    def _goto(self, tx=None, ty=None, tol=1e-4, max_steps=200):
++        """Straight-line move towards (tx, ty). Returns True on success."""
++        stuck = 0
++        last = None
++        for _ in range(max_steps):
++            x, y, th, aj = self._rpos()
++            gx = x if tx is None else tx
++            gy = y if ty is None else ty
++            ex, ey = gx - x, gy - y
++            eth = math.atan2(math.sin(-math.pi / 2 - th), math.cos(-math.pi / 2 - th))
++            ea = ARM - aj
++            if abs(ex) <= tol and abs(ey) <= tol:
++                if abs(eth) < 1e-4 and abs(ea) < 1e-4:
++                    return True
++            if last is not None and abs(last[0] - x) < 1e-7 and abs(last[1] - y) < 1e-7 \
++                    and abs(last[2] - aj) < 1e-7 and abs(last[3] - th) < 1e-7:
++                stuck += 1
++                if stuck >= 2:
++                    return False
++            else:
++                stuck = 0
++            last = (x, y, aj, th)
++            n = max(1, int(math.ceil(max(abs(ex), abs(ey)) / 0.05 - 1e-6)))
++            yield np.array([ex / n, ey / n, np.clip(eth, -0.19, 0.19),
++                            np.clip(ea, -0.1, 0.1), self.vac], dtype=np.float32)
++        return False
++
++    def _collides(self, x, y, obstacles, crel, m=0.008):
++        if y > ROBOT_Y_MAX + 1e-6 or x < RX_MIN - 1e-6 or x > RX_MAX + 1e-6:
++            return True
++        col = (x - GH / 2, y - TIP, x + GH / 2, y)
++        cb = None
++        if crel is not None:
++            cb = (x + crel[0], y + crel[1], x + crel[2], y + crel[3])
++            if cb[1] < FLOOR - 1e-3:
++                return True
++        for b in obstacles:
++            if _circle_rect_dist(x, y, b) < BASE_R + m:
++                return True
++            if _overlap(col, b, 0.001):
++                return True
++            if cb is not None and _overlap(cb, b, m * 0.6):
++                return True
++        return False
++
++    def _seg_free(self, p, q, obstacles, crel):
++        d = max(abs(q[0] - p[0]), abs(q[1] - p[1]))
++        n = max(1, int(math.ceil(d / 0.008)))
++        for i in range(1, n + 1):
++            t = i / n
++            if self._collides(p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1]), obstacles, crel):
++                return False
++        return True
++
++    def _plan_path(self, x1, y1, obstacles, crel):
++        x0, y0, _, _ = self._rpos()
++        p0 = (x0, y0)
++        if self._seg_free(p0, (x1, y1), obstacles, crel):
++            return [(x1, y1)]
++        dx = x1 - x0
++        sg = 1.0 if dx >= 0 else -1.0
++        tys = sorted(set([round(v, 4) for v in np.arange(max(y0, y1) + 0.01, ROBOT_Y_MAX, 0.02)]
++                         + [ROBOT_Y_MAX]))
++        for ty in tys:
++            a = min(abs(dx), ty - y0)
++            b = min(abs(dx) - a, ty - y1)
++            pa = (x0 + sg * a, ty)
++            pb = (x1 - sg * b, ty)
++            path = [pa, pb, (x1, y1)]
++            pts = [p0] + path
++            if all(self._seg_free(pts[i], pts[i + 1], obstacles, crel) for i in range(3)):
++                return path
++            path = [(x0, ty), (x1, ty), (x1, y1)]
++            pts = [p0] + path
++            if all(self._seg_free(pts[i], pts[i + 1], obstacles, crel) for i in range(3)):
++                return path
++        return [(x0, ROBOT_Y_MAX), (x1, ROBOT_Y_MAX), (x1, y1)]
++
++    def _move(self, x1, y1, carried=None, last_vac=None):
++        """Plan & execute a collision-free path. carried: grasped object or None."""
++        x0, y0, _, _ = self._rpos()
++        excl = [carried] if carried is not None else []
++        obstacles = self._others_bboxes(excl)
++        robot, block, surf, obst = self._objs()
++        obstacles.append(_rect_bbox(self.state, surf))
++        crel = None
++        if carried is not None:
++            cb = _rect_bbox(self.state, carried)
++            crel = (cb[0] - x0, cb[1] - y0, cb[2] - x0, cb[3] - y0)
++        path = self._plan_path(x1, y1, obstacles, crel)
++        for i, (px, py) in enumerate(path):
++            if last_vac is not None and i == len(path) - 1:
++                # final segment: run all but last step, then set vacuum on last step
++                gen = self._goto(px, py)
++                while True:
++                    x, y, _, _ = self._rpos()
++                    if max(abs(px - x), abs(py - y)) <= 0.05 + 1e-6:
++                        break
++                    try:
++                        yield next(gen)
++                    except StopIteration:
++                        break
++                self.vac = last_vac
++            ok = yield from self._goto(px, py)
++            if not ok:
++                return False
++        return True
++
++    # ------------------------------------------------------------------
++    def _others_bboxes(self, exclude):
++        robot, block, surf, obst = self._objs()
++        out = []
++        for o in [block] + obst:
++            if o in exclude:
++                continue
++            out.append(_rect_bbox(self.state, o))
++        return out
++
++    def _descent_free(self, rx, ry_final, carried_bbox_final, others, margin=0.01):
++        """Check vertical descent from travel height to ry_final at x=rx is collision free."""
++        # base circle sweep: check at the final (lowest) position -- sweep is vertical,
++        # and anything below is covered by checking the column.
++        for b in others:
++            # circle swept vertically from ry_final upwards
++            cy = min(max(ry_final, b[1]), ROBOT_Y_MAX)
++            cy = max(cy, ry_final)
++            if _circle_rect_dist(rx, cy, b) < BASE_R + margin:
++                return False
++            # arm + gripper column
++            col = (rx - GH / 2, ry_final - TIP, rx + GH / 2, ROBOT_Y_MAX)
++            if _overlap(col, b, margin * 0.3):
++                return False
++            if carried_bbox_final is not None:
++                cb = carried_bbox_final
++                colc = (cb[0], cb[1], cb[2], cb[3] + (ROBOT_Y_MAX - ry_final))
++                if _overlap(colc, b, margin * 0.5):
++                    return False
++        return True
++
++    def _grasp_cands(self, b, pref=None):
++        lo = b[0] + 0.012 - (GH / 2 - 0.02)
++        hi = b[2] - 0.012 + (GH / 2 - 0.02)
++        cx = (b[0] + b[2]) / 2 if pref is None else pref
++        if hi < lo:
++            lo = hi = (b[0] + b[2]) / 2
++        full_lo = b[0] + GH / 2
++        full_hi = b[2] - GH / 2
++        vals = np.linspace(lo, hi, 41).tolist() + [min(max(cx, lo), hi)]
++
++        def key(v):
++            # prefer full gripper contact, then closeness to preferred
++            pen = 0.0
++            if full_lo <= full_hi:
++                pen = max(0.0, full_lo - v, v - full_hi)
++            return (round(pen, 4) > 0.0, abs(v - cx))
++        return sorted(vals, key=key)
++
++    def _choose_grasp_x(self, o, others, pref=None):
++        b = _rect_bbox(self.state, o)
++        ry = b[3] + TIP + 0.003
++        for gx in self._grasp_cands(b, pref):
++            if gx < RX_MIN or gx > RX_MAX:
++                continue
++            if self._descent_free(gx, ry, None, others):
++                return gx
++        return None
++
++    def _pick(self, o, pref=None):
++        others = self._others_bboxes([o])
++        gx = self._choose_grasp_x(o, others, pref)
++        if gx is None:
++            return False
++        b = _rect_bbox(self.state, o)
++        ry = b[3] + TIP + 0.003
++        yield from self._move(gx, ry, None, last_vac=1.0)
++        self.vac = 1.0
++        return True
++
++    def _place_at(self, o, target_left, target_bottom, check=True):
++        x, y, _, _ = self._rpos()
++        b0 = _rect_bbox(self.state, o)
++        rx = x + (target_left - b0[0])
++        ry = y - (b0[1] - target_bottom)
++        gen = self._move(rx, ry, o)
++        first = True
++        while True:
++            try:
++                a = next(gen)
++            except StopIteration as e:
++                return True
++            yield a
++            if first and check:
++                first = False
++                nb = _rect_bbox(self.state, o)
++                if abs(nb[0] - b0[0]) + abs(nb[1] - b0[1]) < 1e-6:
++                    # grasp failed
++                    self.vac = 0.0
++                    yield self._act()
++                    return False
++
++    # ------------------------------------------------------------------
++    def _final_placement(self):
++        """Returns (left, bottom, surface_bbox, grasp_offset_from_block_left)."""
++        robot, block, surf, obst = self._objs()
++        s = self.state
++        sb = _rect_bbox(s, surf)
++        bb = _rect_bbox(s, block)
++        bw = bb[2] - bb[0]
++        Llo = sb[0] + min(0.004, max(0.0, (sb[2] - sb[0] - bw) / 2))
++        Lhi = sb[2] - bw - min(0.004, max(0.0, (sb[2] - sb[0] - bw) / 2))
++        Lc = sb[0] + (sb[2] - sb[0] - bw) / 2
++        if Lhi < Llo:
++            Llo = Lhi = Lc
++        best = None
++        for g in self._grasp_cands((0.0, 0.0, bw, 1.0)):
++            for L in sorted(np.linspace(Llo, Lhi, 21).tolist() + [Lc], key=lambda v: abs(v - Lc)):
++                if RX_MIN <= L + g <= RX_MAX:
++                    best = (L, g)
++                    break
++            if best is not None:
++                break
++        if best is None:
++            best = (Lc, bw / 2)
++        return best[0], sb[3] + 0.008, sb, best[1]
++
++    def _blocking(self):
++        """Obstructions that interfere with placing the block on the surface."""
++        robot, block, surf, obst = self._objs()
++        s = self.state
++        left, bottom, sb, g = self._final_placement()
++        bb = _rect_bbox(s, block)
++        bw, bh = bb[2] - bb[0], bb[3] - bb[1]
++        final_bb = (left, bottom, left + bw, bottom + bh)
++        rx = left + g
++        ry = bottom + bh + TIP + 0.003
++        res = []
++        for o in obst:
++            ob = _rect_bbox(s, o)
++            if not self._descent_free(rx, ry, final_bb, [ob], margin=0.015):
++                res.append(o)
++            elif ob[0] < sb[2] and ob[2] > sb[0] and ob[1] < sb[3] + 0.05:
++                res.append(o)
++        return res
++
++    def _final_sweep(self):
++        """(rx, ry, final_bb) for the final block placement."""
++        robot, block, surf, obst = self._objs()
++        left, bottom, sb, g = self._final_placement()
++        bb = _rect_bbox(self.state, block)
++        bw, bh = bb[2] - bb[0], bb[3] - bb[1]
++        final_bb = (left, bottom, left + bw, bottom + bh)
++        return left + g, bottom + bh + TIP + 0.003, final_bb
++
++    def _find_spot(self, o):
++        """Find (left, bottom) to park the (currently grasped) obstruction o."""
++        robot, block, surf, obst = self._objs()
++        s = self.state
++        ob = _rect_bbox(s, o)
++        w, h = ob[2] - ob[0], ob[3] - ob[1]
++        x, y, _, _ = self._rpos()
++        goff = x - ob[0]
++        hang = y - ob[3]  # robot y minus object top
++        sb = _rect_bbox(s, surf)
++        others = self._others_bboxes([o])
++        frx, fry, fbb = self._final_sweep()
++        # target block pickup sweep
++        _, _, _, g = self._final_placement()
++        bb = _rect_bbox(s, block)
++        brx = bb[0] + g
++        bry = bb[3] + TIP + 0.003
++        levels = [(FLOOR + 0.005, 0.0)]
++        for b in others:
++            if b[3] + 0.005 + h < 0.42:
++                levels.append((b[3] + 0.005, 1.0 + b[3]))
++        best = None
++        xs = np.arange(WORLD_X[0] + 0.002, WORLD_X[1] - w - 0.002, 0.005)
++        for bottom, pen in levels:
++            for lx in xs:
++                rx = lx + goff
++                if rx < RX_MIN or rx > RX_MAX:
++                    continue
++                cand = (lx, bottom, lx + w, bottom + h)
++                if cand[0] < sb[2] + 0.01 and cand[2] > sb[0] - 0.01:
++                    continue
++                bad = False
++                for b in others:
++                    if _overlap(cand, b, 0.01):
++                        bad = True
++                        break
++                if bad:
++                    continue
++                if not self._descent_free(frx, fry, fbb, [cand], margin=0.02):
++                    continue
++                if not self._descent_free(brx, bry, None, [cand], margin=0.02):
++                    continue
++                ry = bottom + h + hang
++                if not self._descent_free(rx, ry, cand, others, margin=0.012):
++                    continue
++                cost = abs(rx - x) + pen
++                if best is None or cost < best[0]:
++                    best = (cost, lx, bottom)
++        if best is None:
++            return None
++        return best[1], best[2]
++
++    def _plan(self):
++        self.vac = 0.0
++        failures = 0
++        for _ in range(30):
++            blockers = self._blocking()
++            if not blockers:
++                break
++            robot, block, surf, obst = self._objs()
++            x, y, _, _ = self._rpos()
++            blockers.sort(key=lambda o: (-_rect_bbox(self.state, o)[3]))
++            picked = False
++            for o in blockers:
++                others = self._others_bboxes([o])
++                if self._choose_grasp_x(o, others) is None:
++                    continue
++                ok = yield from self._pick(o)
++                if not ok:
++                    failures += 1
++                    continue
++                spot = self._find_spot(o)
++                if spot is None:
++                    spot = (_rect_bbox(self.state, o)[0], FLOOR + 0.005)
++                    failures += 1
++                left, bottom = spot
++                ok = yield from self._place_at(o, left, bottom)
++                self.vac = 0.0
++                yield self._act()
++                if not ok:
++                    failures += 1
++                    continue
++                picked = True
++                break
++            if not picked:
++                failures += 1
++                if failures > 5:
++                    break
++        # now the target block
++        robot, block, surf, obst = self._objs()
++        for _ in range(10):
++            left, bottom, sb, g = self._final_placement()
++            bb = _rect_bbox(self.state, block)
++            ok = yield from self._pick(block, pref=bb[0] + g)
++            if not ok:
++                self.vac = 0.0
++                yield self._act()
++                continue
++            left, bottom, sb, g = self._final_placement()
++            ok = yield from self._place_at(block, left, bottom)
++            if ok:
++                break
++        self.vac = 0.0
++        for _ in range(5):
++            yield self._act()
+diff --git a/c3.txt b/c3.txt
+deleted file mode 100644
+index fc61cda..0000000
+--- a/c3.txt
++++ /dev/null
+@@ -1,41 +0,0 @@
+-seed 200 nobs 3 success True steps 181 time 11.3
+-seed 201 nobs 3 success True steps 176 time 12.5
+-seed 202 nobs 3 success True steps 175 time 12.9
+-seed 203 nobs 3 success True steps 238 time 16.9
+-seed 204 nobs 3 success True steps 182 time 10.2
+-seed 205 nobs 3 success True steps 217 time 14.1
+-seed 206 nobs 3 success True steps 180 time 14.6
+-seed 207 nobs 3 success True steps 220 time 15.3
+-seed 208 nobs 3 success True steps 164 time 11.4
+-seed 209 nobs 3 success True steps 94 time 6.2
+-seed 210 nobs 3 success True steps 246 time 15.3
+-seed 211 nobs 3 success True steps 183 time 12.6
+-seed 212 nobs 3 success True steps 135 time 9.8
+-seed 213 nobs 3 success True steps 162 time 8.6
+-seed 214 nobs 3 success True steps 170 time 10.3
+-seed 215 nobs 3 success True steps 216 time 15.3
+-seed 216 nobs 3 success True steps 188 time 12.6
+-seed 217 nobs 3 success True steps 153 time 8.6
+-seed 218 nobs 3 success True steps 183 time 9.8
+-seed 219 nobs 3 success True steps 173 time 10.1
+-seed 220 nobs 3 success True steps 186 time 9.8
+-seed 221 nobs 3 success True steps 179 time 11.1
+-seed 222 nobs 3 success True steps 165 time 5.0
+-seed 223 nobs 3 success True steps 209 time 7.3
+-seed 224 nobs 3 success True steps 113 time 4.8
+-seed 225 nobs 3 success True steps 175 time 4.1
+-seed 226 nobs 3 success True steps 161 time 6.4
+-seed 227 nobs 3 success True steps 106 time 3.2
+-seed 228 nobs 3 success True steps 169 time 6.6
+-seed 229 nobs 3 success True steps 223 time 8.6
+-seed 230 nobs 3 success True steps 113 time 3.1
+-seed 231 nobs 3 success True steps 226 time 6.4
+-seed 232 nobs 3 success True steps 173 time 5.7
+-seed 233 nobs 3 success True steps 123 time 5.0
+-seed 234 nobs 3 success True steps 171 time 6.2
+-seed 235 nobs 3 success True steps 156 time 5.0
+-seed 236 nobs 3 success True steps 166 time 5.5
+-seed 237 nobs 3 success True steps 197 time 6.8
+-seed 238 nobs 3 success True steps 220 time 9.5
+-seed 239 nobs 3 success True steps 187 time 6.1
+-success 40 / 40
+diff --git a/c4.txt b/c4.txt
+deleted file mode 100644
+index 0cb9db7..0000000
+--- a/c4.txt
++++ /dev/null
+@@ -1,41 +0,0 @@
+-seed 100 nobs 4 success True steps 232 time 17.1
+-seed 101 nobs 4 success True steps 259 time 18.3
+-seed 102 nobs 4 success True steps 175 time 11.2
+-seed 103 nobs 4 success True steps 247 time 16.2
+-seed 104 nobs 4 success True steps 246 time 17.2
+-seed 105 nobs 4 success True steps 191 time 14.2
+-seed 106 nobs 4 success True steps 220 time 14.8
+-seed 107 nobs 4 success True steps 161 time 11.2
+-seed 108 nobs 4 success True steps 203 time 11.9
+-seed 109 nobs 4 success True steps 187 time 9.4
+-seed 110 nobs 4 success True steps 178 time 10.9
+-seed 111 nobs 4 success True steps 163 time 5.3
+-seed 112 nobs 4 success True steps 173 time 5.7
+-seed 113 nobs 4 success True steps 211 time 7.7
+-seed 114 nobs 4 success True steps 170 time 7.2
+-seed 115 nobs 4 success True steps 233 time 7.3
+-seed 116 nobs 4 success True steps 249 time 8.7
+-seed 117 nobs 4 success True steps 241 time 9.0
+-seed 118 nobs 4 success True steps 223 time 7.0
+-seed 119 nobs 4 success True steps 213 time 4.2
+-seed 120 nobs 4 success True steps 250 time 3.2
+-seed 121 nobs 4 success True steps 159 time 0.9
+-seed 122 nobs 4 success True steps 208 time 1.1
+-seed 123 nobs 4 success True steps 123 time 0.7
+-seed 124 nobs 4 success True steps 274 time 1.4
+-seed 125 nobs 4 success True steps 112 time 0.7
+-seed 126 nobs 4 success True steps 218 time 1.2
+-seed 127 nobs 4 success True steps 254 time 1.1
+-seed 128 nobs 4 success True steps 217 time 1.1
+-seed 129 nobs 4 success True steps 169 time 0.9
+-seed 130 nobs 4 success False steps 1000 time 4.3
+-seed 131 nobs 4 success True steps 93 time 0.4
+-seed 132 nobs 4 success True steps 160 time 0.8
+-seed 133 nobs 4 success True steps 222 time 1.1
+-seed 134 nobs 4 success True steps 236 time 1.1
+-seed 135 nobs 4 success True steps 205 time 1.1
+-seed 136 nobs 4 success True steps 170 time 0.8
+-seed 137 nobs 4 success True steps 239 time 1.0
+-seed 138 nobs 4 success True steps 285 time 1.5
+-seed 139 nobs 4 success True steps 234 time 1.1
+-success 39 / 40
+diff --git a/c5.txt b/c5.txt
+deleted file mode 100644
+index 0682116..0000000
+--- a/c5.txt
++++ /dev/null
+@@ -1,13 +0,0 @@
+-Traceback (most recent call last):
+-  File "/sandbox/test_approach.py", line 23, in <module>
+-    term, steps, n, dt = run(s, count=cnt)
+-                         ^^^^^^^^^^^^^^^^^
+-  File "/sandbox/test_approach.py", line 7, in run
+-    obs, info = env.reset(seed=seed, options=({'object_count': count} if count is not None else None))
+-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-  File "/sandbox/env_client.py", line 525, in reset
+-    response = self._request({"cmd": "reset", "seed": seed, "options": options})
+-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-  File "/sandbox/env_client.py", line 478, in _request
+-    raise RuntimeError("Connection to the environment server was closed")
+-RuntimeError: Connection to the environment server was closed
+diff --git a/cd.txt b/cd.txt
+deleted file mode 100644
+index 9c75310..0000000
+--- a/cd.txt
++++ /dev/null
+@@ -1,101 +0,0 @@
+-seed 300 nobs 0 success True steps 50 time 2.0
+-seed 301 nobs 0 success True steps 80 time 3.1
+-seed 302 nobs 2 success True steps 155 time 9.5
+-seed 303 nobs 1 success True steps 134 time 8.0
+-seed 304 nobs 2 success True steps 169 time 5.6
+-seed 305 nobs 0 success True steps 49 time 2.4
+-seed 306 nobs 2 success True steps 163 time 9.5
+-seed 307 nobs 2 success True steps 187 time 11.6
+-seed 308 nobs 1 success True steps 110 time 7.2
+-seed 309 nobs 1 success True steps 125 time 4.4
+-seed 310 nobs 0 success True steps 44 time 1.7
+-seed 311 nobs 1 success True steps 117 time 6.8
+-seed 312 nobs 0 success True steps 74 time 5.0
+-seed 313 nobs 0 success True steps 48 time 3.1
+-seed 314 nobs 1 success True steps 66 time 4.0
+-seed 315 nobs 1 success True steps 41 time 2.3
+-seed 316 nobs 0 success True steps 48 time 2.9
+-seed 317 nobs 0 success True steps 41 time 2.0
+-seed 318 nobs 0 success True steps 74 time 3.2
+-seed 319 nobs 2 success True steps 113 time 5.8
+-seed 320 nobs 0 success True steps 39 time 1.8
+-seed 321 nobs 1 success True steps 101 time 4.9
+-seed 322 nobs 0 success True steps 46 time 2.3
+-seed 323 nobs 2 success True steps 115 time 8.2
+-seed 324 nobs 1 success True steps 132 time 7.4
+-seed 325 nobs 0 success True steps 48 time 2.8
+-seed 326 nobs 0 success True steps 75 time 4.2
+-seed 327 nobs 1 success True steps 104 time 6.8
+-seed 328 nobs 0 success True steps 40 time 1.7
+-seed 329 nobs 2 success True steps 165 time 9.1
+-seed 330 nobs 1 success True steps 117 time 1.9
+-seed 331 nobs 0 success True steps 38 time 1.4
+-seed 332 nobs 1 success True steps 103 time 6.8
+-seed 333 nobs 0 success True steps 34 time 1.9
+-seed 334 nobs 1 success True steps 93 time 5.4
+-seed 335 nobs 0 success True steps 44 time 2.2
+-seed 336 nobs 1 success True steps 119 time 6.2
+-seed 337 nobs 0 success True steps 81 time 3.7
+-seed 338 nobs 1 success True steps 98 time 5.9
+-seed 339 nobs 0 success True steps 62 time 4.5
+-seed 340 nobs 0 success True steps 42 time 1.7
+-seed 341 nobs 2 success True steps 99 time 6.2
+-seed 342 nobs 2 success True steps 191 time 10.7
+-seed 343 nobs 0 success True steps 58 time 2.4
+-seed 344 nobs 0 success True steps 59 time 3.2
+-seed 345 nobs 0 success True steps 58 time 3.4
+-seed 346 nobs 1 success True steps 133 time 6.3
+-seed 347 nobs 2 success True steps 96 time 5.4
+-seed 348 nobs 0 success True steps 52 time 1.8
+-seed 349 nobs 2 success True steps 105 time 5.0
+-seed 350 nobs 1 success True steps 98 time 4.9
+-seed 351 nobs 1 success True steps 120 time 4.6
+-seed 352 nobs 0 success True steps 61 time 2.7
+-seed 353 nobs 0 success True steps 45 time 1.6
+-seed 354 nobs 2 success True steps 177 time 8.0
+-seed 355 nobs 1 success True steps 57 time 2.5
+-seed 356 nobs 0 success True steps 54 time 1.2
+-seed 357 nobs 1 success True steps 125 time 6.2
+-seed 358 nobs 2 success True steps 140 time 8.1
+-seed 359 nobs 1 success True steps 109 time 4.6
+-seed 360 nobs 2 success True steps 155 time 4.0
+-seed 361 nobs 2 success True steps 162 time 5.5
+-seed 362 nobs 2 success True steps 163 time 5.2
+-seed 363 nobs 0 success True steps 66 time 1.9
+-seed 364 nobs 1 success True steps 108 time 1.7
+-seed 365 nobs 0 success True steps 71 time 1.8
+-seed 366 nobs 0 success True steps 45 time 1.1
+-seed 367 nobs 2 success True steps 199 time 7.2
+-seed 368 nobs 2 success True steps 151 time 3.8
+-seed 369 nobs 2 success True steps 163 time 5.3
+-seed 370 nobs 1 success True steps 114 time 1.8
+-seed 371 nobs 2 success True steps 97 time 3.2
+-seed 372 nobs 1 success True steps 137 time 3.4
+-seed 373 nobs 1 success True steps 118 time 2.1
+-seed 374 nobs 2 success True steps 165 time 4.7
+-seed 375 nobs 0 success True steps 51 time 1.1
+-seed 376 nobs 1 success True steps 118 time 4.1
+-seed 377 nobs 2 success True steps 132 time 3.4
+-seed 378 nobs 1 success True steps 141 time 4.5
+-seed 379 nobs 2 success True steps 166 time 6.3
+-seed 380 nobs 1 success True steps 123 time 2.9
+-seed 381 nobs 2 success True steps 133 time 3.2
+-seed 382 nobs 0 success True steps 67 time 1.4
+-seed 383 nobs 0 success True steps 63 time 1.8
+-seed 384 nobs 0 success True steps 64 time 2.0
+-seed 385 nobs 2 success True steps 140 time 4.6
+-seed 386 nobs 1 success True steps 104 time 3.3
+-seed 387 nobs 1 success True steps 113 time 3.2
+-seed 388 nobs 1 success True steps 106 time 3.9
+-seed 389 nobs 0 success True steps 53 time 1.6
+-seed 390 nobs 1 success True steps 122 time 3.7
+-seed 391 nobs 0 success True steps 66 time 2.3
+-seed 392 nobs 2 success True steps 101 time 3.0
+-seed 393 nobs 2 success True steps 46 time 1.3
+-seed 394 nobs 0 success True steps 44 time 1.5
+-seed 395 nobs 1 success True steps 131 time 2.3
+-seed 396 nobs 1 success True steps 134 time 2.5
+-seed 397 nobs 2 success True steps 159 time 2.8
+-seed 398 nobs 2 success True steps 97 time 1.0
+-seed 399 nobs 2 success True steps 165 time 1.6
+-success 100 / 100
+diff --git a/cnt_3.txt b/cnt_3.txt
+deleted file mode 100644
+index 295924d..0000000
+--- a/cnt_3.txt
++++ /dev/null
+@@ -1,4 +0,0 @@
+-seed 0 nobs 3 success True steps 105 time 4.6
+-seed 1 nobs 3 success True steps 177 time 9.8
+-seed 2 nobs 3 success True steps 187 time 10.0
+-success 3 / 3
+diff --git a/cnt_4.txt b/cnt_4.txt
+deleted file mode 100644
+index c14d154..0000000
+--- a/cnt_4.txt
++++ /dev/null
+@@ -1,4 +0,0 @@
+-seed 0 nobs 4 success True steps 160 time 8.6
+-seed 1 nobs 4 success True steps 214 time 9.0
+-seed 2 nobs 4 success True steps 179 time 6.6
+-success 3 / 3
+diff --git a/cnt_6.txt b/cnt_6.txt
+deleted file mode 100644
+index 42485f0..0000000
+--- a/cnt_6.txt
++++ /dev/null
+@@ -1,13 +0,0 @@
+-Traceback (most recent call last):
+-  File "/sandbox/test_approach.py", line 23, in <module>
+-    term, steps, n, dt = run(s, count=cnt)
+-                         ^^^^^^^^^^^^^^^^^
+-  File "/sandbox/test_approach.py", line 7, in run
+-    obs, info = env.reset(seed=seed, options=({'object_count': count} if count is not None else None))
+-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-  File "/sandbox/env_client.py", line 525, in reset
+-    response = self._request({"cmd": "reset", "seed": seed, "options": options})
+-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-  File "/sandbox/env_client.py", line 481, in _request
+-    raise RuntimeError(f"Environment server error: {response['error']}")
+-RuntimeError: Environment server error: ValueError: Obstruction2DEnv could not build an instance with num_obstructions=6; it likely exceeds the family's feasible object count. Lower the configured counts.
+diff --git a/cnt_8.txt b/cnt_8.txt
+deleted file mode 100644
+index f18b7e3..0000000
+--- a/cnt_8.txt
++++ /dev/null
+@@ -1,13 +0,0 @@
+-Traceback (most recent call last):
+-  File "/sandbox/test_approach.py", line 23, in <module>
+-    term, steps, n, dt = run(s, count=cnt)
+-                         ^^^^^^^^^^^^^^^^^
+-  File "/sandbox/test_approach.py", line 7, in run
+-    obs, info = env.reset(seed=seed, options=({'object_count': count} if count is not None else None))
+-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-  File "/sandbox/env_client.py", line 525, in reset
+-    response = self._request({"cmd": "reset", "seed": seed, "options": options})
+-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-  File "/sandbox/env_client.py", line 481, in _request
+-    raise RuntimeError(f"Environment server error: {response['error']}")
+-RuntimeError: Environment server error: ValueError: Obstruction2DEnv could not build an instance with num_obstructions=8; it likely exceeds the family's feasible object count. Lower the configured counts.
+diff --git a/dbg_spot.py b/dbg_spot.py
+new file mode 100644
+index 0000000..6f9b50b
+--- /dev/null
++++ b/dbg_spot.py
+@@ -0,0 +1,23 @@
++import sys, numpy as np
++from env_client import make_env
++import approach
++from approach import GeneratedApproach, _rect_bbox
++seed=int(sys.argv[1])
++env=make_env(); obs,info=env.reset(seed=seed)
++ap=GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs,info)
++# monkeypatch path cost to print
++orig=ap._path_cost
++log=[]
++def pc(p0,p1,o,c):
++    v=orig(p0,p1,o,c); log.append((p0,p1,v)); return v
++ap._path_cost=pc
++orig_fs=ap._find_spot
++def fs(o):
++    log.clear(); r=orig_fs(o)
++    for i in range(0,len(log),3):
++        print("cand rx=%.3f ry=%.3f  c1=%d c2=%d c3=%d"%(log[i][1][0],log[i][1][1],log[i][2],log[i+1][2],log[i+2][2]))
++    print("chosen",r); return r
++ap._find_spot=fs
++for t in range(200):
++    a=ap.get_action(obs); obs,r,term,tr,_=env.step(a)
++    if term: print("steps",t+1); break
+diff --git a/quick.py b/quick.py
+new file mode 100644
+index 0000000..0ce7f88
+--- /dev/null
++++ b/quick.py
+@@ -0,0 +1,11 @@
++import sys, time
++import test_approach as t
++from concurrent.futures import ThreadPoolExecutor
++seeds=[int(a) for a in sys.argv[1].split(',')] if ',' in sys.argv[1] else list(range(int(sys.argv[1]), int(sys.argv[2])))
++cnt=int(sys.argv[3]) if len(sys.argv)>3 and sys.argv[3]!='-' else None
++with ThreadPoolExecutor(4) as ex:
++    res=list(ex.map(lambda s: (s,)+tuple(t.run(s,count=cnt)), seeds))
++print(" ".join(f"{r[0]}:{r[2]}" for r in res))
++for r in res:
++    if not r[1]: print("FAIL", r)
++print("succ", sum(r[1] for r in res), "/", len(res), "mean steps", sum(r[2] for r in res)/len(res), "max time", max(r[4] for r in res))
+diff --git a/r3.txt b/r3.txt
+index 6520d25..80fc373 100644
+--- a/r3.txt
++++ b/r3.txt
+@@ -1,10 +1,101 @@
+-seed 2000 nobs 3 success True steps 204 time 8.5
+-seed 2001 nobs 3 success True steps 150 time 5.9
+-seed 2002 nobs 3 success True steps 204 time 8.2
+-seed 2003 nobs 3 success True steps 211 time 6.2
+-seed 2004 nobs 3 success True steps 160 time 4.1
+-seed 2005 nobs 3 success True steps 156 time 5.5
+-seed 2006 nobs 3 success True steps 203 time 8.2
+-seed 2007 nobs 3 success True steps 164 time 5.4
+-seed 2008 nobs 3 success True steps 176 time 7.2
+-seed 2009 nobs 3 success True steps 174 time 8.3
++seed 2000 nobs 3 success True steps 92 time 3.0
++seed 2001 nobs 3 success True steps 50 time 2.0
++seed 2002 nobs 3 success True steps 76 time 2.7
++seed 2003 nobs 3 success True steps 84 time 2.7
++seed 2004 nobs 3 success True steps 56 time 1.9
++seed 2005 nobs 3 success True steps 63 time 1.7
++seed 2006 nobs 3 success True steps 98 time 3.0
++seed 2007 nobs 3 success True steps 68 time 2.4
++seed 2008 nobs 3 success True steps 82 time 2.7
++seed 2009 nobs 3 success True steps 68 time 1.9
++seed 2010 nobs 3 success True steps 71 time 2.6
++seed 2011 nobs 3 success True steps 43 time 1.6
++seed 2012 nobs 3 success True steps 48 time 1.3
++seed 2013 nobs 3 success True steps 46 time 1.6
++seed 2014 nobs 3 success True steps 58 time 2.5
++seed 2015 nobs 3 success True steps 73 time 2.3
++seed 2016 nobs 3 success True steps 55 time 2.1
++seed 2017 nobs 3 success True steps 77 time 3.2
++seed 2018 nobs 3 success True steps 85 time 4.0
++seed 2019 nobs 3 success True steps 68 time 3.2
++seed 2020 nobs 3 success True steps 71 time 2.5
++seed 2021 nobs 3 success True steps 72 time 3.1
++seed 2022 nobs 3 success True steps 115 time 4.7
++seed 2023 nobs 3 success True steps 45 time 1.8
++seed 2024 nobs 3 success True steps 57 time 2.8
++seed 2025 nobs 3 success True steps 63 time 2.3
++seed 2026 nobs 3 success True steps 84 time 3.3
++seed 2027 nobs 3 success True steps 40 time 1.8
++seed 2028 nobs 3 success True steps 72 time 3.2
++seed 2029 nobs 3 success True steps 96 time 4.0
++seed 2030 nobs 3 success True steps 57 time 2.4
++seed 2031 nobs 3 success True steps 80 time 3.1
++seed 2032 nobs 3 success True steps 90 time 4.3
++seed 2033 nobs 3 success True steps 80 time 2.3
++seed 2034 nobs 3 success True steps 103 time 4.2
++seed 2035 nobs 3 success True steps 61 time 2.1
++seed 2036 nobs 3 success True steps 77 time 3.2
++seed 2037 nobs 3 success True steps 18 time 0.6
++seed 2038 nobs 3 success True steps 65 time 3.0
++seed 2039 nobs 3 success True steps 70 time 3.0
++seed 2040 nobs 3 success True steps 59 time 1.5
++seed 2041 nobs 3 success True steps 84 time 3.3
++seed 2042 nobs 3 success True steps 71 time 2.7
++seed 2043 nobs 3 success True steps 124 time 5.3
++seed 2044 nobs 3 success True steps 67 time 2.5
++seed 2045 nobs 3 success True steps 64 time 2.6
++seed 2046 nobs 3 success True steps 74 time 3.4
++seed 2047 nobs 3 success True steps 55 time 2.3
++seed 2048 nobs 3 success True steps 82 time 2.8
++seed 2049 nobs 3 success True steps 47 time 2.1
++seed 2050 nobs 3 success True steps 47 time 2.3
++seed 2051 nobs 3 success True steps 48 time 1.9
++seed 2052 nobs 3 success True steps 97 time 4.5
++seed 2053 nobs 3 success True steps 91 time 3.8
++seed 2054 nobs 3 success True steps 68 time 2.5
++seed 2055 nobs 3 success True steps 69 time 2.4
++seed 2056 nobs 3 success True steps 42 time 1.5
++seed 2057 nobs 3 success True steps 83 time 4.9
++seed 2058 nobs 3 success True steps 64 time 4.1
++seed 2059 nobs 3 success True steps 46 time 2.3
++seed 2060 nobs 3 success True steps 30 time 1.4
++seed 2061 nobs 3 success True steps 53 time 3.4
++seed 2062 nobs 3 success True steps 44 time 2.6
++seed 2063 nobs 3 success True steps 102 time 5.0
++seed 2064 nobs 3 success True steps 36 time 2.4
++seed 2065 nobs 3 success True steps 42 time 2.1
++seed 2066 nobs 3 success True steps 50 time 2.4
++seed 2067 nobs 3 success True steps 78 time 4.8
++seed 2068 nobs 3 success True steps 66 time 3.3
++seed 2069 nobs 3 success True steps 71 time 4.0
++seed 2070 nobs 3 success True steps 63 time 3.3
++seed 2071 nobs 3 success True steps 55 time 2.7
++seed 2072 nobs 3 success True steps 74 time 4.5
++seed 2073 nobs 3 success True steps 60 time 3.2
++seed 2074 nobs 3 success True steps 64 time 3.3
++seed 2075 nobs 3 success True steps 40 time 2.7
++seed 2076 nobs 3 success True steps 69 time 4.7
++seed 2077 nobs 3 success True steps 64 time 3.7
++seed 2078 nobs 3 success True steps 48 time 2.9
++seed 2079 nobs 3 success True steps 51 time 2.8
++seed 2080 nobs 3 success True steps 58 time 2.9
++seed 2081 nobs 3 success True steps 74 time 4.6
++seed 2082 nobs 3 success True steps 73 time 4.1
++seed 2083 nobs 3 success False steps 1000 time 41.7
++seed 2084 nobs 3 success True steps 84 time 2.4
++seed 2085 nobs 3 success True steps 55 time 5.7
++seed 2086 nobs 3 success True steps 69 time 6.4
++seed 2087 nobs 3 success True steps 76 time 2.5
++seed 2088 nobs 3 success True steps 20 time 0.8
++seed 2089 nobs 3 success True steps 59 time 6.1
++seed 2090 nobs 3 success True steps 80 time 6.9
++seed 2091 nobs 3 success True steps 53 time 1.9
++seed 2092 nobs 3 success True steps 89 time 7.3
++seed 2093 nobs 3 success True steps 69 time 7.2
++seed 2094 nobs 3 success True steps 45 time 3.9
++seed 2095 nobs 3 success False steps 1000 time 53.1
++seed 2096 nobs 3 success True steps 73 time 6.9
++seed 2097 nobs 3 success True steps 78 time 4.3
++seed 2098 nobs 3 success True steps 19 time 0.5
++seed 2099 nobs 3 success True steps 126 time 5.0
++success 98 / 100
+diff --git a/r4.txt b/r4.txt
+index 83560bf..684115e 100644
+--- a/r4.txt
++++ b/r4.txt
+@@ -1,6 +1,101 @@
+-seed 1000 nobs 4 success True steps 160 time 6.5
+-seed 1001 nobs 4 success True steps 158 time 5.8
+-seed 1002 nobs 4 success True steps 245 time 9.4
+-seed 1003 nobs 4 success True steps 160 time 6.7
+-seed 1004 nobs 4 success True steps 140 time 6.0
+-seed 1005 nobs 4 success True steps 145 time 6.0
++seed 1000 nobs 4 success True steps 65 time 2.4
++seed 1001 nobs 4 success True steps 43 time 1.5
++seed 1002 nobs 4 success True steps 92 time 3.7
++seed 1003 nobs 4 success True steps 50 time 1.3
++seed 1004 nobs 4 success True steps 51 time 2.4
++seed 1005 nobs 4 success True steps 63 time 2.1
++seed 1006 nobs 4 success True steps 88 time 3.5
++seed 1007 nobs 4 success True steps 41 time 2.0
++seed 1008 nobs 4 success True steps 73 time 3.4
++seed 1009 nobs 4 success True steps 69 time 2.8
++seed 1010 nobs 4 success True steps 92 time 3.7
++seed 1011 nobs 4 success True steps 55 time 2.3
++seed 1012 nobs 4 success True steps 59 time 2.7
++seed 1013 nobs 4 success True steps 107 time 4.4
++seed 1014 nobs 4 success True steps 78 time 3.3
++seed 1015 nobs 4 success True steps 60 time 2.8
++seed 1016 nobs 4 success True steps 73 time 3.0
++seed 1017 nobs 4 success True steps 44 time 1.8
++seed 1018 nobs 4 success True steps 89 time 3.9
++seed 1019 nobs 4 success True steps 68 time 3.0
++seed 1020 nobs 4 success True steps 87 time 4.5
++seed 1021 nobs 4 success True steps 99 time 4.2
++seed 1022 nobs 4 success True steps 78 time 3.7
++seed 1023 nobs 4 success True steps 48 time 3.1
++seed 1024 nobs 4 success True steps 73 time 3.6
++seed 1025 nobs 4 success True steps 89 time 5.4
++seed 1026 nobs 4 success True steps 117 time 6.2
++seed 1027 nobs 4 success True steps 88 time 5.7
++seed 1028 nobs 4 success True steps 102 time 7.4
++seed 1029 nobs 4 success True steps 72 time 3.1
++seed 1030 nobs 4 success True steps 77 time 2.7
++seed 1031 nobs 4 success True steps 71 time 2.7
++seed 1032 nobs 4 success True steps 64 time 6.0
++seed 1033 nobs 4 success True steps 57 time 5.1
++seed 1034 nobs 4 success True steps 81 time 4.7
++seed 1035 nobs 4 success True steps 111 time 11.4
++seed 1036 nobs 4 success True steps 48 time 1.6
++seed 1037 nobs 4 success True steps 86 time 2.8
++seed 1038 nobs 4 success True steps 109 time 4.9
++seed 1039 nobs 4 success True steps 61 time 6.1
++seed 1040 nobs 4 success True steps 108 time 5.0
++seed 1041 nobs 4 success True steps 87 time 1.9
++seed 1042 nobs 4 success True steps 112 time 2.3
++seed 1043 nobs 4 success True steps 53 time 0.9
++seed 1044 nobs 4 success True steps 90 time 1.5
++seed 1045 nobs 4 success True steps 98 time 1.8
++seed 1046 nobs 4 success True steps 46 time 0.8
++seed 1047 nobs 4 success True steps 52 time 0.9
++seed 1048 nobs 4 success True steps 59 time 0.8
++seed 1049 nobs 4 success True steps 106 time 0.7
++seed 1050 nobs 4 success True steps 44 time 0.3
++seed 1051 nobs 4 success True steps 80 time 0.5
++seed 1052 nobs 4 success True steps 61 time 0.4
++seed 1053 nobs 4 success True steps 79 time 0.5
++seed 1054 nobs 4 success True steps 99 time 0.7
++seed 1055 nobs 4 success True steps 57 time 0.4
++seed 1056 nobs 4 success True steps 84 time 0.5
++seed 1057 nobs 4 success True steps 80 time 0.6
++seed 1058 nobs 4 success True steps 72 time 0.4
++seed 1059 nobs 4 success True steps 72 time 0.4
++seed 1060 nobs 4 success True steps 58 time 0.4
++seed 1061 nobs 4 success True steps 43 time 0.4
++seed 1062 nobs 4 success True steps 105 time 0.7
++seed 1063 nobs 4 success True steps 51 time 0.3
++seed 1064 nobs 4 success True steps 127 time 0.9
++seed 1065 nobs 4 success True steps 83 time 0.5
++seed 1066 nobs 4 success True steps 82 time 0.6
++seed 1067 nobs 4 success True steps 59 time 0.9
++seed 1068 nobs 4 success True steps 81 time 5.0
++seed 1069 nobs 4 success True steps 90 time 0.6
++seed 1070 nobs 4 success True steps 138 time 0.9
++seed 1071 nobs 4 success True steps 83 time 0.6
++seed 1072 nobs 4 success True steps 75 time 0.5
++seed 1073 nobs 4 success True steps 30 time 0.3
++seed 1074 nobs 4 success True steps 74 time 0.4
++seed 1075 nobs 4 success True steps 26 time 0.1
++seed 1076 nobs 4 success True steps 81 time 0.7
++seed 1077 nobs 4 success True steps 103 time 0.7
++seed 1078 nobs 4 success True steps 98 time 0.7
++seed 1079 nobs 4 success True steps 116 time 0.8
++seed 1080 nobs 4 success True steps 68 time 0.4
++seed 1081 nobs 4 success True steps 55 time 0.4
++seed 1082 nobs 4 success True steps 125 time 0.8
++seed 1083 nobs 4 success True steps 81 time 0.6
++seed 1084 nobs 4 success True steps 52 time 0.4
++seed 1085 nobs 4 success True steps 118 time 0.8
++seed 1086 nobs 4 success True steps 91 time 0.6
++seed 1087 nobs 4 success True steps 78 time 0.5
++seed 1088 nobs 4 success True steps 92 time 0.6
++seed 1089 nobs 4 success True steps 64 time 3.2
++seed 1090 nobs 4 success True steps 84 time 2.3
++seed 1091 nobs 4 success True steps 122 time 1.3
++seed 1092 nobs 4 success True steps 117 time 0.7
++seed 1093 nobs 4 success True steps 67 time 0.5
++seed 1094 nobs 4 success True steps 47 time 0.3
++seed 1095 nobs 4 success True steps 88 time 0.6
++seed 1096 nobs 4 success True steps 94 time 0.9
++seed 1097 nobs 4 success True steps 84 time 0.5
++seed 1098 nobs 4 success True steps 90 time 0.6
++seed 1099 nobs 4 success True steps 85 time 0.6
++success 100 / 100
+diff --git a/rd.txt b/rd.txt
+index 0bcb4be..d5df934 100644
+--- a/rd.txt
++++ b/rd.txt
+@@ -1,22 +1,301 @@
+-seed 3000 nobs 2 success True steps 178 time 6.6
+-seed 3001 nobs 0 success True steps 50 time 1.8
+-seed 3002 nobs 1 success True steps 111 time 3.2
+-seed 3003 nobs 2 success True steps 148 time 5.2
+-seed 3004 nobs 0 success True steps 52 time 1.9
+-seed 3005 nobs 1 success True steps 108 time 4.1
+-seed 3006 nobs 0 success True steps 51 time 2.0
+-seed 3007 nobs 2 success True steps 91 time 2.2
+-seed 3008 nobs 2 success True steps 99 time 3.4
+-seed 3009 nobs 0 success True steps 58 time 2.2
+-seed 3010 nobs 2 success True steps 176 time 4.0
+-seed 3011 nobs 2 success True steps 176 time 5.9
+-seed 3012 nobs 1 success True steps 111 time 3.4
+-seed 3013 nobs 2 success True steps 160 time 5.7
+-seed 3014 nobs 0 success True steps 43 time 1.1
+-seed 3015 nobs 1 success True steps 91 time 2.4
+-seed 3016 nobs 2 success True steps 133 time 3.7
+-seed 3017 nobs 0 success True steps 37 time 1.2
+-seed 3018 nobs 1 success True steps 101 time 3.4
+-seed 3019 nobs 2 success True steps 158 time 7.0
+-seed 3020 nobs 1 success True steps 107 time 3.0
+-seed 3021 nobs 1 success True steps 86 time 2.0
++seed 0 nobs 2 success True steps 55 time 1.2
++seed 1 nobs 1 success True steps 42 time 1.5
++seed 2 nobs 2 success True steps 56 time 2.0
++seed 3 nobs 2 success True steps 47 time 1.8
++seed 4 nobs 2 success True steps 67 time 2.7
++seed 5 nobs 2 success True steps 77 time 2.1
++seed 6 nobs 1 success True steps 36 time 1.5
++seed 7 nobs 2 success True steps 91 time 3.0
++seed 8 nobs 2 success True steps 57 time 1.4
++seed 9 nobs 1 success True steps 74 time 2.4
++seed 10 nobs 2 success True steps 69 time 1.9
++seed 11 nobs 0 success True steps 37 time 0.8
++seed 12 nobs 1 success True steps 71 time 1.7
++seed 13 nobs 2 success True steps 54 time 1.6
++seed 14 nobs 0 success True steps 19 time 0.5
++seed 15 nobs 2 success True steps 29 time 0.8
++seed 16 nobs 1 success True steps 17 time 0.3
++seed 17 nobs 2 success True steps 58 time 2.2
++seed 18 nobs 2 success True steps 64 time 2.2
++seed 19 nobs 1 success True steps 36 time 1.1
++seed 20 nobs 2 success True steps 48 time 0.8
++seed 21 nobs 0 success True steps 44 time 1.3
++seed 22 nobs 2 success True steps 63 time 2.3
++seed 23 nobs 0 success True steps 34 time 0.6
++seed 24 nobs 1 success True steps 41 time 0.9
++seed 25 nobs 1 success True steps 32 time 0.5
++seed 26 nobs 2 success True steps 81 time 2.5
++seed 27 nobs 0 success True steps 12 time 0.5
++seed 28 nobs 1 success True steps 38 time 1.1
++seed 29 nobs 2 success True steps 22 time 0.9
++seed 30 nobs 0 success True steps 18 time 0.7
++seed 31 nobs 1 success True steps 45 time 1.6
++seed 32 nobs 2 success True steps 58 time 2.7
++seed 33 nobs 2 success True steps 60 time 2.6
++seed 34 nobs 0 success True steps 25 time 0.8
++seed 35 nobs 0 success True steps 24 time 0.8
++seed 36 nobs 1 success True steps 26 time 1.1
++seed 37 nobs 0 success True steps 25 time 1.0
++seed 38 nobs 0 success True steps 14 time 0.5
++seed 39 nobs 2 success True steps 50 time 1.5
++seed 40 nobs 1 success True steps 49 time 1.6
++seed 41 nobs 1 success True steps 49 time 1.9
++seed 42 nobs 0 success True steps 24 time 0.9
++seed 43 nobs 1 success True steps 37 time 1.6
++seed 44 nobs 2 success True steps 47 time 1.8
++seed 45 nobs 2 success True steps 61 time 1.6
++seed 46 nobs 1 success True steps 37 time 1.4
++seed 47 nobs 0 success True steps 31 time 0.5
++seed 48 nobs 0 success True steps 14 time 0.3
++seed 49 nobs 0 success True steps 14 time 0.6
++seed 50 nobs 2 success True steps 59 time 2.5
++seed 51 nobs 1 success True steps 30 time 1.1
++seed 52 nobs 2 success True steps 47 time 1.5
++seed 53 nobs 2 success True steps 66 time 2.0
++seed 54 nobs 0 success True steps 23 time 0.7
++seed 55 nobs 2 success True steps 50 time 1.8
++seed 56 nobs 1 success True steps 52 time 1.8
++seed 57 nobs 0 success True steps 11 time 0.2
++seed 58 nobs 1 success True steps 41 time 1.4
++seed 59 nobs 2 success True steps 70 time 3.1
++seed 60 nobs 0 success True steps 18 time 0.5
++seed 61 nobs 1 success True steps 51 time 2.3
++seed 62 nobs 1 success True steps 51 time 1.8
++seed 63 nobs 1 success True steps 24 time 0.6
++seed 64 nobs 1 success True steps 21 time 0.6
++seed 65 nobs 0 success True steps 13 time 0.4
++seed 66 nobs 2 success True steps 39 time 1.3
++seed 67 nobs 2 success True steps 28 time 0.9
++seed 68 nobs 1 success True steps 26 time 1.0
++seed 69 nobs 0 success True steps 30 time 1.2
++seed 70 nobs 1 success True steps 30 time 1.1
++seed 71 nobs 2 success True steps 20 time 0.7
++seed 72 nobs 2 success True steps 83 time 2.6
++seed 73 nobs 2 success True steps 60 time 2.6
++seed 74 nobs 0 success True steps 17 time 0.3
++seed 75 nobs 1 success True steps 61 time 2.3
++seed 76 nobs 1 success True steps 53 time 1.8
++seed 77 nobs 0 success True steps 14 time 0.4
++seed 78 nobs 2 success True steps 50 time 1.6
++seed 79 nobs 0 success True steps 27 time 0.6
++seed 80 nobs 2 success True steps 60 time 2.0
++seed 81 nobs 0 success True steps 19 time 0.7
++seed 82 nobs 2 success True steps 65 time 2.4
++seed 83 nobs 2 success True steps 66 time 3.4
++seed 84 nobs 1 success True steps 52 time 1.6
++seed 85 nobs 2 success True steps 54 time 1.3
++seed 86 nobs 2 success True steps 31 time 1.4
++seed 87 nobs 1 success True steps 36 time 1.0
++seed 88 nobs 1 success True steps 46 time 1.3
++seed 89 nobs 2 success True steps 44 time 1.0
++seed 90 nobs 1 success True steps 55 time 1.9
++seed 91 nobs 2 success True steps 26 time 1.1
++seed 92 nobs 1 success True steps 35 time 1.1
++seed 93 nobs 2 success True steps 53 time 2.1
++seed 94 nobs 0 success True steps 17 time 0.5
++seed 95 nobs 1 success True steps 42 time 1.5
++seed 96 nobs 2 success True steps 43 time 1.3
++seed 97 nobs 0 success True steps 28 time 0.7
++seed 98 nobs 1 success True steps 47 time 1.7
++seed 99 nobs 2 success True steps 48 time 2.1
++seed 100 nobs 2 success True steps 67 time 2.4
++seed 101 nobs 0 success True steps 11 time 0.2
++seed 102 nobs 1 success True steps 45 time 1.7
++seed 103 nobs 1 success True steps 29 time 1.2
++seed 104 nobs 2 success True steps 52 time 2.0
++seed 105 nobs 0 success True steps 14 time 0.3
++seed 106 nobs 1 success True steps 38 time 1.1
++seed 107 nobs 0 success True steps 23 time 0.8
++seed 108 nobs 0 success True steps 18 time 0.7
++seed 109 nobs 1 success True steps 32 time 1.0
++seed 110 nobs 1 success True steps 57 time 1.7
++seed 111 nobs 1 success True steps 40 time 1.5
++seed 112 nobs 0 success True steps 20 time 0.7
++seed 113 nobs 0 success True steps 33 time 1.0
++seed 114 nobs 0 success True steps 14 time 0.5
++seed 115 nobs 1 success True steps 53 time 2.0
++seed 116 nobs 0 success True steps 42 time 1.1
++seed 117 nobs 0 success True steps 20 time 0.6
++seed 118 nobs 1 success True steps 38 time 1.1
++seed 119 nobs 1 success True steps 48 time 1.6
++seed 120 nobs 0 success True steps 14 time 0.2
++seed 121 nobs 0 success True steps 19 time 0.6
++seed 122 nobs 2 success True steps 63 time 2.3
++seed 123 nobs 0 success True steps 32 time 1.1
++seed 124 nobs 2 success True steps 38 time 1.2
++seed 125 nobs 1 success True steps 61 time 2.1
++seed 126 nobs 0 success True steps 11 time 0.7
++seed 127 nobs 1 success True steps 56 time 2.3
++seed 128 nobs 2 success True steps 80 time 3.5
++seed 129 nobs 1 success True steps 49 time 2.2
++seed 130 nobs 2 success True steps 43 time 2.3
++seed 131 nobs 1 success True steps 45 time 1.8
++seed 132 nobs 2 success True steps 70 time 3.7
++seed 133 nobs 1 success True steps 54 time 2.8
++seed 134 nobs 2 success True steps 12 time 0.5
++seed 135 nobs 1 success True steps 12 time 0.6
++seed 136 nobs 2 success True steps 32 time 1.9
++seed 137 nobs 1 success True steps 63 time 2.5
++seed 138 nobs 1 success True steps 70 time 3.5
++seed 139 nobs 1 success True steps 74 time 4.1
++seed 140 nobs 1 success True steps 26 time 0.9
++seed 141 nobs 1 success True steps 41 time 1.8
++seed 142 nobs 0 success True steps 45 time 1.9
++seed 143 nobs 2 success True steps 51 time 2.4
++seed 144 nobs 0 success True steps 30 time 1.2
++seed 145 nobs 1 success True steps 23 time 1.1
++seed 146 nobs 2 success True steps 36 time 1.9
++seed 147 nobs 0 success True steps 17 time 0.9
++seed 148 nobs 0 success True steps 12 time 0.3
++seed 149 nobs 0 success True steps 22 time 0.8
++seed 150 nobs 1 success True steps 28 time 1.1
++seed 151 nobs 2 success True steps 39 time 1.8
++seed 152 nobs 2 success True steps 33 time 1.4
++seed 153 nobs 2 success True steps 42 time 2.3
++seed 154 nobs 0 success True steps 31 time 1.0
++seed 155 nobs 0 success True steps 19 time 0.7
++seed 156 nobs 2 success True steps 47 time 2.0
++seed 157 nobs 0 success True steps 29 time 0.9
++seed 158 nobs 1 success True steps 59 time 2.7
++seed 159 nobs 2 success True steps 48 time 2.9
++seed 160 nobs 0 success True steps 15 time 0.9
++seed 161 nobs 2 success True steps 32 time 2.0
++seed 162 nobs 1 success True steps 37 time 1.8
++seed 163 nobs 1 success True steps 33 time 1.7
++seed 164 nobs 1 success True steps 30 time 1.2
++seed 165 nobs 1 success True steps 53 time 2.6
++seed 166 nobs 2 success True steps 30 time 1.5
++seed 167 nobs 2 success True steps 60 time 3.3
++seed 168 nobs 1 success True steps 57 time 3.0
++seed 169 nobs 2 success True steps 74 time 4.3
++seed 170 nobs 2 success True steps 51 time 3.0
++seed 171 nobs 2 success True steps 54 time 2.3
++seed 172 nobs 1 success True steps 28 time 1.6
++seed 173 nobs 2 success True steps 64 time 3.2
++seed 174 nobs 1 success True steps 50 time 2.9
++seed 175 nobs 2 success True steps 36 time 1.4
++seed 176 nobs 0 success True steps 28 time 1.3
++seed 177 nobs 2 success True steps 41 time 2.4
++seed 178 nobs 1 success True steps 63 time 2.8
++seed 179 nobs 2 success True steps 39 time 2.4
++seed 180 nobs 0 success True steps 29 time 1.2
++seed 181 nobs 2 success True steps 58 time 2.8
++seed 182 nobs 2 success True steps 74 time 2.7
++seed 183 nobs 2 success True steps 79 time 2.7
++seed 184 nobs 1 success True steps 46 time 0.7
++seed 185 nobs 0 success True steps 19 time 0.4
++seed 186 nobs 0 success True steps 16 time 0.6
++seed 187 nobs 1 success True steps 35 time 1.4
++seed 188 nobs 1 success True steps 29 time 1.0
++seed 189 nobs 1 success True steps 51 time 2.0
++seed 190 nobs 0 success True steps 13 time 0.3
++seed 191 nobs 0 success True steps 24 time 0.4
++seed 192 nobs 2 success True steps 52 time 1.6
++seed 193 nobs 1 success True steps 44 time 1.3
++seed 194 nobs 2 success True steps 51 time 1.6
++seed 195 nobs 0 success True steps 18 time 0.5
++seed 196 nobs 0 success True steps 33 time 0.9
++seed 197 nobs 2 success True steps 79 time 3.2
++seed 198 nobs 1 success True steps 43 time 1.3
++seed 199 nobs 1 success True steps 40 time 1.6
++seed 200 nobs 0 success True steps 17 time 0.3
++seed 201 nobs 0 success True steps 20 time 0.5
++seed 202 nobs 0 success True steps 26 time 0.5
++seed 203 nobs 0 success True steps 29 time 0.8
++seed 204 nobs 2 success True steps 49 time 2.0
++seed 205 nobs 1 success True steps 33 time 1.3
++seed 206 nobs 1 success True steps 41 time 0.9
++seed 207 nobs 0 success True steps 15 time 0.2
++seed 208 nobs 2 success True steps 41 time 2.8
++seed 209 nobs 2 success True steps 27 time 2.3
++seed 210 nobs 0 success True steps 16 time 1.2
++seed 211 nobs 0 success True steps 23 time 1.3
++seed 212 nobs 0 success True steps 25 time 1.1
++seed 213 nobs 0 success True steps 14 time 0.8
++seed 214 nobs 0 success True steps 38 time 2.4
++seed 215 nobs 2 success True steps 59 time 1.8
++seed 216 nobs 2 success True steps 49 time 2.3
++seed 217 nobs 2 success True steps 61 time 5.4
++seed 218 nobs 1 success True steps 25 time 2.2
++seed 219 nobs 0 success True steps 17 time 1.3
++seed 220 nobs 2 success True steps 54 time 3.7
++seed 221 nobs 1 success True steps 48 time 1.3
++seed 222 nobs 1 success True steps 36 time 1.1
++seed 223 nobs 1 success True steps 39 time 0.8
++seed 224 nobs 2 success True steps 43 time 2.1
++seed 225 nobs 2 success True steps 76 time 7.7
++seed 226 nobs 2 success True steps 54 time 4.9
++seed 227 nobs 1 success True steps 33 time 1.8
++seed 228 nobs 1 success True steps 37 time 2.8
++seed 229 nobs 1 success True steps 19 time 1.5
++seed 230 nobs 1 success True steps 28 time 2.1
++seed 231 nobs 0 success True steps 27 time 1.7
++seed 232 nobs 1 success True steps 34 time 1.4
++seed 233 nobs 0 success True steps 18 time 0.5
++seed 234 nobs 1 success True steps 30 time 0.8
++seed 235 nobs 2 success True steps 57 time 1.3
++seed 236 nobs 1 success True steps 58 time 2.0
++seed 237 nobs 2 success True steps 67 time 2.7
++seed 238 nobs 1 success True steps 10 time 0.3
++seed 239 nobs 2 success True steps 62 time 1.6
++seed 240 nobs 2 success True steps 65 time 2.1
++seed 241 nobs 1 success True steps 10 time 0.4
++seed 242 nobs 2 success True steps 60 time 2.4
++seed 243 nobs 2 success True steps 43 time 1.8
++seed 244 nobs 2 success True steps 46 time 1.7
++seed 245 nobs 2 success True steps 72 time 2.6
++seed 246 nobs 2 success True steps 59 time 2.4
++seed 247 nobs 0 success True steps 24 time 0.4
++seed 248 nobs 1 success True steps 40 time 1.6
++seed 249 nobs 2 success True steps 52 time 1.5
++seed 250 nobs 1 success True steps 62 time 3.8
++seed 251 nobs 0 success True steps 15 time 0.9
++seed 252 nobs 2 success True steps 72 time 6.4
++seed 253 nobs 1 success True steps 48 time 4.4
++seed 254 nobs 0 success True steps 23 time 0.8
++seed 255 nobs 0 success True steps 18 time 0.6
++seed 256 nobs 1 success True steps 28 time 0.9
++seed 257 nobs 2 success True steps 22 time 0.8
++seed 258 nobs 1 success True steps 35 time 1.1
++seed 259 nobs 0 success True steps 12 time 0.4
++seed 260 nobs 2 success True steps 40 time 1.4
++seed 261 nobs 1 success True steps 71 time 1.8
++seed 262 nobs 2 success True steps 52 time 1.7
++seed 263 nobs 2 success True steps 58 time 0.8
++seed 264 nobs 0 success True steps 34 time 0.3
++seed 265 nobs 2 success True steps 47 time 1.0
++seed 266 nobs 1 success True steps 34 time 0.5
++seed 267 nobs 1 success True steps 33 time 0.4
++seed 268 nobs 2 success True steps 72 time 1.6
++seed 269 nobs 2 success True steps 66 time 1.1
++seed 270 nobs 1 success True steps 33 time 0.5
++seed 271 nobs 2 success True steps 39 time 0.5
++seed 272 nobs 0 success True steps 10 time 0.1
++seed 273 nobs 0 success True steps 24 time 0.3
++seed 274 nobs 1 success True steps 79 time 1.2
++seed 275 nobs 0 success True steps 28 time 0.4
++seed 276 nobs 1 success True steps 33 time 1.0
++seed 277 nobs 0 success True steps 26 time 0.3
++seed 278 nobs 1 success True steps 37 time 0.6
++seed 279 nobs 1 success True steps 37 time 1.2
++seed 280 nobs 1 success True steps 49 time 1.0
++seed 281 nobs 1 success True steps 34 time 0.3
++seed 282 nobs 2 success True steps 38 time 0.7
++seed 283 nobs 0 success True steps 45 time 0.7
++seed 284 nobs 0 success True steps 18 time 0.2
++seed 285 nobs 2 success True steps 69 time 1.5
++seed 286 nobs 0 success True steps 24 time 0.3
++seed 287 nobs 2 success True steps 90 time 1.1
++seed 288 nobs 0 success True steps 16 time 0.3
++seed 289 nobs 1 success True steps 20 time 0.2
++seed 290 nobs 0 success True steps 31 time 0.5
++seed 291 nobs 0 success True steps 27 time 0.3
++seed 292 nobs 2 success True steps 112 time 2.6
++seed 293 nobs 0 success True steps 26 time 0.3
++seed 294 nobs 0 success True steps 24 time 0.3
++seed 295 nobs 0 success True steps 42 time 0.7
++seed 296 nobs 0 success True steps 19 time 0.2
++seed 297 nobs 0 success True steps 27 time 0.4
++seed 298 nobs 1 success True steps 35 time 0.9
++seed 299 nobs 2 success True steps 83 time 1.9
++success 300 / 300
+diff --git a/res_0.txt b/res_0.txt
+deleted file mode 100644
+index cdf493c..0000000
+--- a/res_0.txt
++++ /dev/null
+@@ -1,51 +0,0 @@
+-seed 10 nobs 2 success True steps 165 time 6.5
+-seed 11 nobs 0 success True steps 66 time 2.6
+-seed 12 nobs 1 success True steps 141 time 7.0
+-seed 13 nobs 2 success True steps 153 time 4.3
+-seed 14 nobs 0 success True steps 45 time 1.9
+-seed 15 nobs 2 success True steps 92 time 5.0
+-seed 16 nobs 1 success True steps 45 time 1.1
+-seed 17 nobs 2 success True steps 158 time 8.1
+-seed 18 nobs 2 success True steps 180 time 9.5
+-seed 19 nobs 1 success True steps 101 time 4.9
+-seed 20 nobs 2 success True steps 119 time 6.1
+-seed 21 nobs 0 success False steps 1000 time 41.4
+-seed 22 nobs 2 success True steps 163 time 8.3
+-seed 23 nobs 0 success True steps 68 time 3.3
+-seed 24 nobs 1 success True steps 125 time 4.6
+-seed 25 nobs 1 success True steps 93 time 4.3
+-seed 26 nobs 2 success True steps 162 time 7.7
+-seed 27 nobs 0 success True steps 49 time 2.0
+-seed 28 nobs 1 success True steps 65 time 2.3
+-seed 29 nobs 2 success True steps 99 time 5.3
+-seed 30 nobs 0 success True steps 55 time 2.2
+-seed 31 nobs 1 success False steps 1000 time 44.2
+-seed 32 nobs 2 success True steps 165 time 8.0
+-seed 33 nobs 2 success True steps 143 time 8.3
+-seed 34 nobs 0 success True steps 53 time 1.1
+-seed 35 nobs 0 success True steps 51 time 1.6
+-seed 36 nobs 1 success True steps 89 time 3.8
+-seed 37 nobs 0 success True steps 53 time 2.3
+-seed 38 nobs 0 success True steps 46 time 1.9
+-seed 39 nobs 2 success True steps 175 time 10.1
+-seed 40 nobs 1 success True steps 116 time 5.3
+-seed 41 nobs 1 success True steps 113 time 2.8
+-seed 42 nobs 0 success True steps 48 time 1.3
+-seed 43 nobs 1 success True steps 119 time 4.0
+-seed 44 nobs 2 success True steps 155 time 7.0
+-seed 45 nobs 2 success True steps 170 time 8.6
+-seed 46 nobs 1 success True steps 114 time 5.4
+-seed 47 nobs 0 success True steps 61 time 0.8
+-seed 48 nobs 0 success True steps 47 time 1.0
+-seed 49 nobs 0 success True steps 41 time 0.7
+-seed 50 nobs 2 success True steps 170 time 2.6
+-seed 51 nobs 1 success True steps 102 time 1.2
+-seed 52 nobs 2 success True steps 160 time 3.5
+-seed 53 nobs 2 success True steps 169 time 3.8
+-seed 54 nobs 0 success True steps 59 time 0.4
+-seed 55 nobs 2 success True steps 154 time 1.5
+-seed 56 nobs 1 success True steps 117 time 1.3
+-seed 57 nobs 0 success True steps 41 time 0.4
+-seed 58 nobs 1 success True steps 119 time 1.1
+-seed 59 nobs 2 success True steps 179 time 1.5
+-success 48 / 50
+diff --git a/res_1.txt b/res_1.txt
+deleted file mode 100644
+index 51dea27..0000000
+--- a/res_1.txt
++++ /dev/null
+@@ -1,51 +0,0 @@
+-seed 60 nobs 0 success True steps 46 time 1.3
+-seed 61 nobs 1 success True steps 114 time 3.6
+-seed 62 nobs 1 success True steps 113 time 4.9
+-seed 63 nobs 1 success True steps 97 time 4.2
+-seed 64 nobs 1 success True steps 52 time 2.0
+-seed 65 nobs 0 success True steps 47 time 1.1
+-seed 66 nobs 2 success True steps 110 time 5.5
+-seed 67 nobs 2 success True steps 105 time 5.1
+-seed 68 nobs 1 success True steps 104 time 4.8
+-seed 69 nobs 0 success True steps 60 time 2.1
+-seed 70 nobs 1 success True steps 115 time 4.7
+-seed 71 nobs 2 success True steps 105 time 4.8
+-seed 72 nobs 2 success True steps 144 time 7.0
+-seed 73 nobs 2 success True steps 175 time 8.7
+-seed 74 nobs 0 success False steps 1000 time 40.9
+-seed 75 nobs 1 success False steps 1000 time 43.9
+-seed 76 nobs 1 success True steps 126 time 4.7
+-seed 77 nobs 0 success True steps 50 time 1.5
+-seed 78 nobs 2 success True steps 164 time 8.4
+-seed 79 nobs 0 success True steps 62 time 2.5
+-seed 80 nobs 2 success True steps 166 time 8.9
+-seed 81 nobs 0 success True steps 54 time 2.3
+-seed 82 nobs 2 success True steps 131 time 5.0
+-seed 83 nobs 2 success True steps 174 time 8.6
+-seed 84 nobs 1 success True steps 121 time 5.7
+-seed 85 nobs 2 success True steps 156 time 7.9
+-seed 86 nobs 2 success True steps 95 time 4.4
+-seed 87 nobs 1 success True steps 112 time 6.3
+-seed 88 nobs 1 success True steps 118 time 5.8
+-seed 89 nobs 2 success True steps 112 time 6.9
+-seed 90 nobs 1 success True steps 114 time 4.4
+-seed 91 nobs 2 success True steps 96 time 3.9
+-seed 92 nobs 1 success True steps 112 time 4.9
+-seed 93 nobs 2 success True steps 162 time 8.0
+-seed 94 nobs 0 success True steps 41 time 1.4
+-seed 95 nobs 1 success True steps 106 time 2.8
+-seed 96 nobs 2 success True steps 95 time 4.6
+-seed 97 nobs 0 success True steps 65 time 2.3
+-seed 98 nobs 1 success True steps 108 time 1.5
+-seed 99 nobs 2 success True steps 107 time 1.3
+-seed 100 nobs 2 success True steps 180 time 2.6
+-seed 101 nobs 0 success True steps 42 time 0.6
+-seed 102 nobs 1 success True steps 122 time 2.7
+-seed 103 nobs 1 success True steps 97 time 1.5
+-seed 104 nobs 2 success True steps 165 time 1.9
+-seed 105 nobs 0 success True steps 39 time 0.3
+-seed 106 nobs 1 success True steps 123 time 1.5
+-seed 107 nobs 0 success True steps 48 time 0.6
+-seed 108 nobs 0 success True steps 45 time 0.4
+-seed 109 nobs 1 success True steps 104 time 1.6
+-success 48 / 50
+diff --git a/res_2.txt b/res_2.txt
+deleted file mode 100644
+index ad1b157..0000000
+--- a/res_2.txt
++++ /dev/null
+@@ -1,51 +0,0 @@
+-seed 110 nobs 1 success True steps 117 time 4.2
+-seed 111 nobs 1 success True steps 102 time 4.1
+-seed 112 nobs 0 success True steps 45 time 1.7
+-seed 113 nobs 0 success True steps 70 time 2.8
+-seed 114 nobs 0 success True steps 41 time 1.8
+-seed 115 nobs 1 success True steps 126 time 3.8
+-seed 116 nobs 0 success True steps 73 time 2.9
+-seed 117 nobs 0 success True steps 53 time 2.3
+-seed 118 nobs 1 success True steps 109 time 4.8
+-seed 119 nobs 1 success True steps 112 time 4.9
+-seed 120 nobs 0 success True steps 40 time 1.7
+-seed 121 nobs 0 success True steps 45 time 1.4
+-seed 122 nobs 2 success True steps 170 time 8.7
+-seed 123 nobs 0 success True steps 67 time 3.0
+-seed 124 nobs 2 success True steps 120 time 4.5
+-seed 125 nobs 1 success True steps 127 time 5.8
+-seed 126 nobs 0 success True steps 40 time 1.7
+-seed 127 nobs 1 success True steps 130 time 6.3
+-seed 128 nobs 2 success True steps 173 time 9.4
+-seed 129 nobs 1 success True steps 111 time 5.0
+-seed 130 nobs 2 success True steps 113 time 3.9
+-seed 131 nobs 1 success True steps 107 time 4.9
+-seed 132 nobs 2 success True steps 160 time 8.0
+-seed 133 nobs 1 success True steps 103 time 5.2
+-seed 134 nobs 2 success True steps 49 time 2.4
+-seed 135 nobs 1 success True steps 41 time 1.8
+-seed 136 nobs 2 success True steps 107 time 4.4
+-seed 137 nobs 1 success True steps 132 time 4.4
+-seed 138 nobs 1 success True steps 144 time 5.5
+-seed 139 nobs 1 success True steps 129 time 6.6
+-seed 140 nobs 1 success True steps 104 time 4.8
+-seed 141 nobs 1 success True steps 100 time 3.8
+-seed 142 nobs 0 success True steps 80 time 2.6
+-seed 143 nobs 2 success True steps 161 time 7.1
+-seed 144 nobs 0 success True steps 61 time 2.7
+-seed 145 nobs 1 success True steps 93 time 3.9
+-seed 146 nobs 2 success True steps 113 time 5.1
+-seed 147 nobs 0 success True steps 48 time 2.5
+-seed 148 nobs 0 success True steps 39 time 1.8
+-seed 149 nobs 0 success True steps 51 time 2.1
+-seed 150 nobs 1 success True steps 96 time 3.9
+-seed 151 nobs 2 success True steps 137 time 6.7
+-seed 152 nobs 2 success True steps 101 time 2.7
+-seed 153 nobs 2 success True steps 160 time 8.4
+-seed 154 nobs 0 success True steps 61 time 2.2
+-seed 155 nobs 0 success True steps 49 time 2.1
+-seed 156 nobs 2 success True steps 141 time 7.5
+-seed 157 nobs 0 success True steps 52 time 2.1
+-seed 158 nobs 1 success True steps 135 time 5.7
+-seed 159 nobs 2 success True steps 156 time 8.4
+-success 50 / 50
+diff --git a/res_3.txt b/res_3.txt
+deleted file mode 100644
+index 6c248bd..0000000
+--- a/res_3.txt
++++ /dev/null
+@@ -1,51 +0,0 @@
+-seed 160 nobs 0 success True steps 46 time 1.4
+-seed 161 nobs 2 success True steps 111 time 3.2
+-seed 162 nobs 1 success True steps 110 time 5.4
+-seed 163 nobs 1 success True steps 115 time 5.8
+-seed 164 nobs 1 success True steps 100 time 3.0
+-seed 165 nobs 1 success True steps 126 time 5.7
+-seed 166 nobs 2 success True steps 107 time 5.6
+-seed 167 nobs 2 success True steps 165 time 8.9
+-seed 168 nobs 1 success True steps 129 time 5.5
+-seed 169 nobs 2 success True steps 187 time 10.1
+-seed 170 nobs 2 success True steps 157 time 8.2
+-seed 171 nobs 2 success True steps 161 time 9.0
+-seed 172 nobs 1 success True steps 94 time 4.9
+-seed 173 nobs 2 success True steps 170 time 8.5
+-seed 174 nobs 1 success True steps 101 time 4.3
+-seed 175 nobs 2 success True steps 107 time 4.0
+-seed 176 nobs 0 success True steps 57 time 2.2
+-seed 177 nobs 2 success True steps 119 time 5.8
+-seed 178 nobs 1 success True steps 119 time 6.1
+-seed 179 nobs 2 success True steps 115 time 4.5
+-seed 180 nobs 0 success True steps 57 time 2.3
+-seed 181 nobs 2 success True steps 164 time 6.3
+-seed 182 nobs 2 success True steps 181 time 9.5
+-seed 183 nobs 2 success True steps 179 time 9.6
+-seed 184 nobs 1 success True steps 114 time 4.9
+-seed 185 nobs 0 success True steps 50 time 2.0
+-seed 186 nobs 0 success True steps 46 time 2.0
+-seed 187 nobs 1 success True steps 109 time 5.3
+-seed 188 nobs 1 success True steps 95 time 4.2
+-seed 189 nobs 1 success True steps 131 time 6.3
+-seed 190 nobs 0 success True steps 46 time 2.1
+-seed 191 nobs 0 success True steps 54 time 1.9
+-seed 192 nobs 2 success True steps 163 time 6.5
+-seed 193 nobs 1 success True steps 116 time 2.6
+-seed 194 nobs 2 success True steps 158 time 7.6
+-seed 195 nobs 0 success True steps 50 time 2.0
+-seed 196 nobs 0 success True steps 61 time 2.6
+-seed 197 nobs 2 success True steps 184 time 8.3
+-seed 198 nobs 1 success True steps 119 time 5.8
+-seed 199 nobs 1 success True steps 105 time 5.0
+-seed 200 nobs 0 success True steps 51 time 2.2
+-seed 201 nobs 0 success True steps 53 time 1.5
+-seed 202 nobs 0 success True steps 57 time 2.0
+-seed 203 nobs 0 success True steps 63 time 2.5
+-seed 204 nobs 2 success True steps 154 time 7.7
+-seed 205 nobs 1 success True steps 107 time 4.2
+-seed 206 nobs 1 success True steps 114 time 5.7
+-seed 207 nobs 0 success True steps 48 time 1.7
+-seed 208 nobs 2 success True steps 112 time 4.7
+-seed 209 nobs 2 success True steps 94 time 5.1
+-success 50 / 50
+diff --git a/test_approach.py b/test_approach.py
+index 1457b4b..13e4f63 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -1,7 +1,8 @@
+ import sys, time
+ import numpy as np
+ from env_client import make_env
+-from approach import GeneratedApproach
++import os, importlib
++GeneratedApproach = importlib.import_module(os.environ.get("APPROACH", "approach")).GeneratedApproach
+ def run(seed, verbose=False, count=None):
+     env = make_env()
+     obs, info = env.reset(seed=seed, options=({'object_count': count} if count is not None else None))
+diff --git a/timing.py b/timing.py
+new file mode 100644
+index 0000000..db2cdeb
+--- /dev/null
++++ b/timing.py
+@@ -0,0 +1,13 @@
++import time, numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++env=make_env(); obs,info=env.reset(seed=1)
++ap=GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs,info); ap.state=obs
++robot,block,surf,obst=ap._objs()
++obstacles=ap._others_bboxes([])+[ap._others_bboxes([])[0]]
++t=time.time()
++for _ in range(20): r=ap._dp_path(0.389,0.826,1.09,0.38,obstacles,None)
++print("dp ms", (time.time()-t)/20*1000, r[0])
++t=time.time()
++for _ in range(5): ap._find_spot(obst[0])
++print("find_spot ms", (time.time()-t)/5*1000)

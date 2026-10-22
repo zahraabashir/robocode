@@ -1,0 +1,48 @@
+diff --git a/final_dense20.txt b/final_dense20.txt
+new file mode 100644
+index 0000000..dfce510
+--- /dev/null
++++ b/final_dense20.txt
+@@ -0,0 +1,7 @@
++progress 0 above obstruction13:Kinematic3DCuboid 0 9 0 0 0.04
++progress 50 lower obstruction3:Kinematic3DCuboid 0 9 0 0 2.02
++progress 100 align obstruction4:Kinematic3DCuboid 2 9 0 0 3.45
++progress 150 grasp obstruction18:Kinematic3DCuboid 3 9 1 1 4.88
++progress 200 lower obstruction1:Kinematic3DCuboid 4 9 0 0 6.38
++progress 250 release obstruction13:Kinematic3DCuboid 6 9 0 0 7.95
++{"seed": 1, "count": 20, "success": true, "steps": 298, "seconds": 9.28, "compute": 0.227, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
+diff --git a/final_dense50.txt b/final_dense50.txt
+new file mode 100644
+index 0000000..facfb12
+--- /dev/null
++++ b/final_dense50.txt
+@@ -0,0 +1,7 @@
++progress 0 above obstruction7:Kinematic3DCuboid 0 7 0 0 0.07
++progress 50 above obstruction4:Kinematic3DCuboid 2 7 0 0 2.44
++progress 100 grasp obstruction1:Kinematic3DCuboid 3 7 0 1 4.51
++progress 150 lift obstruction3:Kinematic3DCuboid 5 8 0 0 6.78
++progress 200 grasp obstruction0:Kinematic3DCuboid 6 8 0 0 9.3
++progress 250 align target_block:Kinematic3DCuboid 7 8 0 0 11.5
++{"seed": 0, "count": 50, "success": true, "steps": 270, "seconds": 12.28, "compute": 0.755, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
+diff --git a/final_targeted.txt b/final_targeted.txt
+new file mode 100644
+index 0000000..2f7c2f7
+--- /dev/null
++++ b/final_targeted.txt
+@@ -0,0 +1,3 @@
++{"seed": 2, "count": 2, "success": true, "steps": 98, "seconds": 2.17, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
++{"seed": 45, "count": 2, "success": true, "steps": 93, "seconds": 2.53, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
++{"seed": 67, "count": 2, "success": true, "steps": 101, "seconds": 2.14, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}
+diff --git a/stress50_fine_lift.txt b/stress50_fine_lift.txt
+new file mode 100644
+index 0000000..182a6a7
+--- /dev/null
++++ b/stress50_fine_lift.txt
+@@ -0,0 +1,7 @@
++progress 0 above obstruction43:Kinematic3DCuboid 0 7 0 0 0.07
++progress 50 lower obstruction43:Kinematic3DCuboid 0 7 0 1 2.15
++progress 100 align obstruction21:Kinematic3DCuboid 2 7 0 1 4.5
++progress 150 grasp obstruction1:Kinematic3DCuboid 2 7 0 1 6.99
++progress 200 above obstruction2:Kinematic3DCuboid 4 7 0 0 9.37
++progress 250 align obstruction21:Kinematic3DCuboid 5 7 0 0 11.68
++{"seed": 2, "count": 50, "success": true, "steps": 295, "seconds": 13.53, "compute": 0.433, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 0, "attempt": 0}

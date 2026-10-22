@@ -1,0 +1,25 @@
+diff --git a/approach.py b/approach.py
+index 9179de7..66958e5 100644
+--- a/approach.py
++++ b/approach.py
+@@ -75,7 +75,8 @@ class GeneratedApproach:
+             ans.append((s.get(o,"x"), s.get(o,"y"), s.get(o,"half_x"), s.get(o,"half_y")))
+         # Lander is a physical obstacle; use a conservative footprint.
+         for o in self._get(s, "lander"):
+-            ans.append((s.get(o,"x"), s.get(o,"y"), .32, .32))
++            # Its collision body is compact (rover1 starts only .25 m north of it).
++            ans.append((s.get(o,"x"), s.get(o,"y"), .04, .04))
+         return ans
+ 
+     @staticmethod
+@@ -95,8 +96,8 @@ class GeneratedApproach:
+                 if lo > hi: return False
+         return True
+ 
+-    def _free(self, p, rects, pad=.24):
+-        if p[0] < -2.30 or p[0] > 2.30 or p[1] < -2.30 or p[1] > 2.30:
++    def _free(self, p, rects, pad=.20):
++        if p[0] < -2.27 or p[0] > 2.27 or p[1] < -2.27 or p[1] > 2.27:
+             return False
+         return not any(abs(p[0]-x) <= hx+pad and abs(p[1]-y) <= hy+pad
+                        for x,y,hx,hy in rects)

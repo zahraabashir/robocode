@@ -1,0 +1,24 @@
+diff --git a/approach.py b/approach.py
+index cdcf5c9..b96faf3 100644
+--- a/approach.py
++++ b/approach.py
+@@ -182,6 +182,7 @@ class GeneratedApproach:
+             self.last_robot_y = ry
+             if self.stalled >= 2 or ry < 0.18:
+                 self.phase = "lift"
++                self.contact_robot_y = ry
+             else:
+                 # Fine approach is essential: collision resolution rejects an
+                 # overshooting move wholesale, leaving the vacuum just off-contact.
+@@ -196,7 +197,10 @@ class GeneratedApproach:
+             park_y = (0.45 if obj.type.name == "target_block"
+                       else self.parking_y.get(obj.name, 0.30))
+             parked_high_enough = (not is_target and self.attached and oy >= park_y)
+-            lift_limit = self.safe_y if is_target else 0.74
++            if not self.attached:
++                lift_limit = min(0.74, self.contact_robot_y + 0.15)
++            else:
++                lift_limit = self.safe_y if is_target else 0.74
+             if ry < lift_limit and not parked_high_enough:
+                 return self._action(dy=min(0.05, self.safe_y - ry), vac=1.0)
+             if not self.attached:

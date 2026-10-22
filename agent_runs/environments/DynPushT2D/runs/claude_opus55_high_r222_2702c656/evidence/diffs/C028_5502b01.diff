@@ -1,0 +1,39 @@
+diff --git a/approach.py b/approach.py
+index d25cfc5..0f917ac 100644
+--- a/approach.py
++++ b/approach.py
+@@ -23,10 +23,12 @@ COR = {
+     'Rtop+': (-0.268, -0.565), 'Rtop-': (0.276, -0.562),
+     'Rslm': (0.355, -0.008), 'Rsrm': (-0.355, -0.008),
+     'Rtopm+': (-0.62, -0.49), 'Rtopm-': (0.62, -0.49),
++    'Rend+': (0.07, -1.18), 'Rend-': (-0.07, -1.18),
+ }
+ # rotation per unit robot travel
+ RATE = {'Rsl': 0.88, 'Rsr': 0.88, 'Rbot+': 0.73, 'Rbot-': 0.73, 'Rtop+': 0.97, 'Rtop-': 0.97,
+-        'Rslm': 1.0, 'Rsrm': 1.0, 'Rtopm+': 0.93, 'Rtopm-': 0.93}
++        'Rslm': 1.0, 'Rsrm': 1.0, 'Rtopm+': 0.93, 'Rtopm-': 0.93,
++        'Rend+': 0.78, 'Rend-': 0.78}
+ 
+ 
+ class Block:
+@@ -108,8 +110,8 @@ class GeneratedApproach:
+         self.rot_chunk = 1.2
+         self.kpush = 20.0
+         self.obl = 0.0
+-        self.extra_rot = ''
+-        self.use_rate = False
++        self.extra_rot = 'mt'
++        self.use_rate = True
+         self.tk = 0.6
+         self.rot_end = math.radians(1.0)
+         self.rot_ramp = math.radians(10)
+@@ -165,6 +167,9 @@ class GeneratedApproach:
+         if 't' in self.extra_rot:
+             prims.append(('Rtopm+', (Lh / 4, 0.0), (0.0, -1.0), 'r'))
+             prims.append(('Rtopm-', (-Lh / 4, 0.0), (0.0, -1.0), 'r'))
++        if 'e' in self.extra_rot:
++            prims.append(('Rend+', (Lh / 2, -w / 2), (-1.0, 0.0), 'r'))
++            prims.append(('Rend-', (-Lh / 2, -w / 2), (1.0, 0.0), 'r'))
+         out = []
+         for name, p, n, k in prims:
+             p = np.array(p)

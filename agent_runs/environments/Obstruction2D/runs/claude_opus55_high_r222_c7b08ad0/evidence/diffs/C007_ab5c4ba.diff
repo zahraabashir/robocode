@@ -1,0 +1,102 @@
+diff --git a/approach.py b/approach.py
+index 050d383..874e567 100644
+--- a/approach.py
++++ b/approach.py
+@@ -204,14 +204,40 @@ class GeneratedApproach:
+         return int(np.clip(round((x - self.xs[0]) / self.dxs), 0, len(self.xs) - 1))
+ 
+     def _est(self, xa, ya, xb, yb, prof, margin=0.004):
+-        dx = abs(xb - xa)
+-        if dx < 1e-6:
++        """Simulate the greedy controller on a 1-D clearance profile; return #steps."""
++        if abs(xb - xa) < 1e-6:
+             return np.ceil(abs(yb - ya) / MAXD - 1e-6)
+-        i, j = sorted((self._xi(xa), self._xi(xb)))
+-        H = prof[i:j + 1].max() + margin
+-        top = max(H, ya, yb)
+-        vert = (top - ya) + (top - yb)
+-        return np.ceil(max(dx, vert) / MAXD - 1e-6)
++        ia, ib = self._xi(xa), self._xi(xb)
++        if ia <= ib:
++            seg = prof[ia:ib + 1] + margin
++        else:
++            seg = prof[ib:ia + 1][::-1] + margin
++        rem = np.maximum.accumulate(seg[::-1])[::-1]
++        n = len(seg)
++        d = abs(xb - xa)
++        pos = 0.0
++        y = ya
++        steps = 0
++        while steps < 200:
++            if d - pos < 1e-6:
++                steps += np.ceil(abs(yb - y) / MAXD - 1e-6)
++                break
++            npos = min(d, pos + MAXD)
++            k0 = int(round(pos / d * (n - 1)))
++            k1 = int(round(npos / d * (n - 1)))
++            need_rest = rem[k1]
++            need_step = seg[k0:k1 + 1].max()
++            ty = max(yb, need_rest)
++            dy = min(MAXD, max(-MAXD, ty - y))
++            if y + dy < need_step:
++                dy = min(MAXD, max(-MAXD, need_step - y))
++            if y + dy < need_step - 1e-9:
++                y += MAXD
++            else:
++                y += dy
++                pos = npos
++            steps += 1
++        return steps
+ 
+     def _mk_held(self, o, gx, gy):
+         return dict(name=o['name'], dx0=o['x0'] - gx, dx1=o['x1'] - gx,
+@@ -236,7 +262,7 @@ class GeneratedApproach:
+         ymax = WORLD_Y[1] - r['R'] - 0.002
+         best = None
+         for margin in (0.03, 0.01):
+-            for rx in xs:
++            for rx in xs[::2]:
+                 if rx < WORLD_X[0] + r['R'] + 0.002 or rx > WORLD_X[1] - r['R'] - 0.002:
+                     continue
+                 x0, x1 = rx + held['dx0'], rx + held['dx1']
+@@ -252,7 +278,7 @@ class GeneratedApproach:
+                 if not ok:
+                     continue
+                 ry_low = max(gy + 0.003, P1[self._xi(rx)] + 0.004)
+-                for ry in np.arange(ry_low, ymax, 0.05)[:8]:
++                for ry in np.arange(ry_low, ymax, 0.05)[:5]:
+                     c1 = self._est(gx, gy, rx, ry, P1)
+                     box = (x0, x1, ry + held['dy1'])
+                     P2n = np.maximum(P2, self._colprof(xs, box, None))
+diff --git a/dbg2.py b/dbg2.py
+new file mode 100644
+index 0000000..a3948f9
+--- /dev/null
++++ b/dbg2.py
+@@ -0,0 +1,26 @@
++import numpy as np, sys
++from env_client import make_env
++from approach import GeneratedApproach
++import approach
++env = make_env()
++ap = GeneratedApproach(env.action_space, env.observation_space, {})
++obs, info = env.reset(seed=3, options={'object_count':4})
++ap.reset(obs, info)
++r, rects = ap._parse(obs); ap.r = r
++o = rects['obstruction1']; surf=rects['target_surface']; blk=rects['target_block']
++xs=ap.xs
++gx = ap._grasp_x(o, rects); gy = o['y1']+0.2+r['gw']+ap.grasp_eps
++held = ap._mk_held(o,gx,gy)
++others = {k:v for k,v in rects.items() if k!=o['name']}
++cands, held_b, gxb, gyb = ap._place_candidates_target(blk, surf, others)
++print('gx',gx,'gy',gy,'target', cands[0][:4], gxb, gyb)
++P1 = ap._profile(xs, others, held); P2 = ap._profile(xs, others, None)
++P3 = ap._profile(xs, {k: v for k, v in others.items() if k != blk['name']}, held_b)
++_,_,rxt,ryt,_ = cands[0]
++for rx in [0.36, 1.45, 1.47, 1.5]:
++    ry = max(gy+0.003, P1[ap._xi(rx)]+0.004)
++    x0,x1 = rx+held['dx0'], rx+held['dx1']
++    box=(x0,x1,ry+held['dy1'])
++    c1=ap._est(gx,gy,rx,ry,P1); c2=ap._est(rx,ry,gxb,gyb,np.maximum(P2,ap._colprof(xs,box,None))); c3=ap._est(gxb,gyb,rxt,ryt,np.maximum(P3,ap._colprof(xs,box,held_b)))
++    print(rx, ry, c1,c2,c3)
++print(ap._drop_spot(o, rects, surf, blk))

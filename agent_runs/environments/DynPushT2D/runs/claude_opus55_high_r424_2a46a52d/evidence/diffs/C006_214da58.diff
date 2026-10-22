@@ -1,0 +1,213 @@
+diff --git a/approach.py b/approach.py
+index 362499c..caa8a81 100644
+--- a/approach.py
++++ b/approach.py
+@@ -10,6 +10,8 @@ import math
+ 
+ import numpy as np
+ 
++from navgrid import NavGrid
++
+ C_GAP = 0.265
+ MU = 1.0
+ LO, HI = 0.1, 4.9  # robot centre bounds
+@@ -124,6 +126,7 @@ class GeneratedApproach:
+     KMAX = 30
+     NAV_OVER = 3.0
+     LOOK = 10
++    GRIDNAV = True
+     def __init__(self, action_space, observation_space, primitives):
+         self.action_space = action_space
+         self.rng = np.random.default_rng(0)
+@@ -215,8 +218,17 @@ class GeneratedApproach:
+         dstart = m.world_dist(np.repeat(pos0[None], len(starts), 0), np.full(len(starts), th0), starts)
+         ok &= (dstart > r + 0.02) | (np.arange(len(starts)) >= len(start))
+         starts, dirs = starts[ok], dirs[ok]
+-        nav = np.linalg.norm(starts - rob0, axis=1) / AMAX
+-        nav = nav * 1.3 + np.where(nav > 1e-6, self.NAV_OVER, 0.0)
++        eu = np.linalg.norm(starts - rob0, axis=1)
++        if self.GRIDNAV:
++            g = NavGrid(m, pos0, th0, r + 0.015)
++            src, dist, _ = g.from_source(rob0)
++            gd = g.dist_to(dist, starts, rob0)
++            gd = np.where(np.isfinite(gd), gd, eu * 3 + 1.0)
++            pl = np.maximum(eu, gd * 0.97)
++        else:
++            pl = eu * 1.3
++        nav = pl / AMAX
++        nav = nav + np.where(eu > 1e-6, self.NAV_OVER, 0.0)
+         steps_opts = steps_opts or [AMAX, 0.02, 0.008]
+         N = len(starts)
+         S = len(steps_opts)
+@@ -322,7 +334,7 @@ class GeneratedApproach:
+         if seg_clear(rob, target):
+             path = [rob, target]
+         else:
+-            path = self._astar(rob, target, pos0, th0, clear)
++            path = self._gridpath(rob, target, pos0, th0, clear)
+             if path is None:
+                 path = [rob, target]
+         acts = []
+@@ -342,6 +354,32 @@ class GeneratedApproach:
+                 break
+         return acts
+ 
++    def _gridpath(self, start, goal, pos0, th0, clear):
++        m = self.model
++        g = NavGrid(m, pos0, th0, clear + 0.005)
++        src, dist, pred = g.from_source(start)
++        dst = g.nearest_free(goal)
++        cells = g.path(pred, src, dst)
++        if cells is None:
++            return None
++        raw = [np.array(start)] + [c for c in cells] + [np.array(goal)]
++
++        def seg_ok(p, q):
++            k = max(2, int(np.linalg.norm(q - p) / 0.01) + 1)
++            f = np.linspace(0, 1, k)[:, None]
++            pp = p * (1 - f) + q * f
++            dd = m.world_dist(np.repeat(pos0[None], k, 0), np.full(k, th0), pp)
++            return bool(np.all(dd >= clear))
++        out = [raw[0]]
++        i = 0
++        while i < len(raw) - 1:
++            j = len(raw) - 1
++            while j > i + 1 and not seg_ok(raw[i], raw[j]):
++                j -= 1
++            out.append(raw[j])
++            i = j
++        return out
++
+     def _astar(self, start, goal, pos0, th0, clear):
+         m = self.model
+         res = 0.04
+diff --git a/breakdown.py b/breakdown.py
+new file mode 100644
+index 0000000..0193c3a
+--- /dev/null
++++ b/breakdown.py
+@@ -0,0 +1,29 @@
++import numpy as np
++from multiprocessing import Pool
++from env_client import make_env
++import approach
++def run(seed):
++    env=make_env(); obs,info=env.reset(seed=seed)
++    ap=approach.GeneratedApproach(None,None,{}); ap.reset(obs,info)
++    nav=0; push={}; plans=0; orig=ap._plan_push
++    def pp(o):
++        nonlocal plans; plans+=1; return orig(o)
++    ap._plan_push=pp
++    for t in range(1000):
++        navmode = ap.nav_len>0 if hasattr(ap,'nav_len') and ap.plan else None
++        a=ap.get_action(obs)
++        if ap.nav_len>0 or (len(ap.plan)>0 and False): pass
++        obs2,r,term,trunc,_=env.step(a)
++        moved = np.abs(obs2[0:3]-obs[0:3]).max()>1e-6
++        if moved: 
++            k=round(float(np.abs(a).max()),3); push[k]=push.get(k,0)+1
++        else: nav+=1
++        obs=obs2
++        if term: break
++    return t+1, nav, push, plans
++with Pool(10) as p: res=p.map(run, range(200,240))
++print("mean steps", np.mean([r[0] for r in res]), "nav(no block motion)", np.mean([r[1] for r in res]), "plans", np.mean([r[3] for r in res]))
++tot={}
++for r in res:
++    for k,v in r[2].items(): tot[k]=tot.get(k,0)+v/len(res)
++print(sorted(tot.items(), key=lambda x:-x[1])[:10])
+diff --git a/navgrid.py b/navgrid.py
+new file mode 100644
+index 0000000..cb80815
+--- /dev/null
++++ b/navgrid.py
+@@ -0,0 +1,76 @@
++"""Grid shortest-path distances around the T-block (scipy csgraph Dijkstra)."""
++import numpy as np
++from scipy.sparse import csr_matrix
++from scipy.sparse.csgraph import dijkstra
++
++LO, HI = 0.1, 4.9
++RES = 0.05
++NG = int(round((HI - LO) / RES)) + 1
++_xs = LO + np.arange(NG) * RES
++_X, _Y = np.meshgrid(_xs, _xs, indexing="ij")
++PTS = np.stack([_X.ravel(), _Y.ravel()], 1)
++_idx = np.arange(NG * NG).reshape(NG, NG)
++_E = []
++for di, dj, w in [(1, 0, 1.0), (0, 1, 1.0), (1, 1, 2 ** 0.5), (1, -1, 2 ** 0.5)]:
++    a = _idx[max(0, -di):NG - max(0, di), max(0, -dj):NG - max(0, dj)]
++    b = _idx[max(0, di):NG - max(0, -di) if max(0, -di) else NG, max(0, dj):NG - max(0, -dj) if max(0, -dj) else NG]
++    _E.append((a.ravel(), b.ravel(), w))
++EA = np.concatenate([e[0] for e in _E])
++EB = np.concatenate([e[1] for e in _E])
++EW = np.concatenate([np.full(len(e[0]), e[2]) for e in _E]) * RES
++
++
++def cell_of(p):
++    i = np.clip(np.round((np.asarray(p)[..., 0] - LO) / RES).astype(int), 0, NG - 1)
++    j = np.clip(np.round((np.asarray(p)[..., 1] - LO) / RES).astype(int), 0, NG - 1)
++    return i * NG + j
++
++
++class NavGrid:
++    def __init__(self, model, pos, th, clear):
++        d = model.world_dist(np.repeat(np.asarray(pos)[None], len(PTS), 0), np.full(len(PTS), th), PTS)
++        self.free = d >= clear
++        m = self.free[EA] & self.free[EB]
++        a, b, w = EA[m], EB[m], EW[m]
++        self.G = csr_matrix((np.concatenate([w, w]), (np.concatenate([a, b]), np.concatenate([b, a]))),
++                            shape=(NG * NG, NG * NG))
++
++    def nearest_free(self, p):
++        c = int(cell_of(p))
++        if self.free[c]:
++            return c
++        fi = np.flatnonzero(self.free)
++        dd = ((PTS[fi] - np.asarray(p)) ** 2).sum(1)
++        return int(fi[np.argmin(dd)])
++
++    def from_source(self, p):
++        src = self.nearest_free(p)
++        dist, pred = dijkstra(self.G, directed=False, indices=src, return_predecessors=True)
++        return src, dist, pred
++
++    def dist_to(self, dist, pts, src_p):
++        """path length estimates from source to each of pts (N,2)."""
++        c = cell_of(pts)
++        base = dist[c]
++        # fallback: pts in non-free cells -> look at 3x3 neighbourhood
++        bad = ~np.isfinite(base) | ~self.free[c]
++        if bad.any():
++            ci, cj = c // NG, c % NG
++            best = np.full(len(c), np.inf)
++            for di in (-2, -1, 0, 1, 2):
++                for dj in (-2, -1, 0, 1, 2):
++                    ii = np.clip(ci + di, 0, NG - 1)
++                    jj = np.clip(cj + dj, 0, NG - 1)
++                    cc = ii * NG + jj
++                    val = np.where(self.free[cc], dist[cc] + np.linalg.norm(PTS[cc] - pts, axis=1), np.inf)
++                    best = np.minimum(best, val)
++            base = np.where(bad, best, base)
++        return base + np.linalg.norm(pts - PTS[c], axis=1) * 0.0
++
++    def path(self, pred, src, dst):
++        cells = [dst]
++        while cells[-1] != src and cells[-1] >= 0:
++            cells.append(pred[cells[-1]])
++        if cells[-1] != src:
++            return None
++        return PTS[np.array(cells[::-1])]
+diff --git a/t_nav.py b/t_nav.py
+new file mode 100644
+index 0000000..17c203f
+--- /dev/null
++++ b/t_nav.py
+@@ -0,0 +1,7 @@
++import time, numpy as np
++from env_client import make_env
++import approach, navgrid
++env=make_env(); obs,_=env.reset(seed=5)
++m=approach.Model(obs)
++t=time.time(); g=navgrid.NavGrid(m,obs[0:2],obs[2],0.115); src,d,pr=g.from_source(obs[16:18]); print("t",time.time()-t)
++print(np.isfinite(d).sum(), g.free.sum(), d[navgrid.cell_of(obs[0:2]+np.array([0,0.4]))])

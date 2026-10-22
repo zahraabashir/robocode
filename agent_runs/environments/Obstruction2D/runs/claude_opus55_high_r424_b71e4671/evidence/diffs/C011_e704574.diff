@@ -1,0 +1,17 @@
+diff --git a/approach.py b/approach.py
+index 264b948..e5dcd3c 100644
+--- a/approach.py
++++ b/approach.py
+@@ -39,9 +39,9 @@ class GeneratedApproach:
+         self.max_d = float(self.high[0])
+         self.max_dth = float(self.high[2])
+         self.max_darm = float(self.high[3])
+-        self.n_sim = 8
+-        self.k_drop = 2
+-        self.k_place = 2
++        self.n_sim = 20
++        self.k_drop = 3
++        self.k_place = 3
+ 
+     # ------------------------------------------------------------ parsing
+     def _parse(self, s):

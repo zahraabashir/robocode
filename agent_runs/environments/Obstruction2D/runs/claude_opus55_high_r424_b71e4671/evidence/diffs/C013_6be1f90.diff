@@ -1,0 +1,281 @@
+diff --git a/approach.py b/approach.py
+index 1d39e81..4d87283 100644
+--- a/approach.py
++++ b/approach.py
+@@ -14,6 +14,7 @@ GAP = 0.006     # gripper gap to object top when grasping (grasp works <= ~0.01)
+ DROP_BOT = FLOOR_Y + 0.006
+ PLACE_BOT = FLOOR_Y + 0.012
+ STEP = 0.05
++VAC_CLR = 0.02
+ 
+ 
+ def _g(s, o, f):
+@@ -118,6 +119,7 @@ class GeneratedApproach:
+         self.last = None
+         self.stuck = 0
+         self.noprog = 0
++        self.last_arm = 0.0
+         self.replan = False
+         self.replans = 0
+         try:
+@@ -201,25 +203,37 @@ class GeneratedApproach:
+             return None
+         plans.sort(key=lambda p: p[0])
+         best = None
++        a0 = _g(state, robot, "arm_joint")
+         for cost, legs, specs in plans[:self.n_sim]:
+-            steps = sum(self._sim_leg(*sp) for sp in specs)
++            steps = self._sim_plan(start, a0, specs)
+             key = (steps, cost)
+             if best is None or key < best[0]:
+                 best = (key, legs)
+         return best[1]
+ 
+-    def _sim_leg(self, p0, p1, boxes, obstacles, cap=120):
+-        x, y = p0
+-        tx, ty = p1
+-        for i in range(cap):
+-            dx, dy = self._control(x, y, tx, ty, boxes, obstacles)
+-            if abs(x + dx - tx) < 1e-5 and abs(y + dy - ty) < 1e-5:
+-                return i + 1
+-            if abs(dx) < 1e-9 and abs(dy) < 1e-9:
+-                return 2 * cap
+-            x += dx
+-            y += dy
+-        return 2 * cap
++    def _sim_plan(self, start, a0, specs, cap=120):
++        x, y = start
++        a = a0
++        total = 0
++        for p0, p1, held_y, obstacles in specs:
++            held_g = None
++            if held_y is not None:
++                held_g = (held_y[0], held_y[1], held_y[2] + self.arm)
++            G, B = self._split_boxes(held_g)
++            tx, tg = p1[0], p1[1] - self.arm
++            for i in range(cap):
++                dx, dy, da, arrived = self._control(x, y, a, tx, tg, G, B, obstacles)
++                x += dx
++                y += dy
++                a += da
++                total += 1
++                if arrived:
++                    break
++                if abs(dx) < 1e-9 and abs(dy) < 1e-9 and abs(da) < 1e-9:
++                    return total + 10 * cap
++            else:
++                return total + 10 * cap
++        return total
+ 
+     def _plan_subset(self, start, R, orects, br, surf, boxes0):
+         sx0, sx1 = surf
+@@ -295,8 +309,8 @@ class GeneratedApproach:
+                 ncur = dict(cur)
+                 ncur[n] = (left, left + w, DROP_BOT, DROP_BOT + h)
+                 nlegs = legs + [("pick", n, d, pick), ("drop", n, dpose)]
+-                nspecs = specs + [(pos, pick, boxes0, others + [(r[0], r[1], r[3])]),
+-                                  (pick, dpose, boxes_h, others)]
++                nspecs = specs + [(pos, pick, None, others + [(r[0], r[1], r[3])]),
++                                  (pick, dpose, held, others)]
+                 rec(i + 1, dpose, ncur, nlegs, nspecs, cost + c1 + c2)
+ 
+         rec(0, start, dict(orects), [], [], 0.0)
+@@ -327,10 +341,10 @@ class GeneratedApproach:
+                 if req > ty + 1e-6:
+                     continue
+                 c2 = self._leg_cost(pick, (tx, ty), boxes_h, obst_final)
+-                cands.append((c1 + c2, float(d), pick, (tx, ty), boxes_h))
++                cands.append((c1 + c2, float(d), pick, (tx, ty), held))
+         cands.sort(key=lambda c: c[0])
+         used = []
+-        for sc, d, pick, ppose, boxes_h in cands:
++        for sc, d, pick, ppose, held in cands:
+             if len(used) >= self.k_place:
+                 break
+             if any(abs(d - ud) < 1e-9 and abs(ppose[0] - ux) < 0.02 for ud, ux in used):
+@@ -338,8 +352,8 @@ class GeneratedApproach:
+             used.append((d, ppose[0]))
+             nlegs = legs + [("pick", self.block_name, d, pick),
+                             ("place", self.block_name, ppose)]
+-            nspecs = specs + [(pos, pick, boxes0, obst_final + [block_obs]),
+-                              (pick, ppose, boxes_h, obst_final)]
++            nspecs = specs + [(pos, pick, None, obst_final + [block_obs]),
++                              (pick, ppose, held, obst_final)]
+             out.append((cost + sc, nlegs, nspecs))
+ 
+     def _fallback_plan(self, state):
+@@ -368,7 +382,7 @@ class GeneratedApproach:
+         vac = _g(state, robot, "vacuum")
+         th_err = (-np.pi / 2 - rth + np.pi) % (2 * np.pi) - np.pi
+         dth = float(np.clip(th_err, -self.max_dth, self.max_dth))
+-        darm = float(np.clip(self.arm - arm, -self.max_darm, self.max_darm))
++        darm = 0.0
+ 
+         if self.last is not None:
+             lx, ly, cdx, cdy = self.last
+@@ -377,7 +391,8 @@ class GeneratedApproach:
+             else:
+                 self.stuck = 0
+ 
+-        if self.last is not None and abs(self.last[0] - rx) < 1e-6 and abs(self.last[1] - ry) < 1e-6:
++        if self.last is not None and abs(self.last[0] - rx) < 1e-6 and abs(self.last[1] - ry) < 1e-6 \
++                and abs(self.last_arm - arm) < 1e-6:
+             self.noprog += 1
+         else:
+             self.noprog = 0
+@@ -402,6 +417,7 @@ class GeneratedApproach:
+             self.noprog = 0
+             self.replan = True
+             self.last = (rx, ry, 0.0, 0.0)
++            self.last_arm = arm
+             if kind == "drop":
+                 return self._act(0, 0, dth, darm, 0.0)
+             if kind == "pick":
+@@ -411,20 +427,20 @@ class GeneratedApproach:
+         kind, name = leg[0], leg[1]
+         allr = {o.name: _rect(state, o) for o in obst + [block]}
+         holding = kind in ("drop", "place")
+-        held_rel = None
++        held_g = None
++        gref = ry - arm
+         if holding:
+             r = allr[name]
+-            held_rel = (r[0] - rx, r[1] - rx, r[2] - ry)
++            held_g = (r[0] - rx, r[1] - rx, r[2] - gref)
+         obstacles = [(q[0], q[1], q[3]) for n, q in allr.items()
+                      if not (holding and n == name)]
+         tx, ty = leg[3] if kind == "pick" else leg[2]
+-        boxes = self._assembly(held_rel)
++        G, B = self._split_boxes(held_g)
+         vcmd = 1.0 if holding else 0.0
+ 
+-        dx, dy = self._control(rx, ry, tx, ty, boxes, obstacles)
++        dx, dy, darm, arrived = self._control(rx, ry, arm, tx, ty - self.arm, G, B, obstacles)
+         if self.stuck >= 2:
+-            dx, dy = 0.0, min(STEP, YMAX - ry)
+-        arrived = abs(rx + dx - tx) < 1e-5 and abs(ry + dy - ty) < 1e-5
++            dx, dy, darm, arrived = 0.0, min(STEP, YMAX - ry), 0.0, False
+         if arrived:
+             if kind == "pick":
+                 vcmd = 1.0
+@@ -432,33 +448,66 @@ class GeneratedApproach:
+                 vcmd = 0.0
+             self.leg += 1
+         self.last = (rx, ry, dx, dy)
++        self.last_arm = arm
+         return self._act(dx, dy, dth, darm, vcmd)
+ 
+-    def _control(self, rx, ry, tx, ty, boxes, obstacles):
++    def _split_boxes(self, held_g=None):
++        """Gripper-attached boxes (relative to g = y - arm) and base boxes."""
++        gh = self.gh / 2.0
++        G = [(-gh, gh, -self.gw)]
++        if held_g is not None:
++            # keep the vacuum face well above other objects while carrying
++            G = [(-gh, gh, -self.gw - VAC_CLR), held_g]
++        rb = self.base_r
++        Bx = []
++        edges = np.linspace(0.0, rb, 6)
++        for a0, b0 in zip(edges[:-1], edges[1:]):
++            off = -np.sqrt(max(rb * rb - a0 * a0, 0.0))
++            Bx.append((a0, b0, off))
++            Bx.append((-b0, -a0, off))
++        return G, Bx
++
++    def _control(self, x, y, a, tx, tg, G, B, obstacles):
++        """Returns (dx, dy, darm, arrived). g = y - a is the gripper ref."""
+         md = self.max_d - 1e-6
+-        ex, ey = tx - rx, ty - ry
+-        if abs(ex) <= md and abs(ey) <= md:
+-            req = float(self._safe(np.array([tx]), boxes, obstacles)[0])
+-            X = np.linspace(rx, tx, 12)
+-            if req <= ty + 1e-6 and float(self._safe(X, boxes, obstacles).max()) <= max(ty, ry) + 1e-6:
+-                return ex, ey
++        mda = self.max_darm - 1e-6
++        amin, amax = self.base_r, self.arm
++        g = y - a
++        ex = tx - x
+         n = max(2, int(abs(ex) / 0.0025) + 2)
+-        X = np.linspace(rx, tx, n)
+-        S = self._safe(X, boxes, obstacles)
++        X = np.linspace(x, tx, n)
++        SG = self._safe(X, G, obstacles)
++        SB = self._safe(X, B, obstacles)
+         sgn = 1.0 if ex >= 0 else -1.0
+         dxf = float(np.clip(ex, -md, md))
++        lo_a, hi_a = max(amin, a - mda), min(amax, a + mda)
+         for f in (1.0, 0.8, 0.6, 0.4, 0.25, 0.1, 0.0):
+             dx = dxf * f
+-            nx = rx + dx
++            nx = x + dx
+             sw = (X - nx) * sgn <= 1e-9
+-            req_sweep = float(S[sw].max()) if sw.any() else -1.0
+-            req_sweep = max(req_sweep, float(self._safe(np.array([nx]), boxes, obstacles)[0]))
++            px = np.array([nx])
++            rg_sw = max(float(SG[sw].max()) if sw.any() else -1.0,
++                        float(self._safe(px, G, obstacles)[0]))
++            rb_sw = max(float(SB[sw].max()) if sw.any() else -1.0,
++                        float(self._safe(px, B, obstacles)[0]))
+             ahead = ~sw
+-            req_ahead = float((S[ahead] - 0.9 * np.abs(X[ahead] - nx)).max()) if ahead.any() else -1.0
+-            req = max(req_sweep, req_ahead)
+-            ny = ry + float(np.clip(ey, -md, md))
+-            ny = max(ny, req + 1e-4)
+-            if ny - ry > md + 1e-9 or ny > YMAX:
++            if ahead.any():
++                dist = 0.9 * np.abs(X[ahead] - nx)
++                rg_ah = float((SG[ahead] - dist).max())
++                rb_ah = float((SB[ahead] - dist).max())
++            else:
++                rg_ah = rb_ah = -1.0
++            y_lo = max(y - md, rb_sw, rb_ah, rg_ah + amin, rg_sw + amin)
++            y_hi = min(y + md, YMAX)
++            if y_lo > y_hi + 1e-9:
++                continue
++            g_des = float(np.clip(tg, g - md - mda, g + md + mda))
++            g_des = max(g_des, rg_sw)
++            ny = float(np.clip(g_des + amax, y_lo, y_hi))
++            ng = float(np.clip(g_des, ny - hi_a, ny - lo_a))
++            if ng < rg_sw - 1e-9:
+                 continue
+-            return dx, ny - ry
+-        return 0.0, max(0.0, min(md, YMAX - ry))
++            arrived = abs(nx - tx) < 1e-5 and abs(ng - tg) < 1e-5
++            return dx, ny - y, (ny - ng) - a, arrived
++        dy = max(0.0, min(md, YMAX - y))
++        return 0.0, dy, -(a - lo_a), False
+diff --git a/dbg4.py b/dbg4.py
+new file mode 100644
+index 0000000..30769f7
+--- /dev/null
++++ b/dbg4.py
+@@ -0,0 +1,23 @@
++import sys
++import numpy as np
++from env_client import make_env
++import approach
++from approach import GeneratedApproach
++seed=int(sys.argv[1]); upto=int(sys.argv[2])
++env = make_env()
++ap = GeneratedApproach(env.action_space, env.observation_space, {})
++obs, info = env.reset(seed=seed); ap.reset(obs, info)
++print(ap.legs)
++orig=ap._control
++def wrap(x,y,a,tx,tg,G,B,obs_):
++    out=orig(x,y,a,tx,tg,G,B,obs_)
++    if wrap.on: print("CTRL",round(x,3),round(y,3),round(a,3),"t",round(tx,3),round(tg,3),"G",np.round(G,3).tolist(),"obs",np.round(obs_,3).tolist(),"->",np.round(out[:3],3))
++    return out
++wrap.on=False
++ap._control=wrap
++for t in range(upto):
++    wrap.on = t>=upto-3
++    a = ap.get_action(obs)
++    obs, rew, te, tr, _ = env.step(a)
++    if te: break
++env.close()
+diff --git a/res_0_300_v3.txt b/res_0_300_v3.txt
+index e69de29..3081968 100644
+--- a/res_0_300_v3.txt
++++ b/res_0_300_v3.txt
+@@ -0,0 +1 @@
++solved 300/300  mean steps 30.7 max time 22.0s

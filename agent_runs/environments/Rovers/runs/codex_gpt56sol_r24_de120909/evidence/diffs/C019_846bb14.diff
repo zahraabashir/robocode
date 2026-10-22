@@ -1,0 +1,42 @@
+diff --git a/approach.py b/approach.py
+index 6532ad2..b3d2885 100644
+--- a/approach.py
++++ b/approach.py
+@@ -47,7 +47,8 @@ class GeneratedApproach:
+                 # Samples squeezed between the large lander and southwest arena
+                 # corner are not drive-reachable; prefer either of the other two.
+                 trapped = owner==1 and math.dist((x,y),lq)<.60
+-                choices.append((int(trapped),math.dist(self.home[owner],(x,y)),owner,o.name))
++                edge = abs(x)>2.20 or abs(y)>2.20
++                choices.append((int(trapped or edge),math.dist(self.home[owner],(x,y)),owner,o.name))
+             if choices:
+                 _,_,owner,name=min(choices)
+                 self.sample_jobs[owner][soil]=name
+@@ -159,7 +160,8 @@ class GeneratedApproach:
+     def _candidates(self, s, q, radius, require_los=True):
+         rects=self._rects(s); out=[]
+         # Fine angular rings give plenty of robust visibility choices.
+-        for rad in (min(radius*.72,1.55), min(radius*.88,1.82), radius*.55):
++        for rad in (min(radius*.72,1.55), min(radius*.88,1.82),
++                    min(radius*.98,1.88), radius*.55):
+             for j in range(32):
+                 a=2*math.pi*j/32
+                 p=(q[0]+rad*math.cos(a),q[1]+rad*math.sin(a))
+@@ -224,7 +226,7 @@ class GeneratedApproach:
+                 q=(s.get(o,"x"),s.get(o,"y"))
+                 candidates.append((math.dist(pos,q),q))
+             q=min(candidates)[1]
+-            if math.dist(pos,q)<=.24: return ("sample",pos)
++            if math.dist(pos,q)<=.249: return ("sample",pos)
+             return ("nav_sample",q)
+         # No pending work of our nominal class: help with anything globally missing.
+         return ("home",self.home[i])
+@@ -234,7 +236,7 @@ class GeneratedApproach:
+         base_rects=self._rects(state)
+         for i in range(2):
+             r=state.get_object_from_name(self.names[i]); pos=(state.get(r,"x"),state.get(r,"y"))
+-            if self.last_motion[i] is not None and math.dist(pos,self.lastpos[i])<.02:
++            if self.last_motion[i] is not None and math.dist(pos,self.lastpos[i])<.0005:
+                 bx,by=self.last_motion[i]
+                 self.extra_rects[i].append((bx,by,.07,.07))
+                 self.paths[i]=[]; self.targets[i]=None

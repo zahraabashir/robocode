@@ -1,0 +1,15 @@
+diff --git a/approach.py b/approach.py
+index ba7b5f6..ef555ac 100644
+--- a/approach.py
++++ b/approach.py
+@@ -104,6 +104,10 @@ class GeneratedApproach:
+                 # touch the gripper as it passes underneath.
+                 return self._action(dx=self._clip(tx - rx, 0.05), vac=0.0)
+         if self.phase == "descend":
++            # A neighboring floating object can be pushed downward before the
++            # vacuum acquires it.  Verify lift relative to the lowest observed
++            # height, not merely its height at the start of the approach.
++            self.pick_y = min(self.pick_y, oy)
+             if self.last_robot_y is not None and abs(ry - self.last_robot_y) < 0.001:
+                 self.stalled += 1
+             else:

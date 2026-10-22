@@ -1,0 +1,41 @@
+diff --git a/approach.py b/approach.py
+index e7901a6..d2e18ad 100644
+--- a/approach.py
++++ b/approach.py
+@@ -145,7 +145,7 @@ class GeneratedApproach:
+             ('move', np.array([p[0], p[1], max(SAFE_Z, gz + 0.05)]), yaw, False),
+             ('move', np.array([p[0], p[1], gz + 0.02]), yaw, False),
+             ('move', np.array([p[0], p[1], gz]), yaw, True, FINE),
+-            ('close', obj.name),
++            ('close', obj.name, p.copy(), yaw, [0.045, 0.03, 0.05, 0.025]),
+             ('move', np.array([p[0], p[1], gz + 0.03]), yaw, False, FINE),
+             ('move', np.array([p[0], p[1], SAFE_Z]), yaw, False),
+             ('place_move', place_center + np.array([0, 0, SAFE_Z - place_center[2]]), yaw, False),
+@@ -248,6 +248,16 @@ class GeneratedApproach:
+                 self.grasp_fail = 0
+                 return None
+             self.retries += 1
++            if self.retries > 2 and len(cmd) > 4 and cmd[4]:
++                # failed grasp: open, try another depth in place
++                self.retries = 0
++                dz = cmd[4][0]
++                self.queue[0] = cmd[:4] + (cmd[4][1:],)
++                pc = cmd[2]
++                self.queue.insert(0, ('move', np.array([pc[0], pc[1], pc[2] + dz]), cmd[3], True, FINE))
++                self.queue.insert(0, ('move', np.array([pc[0], pc[1], pc[2] + max(dz, 0.035) + 0.01]), cmd[3], True, FINE))
++                self.queue.insert(0, ('ungrip',))
++                return None
+             if self.retries > 2:
+                 # failed grasp: replan from scratch with another yaw
+                 self.retries = 0
+@@ -256,6 +266,10 @@ class GeneratedApproach:
+                 return None
+             a[10] = -1.0
+             return a
++        if kind == 'ungrip':
++            self.queue.pop(0)
++            a[10] = 1.0
++            return a
+         if kind == 'open':
+             if not grasping:
+                 self.queue.pop(0)

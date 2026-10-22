@@ -1,0 +1,621 @@
+diff --git a/approach.py b/approach.py
+index 4a6b168..4acb0e7 100644
+--- a/approach.py
++++ b/approach.py
+@@ -70,6 +70,26 @@ def sense_offset(theta):
+     return (-SENSE_BACK * c + SENSE_RIGHT * s, -SENSE_BACK * s - SENSE_RIGHT * c)
+ 
+ 
++PIL_R = 0.0707 + 0.004
++
++
++def pillar_ok(X, Y, th, pillars):
++    """Heading-aware rover-vs-pillar check (pillar treated as disc of circumradius)."""
++    c, s_ = math.cos(th), math.sin(th)
++    ok = np.ones(np.shape(X), dtype=bool)
++    for p in pillars:
++        wx = p["x"] - X
++        wy = p["y"] - Y
++        u = c * wx + s_ * wy
++        v = -s_ * wx + c * wy
++        au, av = np.abs(u), np.abs(v)
++        d1 = np.hypot(np.maximum(au - 0.158, 0), np.maximum(av - 0.1705, 0))
++        d2 = np.hypot(np.maximum(np.maximum(-0.187 - u, u), 0), np.maximum(av - 0.14, 0))
++        d3 = np.hypot(u, v) - 0.177
++        ok &= np.minimum(np.minimum(d1, d2), d3) >= PIL_R
++    return ok
++
++
+ def seg_dist_grid(ex, ey, tx, ty, px, py):
+     """Distance from point (px,py) to segments (ex,ey)->(tx,ty); ex,ey arrays."""
+     dx = tx - ex
+@@ -445,7 +465,9 @@ class GeneratedApproach:
+         return self._field_cache[key]
+ 
+     # ------------------------------------------------------------ model sim
+-    def _free_pt(self, r, x, y):
++    def _free_pt(self, r, x, y, th=None):
++        if th is not None and not bool(pillar_ok(x, y, th, self.pillars)):
++            return False
+         if abs(x) > 2.27 or abs(y) > 2.27 or abs(x) < 0.228:
+             return False
+         for m in self.mounds:
+@@ -483,10 +505,11 @@ class GeneratedApproach:
+             dx = float(np.clip(act[4 * k], -0.2, 0.2))
+             dy = float(np.clip(act[4 * k + 1], -0.2, 0.2))
+             nx, ny = ro["x"] + dx, ro["y"] + dy
+-            if self._free_pt(r, nx, ny):
++            dth = float(np.clip(act[4 * k + 2], -0.4, 0.4))
++            nth = (ro["theta"] + dth + math.pi) % (2 * math.pi) - math.pi
++            if self._free_pt(r, nx, ny, nth):
+                 ro["x"], ro["y"] = nx, ny
+-                dth = float(np.clip(act[4 * k + 2], -0.4, 0.4))
+-                ro["theta"] = (ro["theta"] + dth + math.pi) % (2 * math.pi) - math.pi
++                ro["theta"] = nth
+         for k, r in enumerate(self.rovers):
+             ro = d2["rover"][r]
+             other = d2["rover"][[q for q in self.rovers if q != r][0]]
+@@ -716,7 +739,12 @@ class GeneratedApproach:
+             ro2 = dict(ro)
+             ro2["theta"] = th + dth
+             dx, dy, op = self._rover_action(d, r, ro2, (orv["x"], orv["y"]))
+-            op = self._guard_op(d, r, ro2["x"] + dx, ro2["y"] + dy, ro2["theta"], op)
++            if not bool(pillar_ok(ro["x"] + dx, ro["y"] + dy, th + dth, self.pillars)):
++                for f in (0.5, 0.25, 0.0):
++                    if bool(pillar_ok(ro["x"] + dx, ro["y"] + dy, th + dth * f, self.pillars)):
++                        break
++                dth = dth * f
++            op = self._guard_op(d, r, ro2["x"] + dx, ro2["y"] + dy, th + dth, op)
+             act[4 * k + 0] = dx
+             act[4 * k + 1] = dy
+             act[4 * k + 2] = dth
+@@ -842,6 +870,8 @@ class GeneratedApproach:
+             opts.append((np.where(self.send_reg[r][win], G[(stage, cal, full, 1)][win], INF), "send"))
+         ii, jj = np.meshgrid(np.arange(i0, i1 + 1), np.arange(j0, j1 + 1), indexing="ij")
+         mv = np.maximum(np.abs(ii - i), np.abs(jj - j)) * 1e-3 + np.hypot(ii - i, jj - j) * 1e-4
++        okm = pillar_ok(COORDS[ii], COORDS[jj], th, self.pillars)
++        mv = mv + np.where(okm, 0.0, INF)
+         if self.bad_cells[r] and not self._predicting:
+             for (bi, bj) in self.bad_cells[r]:
+                 if i0 <= bi <= i1 and j0 <= bj <= j1:
+diff --git a/pF_A.txt b/pF_A.txt
+new file mode 100644
+index 0000000..6fa260f
+--- /dev/null
++++ b/pF_A.txt
+@@ -0,0 +1,4 @@
++0.0 theta -3.1416 True True {'-y': 0.2475, '-y+x': 0.28125, '+x': 0.2475, '+x+y': 0.28125, '+y': 0.2475, '+y-x': 0.28125, '-x': 0.2575, '-x-y': 0.2825}
++0.4 theta -2.7416 True True {'-y': 0.2575, '-y+x': 0.255, '+x': 0.2475, '+x+y': 0.24125, '+y': 0.25625, '+y-x': 0.255, '-x': 0.27375, '-x-y': 0.2725}
++0.785 theta -2.3566 True True {'-y': 0.2925, '-y+x': 0.2275, '+x': 0.295, '+x+y': 0.2275, '+y': 0.29125, '+y-x': 0.2275, '-x': 0.29625, '-x-y': 0.23875}
++1.57 theta -1.5716 True True {'-y': 0.2575, '-y+x': 0.2825, '+x': 0.2475, '+x+y': 0.28125, '+y': 0.2475, '+y-x': 0.28125, '-x': 0.2475, '-x-y': 0.28125}
+diff --git a/pF_B.txt b/pF_B.txt
+new file mode 100644
+index 0000000..6d5f059
+--- /dev/null
++++ b/pF_B.txt
+@@ -0,0 +1,4 @@
++0.2 theta -2.9416 True True {'-y': 0.2475, '-y+x': 0.28, '+x': 0.2475, '+x+y': 0.2725, '+y': 0.2475, '+y-x': 0.28, '-x': 0.26125, '-x-y': 0.2825}
++0.6 theta -2.5416 True True {'-y': 0.27875, '-y+x': 0.23375, '+x': 0.2625, '+x+y': 0.2275, '+y': 0.27875, '+y-x': 0.23375, '-x': 0.29875, '-x-y': 0.25125}
++1.0 theta -2.1416 True True {'-y': 0.29125, '-y+x': 0.23375, '+x': 0.2725, '+x+y': 0.2275, '+y': 0.25625, '+y-x': 0.23375, '-x': 0.27125, '-x-y': 0.25125}
++1.2 theta -1.9416 True True {'-y': 0.27, '-y+x': 0.2575, '+x': 0.2525, '+x+y': 0.2425, '+y': 0.2475, '+y-x': 0.2575, '-x': 0.2525, '-x-y': 0.275}
+diff --git a/pF_C.txt b/pF_C.txt
+new file mode 100644
+index 0000000..4f87c64
+--- /dev/null
++++ b/pF_C.txt
+@@ -0,0 +1,2 @@
++0.0 theta -3.1416 True True {'-y': 0.245, '-y+x': 0.28125, '+x': 0.24625, '+x+y': 0.285, '+y': 0.24625, '+y-x': 0.2875, '-x': 0.255, '-x-y': 0.28375}
++0.785 theta -2.3566 True True {'-y': 0.28625, '-y+x': 0.23125, '+x': 0.29875, '+x+y': 0.2325, '+y': 0.28625, '+y-x': 0.23125, '-x': 0.29875, '-x-y': 0.245}
+diff --git a/pF_bnd.py b/pF_bnd.py
+new file mode 100644
+index 0000000..c2929e0
+--- /dev/null
++++ b/pF_bnd.py
+@@ -0,0 +1,20 @@
++from pF_lib import *
++import sys
++i=1
++def push(s,ux,uy):
++    for h in (0.08,0.04,0.02,0.01,0.005,0.0025,0.00125):
++        for _ in range(60):
++            p=pose(s,i); q=step(s,i,h*ux,h*uy)
++            if np.allclose(q,p,atol=1e-7): break
++    return pose(s,i)
++for thr in [float(v) for v in sys.argv[1].split(',')]:
++    s=Sim(28); r={}
++    go(s,i,-0.6,-1.0); go(s,i,-0.6,-1.0,thr); r['theta']=round(pose(s,i)[2],4)
++    r['ymin']=round(push(s,0,-1)[1],5); go(s,i,-0.6,-1.0)
++    r['xmin']=round(push(s,-1,0)[0],5); go(s,i,-0.6,-1.0)
++    r['xmax(wall?)']=round(push(s,1,0)[0],5); go(s,i,-0.6,-1.0)
++    go(s,i,-0.6,1.2); go(s,i,-0.5,1.2)
++    r['mound3 bottom y']=round(push(s,0,1)[1],5); go(s,i,-0.5,1.2); go(s,i,-1.1,1.2); ok=go(s,i,-1.1,2.0)
++    r['mound3 left x']=round(push(s,1,0)[0],5) if ok else None; go(s,i,-1.1,2.0); go(s,i,-1.104,1.396)
++    p=push(s,np.sqrt(.5),np.sqrt(.5)); r['corner(-0.75,1.75) dist']=round(float(np.hypot(p[0]+0.75,p[1]-1.75)),5)
++    print('thr',thr,r,flush=True); s.env.close()
+diff --git a/pF_bnd1.txt b/pF_bnd1.txt
+new file mode 100644
+index 0000000..e894654
+--- /dev/null
++++ b/pF_bnd1.txt
+@@ -0,0 +1,2 @@
++thr 0.0 {'theta': 0.0, 'ymin': -2.2725, 'xmin': -2.2725, 'xmax(wall?)': -0.2275, 'mound3 bottom y': 1.5725, 'mound3 left x': -0.9275, 'corner(-0.75,1.75) dist': 0.17688}
++thr 0.4 {'theta': 0.4, 'ymin': -2.2725, 'xmin': -2.2725, 'xmax(wall?)': -0.2275, 'mound3 bottom y': 1.5725, 'mound3 left x': -0.9275, 'corner(-0.75,1.75) dist': 0.17688}
+diff --git a/pF_bnd2.txt b/pF_bnd2.txt
+new file mode 100644
+index 0000000..4d80b1f
+--- /dev/null
++++ b/pF_bnd2.txt
+@@ -0,0 +1,2 @@
++thr 0.785 {'theta': 0.785, 'ymin': -2.2725, 'xmin': -2.2725, 'xmax(wall?)': -0.2275, 'mound3 bottom y': 1.5725, 'mound3 left x': -0.9275, 'corner(-0.75,1.75) dist': 0.17688}
++thr 1.57 {'theta': 1.57, 'ymin': -2.2725, 'xmin': -2.2725, 'xmax(wall?)': -0.2275, 'mound3 bottom y': 1.5725, 'mound3 left x': -0.9275, 'corner(-0.75,1.75) dist': 0.17688}
+diff --git a/pF_find.py b/pF_find.py
+new file mode 100644
+index 0000000..bcfd6f8
+--- /dev/null
++++ b/pF_find.py
+@@ -0,0 +1,12 @@
++from pE_lib import *
++for seed in range(40):
++    s=Sim(seed); P=[];S=[]
++    for n in s.obs.get_object_names():
++        o=s.obs.get_object_from_name(n); v=s.obs.vec([o])
++        if str(n).startswith('obstacle') and abs(float(s.obs.get(o,'half_x'))-0.05)<1e-3: P.append(v[:2])
++        if str(n).startswith('sample'): S.append(v[:2])
++    for p in P:
++        if 0.6<p[0]<1.7 and -1.3<p[1]<1.2:
++            d=min([np.hypot(*(p-q)) for q in P if np.hypot(*(p-q))>1e-6]+[np.hypot(*(p-q)) for q in S])
++            if d>0.75: print(seed,p.round(3),round(d,3),flush=True)
++    s.env.close()
+diff --git a/pF_fit.py b/pF_fit.py
+new file mode 100644
+index 0000000..7cbf634
+--- /dev/null
++++ b/pF_fit.py
+@@ -0,0 +1,12 @@
++from pF_model import *
++import sys
++dirs=[(np.cos(a),np.sin(a)) for a in np.arange(8)*np.pi/4]
++base=[0.1583,0.1705,0.1868,0.14,0.1768]
++for tag in sys.argv[1:]:
++    D=json.load(open('pF_out_%s.json'%tag))
++    for yaw in np.pi/4+np.radians(np.arange(-45,45,3)):
++        e=[]
++        for thr,v in D.items():
++            pr=[contact(base+[yaw],v['theta'],*dirs[k]) for k in v['order']]
++            e+=[m-p for m,p in zip(v['d'],pr)]
++        e=np.array(e); print(tag,'yaw_deg %.0f'%np.degrees(yaw),'rms %.4f max %.4f mean %.4f'%(np.sqrt((e**2).mean()),np.abs(e).max(),e.mean()))
+diff --git a/pF_lib.py b/pF_lib.py
+new file mode 100644
+index 0000000..81f55f0
+--- /dev/null
++++ b/pF_lib.py
+@@ -0,0 +1,25 @@
++from pE_lib import *
++import time
++def pose(s,i):
++    o=s.obs.get_object_from_name('rover%d'%i); v=s.obs.vec([o]); return np.array([float(v[0]),float(v[1]),float(v[2])])
++def step(s,i,dx,dy,dth=0.0):
++    a=(dx,dy,dth,'noop')
++    if i==0: s.act(a0=a)
++    else: s.act(a1=a)
++    return pose(s,i)
++def go(s,i,x,y,th=None,maxit=60):
++    for _ in range(maxit):
++        p=pose(s,i); dx=np.clip(x-p[0],-.2,.2); dy=np.clip(y-p[1],-.2,.2)
++        dth=0 if th is None else np.clip((th-p[2]+np.pi)%(2*np.pi)-np.pi,-.4,.4)
++        if abs(dx)<1e-6 and abs(dy)<1e-6 and abs(dth)<1e-6: return True
++        q=step(s,i,dx,dy,dth)
++        if np.allclose(q,p,atol=1e-7): return False
++    return False
++def approach(s,i,px,py,ux,uy,d0=0.5):
++    """start at pillar + d0*u, move along -u, return min centre distance reached (projected along u)."""
++    if not go(s,i,px+d0*ux,py+d0*uy): return None
++    for h in (0.04,0.02,0.01,0.005,0.0025,0.00125):
++        for _ in range(40):
++            p=pose(s,i); q=step(s,i,-h*ux,-h*uy)
++            if np.allclose(q,p,atol=1e-7): break
++    p=pose(s,i); return float(np.hypot(p[0]-px,p[1]-py)), p
+diff --git a/pF_meas.py b/pF_meas.py
+new file mode 100644
+index 0000000..cd1b25d
+--- /dev/null
++++ b/pF_meas.py
+@@ -0,0 +1,27 @@
++from pF_lib import *
++import sys, json
++seed=int(sys.argv[1]); px,py=[float(v) for v in sys.argv[2].split(',')]; ths=[float(v) for v in sys.argv[3].split(',')]
++i=0; th0=np.pi; R0=0.6
++dirs=[(np.cos(a),np.sin(a)) for a in np.arange(8)*np.pi/4]   # side where rover sits, ccw from +x
++def approach2(s,ux,uy):
++    for h in (0.08,0.04,0.02,0.01,0.005,0.0025,0.00125):
++        for _ in range(40):
++            p=pose(s,i); q=step(s,i,-h*ux,-h*uy)
++            if np.allclose(q,p,atol=1e-7): break
++    p=pose(s,i); return float(np.hypot(p[0]-px,p[1]-py))
++out={}
++for thr in ths:
++    s=Sim(seed); res=[]
++    # go to first start point (below pillar = dir index 6) then rotate
++    order=[6,7,0,1,2,3,4,5]
++    ux,uy=dirs[6]; ok=go(s,i,px+R0*ux,py+R0*uy); ok2=go(s,i,px+R0*ux,py+R0*uy,th0+thr)
++    th=pose(s,i)[2]
++    for k in order:
++        ux,uy=dirs[k]
++        if not go(s,i,px+R0*ux,py+R0*uy): res.append(None); print('noreach',thr,k); continue
++        d=approach2(s,ux,uy); res.append(round(d,5))
++        go(s,i,px+R0*ux,py+R0*uy)
++    out[thr]=dict(order=order,d=res,theta=float(th))
++    print(thr, 'theta',round(th,4), ok,ok2, dict(zip(['-y','-y+x','+x','+x+y','+y','+y-x','-x','-x-y'],res)),flush=True)
++    s.env.close()
++json.dump(out,open('pF_out_%s.json'%sys.argv[4],'w'))
+diff --git a/pF_model.py b/pF_model.py
+new file mode 100644
+index 0000000..07fef14
+--- /dev/null
++++ b/pF_model.py
+@@ -0,0 +1,49 @@
++import numpy as np, json, glob
++def box(x0,x1,y0,y1): return np.array([[x0,y0],[x1,y0],[x1,y1],[x0,y1]])
++def circ(r,n=72): a=np.arange(n)*2*np.pi/n; return np.c_[r*np.cos(a),r*np.sin(a)]/np.cos(np.pi/n)*1.0
++def sat(A,B):
++    for P in (A,B):
++        for k in range(len(P)):
++            e=P[(k+1)%len(P)]-P[k]; n=np.array([-e[1],e[0]])
++            a=A@n; b=B@n
++            if a.max()<=b.min() or b.max()<=a.min(): return False
++    return True
++def make(prm):
++    f,s,r,rw,rc,pyaw=prm
++    parts=[box(-f,f,-s,s),box(-r,0,-rw,rw),circ(rc)]
++    a=np.arange(4)*np.pi/2+pyaw+np.pi/4; pil=0.05*np.sqrt(2)*np.c_[np.cos(a),np.sin(a)]
++    return parts,pil
++def coll(parts,pil,cx,cy,th):
++    R=np.array([[np.cos(th),-np.sin(th)],[np.sin(th),np.cos(th)]])
++    return any(sat(p@R.T+[cx,cy],pil) for p in parts)
++def contact(prm,th,ux,uy,e=0.0):
++    parts,pil=make(prm); vx,vy=-uy,ux
++    lo,hi=-0.05,0.6
++    # find first contact moving from hi down: scan then bisect
++    ts=np.arange(0.6,-0.05,-0.005); prev=0.6
++    for t in ts:
++        if coll(parts,pil,t*ux+e*vx,t*uy+e*vy,th): lo,hi=t,prev; break
++        prev=t
++    else: return None
++    for _ in range(20):
++        m=(lo+hi)/2
++        if coll(parts,pil,m*ux+e*vx,m*uy+e*vy,th): lo=m
++        else: hi=m
++    return hi
++if __name__=='__main__':
++    import sys
++    prm=[0.1583,0.1705,0.1868,0.14,0.1768,np.pi/4]
++    dirs=[(np.cos(a),np.sin(a)) for a in np.arange(8)*np.pi/4]
++    errs=[]
++    for fn in sorted(glob.glob('pF_out_[AB].json')):
++        for thr,v in json.load(open(fn)).items():
++            pr=[contact(prm,v['theta'],*dirs[k]) for k in v['order']]
++            print('thr',thr,' '.join('%.4f/%.4f'%(m,p) for m,p in zip(v['d'],pr)))
++            errs+=[m-p for m,p in zip(v['d'],pr)]
++    for fn in sorted(glob.glob('pF_prof_*.json')):
++        v=json.load(open(fn)); th=np.pi+v['thr']; u=(np.cos(v['ang']),np.sin(v['ang']))
++        pr=[contact(prm,th,*u,e) for e in v['offs']]
++        ee=[(m-p) for m,p in zip(v['res'],pr) if m is not None and p is not None]
++        miss=sum((m is None)!=(p is None) for m,p in zip(v['res'],pr))
++        print(fn,'maxerr %.4f meanabs %.4f hitmismatch %d'%(np.max(np.abs(ee)),np.mean(np.abs(ee)),miss)); errs+=ee
++    errs=np.array(errs); print('ALL n',len(errs),'mean',errs.mean().round(4),'maxabs',np.abs(errs).max().round(4),'rms',np.sqrt((errs**2).mean()).round(4))
+diff --git a/pF_out_A.json b/pF_out_A.json
+new file mode 100644
+index 0000000..e1bad03
+--- /dev/null
++++ b/pF_out_A.json
+@@ -0,0 +1 @@
++{"0.0": {"order": [6, 7, 0, 1, 2, 3, 4, 5], "d": [0.2475, 0.28125, 0.2475, 0.28125, 0.2475, 0.28125, 0.2575, 0.2825], "theta": -3.1415927410125732}, "0.4": {"order": [6, 7, 0, 1, 2, 3, 4, 5], "d": [0.2575, 0.255, 0.2475, 0.24125, 0.25625, 0.255, 0.27375, 0.2725], "theta": -2.7415926456451416}, "0.785": {"order": [6, 7, 0, 1, 2, 3, 4, 5], "d": [0.2925, 0.2275, 0.295, 0.2275, 0.29125, 0.2275, 0.29625, 0.23875], "theta": -2.3565926551818848}, "1.57": {"order": [6, 7, 0, 1, 2, 3, 4, 5], "d": [0.2575, 0.2825, 0.2475, 0.28125, 0.2475, 0.28125, 0.2475, 0.28125], "theta": -1.5715925693511963}}
+\ No newline at end of file
+diff --git a/pF_out_B.json b/pF_out_B.json
+new file mode 100644
+index 0000000..3484ee7
+--- /dev/null
++++ b/pF_out_B.json
+@@ -0,0 +1 @@
++{"0.2": {"order": [6, 7, 0, 1, 2, 3, 4, 5], "d": [0.2475, 0.28, 0.2475, 0.2725, 0.2475, 0.28, 0.26125, 0.2825], "theta": -2.9415924549102783}, "0.6": {"order": [6, 7, 0, 1, 2, 3, 4, 5], "d": [0.27875, 0.23375, 0.2625, 0.2275, 0.27875, 0.23375, 0.29875, 0.25125], "theta": -2.541592597961426}, "1.0": {"order": [6, 7, 0, 1, 2, 3, 4, 5], "d": [0.29125, 0.23375, 0.2725, 0.2275, 0.25625, 0.23375, 0.27125, 0.25125], "theta": -2.1415927410125732}, "1.2": {"order": [6, 7, 0, 1, 2, 3, 4, 5], "d": [0.27, 0.2575, 0.2525, 0.2425, 0.2475, 0.2575, 0.2525, 0.275], "theta": -1.941592812538147}}
+\ No newline at end of file
+diff --git a/pF_out_C.json b/pF_out_C.json
+new file mode 100644
+index 0000000..8c39ac9
+--- /dev/null
++++ b/pF_out_C.json
+@@ -0,0 +1 @@
++{"0.0": {"order": [6, 7, 0, 1, 2, 3, 4, 5], "d": [0.245, 0.28125, 0.24625, 0.285, 0.24625, 0.2875, 0.255, 0.28375], "theta": -3.1415927410125732}, "0.785": {"order": [6, 7, 0, 1, 2, 3, 4, 5], "d": [0.28625, 0.23125, 0.29875, 0.2325, 0.28625, 0.23125, 0.29875, 0.245], "theta": -2.3565926551818848}}
+\ No newline at end of file
+diff --git a/pF_pf0.txt b/pF_pf0.txt
+new file mode 100644
+index 0000000..d87e967
+--- /dev/null
++++ b/pF_pf0.txt
+@@ -0,0 +1,2 @@
++theta -3.1415927410125732
++f0 thr 0.0 ang 0.0 [(-0.35, None), (-0.325, None), (-0.3, None), (-0.275, None), (-0.25, None), (-0.225, 0.17375), (-0.2, 0.1975), (-0.175, 0.22125), (-0.15, 0.22875), (-0.125, 0.22875), (-0.1, 0.22875), (-0.075, 0.23), (-0.05, 0.23875), (-0.025, 0.245), (0.0, 0.2475), (0.025, 0.24625), (0.05, 0.24), (0.075, 0.23125), (0.1, 0.22875), (0.125, 0.22875), (0.15, 0.22875), (0.175, 0.225), (0.2, 0.19875), (0.225, 0.17125), (0.25, None), (0.275, None), (0.3, None), (0.325, None), (0.35, None)]
+diff --git a/pF_pf45.txt b/pF_pf45.txt
+new file mode 100644
+index 0000000..40b27de
+--- /dev/null
++++ b/pF_pf45.txt
+@@ -0,0 +1,2 @@
++theta -2.3565926551818848
++f45 thr 0.785 ang 0.785398 [(-0.35, None), (-0.325, None), (-0.3, None), (-0.275, None), (-0.25, None), (-0.225, 0.05625), (-0.2, 0.21), (-0.175, 0.21), (-0.15, 0.21), (-0.125, 0.21), (-0.1, 0.22), (-0.075, 0.22625), (-0.05, 0.22875), (-0.025, 0.22875), (0.0, 0.2275), (0.025, 0.22625), (0.05, 0.22625), (0.075, 0.22375), (0.1, 0.2175), (0.125, 0.21), (0.15, 0.20875), (0.175, 0.2075), (0.2, 0.2075), (0.225, 0.0825), (0.25, None), (0.275, None), (0.3, None), (0.325, None), (0.35, None)]
+diff --git a/pF_pr0.txt b/pF_pr0.txt
+new file mode 100644
+index 0000000..9487608
+--- /dev/null
++++ b/pF_pr0.txt
+@@ -0,0 +1,2 @@
++theta -3.1415927410125732
++r0 thr 0.0 ang 3.14159265 [(-0.35, None), (-0.325, None), (-0.3, None), (-0.275, None), (-0.25, None), (-0.225, 0.17375), (-0.2, 0.1975), (-0.175, 0.22125), (-0.15, 0.245), (-0.125, 0.2575), (-0.1, 0.2575), (-0.075, 0.2575), (-0.05, 0.2575), (-0.025, 0.2575), (0.0, 0.2575), (0.025, 0.2575), (0.05, 0.2575), (0.075, 0.2575), (0.1, 0.2575), (0.125, 0.2575), (0.15, 0.2475), (0.175, 0.225), (0.2, 0.19875), (0.225, 0.17125), (0.25, None), (0.275, None), (0.3, None), (0.325, None), (0.35, None)]
+diff --git a/pF_prof.py b/pF_prof.py
+new file mode 100644
+index 0000000..36ae103
+--- /dev/null
++++ b/pF_prof.py
+@@ -0,0 +1,24 @@
++from pF_lib import *
++import sys, json
++seed=28; px,py=0.9779,-0.9694; i=0; th0=np.pi; R0=0.6
++thr=float(sys.argv[1]); ang=float(sys.argv[2]); tag=sys.argv[3]
++offs=np.round(np.arange(-0.35,0.3501,0.025),4)
++ux,uy=np.cos(ang),np.sin(ang); vx,vy=-uy,ux
++s=Sim(seed)
++def P(a,e): return px+a*ux+e*vx, py+a*uy+e*vy
++go(s,i,*P(R0,offs[0])); go(s,i,*P(R0,offs[0]),th0+thr); print('theta',pose(s,i)[2])
++res=[]
++for e in offs:
++    if not go(s,i,*P(R0,e)): res.append(None); continue
++    hit=False
++    for h in (0.08,0.04,0.02,0.01,0.005,0.0025,0.00125):
++        for _ in range(40):
++            p=pose(s,i); along=(p[0]-px)*ux+(p[1]-py)*uy
++            if along-h < -0.05 and not hit: break
++            q=step(s,i,-h*ux,-h*uy)
++            if np.allclose(q,p,atol=1e-7): hit=True; break
++    p=pose(s,i); along=(p[0]-px)*ux+(p[1]-py)*uy
++    res.append(round(along,5) if hit else None)
++    go(s,i,*P(R0,e))
++print(tag,'thr',thr,'ang',ang, list(zip(offs.tolist(),res)),flush=True)
++json.dump(dict(thr=thr,ang=ang,offs=offs.tolist(),res=res),open('pF_prof_%s.json'%tag,'w'))
+diff --git a/pF_prof_f0.json b/pF_prof_f0.json
+new file mode 100644
+index 0000000..e3a6ad1
+--- /dev/null
++++ b/pF_prof_f0.json
+@@ -0,0 +1 @@
++{"thr": 0.0, "ang": 0.0, "offs": [-0.35, -0.325, -0.3, -0.275, -0.25, -0.225, -0.2, -0.175, -0.15, -0.125, -0.1, -0.075, -0.05, -0.025, 0.0, 0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.275, 0.3, 0.325, 0.35], "res": [null, null, null, null, null, 0.17375, 0.1975, 0.22125, 0.22875, 0.22875, 0.22875, 0.23, 0.23875, 0.245, 0.2475, 0.24625, 0.24, 0.23125, 0.22875, 0.22875, 0.22875, 0.225, 0.19875, 0.17125, null, null, null, null, null]}
+\ No newline at end of file
+diff --git a/pF_prof_f45.json b/pF_prof_f45.json
+new file mode 100644
+index 0000000..7ef15c3
+--- /dev/null
++++ b/pF_prof_f45.json
+@@ -0,0 +1 @@
++{"thr": 0.785, "ang": 0.785398, "offs": [-0.35, -0.325, -0.3, -0.275, -0.25, -0.225, -0.2, -0.175, -0.15, -0.125, -0.1, -0.075, -0.05, -0.025, 0.0, 0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.275, 0.3, 0.325, 0.35], "res": [null, null, null, null, null, 0.05625, 0.21, 0.21, 0.21, 0.21, 0.22, 0.22625, 0.22875, 0.22875, 0.2275, 0.22625, 0.22625, 0.22375, 0.2175, 0.21, 0.20875, 0.2075, 0.2075, 0.0825, null, null, null, null, null]}
+\ No newline at end of file
+diff --git a/pF_prof_r0.json b/pF_prof_r0.json
+new file mode 100644
+index 0000000..7f8e821
+--- /dev/null
++++ b/pF_prof_r0.json
+@@ -0,0 +1 @@
++{"thr": 0.0, "ang": 3.14159265, "offs": [-0.35, -0.325, -0.3, -0.275, -0.25, -0.225, -0.2, -0.175, -0.15, -0.125, -0.1, -0.075, -0.05, -0.025, 0.0, 0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.275, 0.3, 0.325, 0.35], "res": [null, null, null, null, null, 0.17375, 0.1975, 0.22125, 0.245, 0.2575, 0.2575, 0.2575, 0.2575, 0.2575, 0.2575, 0.2575, 0.2575, 0.2575, 0.2575, 0.2575, 0.2475, 0.225, 0.19875, 0.17125, null, null, null, null, null]}
+\ No newline at end of file
+diff --git a/pF_prof_s0.json b/pF_prof_s0.json
+new file mode 100644
+index 0000000..9e85bd4
+--- /dev/null
++++ b/pF_prof_s0.json
+@@ -0,0 +1 @@
++{"thr": 0.0, "ang": -1.5707963, "offs": [-0.35, -0.325, -0.3, -0.275, -0.25, -0.225, -0.2, -0.175, -0.15, -0.125, -0.1, -0.075, -0.05, -0.025, 0.0, 0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.275, 0.3, 0.325, 0.35], "res": [null, null, null, null, 0.1475, 0.175, 0.19875, 0.2225, 0.24125, 0.24125, 0.24125, 0.24125, 0.24125, 0.245, 0.2475, 0.24625, 0.24125, 0.24125, 0.24125, 0.24125, 0.24125, 0.22375, 0.1975, 0.17125, null, null, null, null, null]}
+\ No newline at end of file
+diff --git a/pF_prof_x45.json b/pF_prof_x45.json
+new file mode 100644
+index 0000000..2195ea9
+--- /dev/null
++++ b/pF_prof_x45.json
+@@ -0,0 +1 @@
++{"thr": 0.785, "ang": 0.0, "offs": [-0.35, -0.325, -0.3, -0.275, -0.25, -0.225, -0.2, -0.175, -0.15, -0.125, -0.1, -0.075, -0.05, -0.025, 0.0, 0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.275, 0.3, 0.325, 0.35], "res": [null, null, null, 0.03875, 0.06375, 0.08875, 0.1225, 0.1475, 0.17125, 0.195, 0.215, 0.23875, 0.2625, 0.28625, 0.29625, 0.27125, 0.24625, 0.23125, 0.21875, 0.19875, 0.1725, 0.14625, 0.11875, 0.0825, 0.045, null, null, null, null]}
+\ No newline at end of file
+diff --git a/pF_ps0.txt b/pF_ps0.txt
+new file mode 100644
+index 0000000..b09ce57
+--- /dev/null
++++ b/pF_ps0.txt
+@@ -0,0 +1,2 @@
++theta -3.1415927410125732
++s0 thr 0.0 ang -1.5707963 [(-0.35, None), (-0.325, None), (-0.3, None), (-0.275, None), (-0.25, 0.1475), (-0.225, 0.175), (-0.2, 0.19875), (-0.175, 0.2225), (-0.15, 0.24125), (-0.125, 0.24125), (-0.1, 0.24125), (-0.075, 0.24125), (-0.05, 0.24125), (-0.025, 0.245), (0.0, 0.2475), (0.025, 0.24625), (0.05, 0.24125), (0.075, 0.24125), (0.1, 0.24125), (0.125, 0.24125), (0.15, 0.24125), (0.175, 0.22375), (0.2, 0.1975), (0.225, 0.17125), (0.25, None), (0.275, None), (0.3, None), (0.325, None), (0.35, None)]
+diff --git a/pF_px45.txt b/pF_px45.txt
+new file mode 100644
+index 0000000..1c21ad5
+--- /dev/null
++++ b/pF_px45.txt
+@@ -0,0 +1,2 @@
++theta -2.3565926551818848
++x45 thr 0.785 ang 0.0 [(-0.35, None), (-0.325, None), (-0.3, None), (-0.275, 0.03875), (-0.25, 0.06375), (-0.225, 0.08875), (-0.2, 0.1225), (-0.175, 0.1475), (-0.15, 0.17125), (-0.125, 0.195), (-0.1, 0.215), (-0.075, 0.23875), (-0.05, 0.2625), (-0.025, 0.28625), (0.0, 0.29625), (0.025, 0.27125), (0.05, 0.24625), (0.075, 0.23125), (0.1, 0.21875), (0.125, 0.19875), (0.15, 0.1725), (0.175, 0.14625), (0.2, 0.11875), (0.225, 0.0825), (0.25, 0.045), (0.275, None), (0.3, None), (0.325, None), (0.35, None)]
+diff --git a/pF_t1.py b/pF_t1.py
+new file mode 100644
+index 0000000..ba1cbfc
+--- /dev/null
++++ b/pF_t1.py
+@@ -0,0 +1,9 @@
++from pF_lib import *
++s=Sim(28); px,py=0.978,-0.969; i=0
++print('start',pose(s,i))
++d,p=approach(s,i,px,py,0,-1); print('contact from below',d,p)
++# translation into pillar + rotation
++q=step(s,i,0,0.05,0.3); print('blocked move+rot ->',q)
++# pure rotation near pillar
++for k in range(8):
++    q=step(s,i,0,0,0.4); print('pure rot ->',q.round(4))
+diff --git a/pF_t1b.py b/pF_t1b.py
+new file mode 100644
+index 0000000..3c3cb01
+--- /dev/null
++++ b/pF_t1b.py
+@@ -0,0 +1,10 @@
++from pF_lib import *
++s=Sim(28); px,py=0.978,-0.969; i=0
++print('free rot', step(s,i,0,0,0.1).round(4), step(s,i,0,0,-0.1).round(4))
++d,p=approach(s,i,px,py,0,-1); print('contact',d)
++for dth in (0.01,-0.01,0.05,-0.05):
++    print('rot',dth,step(s,i,0,0,dth).round(4))
++for back in (0.01,0.02,0.04,0.08):
++    go(s,i,px,py-d-back)
++    r=[step(s,i,0,0,dth)[2] for dth in (0.1,)]
++    print('back',back,'rot+0.1 ->',round(r[0],4)); go(s,i,px,py-d-back,np.pi)
+diff --git a/pF_t1c.py b/pF_t1c.py
+new file mode 100644
+index 0000000..f8266f9
+--- /dev/null
++++ b/pF_t1c.py
+@@ -0,0 +1,6 @@
++from pF_lib import *
++s=Sim(28); px,py=0.9779,-0.9694; i=0
++d,p=approach(s,i,px,py,0,-1); print('contact',round(d,5))
++print('rot +0.05 alone ok? then undo'); print(step(s,i,0,0,0.05).round(4)); print(step(s,i,0,0,-0.05).round(4))
++print('blocked translate (0,+0.02) + rot 0.05 ->',step(s,i,0,0.02,0.05).round(4))
++print('free translate (0,-0.02) + rot 0.05 ->',step(s,i,0,-0.02,0.05).round(4))
+diff --git a/pF_worst.py b/pF_worst.py
+new file mode 100644
+index 0000000..f50e062
+--- /dev/null
++++ b/pF_worst.py
+@@ -0,0 +1,9 @@
++from pF_model import *
++base=[0.1583,0.1705,0.1868,0.14,0.1768]
++dirs=[(np.cos(a),np.sin(a)) for a in np.arange(8)*np.pi/4]
++names=['+x','+x+y','+y','-x+y','-x','-x-y','-y','+x-y']
++yaws=np.radians(np.arange(0,90,7.5))
++for thr in [0,0.4,0.785,1.57]:
++    row=[max(contact(base+[y],np.pi+thr,*d) for y in yaws) for d in dirs]
++    mn=[min(contact(base+[y],np.pi+thr,*d) for y in yaws) for d in dirs]
++    print(thr,' '.join('%s:%.3f-%.3f'%(n,a,b) for n,a,b in zip(names,mn,row)))
+diff --git a/real_batch6.txt b/real_batch6.txt
+index e69de29..ea864cd 100644
+--- a/real_batch6.txt
++++ b/real_batch6.txt
+@@ -0,0 +1,61 @@
++40 2 21 True 21 4.32
++41 2 19 True 19 3.59
++42 1 21 True 21 2.87
++43 2 24 True 24 4.4
++44 3 20 True 20 4.94
++45 3 21 True 21 2.99
++46 2 18 True 18 3.53
++47 1 19 True 19 2.64
++48 1 18 True 18 4.29
++49 1 22 True 22 3.66
++50 3 21 True 21 3.74
++51 2 20 True 20 4.08
++52 3 21 True 21 4.19
++53 3 20 True 20 4.13
++54 1 18 True 18 1.69
++55 3 27 True 27 4.72
++56 2 22 True 22 4.38
++57 1 16 True 16 3.07
++58 2 23 True 23 2.79
++59 3 20 True 20 3.76
++60 1 20 True 20 3.65
++61 2 20 True 20 4.41
++62 2 22 True 22 4.59
++63 2 22 True 22 3.46
++64 2 21 True 21 3.35
++65 1 16 True 16 3.48
++66 3 22 True 22 3.54
++67 3 21 True 21 3.52
++68 2 19 True 19 2.7
++69 1 21 True 21 2.9
++70 2 20 True 20 3.41
++71 3 20 True 20 4.12
++72 3 20 True 20 4.34
++73 3 20 True 20 3.86
++74 1 20 True 20 2.63
++75 2 18 True 18 3.31
++76 2 21 True 21 4.31
++77 1 18 True 18 2.46
++78 3 22 True 21 3.63
++79 1 23 True 23 4.03
++80 3 20 True 20 3.87
++81 1 18 True 18 2.69
++82 3 20 True 20 2.83
++83 3 21 True 21 3.92
++84 2 22 True 22 3.58
++85 3 19 True 19 3.34
++86 3 20 True 20 3.43
++87 2 23 True 23 3.32
++88 2 20 True 20 4.37
++89 3 21 True 21 4.56
++90 2 21 True 21 2.94
++91 3 24 True 24 4.1
++92 2 23 True 23 3.8
++93 3 20 True 20 3.73
++94 1 20 True 20 3.83
++95 2 20 True 20 4.31
++96 3 21 True 21 2.7
++97 1 27 True 27 3.55
++98 2 22 True 22 3.41
++99 3 23 True 23 3.76
++TOTAL 1242 fails 0 maxplan 4.94
+diff --git a/st78.txt b/st78.txt
+new file mode 100644
+index 0000000..2bfd3d3
+--- /dev/null
++++ b/st78.txt
+@@ -0,0 +1,23 @@
++{'rover0': [('obj', 'objective0'), ('stone', 'sample0')], 'rover1': [('obj', 'objective1'), ('obj', 'objective2'), ('soil', 'sample3')]} 21
++0 rover0(1.00,-1.75)+(0.00,0.10) - c0s0h1 | rover1(-1.00,-1.75)+(0.00,0.15) - c0s0h1
++1 rover0(1.00,-1.65)+(0.00,0.20) - c0s0h1 | rover1(-1.00,-1.60)+(0.00,0.20) - c0s0h1
++2 rover0(1.00,-1.45)+(0.00,0.20) - c0s0h0 | rover1(-1.00,-1.40)+(0.05,0.20) - c0s0h0
++3 rover0(1.00,-1.25)+(0.00,0.20) - c0s0h0 | rover1(-0.95,-1.20)+(0.20,0.20) - c0s0h0
++4 rover0(1.00,-1.05)+(0.00,0.20) - c0s0h0 | rover1(-0.75,-1.00)+(0.10,0.20) - c0s0h0
++5 rover0(1.00,-0.85)+(0.15,0.20) - c0s0h0 | rover1(-0.65,-0.80)+(0.20,0.20) - c0s0h0
++6 rover0(1.15,-0.65)+(0.20,0.20) - c0s0h0 | rover1(-0.45,-0.60)+(-0.00,0.20) - c0s0h0
++7 rover0(1.35,-0.45)+(0.20,0.20) - c0s0h0 | rover1(-0.45,-0.40)+(-0.00,0.20) - c0s0h0
++8 rover0(1.55,-0.25)+(0.20,0.20) cal c0s0h0 | rover1(-0.45,-0.20)+(0.10,0.20) cal c0s0h0
++9 rover0(1.75,-0.05)+(0.00,-0.00) img c1s0h0 | rover1(-0.35,-0.00)+(-0.15,0.10) img c1s0h0
++10 rover0(1.75,-0.05)+(0.00,-0.20) - c0s0h0 | rover1(-0.50,0.10)+(-0.20,0.10) cal c0s0h0
++11 rover0(1.75,-0.25)+(0.00,-0.20) - c0s0h0 | rover1(-0.70,0.20)+(-0.20,0.05) img c1s0h0
++12 rover0(1.75,-0.45)+(0.00,-0.20) send c0s0h0 | rover1(-0.90,0.25)+(0.20,-0.20) send c0s0h0
++13 rover0(1.75,-0.65)+(0.00,-0.20) - c0s0h0 | rover1(-0.70,0.05)+(0.20,-0.20) - c0s0h0
++14 rover0(1.75,-0.85)+(0.00,-0.20) - c0s0h0 | rover1(-0.50,-0.15)+(0.05,-0.20) sample c0s0h0
++15 rover0(1.75,-1.05)+(0.00,-0.20) - c0s0h0 | rover1(-0.45,-0.35)+(0.00,-0.20) drop c0s1h0
++16 rover0(1.75,-1.25)+(0.00,-0.20) - c0s0h0 | rover1(-0.45,-0.55)+(0.00,-0.20) send c0s0h0
++17 rover0(1.75,-1.45)+(-0.15,-0.20) sample c0s0h0 | rover1(-0.45,-0.75)+(-0.05,-0.20) - c0s0h0
++18 rover0(1.60,-1.65)+(-0.20,-0.20) drop c0s1h0 | rover1(-0.50,-0.95)+(-0.20,-0.20) - c0s0h0
++19 rover0(1.40,-1.85)+(-0.20,-0.00) send c0s0h0 | rover1(-0.70,-1.15)+(-0.20,-0.20) - c0s0h0
++20 rover0(1.20,-1.85)+(-0.00,0.00) - c0s0h1 | rover1(-0.90,-1.35)+(-0.20,-0.20) - c0s0h0
++GOAL 21
+diff --git a/tr78.txt b/tr78.txt
+new file mode 100644
+index 0000000..c60942c
+--- /dev/null
++++ b/tr78.txt
+@@ -0,0 +1,23 @@
++orders {'rover0': [('obj', 'objective0'), ('stone', 'sample0')], 'rover1': [('obj', 'objective1'), ('obj', 'objective2'), ('soil', 'sample3')]} plan 21
++0 rover0(1.00,-1.75)+(0.00,0.10) - c0s0 | rover1(-1.00,-1.75)+(0.00,0.15) - c0s0 recImg=0 recAn=0
++1 rover0(1.00,-1.65)+(0.00,0.20) - c0s0 | rover1(-1.00,-1.60)+(0.00,0.20) - c0s0 recImg=0 recAn=0
++2 rover0(1.00,-1.45)+(0.00,0.20) - c0s0 | rover1(-1.00,-1.40)+(0.05,0.20) - c0s0 recImg=0 recAn=0
++3 rover0(1.00,-1.25)+(0.00,0.20) - c0s0 | rover1(-0.95,-1.20)+(0.20,0.20) - c0s0 recImg=0 recAn=0
++4 rover0(1.00,-1.05)+(0.00,0.20) - c0s0 | rover1(-0.75,-1.00)+(0.10,0.20) - c0s0 recImg=0 recAn=0
++5 rover0(1.00,-0.85)+(0.15,0.20) - c0s0 | rover1(-0.65,-0.80)+(0.20,0.20) - c0s0 recImg=0 recAn=0
++6 rover0(1.15,-0.65)+(0.20,0.20) - c0s0 | rover1(-0.45,-0.60)+(0.00,0.20) - c0s0 recImg=0 recAn=0
++7 rover0(1.35,-0.45)+(0.20,0.20) - c0s0 | rover1(-0.45,-0.40)+(-0.00,0.20) - c0s0 recImg=0 recAn=0
++8 rover0(1.55,-0.25)+(0.20,0.20) cal c1s0 | rover1(-0.45,-0.20)+(0.10,0.20) cal c1s0 recImg=0 recAn=0
++9 rover0(1.75,-0.05)+(0.00,0.00) img c0s0 | rover1(-0.35,-0.00)+(-0.15,0.10) img c0s0 recImg=0 recAn=0
++10 rover0(1.75,-0.05)+(0.00,-0.20) - c0s0 | rover1(-0.50,0.10)+(-0.20,0.10) cal c1s0 recImg=0 recAn=0
++11 rover0(1.75,-0.25)+(0.00,-0.20) - c0s0 | rover1(-0.70,0.20)+(-0.20,0.05) img c0s0 recImg=0 recAn=0
++12 rover0(1.75,-0.45)+(0.00,-0.20) send c0s0 | rover1(-0.90,0.25)+(0.20,-0.20) send c0s0 recImg=3 recAn=0
++13 rover0(1.75,-0.65)+(0.00,-0.20) - c0s0 | rover1(-0.70,0.05)+(0.20,-0.20) - c0s0 recImg=3 recAn=0
++14 rover0(1.75,-0.85)+(0.00,-0.20) - c0s0 | rover1(-0.50,-0.15)+(0.05,-0.20)BLOCK sample c0s0 recImg=3 recAn=0
++15 rover0(1.75,-1.05)+(0.00,-0.20) - c0s0 | rover1(-0.50,-0.15)+(0.10,-0.20) sample c0s1 recImg=3 recAn=0
++16 rover0(1.75,-1.25)+(0.00,-0.20) - c0s0 | rover1(-0.40,-0.35)+(0.00,-0.20) drop c0s0 recImg=3 recAn=0
++17 rover0(1.75,-1.45)+(-0.15,-0.20) sample c0s1 | rover1(-0.40,-0.55)+(0.00,-0.20) send c0s0 recImg=3 recAn=1
++18 rover0(1.60,-1.65)+(-0.20,-0.20) drop c0s0 | rover1(-0.40,-0.75)+(-0.10,-0.20) - c0s0 recImg=3 recAn=1
++19 rover0(1.40,-1.85)+(-0.20,0.00) send c0s0 | rover1(-0.50,-0.95)+(-0.20,-0.20) - c0s0 recImg=3 recAn=2
++20 rover0(1.20,-1.85)+(-0.00,-0.00) - c0s0 | rover1(-0.70,-1.15)+(-0.20,-0.20) - c0s0 recImg=3 recAn=2
++21 rover0(1.20,-1.85)+(0.00,0.00) - c0s0 | rover1(-0.90,-1.35)+(-0.20,-0.20) - c0s0 recImg=3 recAn=2

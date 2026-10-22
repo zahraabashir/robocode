@@ -1,0 +1,79 @@
+diff --git a/fast_results.txt b/fast_results.txt
+index ebdd8d1..9d51b1c 100644
+--- a/fast_results.txt
++++ b/fast_results.txt
+@@ -64,3 +64,44 @@ RESULT 16 {'object_count': 1} 80 True 1.44 phase release
+ 17 51 align block [0.276 0.085 0.1  ] held 0.0
+ 17 53 grasp block [0.276 0.085 0.1  ] held 0.0
+ 17 64 lift block [0.276 0.085 0.1  ] held 1.0
++17 73 carry block [0.276 0.085 0.1  ] held 1.0
++17 75 lower block [0.276 0.085 0.1  ] held 1.0
++17 85 release block [0.276 0.085 0.1  ] held 1.0
++17 87 above block [0.276 0.085 0.1  ] held 0.0
++17 96 align block [0.276 0.085 0.1  ] held 0.0
++17 99 grasp block [0.276 0.085 0.1  ] held 0.0
++17 107 lift block [0.276 0.085 0.125] held 1.0
++17 115 carry block [0.276 0.085 0.3  ] held 1.0
++17 118 lower block [ 0.259 -0.214  0.3  ] held 1.0
++17 127 release block [ 0.259 -0.214  0.111] held 1.0
++RESULT 17 {'object_count': 2} 129 True 10.42 phase release
++18 0 above block [0.35  0.056 0.1  ] held 0.0
++18 8 align block [0.35  0.056 0.1  ] held 0.0
++18 11 grasp block [0.35  0.056 0.1  ] held 0.0
++18 21 lift block [0.35  0.056 0.1  ] held 1.0
++18 29 carry block [0.35  0.056 0.1  ] held 1.0
++18 31 lower block [0.35  0.056 0.1  ] held 1.0
++18 40 release block [0.35  0.056 0.1  ] held 1.0
++18 42 above block [0.35  0.056 0.1  ] held 0.0
++18 50 align block [0.35  0.056 0.1  ] held 0.0
++18 53 grasp block [0.35  0.056 0.1  ] held 0.0
++18 61 lift block [0.35  0.056 0.125] held 1.0
++18 69 carry block [0.35  0.056 0.3  ] held 1.0
++18 72 lower block [0.16  0.337 0.3  ] held 1.0
++18 81 release block [0.16  0.337 0.111] held 1.0
++RESULT 18 {'object_count': 2} 83 True 5.51 phase release
++19 0 above block [0.398 0.028 0.1  ] held 0.0
++19 8 align block [0.398 0.028 0.1  ] held 0.0
++19 10 grasp block [0.398 0.028 0.1  ] held 0.0
++19 21 lift block [0.398 0.028 0.1  ] held 1.0
++19 29 carry block [0.398 0.028 0.1  ] held 1.0
++19 31 lower block [0.398 0.028 0.1  ] held 1.0
++19 41 release block [0.398 0.028 0.1  ] held 1.0
++19 43 above block [0.398 0.028 0.1  ] held 0.0
++19 51 align block [0.398 0.028 0.1  ] held 0.0
++19 53 grasp block [0.398 0.028 0.1  ] held 0.0
++19 63 lift block [0.398 0.028 0.125] held 1.0
++19 71 carry block [0.398 0.028 0.3  ] held 1.0
++19 74 lower block [ 0.153 -0.133  0.3  ] held 1.0
++19 83 release block [ 0.153 -0.133  0.111] held 1.0
++RESULT 19 {'object_count': 1} 85 True 4.74 phase release
+diff --git a/test_counts.py b/test_counts.py
+new file mode 100644
+index 0000000..beea76b
+--- /dev/null
++++ b/test_counts.py
+@@ -0,0 +1,11 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import time,json,sys,numpy as np
++for count in map(int,sys.argv[1:] or ['5','10']):
++ for seed in range(4):
++  E=make_env();s,info=E.reset(seed=seed,options={'object_count':count});p=GeneratedApproach(E.action_space,E.observation_space,{});p.reset(s,info);start=time.monotonic();term=False
++  for t in range(min(1000,100+60*count)):
++   s,rew,term,trunc,info=E.step(p.get_action(s))
++   if term or trunc:break
++  print(json.dumps(dict(seed=seed,count=count,success=term,steps=t+1,seconds=round(time.monotonic()-start,2),phase=p.phase,obj=str(p.obj),index=p.index,todo=len(p.todo),stall=p.stall,attempt=p.attempt,pos=p.pos(s,p.obj).tolist(),dest=p.destination.tolist())),flush=True)
++  E.close()
+diff --git a/test_sweep_fast.out b/test_sweep_fast.out
+new file mode 100644
+index 0000000..48206c9
+--- /dev/null
++++ b/test_sweep_fast.out
+@@ -0,0 +1,7 @@
++{"seed": 24, "count": 1, "success": true, "steps": 41, "sec": 1.36}
++{"seed": 25, "count": 1, "success": true, "steps": 85, "sec": 8.09}
++{"seed": 26, "count": 2, "success": true, "steps": 89, "sec": 8.91}
++{"seed": 27, "count": 0, "success": true, "steps": 43, "sec": 0.7}
++{"seed": 28, "count": 1, "success": true, "steps": 87, "sec": 1.44}
++{"seed": 29, "count": 2, "success": true, "steps": 41, "sec": 0.74}
++{"seed": 30, "count": 0, "success": true, "steps": 42, "sec": 0.86}

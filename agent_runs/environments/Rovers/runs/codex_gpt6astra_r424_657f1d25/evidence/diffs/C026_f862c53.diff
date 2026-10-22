@@ -1,0 +1,60 @@
+diff --git a/stats_final2000.txt b/stats_final2000.txt
+new file mode 100644
+index 0000000..45f3fab
+--- /dev/null
++++ b/stats_final2000.txt
+@@ -0,0 +1,3 @@
++{'seed': 2000, 'n': 1, 'success': True, 'steps': 22, 'time': 0.105, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
++{'seed': 2010, 'n': 3, 'success': True, 'steps': 24, 'time': 0.222, 'bad': [0, 0, 0], 'ops': [3, 3, 2, 2, 2]}
++{'seed': 2020, 'n': 1, 'success': True, 'steps': 23, 'time': 0.103, 'bad': [0, 0, 7], 'ops': [1, 1, 10, 2, 2]}
+diff --git a/stats_final4.txt b/stats_final4.txt
+new file mode 100644
+index 0000000..303c1bc
+--- /dev/null
++++ b/stats_final4.txt
+@@ -0,0 +1,2 @@
++{'seed': 1200, 'n': 4, 'success': True, 'steps': 26, 'time': 0.169, 'bad': [0, 0, 0], 'ops': [5, 5, 4, 2, 2]}
++{'seed': 1210, 'n': 4, 'success': True, 'steps': 24, 'time': 0.292, 'bad': [0, 0, 0], 'ops': [5, 5, 4, 2, 2]}
+diff --git a/stats_final400.txt b/stats_final400.txt
+new file mode 100644
+index 0000000..5afcaa4
+--- /dev/null
++++ b/stats_final400.txt
+@@ -0,0 +1,3 @@
++{'seed': 400, 'n': 3, 'success': True, 'steps': 23, 'time': 0.191, 'bad': [0, 0, 0], 'ops': [3, 3, 3, 2, 2]}
++{'seed': 410, 'n': 2, 'success': True, 'steps': 22, 'time': 0.217, 'bad': [0, 0, 0], 'ops': [2, 2, 4, 2, 2]}
++{'seed': 420, 'n': 2, 'success': True, 'steps': 21, 'time': 0.178, 'bad': [0, 0, 0], 'ops': [2, 2, 2, 2, 2]}
+diff --git a/stats_octagon.txt b/stats_octagon.txt
+new file mode 100644
+index 0000000..ba0999d
+--- /dev/null
++++ b/stats_octagon.txt
+@@ -0,0 +1,9 @@
++{'seed': 0, 'n': 3, 'success': True, 'steps': 28, 'time': 0.138, 'bad': [0, 0, 0], 'ops': [3, 3, 2, 2, 2]}
++{'seed': 10, 'n': 3, 'success': True, 'steps': 22, 'time': 0.171, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
++{'seed': 20, 'n': 3, 'success': True, 'steps': 27, 'time': 0.222, 'bad': [0, 0, 0], 'ops': [4, 3, 2, 2, 2]}
++{'seed': 30, 'n': 1, 'success': True, 'steps': 24, 'time': 0.163, 'bad': [0, 0, 4], 'ops': [1, 1, 6, 2, 2]}
++{'seed': 40, 'n': 2, 'success': True, 'steps': 25, 'time': 0.151, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
++{'seed': 50, 'n': 3, 'success': True, 'steps': 24, 'time': 0.206, 'bad': [0, 0, 0], 'ops': [3, 3, 3, 2, 2]}
++{'seed': 60, 'n': 1, 'success': True, 'steps': 22, 'time': 0.174, 'bad': [0, 0, 0], 'ops': [1, 1, 2, 2, 2]}
++{'seed': 70, 'n': 2, 'success': True, 'steps': 22, 'time': 0.218, 'bad': [0, 1, 0], 'ops': [3, 2, 3, 2, 2]}
++{'seed': 80, 'n': 3, 'success': True, 'steps': 23, 'time': 0.214, 'bad': [0, 1, 0], 'ops': [4, 3, 2, 2, 2]}
+diff --git a/task_planner.py b/task_planner.py
+index daac8ed..24a28ae 100644
+--- a/task_planner.py
++++ b/task_planner.py
+@@ -1,11 +1,13 @@
+ """Small cooperative task-tour planner using grid distance transforms."""
+-import math
+ import numpy as np
+ from scipy.sparse import csr_matrix
+ from scipy.sparse.csgraph import dijkstra
+ 
+ 
+ def assign_tasks(policy, state):
++    # Keep planning bounded if a future variant adds many more objectives.
++    if len(policy.objectives)>5:
++        return None
+     n=policy.size
+     free=policy.free.reshape(n,n)
+     ids=np.arange(n*n).reshape(n,n)

@@ -1,0 +1,31 @@
+diff --git a/candidate_strategy.py b/candidate_strategy.py
+index 81cadcb..f47c503 100644
+--- a/candidate_strategy.py
++++ b/candidate_strategy.py
+@@ -69,7 +69,9 @@ class CandidateStrategy:
+             # Push tangentially on the positive local-x end. side is torque sign.
+             contact = c + ex * (0.40 * float(s[13]))
+             force = ey * self.side
+-            setup = contact - force * 0.30
++            # Robot-center staging point: one radius plus a small margin behind
++            # the intended material contact point.
++            setup = contact - force * 0.12
+         return c, robot, contact, setup, force
+ 
+     def get_action(self, state):
+@@ -126,13 +128,13 @@ class CandidateStrategy:
+             pe = float(np.linalg.norm(s[29:31] - c))
+             omega = float(s[5])
+             done = ((self.mode == "rotate" and
+-                     (abs(ae) < 0.075 or omega * self.side > 0.12 or self.ticks > 4)) or
++                     (abs(ae) < 0.075 or omega * self.side > 0.12 or self.ticks > 8)) or
+                     (self.mode == "translate" and
+                      (pe < 0.020 or abs(ae) > 0.14 or self.ticks > 35)))
+             if done:
+                 self.phase = "select"
+             # Aim through the selected contact, then continue in the desired force direction.
+-            aim = contact + force * 0.35
++            aim = contact + force * 0.10
+             return self._move(robot, aim, maxnorm=(0.006 if self.mode == "rotate" else 0.010))
+ 
+         return np.zeros(2)

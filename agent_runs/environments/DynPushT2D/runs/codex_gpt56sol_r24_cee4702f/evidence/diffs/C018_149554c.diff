@@ -1,0 +1,30 @@
+diff --git a/candidate_strategy.py b/candidate_strategy.py
+index 209d428..81cadcb 100644
+--- a/candidate_strategy.py
++++ b/candidate_strategy.py
+@@ -81,7 +81,9 @@ class CandidateStrategy:
+ 
+         # Use a collision-free polar repositioning maneuver around the object.
+         ray = self._unit(setup - c)
+-        radius = 0.70
++        # The T's longest corner is about 0.7 from its reference point; less
++        # clearance makes the robot accidentally shove it while repositioning.
++        radius = 0.88
+         rvec = robot - c
+         rdist = float(np.linalg.norm(rvec))
+         rang = math.atan2(rvec[1], rvec[0])
+@@ -102,8 +104,13 @@ class CandidateStrategy:
+                 self.phase = "approach"
+             else:
+                 # A look-ahead point gives smooth travel around the clearance circle.
+-                stepang = rang + max(-0.35, min(0.35, adiff))
++                direction = 1.0 if adiff > 0 else -1.0
++                stepang = rang + direction * min(0.25, abs(adiff))
+                 waypoint = c + radius * np.array([math.cos(stepang), math.sin(stepang)])
++                # If the short arc runs into a wall, take the long way around.
++                if np.any(waypoint < 0.12) or np.any(waypoint > 4.88):
++                    stepang = rang - direction * 0.25
++                    waypoint = c + radius * np.array([math.cos(stepang), math.sin(stepang)])
+                 waypoint = np.clip(waypoint, 0.12, 4.88)
+                 return self._move(robot, waypoint)
+ 

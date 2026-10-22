@@ -1,0 +1,55 @@
+diff --git a/approach.py b/approach.py
+index 71cda63..f740435 100644
+--- a/approach.py
++++ b/approach.py
+@@ -68,7 +68,7 @@ class GeneratedApproach:
+     def _dist(a, b):
+         return math.hypot(a[0] - b[0], a[1] - b[1])
+ 
+-    def _blocked(self, p, extra=None, margin=0.17):
++    def _blocked(self, p, extra=None, margin=0.27):
+         x, y = p
+         if x < -2.38 or x > 2.38 or y < -2.38 or y > 2.38:
+             return True
+@@ -263,6 +263,9 @@ class GeneratedApproach:
+                         dx, dy = self._move(i, positions[i], site, positions[1-i])
+                         action[4*i] = dx
+                         action[4*i+1] = dy
++                        # Sending is cheap and may already be possible anywhere
++                        # along the route (range is 4m), avoiding needless travel.
++                        self._set_op(action, i, SEND)
+                     else:
+                         self._set_op(action, i, SEND)
+                         self.send_attempts[i] += 1
+diff --git a/probe_ops.py b/probe_ops.py
+index 3355fef..d402dbd 100644
+--- a/probe_ops.py
++++ b/probe_ops.py
+@@ -156,9 +156,17 @@ def simultaneous_probe(seed):
+     env.close()
+ 
+ 
++def count_probe(start, count):
++    for seed in range(start, start + count):
++        env = make_env()
++        _, info = env.reset(seed=seed)
++        print(seed, info.get("object_count"))
++        env.close()
++
++
+ if __name__ == "__main__":
+     p = argparse.ArgumentParser()
+-    p.add_argument("mode", choices=["dump", "selector", "operate", "scenario", "home", "simultaneous"])
++    p.add_argument("mode", choices=["dump", "selector", "operate", "scenario", "home", "simultaneous", "counts"])
+     p.add_argument("--seed", type=int, default=0)
+     p.add_argument("--rover", type=int, default=0)
+     p.add_argument("--target", default="sample0")
+@@ -174,5 +182,7 @@ if __name__ == "__main__":
+         scenario(args.seed)
+     elif args.mode == "home":
+         home_probe(args.seed)
+-    else:
++    elif args.mode == "simultaneous":
+         simultaneous_probe(args.seed)
++    else:
++        count_probe(args.seed, 20)

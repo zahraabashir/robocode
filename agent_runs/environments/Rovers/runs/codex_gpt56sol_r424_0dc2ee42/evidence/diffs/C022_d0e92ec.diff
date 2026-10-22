@@ -1,0 +1,37 @@
+diff --git a/approach.py b/approach.py
+index 352ef5a..dc0aba0 100644
+--- a/approach.py
++++ b/approach.py
+@@ -230,6 +230,8 @@ class GeneratedApproach:
+             x = 0.43
+         if idx == 1 and x > -0.43:
+             x = -0.43
++        x = max(-2.25, min(2.25, x))
++        y = max(-2.25, min(2.25, y))
+         return (x, y)
+ 
+     def _received_own_sample(self, state, idx):
+diff --git a/trace_run.py b/trace_run.py
+index b18825f..e8780b6 100644
+--- a/trace_run.py
++++ b/trace_run.py
+@@ -1,7 +1,9 @@
++import sys
+ from env_client import make_env
+ from approach import GeneratedApproach
+ 
+-env = make_env(); s, info = env.reset(seed=0)
++seed = int(sys.argv[1]) if len(sys.argv) > 1 else 0
++env = make_env(); s, info = env.reset(seed=seed)
+ a = GeneratedApproach(env.action_space, env.observation_space, {})
+ a.reset(s, info)
+ last = None
+@@ -11,7 +13,7 @@ for k in range(250):
+     rovers = sorted(a._objs(s, "rover"), key=a._name)
+     snap = (tuple(a.phase), tuple((round(a._v(s, x, "x"), 2), round(a._v(s, x, "y"), 2)) for x in rovers))
+     if k % 10 == 0 or tuple(a.phase) != (last[0] if last else None):
+-        print(k + 1, snap, [round(float(x), 2) for x in act], [a.stuck[i] for i in range(2)])
++        print(k + 1, snap, [round(float(x), 2) for x in act], [a.stuck[i] for i in range(2)], a.targets)
+     last = snap
+     if term or trunc:
+         print("END", k + 1, term, trunc); break

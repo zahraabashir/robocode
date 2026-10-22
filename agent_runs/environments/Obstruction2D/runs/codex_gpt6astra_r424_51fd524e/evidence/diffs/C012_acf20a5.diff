@@ -1,0 +1,34 @@
+diff --git a/approach.py b/approach.py
+index e64de74..7fb8b50 100644
+--- a/approach.py
++++ b/approach.py
+@@ -50,7 +50,7 @@ class GeneratedApproach:
+                 self.phase='down'; self.n=0
+             if self.phase == 'down':
+                 self.n+=1
+-                goal=y+h+.2+.004
++                goal=y+h+.2+.006
+                 if ry>goal+.001:return self.action(s,y=goal,vac=1)
+                 self.pick_y=y; self.phase='lift';self.n=0
+             if self.phase == 'lift':
+@@ -63,7 +63,19 @@ class GeneratedApproach:
+                 if self.obj==self.block:
+                     self.dropx=self.destx
+                 else:
+-                    self.dropx=.12+len(self.stashed)*.23;self.dropy=.48
++                    occupied=[]
++                    for other in s.get_objects(self.ot):
++                        if other==self.obj:continue
++                        ox,oy,ow,oh=self.rect(s,other)
++                        occupied.append((ox-.012,ox+ow+.012))
++                    candidates=[]
++                    for cx in np.linspace(.101,1.517,220):
++                        left=cx-w/2
++                        if left<.005 or left+w>1.613:continue
++                        if any(left<b and left+w>a for a,b in occupied):continue
++                        candidates.append(left)
++                    self.dropx=min(candidates,key=lambda v:abs(v-x)) if candidates else .01
++                    self.dropy=.101
+                 if self.obj==self.block:self.dropy=s.get(self.surface,'y')+s.get(self.surface,'height')+.001
+                 self.phase='carry'
+             if self.phase == 'carry':

@@ -1,0 +1,16 @@
+diff --git a/probe_geometry.py b/probe_geometry.py
+new file mode 100644
+index 0000000..073b9fa
+--- /dev/null
++++ b/probe_geometry.py
+@@ -0,0 +1,10 @@
++from env_client import make_env
++import numpy as np
++
++e=make_env();s,i=e.reset(seed=0)
++print('info',i,'max_steps',e.max_steps)
++print('types',e.observation_space.type_features)
++for n in s.get_object_names():
++ o=s.get_object_from_name(n)
++ print(n,[(f,s.get(o,f)) for f in e.observation_space.type_features[o.type]])
++e.close()

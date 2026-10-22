@@ -1,0 +1,126 @@
+diff --git a/debug_priority.py b/debug_priority.py
+new file mode 100644
+index 0000000..303baae
+--- /dev/null
++++ b/debug_priority.py
+@@ -0,0 +1,9 @@
++from env_client import make_env
++from sample_priority import GeneratedApproach
++import sys
++E=make_env();s,info=E.reset(seed=int(sys.argv[1]) if len(sys.argv)>1 else 0);p=GeneratedApproach(E.action_space,E.observation_space,{});p.reset(s,info)
++for t in range(120):
++ a=p.get_action(s);s,r,done,trunc,inf=E.step(a)
++ if t%5==0 or done:print(t,[[round(s.get(ro,k),3) for k in ['x','y','store_full','calibrated','at_home']] for ro in p.rovers],[[s.get(o,k) for k in ['received_image','have_image_rover0','have_image_rover1']] for o in p.objs],a.round(2),flush=True)
++ if done:break
++E.close()
+diff --git a/navigation_results.jsonl b/navigation_results.jsonl
+new file mode 100644
+index 0000000..c79a415
+--- /dev/null
++++ b/navigation_results.jsonl
+@@ -0,0 +1,30 @@
++{"seed": 0, "n": 3, "steps": 34, "success": true, "sec": 2.362}
++{"seed": 1, "n": 2, "steps": 21, "success": true, "sec": 1.373}
++{"seed": 2, "n": 3, "steps": 22, "success": true, "sec": 1.325}
++{"seed": 3, "n": 3, "steps": 23, "success": true, "sec": 0.455}
++{"seed": 4, "n": 3, "steps": 25, "success": true, "sec": 1.106}
++{"seed": 5, "n": 3, "steps": 29, "success": true, "sec": 0.947}
++{"seed": 6, "n": 2, "steps": 22, "success": true, "sec": 0.541}
++{"seed": 7, "n": 3, "steps": 26, "success": true, "sec": 1.201}
++{"seed": 8, "n": 3, "steps": 28, "success": true, "sec": 1.209}
++{"seed": 9, "n": 2, "steps": 24, "success": true, "sec": 1.028}
++{"seed": 10, "n": 3, "steps": 28, "success": true, "sec": 1.157}
++{"seed": 11, "n": 1, "steps": 29, "success": true, "sec": 1.246}
++{"seed": 12, "n": 2, "steps": 25, "success": true, "sec": 0.67}
++{"seed": 13, "n": 3, "steps": 32, "success": true, "sec": 1.293}
++{"seed": 14, "n": 1, "steps": 37, "success": true, "sec": 1.28}
++{"seed": 15, "n": 3, "steps": 43, "success": true, "sec": 1.554}
++{"seed": 16, "n": 2, "steps": 26, "success": true, "sec": 1.169}
++{"seed": 17, "n": 3, "steps": 30, "success": true, "sec": 1.385}
++{"seed": 18, "n": 3, "steps": 24, "success": true, "sec": 1.149}
++{"seed": 19, "n": 2, "steps": 30, "success": true, "sec": 1.651}
++{"seed": 20, "n": 3, "steps": 34, "success": true, "sec": 1.038}
++{"seed": 21, "n": 1, "steps": 33, "success": true, "sec": 1.18}
++{"seed": 22, "n": 3, "steps": 24, "success": true, "sec": 1.085}
++{"seed": 23, "n": 1, "steps": 18, "success": true, "sec": 0.419}
++{"seed": 24, "n": 2, "steps": 25, "success": true, "sec": 1.167}
++{"seed": 25, "n": 2, "steps": 22, "success": true, "sec": 1.03}
++{"seed": 26, "n": 3, "steps": 24, "success": true, "sec": 1.003}
++{"seed": 27, "n": 1, "steps": 23, "success": true, "sec": 0.391}
++{"seed": 28, "n": 2, "steps": 27, "success": true, "sec": 1.027}
++{"seed": 29, "n": 3, "steps": 25, "success": true, "sec": 1.164}
+diff --git a/sample_priority_results.jsonl b/sample_priority_results.jsonl
+index 11a4423..42a2f1f 100644
+--- a/sample_priority_results.jsonl
++++ b/sample_priority_results.jsonl
+@@ -24,3 +24,7 @@
+ {"seed": 23, "n": 1, "steps": 18, "success": true, "sec": 0.872}
+ {"seed": 24, "n": 2, "steps": 25, "success": true, "sec": 0.999}
+ {"seed": 25, "n": 2, "steps": 22, "success": true, "sec": 0.504}
++{"seed": 26, "n": 3, "steps": 25, "success": true, "sec": 0.794}
++{"seed": 27, "n": 1, "steps": 24, "success": true, "sec": 1.301}
++{"seed": 28, "n": 2, "steps": 26, "success": true, "sec": 1.687}
++{"seed": 29, "n": 3, "steps": 25, "success": true, "sec": 1.068}
+diff --git a/stress_500.jsonl b/stress_500.jsonl
+index 43f346b..63a14b9 100644
+--- a/stress_500.jsonl
++++ b/stress_500.jsonl
+@@ -42,3 +42,58 @@
+ {"seed": 541, "n": 4, "steps": 33, "success": true, "sec": 1.421}
+ {"seed": 542, "n": 4, "steps": 32, "success": true, "sec": 1.335}
+ {"seed": 543, "n": 4, "steps": 27, "success": true, "sec": 1.149}
++{"seed": 544, "n": 4, "steps": 32, "success": true, "sec": 1.516}
++{"seed": 545, "n": 4, "steps": 26, "success": true, "sec": 1.893}
++{"seed": 546, "n": 4, "steps": 28, "success": true, "sec": 1.547}
++{"seed": 547, "n": 4, "steps": 38, "success": true, "sec": 1.4}
++{"seed": 548, "n": 4, "steps": 29, "success": true, "sec": 0.918}
++{"seed": 549, "n": 4, "steps": 45, "success": true, "sec": 1.903}
++{"seed": 550, "n": 4, "steps": 29, "success": true, "sec": 1.028}
++{"seed": 551, "n": 4, "steps": 30, "success": true, "sec": 1.263}
++{"seed": 552, "n": 4, "steps": 28, "success": true, "sec": 0.967}
++{"seed": 553, "n": 4, "steps": 26, "success": true, "sec": 1.275}
++{"seed": 554, "n": 4, "steps": 33, "success": true, "sec": 1.33}
++{"seed": 555, "n": 4, "steps": 30, "success": true, "sec": 0.831}
++{"seed": 556, "n": 4, "steps": 27, "success": true, "sec": 1.101}
++{"seed": 557, "n": 4, "steps": 33, "success": true, "sec": 1.129}
++{"seed": 558, "n": 4, "steps": 27, "success": true, "sec": 1.087}
++{"seed": 559, "n": 4, "steps": 29, "success": true, "sec": 0.999}
++{"seed": 560, "n": 4, "steps": 32, "success": true, "sec": 1.055}
++{"seed": 561, "n": 4, "steps": 30, "success": true, "sec": 1.58}
++{"seed": 562, "n": 4, "steps": 31, "success": true, "sec": 1.277}
++{"seed": 563, "n": 4, "steps": 27, "success": true, "sec": 1.077}
++{"seed": 564, "n": 4, "steps": 27, "success": true, "sec": 0.944}
++{"seed": 565, "n": 4, "steps": 31, "success": true, "sec": 1.75}
++{"seed": 566, "n": 4, "steps": 30, "success": true, "sec": 1.139}
++{"seed": 567, "n": 4, "steps": 28, "success": true, "sec": 0.957}
++{"seed": 568, "n": 4, "steps": 30, "success": true, "sec": 1.67}
++{"seed": 569, "n": 4, "steps": 27, "success": true, "sec": 0.998}
++{"seed": 570, "n": 4, "steps": 29, "success": true, "sec": 0.869}
++{"seed": 571, "n": 4, "steps": 33, "success": true, "sec": 0.506}
++{"seed": 572, "n": 4, "steps": 27, "success": true, "sec": 0.473}
++{"seed": 573, "n": 4, "steps": 38, "success": true, "sec": 0.6}
++{"seed": 574, "n": 4, "steps": 24, "success": true, "sec": 0.41}
++{"seed": 575, "n": 4, "steps": 29, "success": true, "sec": 0.476}
++{"seed": 576, "n": 4, "steps": 33, "success": true, "sec": 0.564}
++{"seed": 577, "n": 4, "steps": 29, "success": true, "sec": 0.521}
++{"seed": 578, "n": 4, "steps": 26, "success": true, "sec": 0.429}
++{"seed": 579, "n": 4, "steps": 33, "success": true, "sec": 0.539}
++{"seed": 580, "n": 4, "steps": 27, "success": true, "sec": 0.445}
++{"seed": 581, "n": 4, "steps": 30, "success": true, "sec": 0.475}
++{"seed": 582, "n": 4, "steps": 28, "success": true, "sec": 0.483}
++{"seed": 583, "n": 4, "steps": 31, "success": true, "sec": 0.514}
++{"seed": 584, "n": 4, "steps": 36, "success": true, "sec": 0.644}
++{"seed": 585, "n": 4, "steps": 25, "success": true, "sec": 0.421}
++{"seed": 586, "n": 4, "steps": 35, "success": true, "sec": 0.63}
++{"seed": 587, "n": 4, "steps": 29, "success": true, "sec": 0.589}
++{"seed": 588, "n": 4, "steps": 26, "success": true, "sec": 0.422}
++{"seed": 589, "n": 4, "steps": 34, "success": true, "sec": 0.59}
++{"seed": 590, "n": 4, "steps": 27, "success": true, "sec": 0.48}
++{"seed": 591, "n": 4, "steps": 26, "success": true, "sec": 0.428}
++{"seed": 592, "n": 4, "steps": 27, "success": true, "sec": 0.462}
++{"seed": 593, "n": 4, "steps": 25, "success": true, "sec": 0.422}
++{"seed": 594, "n": 4, "steps": 36, "success": true, "sec": 0.57}
++{"seed": 595, "n": 4, "steps": 34, "success": true, "sec": 0.584}
++{"seed": 596, "n": 4, "steps": 25, "success": true, "sec": 0.413}
++{"seed": 597, "n": 4, "steps": 25, "success": true, "sec": 0.43}
++{"seed": 598, "n": 4, "steps": 30, "success": true, "sec": 0.367}

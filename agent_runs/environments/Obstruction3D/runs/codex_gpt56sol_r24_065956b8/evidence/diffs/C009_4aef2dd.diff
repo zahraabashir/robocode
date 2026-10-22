@@ -1,0 +1,56 @@
+diff --git a/probe_grasp.py b/probe_grasp.py
+index 4ce49dd..0b868ce 100644
+--- a/probe_grasp.py
++++ b/probe_grasp.py
+@@ -73,10 +73,50 @@ def random_search(seed=0, steps=1000):
+     env.close()
+ 
+ 
++def joint_grid(seed=0):
++    """Sweep the main pitch joints with the base y-aligned to the target."""
++    env = make_env()
++    state, _ = env.reset(seed=seed)
++    snap = snapshot(state)
++    target_y = snap["target_block"]["pose_y"]
++    action = np.zeros(11, dtype=np.float32)
++    action[1] = np.clip(target_y - snap["robot"]["pos_base_y"], -0.2, 0.2)
++    state, *_ = env.step(action)
++    base_j2 = snapshot(state)["robot"]["joint_2"]
++    base_j4 = snapshot(state)["robot"]["joint_4"]
++    old_xyz = tuple(snapshot(state)["target_block"]["pose_" + c] for c in "xyz")
++    j2s = [base_j2 + 0.2 * k for k in range(-6, 7)]
++    j4s = [base_j4 + 0.2 * k for k in range(-6, 7)]
++    for row, wanted_j2 in enumerate(j2s):
++        for wanted_j4 in (j4s if row % 2 == 0 else list(reversed(j4s))):
++            now = snapshot(state)["robot"]
++            action = np.zeros(11, dtype=np.float32)
++            action[4] = np.clip(wanted_j2 - now["joint_2"], -0.2, 0.2)
++            action[6] = np.clip(wanted_j4 - now["joint_4"], -0.2, 0.2)
++            action[10] = 1.0
++            state, *_ = env.step(action)
++            close = np.zeros(11, dtype=np.float32)
++            close[10] = -1.0
++            state, reward, term, trunc, _ = env.step(close)
++            ss = snapshot(state)
++            xyz = tuple(ss["target_block"]["pose_" + c] for c in "xyz")
++            moved = max(abs(a - b) for a, b in zip(xyz, old_xyz))
++            if moved > 1e-6 or ss["robot"]["grasp_active"]:
++                print("EVENT", wanted_j2, wanted_j4, "xyz", xyz, "moved", moved,
++                      "robot", ss["robot"], "done", term, trunc)
++            old_xyz = xyz
++            if ss["robot"]["grasp_active"] or term or trunc:
++                env.close()
++                return
++    print("grid found no grasp")
++    env.close()
++
++
+ if __name__ == "__main__":
+     import argparse
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--random", action="store_true")
++    parser.add_argument("--grid", action="store_true")
+     parser.add_argument("--seed", type=int, default=0)
+     args = parser.parse_args()
+-    random_search(args.seed) if args.random else main()
++    joint_grid(args.seed) if args.grid else (random_search(args.seed) if args.random else main())

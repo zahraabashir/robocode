@@ -1,0 +1,140 @@
+diff --git a/approach.py b/approach.py
+index 9434ee4..0304083 100644
+--- a/approach.py
++++ b/approach.py
+@@ -4,6 +4,8 @@ import math
+ 
+ import numpy as np
+ 
++from model_v import VModel
++
+ R_ROBOT = 0.1
+ WALL_LO = 0.0
+ WALL_HI = 5.0
+@@ -163,6 +165,7 @@ class GeneratedApproach:
+         s = np.asarray(state, dtype=float)
+         self.w, self.lh, self.lv = s[12], s[13], s[14]
+         self.model = TModel(self.w, self.lh, self.lv)
++        self.sim = VModel(self.w, self.lh, self.lv)
+         self.goal = s[29:32].copy()
+         self.mode = "plan"
+         self.path = []
+@@ -234,7 +237,7 @@ class GeneratedApproach:
+         bestscore = np.full(N, np.inf)
+         bestk = np.zeros(N, int)
+         for k in range(1, H + 1):
+-            cur, rob = self.model.step(cur, rob, dw * steplen)
++            cur, rob = self.sim.step(cur, rob, dw * steplen)
+             cst = self.cost(cur)
+             # score: resulting cost + time penalty
+             score = cst + 0.004 * (k + travel)
+diff --git a/model_v.py b/model_v.py
+new file mode 100644
+index 0000000..b2e5d32
+--- /dev/null
++++ b/model_v.py
+@@ -0,0 +1,104 @@
++"""Vectorized quasi-static push model (fitted on env data)."""
++import numpy as np
++
++R_ROBOT = 0.1
++
++
++class VModel:
++    def __init__(self, w, lh, lv, mu=0.99, nsub=4, reff=0.1015, beta=0.22):
++        self.w, self.lh, self.lv = w, lh, lv
++        a1, a2 = lh * w, lv * w
++        y1, y2 = -w / 2, -w - lv / 2
++        cy = (a1 * y1 + a2 * y2) / (a1 + a2)
++        I = a1 * ((lh ** 2 + w ** 2) / 12 + (y1 - cy) ** 2) + a2 * ((w ** 2 + lv ** 2) / 12 + (y2 - cy) ** 2)
++        self.com = np.array([0.0, cy])
++        self.k2 = I / (a1 + a2)
++        self.rects = [(-lh / 2, lh / 2, -w, 0.0), (-w / 2, w / 2, -w - lv, -w)]
++        self.mu, self.nsub, self.reff, self.beta = mu, nsub, reff, beta
++
++    def step(self, pose, rob, act):
++        pose = np.array(pose, float, ndmin=2)
++        rob = np.array(rob, float, ndmin=2)
++        a = np.array(act, float, ndmin=2)
++        N = len(pose)
++        if len(rob) != N:
++            rob = np.repeat(rob, N, 0)
++        if len(a) != N:
++            a = np.repeat(a, N, 0)
++        cl = self.com
++        k2, mu, reff, beta = self.k2, self.mu, self.reff, self.beta
++        lo, hi = R_ROBOT, 5.0 - R_ROBOT
++        for _ in range(self.nsub):
++            new = np.clip(rob + a / self.nsub, lo, hi)
++            da = new - rob
++            rob = new
++            for (x0, x1, y0, y1) in self.rects:
++                c, s = np.cos(pose[:, 2]), np.sin(pose[:, 2])
++                dx = rob[:, 0] - pose[:, 0]
++                dy = rob[:, 1] - pose[:, 1]
++                plx = c * dx + s * dy
++                ply = -s * dx + c * dy
++                qx = np.clip(plx, x0, x1)
++                qy = np.clip(ply, y0, y1)
++                vx, vy = plx - qx, ply - qy
++                d = np.hypot(vx, vy)
++                act_m = d < reff
++                if not np.any(act_m):
++                    continue
++                dsafe = np.where(d > 1e-9, d, 1.0)
++                nx, ny = vx / dsafe, vy / dsafe
++                # inside handling
++                ins = d <= 1e-9
++                if np.any(ins):
++                    cand = np.stack([plx - x0, x1 - plx, ply - y0, y1 - ply], 1)
++                    j = np.argmin(cand, 1)
++                    dd = cand[np.arange(N), j]
++                    nxs = np.array([-1.0, 1.0, 0.0, 0.0])[j]
++                    nys = np.array([0.0, 0.0, -1.0, 1.0])[j]
++                    nx = np.where(ins, nxs, nx)
++                    ny = np.where(ins, nys, ny)
++                    qx = np.where(ins, plx + nxs * dd, qx)
++                    qy = np.where(ins, ply + nys * dd, qy)
++                    d = np.where(ins, -dd, d)
++                # world normal
++                nwx = c * nx - s * ny
++                nwy = s * nx + c * ny
++                delta = reff + beta * np.maximum(0.0, -(a[:, 0] * nwx + a[:, 1] * nwy)) - d
++                twx, twy = -nwy, nwx
++                # contact point rel com (world)
++                rlx, rly = qx - cl[0], qy - cl[1]
++                rx = c * rlx - s * rly
++                ry = s * rlx + c * rly
++                rpx, rpy = -ry, rx
++                # K = I + rp rp^T / k2 ; solve K P = want
++                K11 = 1 + rpx * rpx / k2
++                K12 = rpx * rpy / k2
++                K22 = 1 + rpy * rpy / k2
++                dt = da[:, 0] * twx + da[:, 1] * twy
++                wx = -nwx * delta + twx * dt
++                wy = -nwy * delta + twy * dt
++                det = K11 * K22 - K12 * K12
++                Px = (K22 * wx - K12 * wy) / det
++                Py = (-K12 * wx + K11 * wy) / det
++                Pn = -(Px * nwx + Py * nwy)
++                Pt = Px * twx + Py * twy
++                slide = np.abs(Pt) > mu * Pn
++                sg = np.sign(Pt)
++                dvx = -nwx + mu * sg * twx
++                dvy = -nwy + mu * sg * twy
++                Kdx = K11 * dvx + K12 * dvy
++                Kdy = K12 * dvx + K22 * dvy
++                den = -nwx * Kdx - nwy * Kdy
++                Pn2 = delta / np.where(np.abs(den) > 1e-12, den, 1e-12)
++                Px = np.where(slide, Pn2 * dvx, Px)
++                Py = np.where(slide, Pn2 * dvy, Py)
++                ok = act_m & (Pn > 0)
++                Px = np.where(ok, Px, 0.0)
++                Py = np.where(ok, Py, 0.0)
++                dth = (rx * Py - ry * Px) / k2
++                comx = pose[:, 0] + c * cl[0] - s * cl[1] + Px
++                comy = pose[:, 1] + s * cl[0] + c * cl[1] + Py
++                th = pose[:, 2] + dth
++                c2, s2 = np.cos(th), np.sin(th)
++                pose = np.stack([comx - (c2 * cl[0] - s2 * cl[1]), comy - (s2 * cl[0] + c2 * cl[1]), th], 1)
++        return pose, rob

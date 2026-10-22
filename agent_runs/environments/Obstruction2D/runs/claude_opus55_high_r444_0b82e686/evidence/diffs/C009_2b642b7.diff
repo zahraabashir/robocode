@@ -1,0 +1,155 @@
+diff --git a/approach.py b/approach.py
+index 646bda0..8864fb7 100644
+--- a/approach.py
++++ b/approach.py
+@@ -219,64 +219,83 @@ class GeneratedApproach:
+                 res.append(n)
+         return res
+ 
+-    def _drop_spot(self, robot, objs, held, g, next_x, strict=True):
+-        """Choose drop center for obstruction held with offset g (robot_x - center)."""
++    def _steps(self, x0, y0, x1, y1, parts, obst):
++        peak = max(y0, y1, self._req_range(x0, x1, parts, obst))
++        peak = min(peak, H - 0.1)
++        return max(abs(x1 - x0), (peak - y0) + (peak - y1)) / MAXD
++
++    def _drop_spot(self, robot, objs, held, g, next_name, strict=True):
++        """Choose (object center x, object bottom y) drop pose for held obstruction."""
+         lo, hi = self._xlim(robot)
+         w = held["w"]
+         others = {n: o for n, o in objs.items() if n != held["name"]}
+         obst = self._obst(others)
+         depth = robot["y"] - held["y"]
+-        ty_off = FLOOR + PLACE_GAP
+         parts = self._parts(robot, held, -g - w / 2, depth)
+-        # reserved zones: block placement and robot columns for future block ops
+         blk = objs.get("target_block")
+         reserved = []
+         if self.place_c is not None and blk is not None:
+             bw = blk["w"]
+             reserved.append((self.place_c - bw / 2 - 0.01, self.place_c + bw / 2 + 0.01))
+-        cur = held["cx"]
+         future = []
+         for n in self.blockers:
+             if n in others and n not in self.done:
+                 gx, gty = self._grasp_x(robot, others[n], others)
+                 future.append((gx, gty))
++        # next pick pose
++        nxt = others.get(next_name)
++        if nxt is not None:
++            pref = self.block_g if next_name == "target_block" else 0.0
++            ngx, ngty = self._grasp_x(robot, nxt, others, pref)
++        bparts0 = self._parts(robot)
++        if blk is not None:
++            bgx = blk["cx"] + self.block_g
++            bgty = blk["top"] + robot["maxarm"] + robot["gw"] + GRASP_GAP
++            bdepth = robot["maxarm"] + robot["gw"] + blk["h"]
++            pparts = self._parts(robot, blk, -self.block_g - blk["w"] / 2, bdepth)
++            px = self.place_c + self.block_g
++            pty = FLOOR + PLACE_GAP + bdepth
++        levels = [FLOOR + PLACE_GAP + 0.04 * k for k in range(0, 9)]
++        sep = 0.01 if strict else 0.002
+         best = None
+-        for c in np.arange(w / 2 + 0.002, W - w / 2 - 0.002, 0.004):
++        for c in np.arange(w / 2 + 0.002, W - w / 2 - 0.002, 0.005):
+             c = float(c)
+             rx = c + g
+             if rx < lo or rx > hi:
+                 continue
+             a, b = c - w / 2, c + w / 2
+-            sep = 0.01 if strict else 0.002
+             if any(a < o1 + sep and b > o0 - sep for (o0, o1, _) in obst):
+                 continue
+             if any(a < r1 and b > r0 for (r0, r1) in reserved):
+                 continue
+-            ty = ty_off + depth
+-            if self._req(rx, parts, obst) > ty + 1e-9:
+-                continue
+-            # does dropping here block future block grasp/placement?
+-            newob = [(a, b, FLOOR + held["h"])]
+-            bparts0 = self._parts(robot)
+-            if any(self._req(gx, bparts0, newob) > gty + 1e-9 for gx, gty in future):
+-                continue
+-            if strict and blk is not None and self.place_c is not None:
+-                bparts = self._parts(robot)
+-                gx = blk["cx"] + self.block_g
+-                gty = blk["top"] + robot["maxarm"] + robot["gw"] + GRASP_GAP
+-                if self._req(gx, bparts, newob) > gty + 1e-9:
++            req = self._req(rx, parts, obst)
++            for bot in levels:
++                ty = bot + depth
++                if ty > H - robot["r"] - 1e-3:
++                    break
++                if req > ty + 1e-9:
+                     continue
+-                bdepth = robot["maxarm"] + robot["gw"] + blk["h"]
+-                pparts = self._parts(robot, blk, -self.block_g - blk["w"] / 2, bdepth)
+-                pty = FLOOR + PLACE_GAP + bdepth
+-                if self._req(self.place_c + self.block_g, pparts, newob) > pty + 1e-9:
++                newob = [(a, b, bot + held["h"])]
++                if any(self._req(gx, bparts0, newob) > gty + 1e-9 for gx, gty in future):
+                     continue
+-            cost = abs(c - cur) + abs(c + g - next_x) + 1e-3 * abs(c - cur)
+-            if best is None or cost < best[0]:
+-                best = (cost, c)
++                if blk is not None and self.place_c is not None:
++                    if self._req(bgx, bparts0, newob) > bgty + 1e-9:
++                        continue
++                    if self._req(px, pparts, newob) > pty + 1e-9:
++                        continue
++                cost = self._steps(robot["x"], robot["y"], rx, ty, parts, obst)
++                obst2 = obst + newob
++                if nxt is not None:
++                    obst_n = [o for o in obst2 if not (o[0] == nxt["x"] and o[2] == nxt["top"])]
++                    cost += self._steps(rx, ty, ngx, ngty, bparts0, obst_n)
++                    if next_name == "target_block":
++                        cost += self._steps(ngx, ngty, px, pty, pparts, obst_n)
++                cost += 1e-3 * abs(c - held["cx"])
++                if best is None or cost < best[0]:
++                    best = (cost, c, bot)
+         if best is None:
+             return None
+-        return best[1]
++        return best[1], best[2]
+ 
+     def _air_spot(self, robot, objs, held, g):
+         lo, hi = self._xlim(robot)
+@@ -354,11 +373,10 @@ class GeneratedApproach:
+                     d = self._drop_spot(robot, objs, obj, self.g_actual, nxt)
+                     if d is None:
+                         d = self._drop_spot(robot, objs, obj, self.g_actual, nxt, strict=False)
+-                    self.drop_y = None
+                     if d is None:
+-                        d = self._air_spot(robot, objs, obj, self.g_actual)
+-                        self.drop_y = H - robot["r"] - 1e-3
+-                    self.drop = d
++                        d = (self._air_spot(robot, objs, obj, self.g_actual),
++                             H - robot["r"] - 1e-3 - self.depth)
++                    self.drop, self.drop_bot = d
+                 self.mode = "carry"
+                 continue
+             if self.mode == "carry":
+@@ -370,8 +388,8 @@ class GeneratedApproach:
+                 obst = self._obst(objs, exclude=(obj["name"],))
+                 tx = self.drop + (robot["x"] - obj["cx"])
+                 ty = robot["y"] - obj["y"] + FLOOR + PLACE_GAP
+-                if self.cur != "target_block" and getattr(self, "drop_y", None) is not None:
+-                    ty = self.drop_y
++                if self.cur != "target_block":
++                    ty = robot["y"] - obj["y"] + self.drop_bot
+                 act, arrived = self._move(robot, tx, ty, parts, obst, 1.0)
+                 # detect failed grasp: object not following
+                 if abs(robot["y"] - obj["y"] - self.depth) > 5e-3:
+@@ -432,9 +450,8 @@ class GeneratedApproach:
+         return n
+ 
+     def _peek_next(self, robot, objs, exclude):
+-        done = getattr(self, "done", set())
+-        rem = [n for n in self.blockers if n in objs and n not in done and n != exclude]
++        rem = [n for n in self.blockers if n in objs and n not in self.done and n != exclude]
+         if rem:
+             rem.sort(key=lambda n: abs(objs[n]["cx"] - robot["x"]))
+-            return objs[rem[0]]["cx"]
+-        return objs["target_block"]["cx"] + self.block_g
++            return rem[0]
++        return "target_block"

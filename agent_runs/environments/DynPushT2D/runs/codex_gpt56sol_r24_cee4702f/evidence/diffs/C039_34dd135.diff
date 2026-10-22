@@ -1,0 +1,16 @@
+diff --git a/approach.py b/approach.py
+index b227ad8..4785b3e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -165,8 +165,9 @@ class GeneratedApproach:
+                 current_ae = self._angle(goal_theta - theta)
+                 turned = abs(self._angle(theta - self.start_pose[2]))
+                 crowded = min(obj) < 0.95 or max(obj) > 4.05
+-                turn_limit = 0.12 if crowded else 0.18
+-                count_limit = 8 if crowded else 9
++                edge_zone = min(obj) < 1.20 or max(obj) > 3.80
++                turn_limit = 0.12 if crowded else (0.22 if edge_zone else 0.18)
++                count_limit = 8 if crowded else (11 if edge_zone else 9)
+                 if (current_ae * self.turn_sign < 0.0 or abs(current_ae) < 0.055
+                         or turned > turn_limit or self.count >= count_limit):
+                     self.mode = "rot_retreat"

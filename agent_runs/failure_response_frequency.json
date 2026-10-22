@@ -1,0 +1,3292 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-11",
+  "unit": "One completed main-stream policy-test command/batch feedback, not one failed episode.",
+  "labeling": "Single analyst, evidence-reviewed manual labels; not blinded, not an automatic intent classifier or formal ACT*ONOMY labeling.",
+  "labels": {
+    "I": "Investigate failures",
+    "R": "Immediate policy edit/restore",
+    "B": "Broader sampling/regression",
+    "T": "Investigate testing capability",
+    "O": "Other substantive action"
+  },
+  "runs": [
+    {
+      "run_id": "codex_gpt56sol_r424_2c85c614",
+      "directory": "environments/Obstruction2D/runs/codex_gpt56sol_r424_2c85c614",
+      "model": "gpt-5.6-sol",
+      "environment": "Obstruction2D",
+      "replicate_seed": 424,
+      "source_hashes": {
+        "events.json": "0509dcb261cbe35331a7c1169161772c41057c14d47b4345ec9647dba3f629cb",
+        "stream.jsonl": "2c85c614855fe95e7ba23aea0ad5dbf6a336254fbf18377bf6b5a16049213f2e"
+      },
+      "rows": [
+        {
+          "event": "E0079",
+          "next_event": "E0081",
+          "label": "I",
+          "solved": 0,
+          "total": 1,
+          "note": "Manual grasp probe on the same seed; later probes precede testing other seeds without a policy edit.",
+          "flags": [],
+          "feedback_source_line": 79,
+          "next_action_start_line": 80,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0088",
+          "policy_edits_before_next_completed_feedback": [],
+          "followup_sequence": "I \u2192 completed test feedback"
+        },
+        {
+          "event": "E0088",
+          "next_event": "E0090",
+          "label": "I",
+          "solved": 0,
+          "total": 3,
+          "note": "Trace seed 1's controller phases before changing safe travel height.",
+          "flags": [],
+          "feedback_source_line": 88,
+          "next_action_start_line": 89,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0094",
+          "policy_edits_before_next_completed_feedback": [
+            "E0092"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0094",
+          "next_event": "E0099",
+          "label": "B",
+          "solved": 1,
+          "total": 3,
+          "note": "Expand seeds 1\u20133 to 0\u201311 although seeds 2 and 3 still fail; skip process/budget poll E0097.",
+          "flags": [],
+          "feedback_source_line": 94,
+          "next_action_start_line": 95,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0099",
+          "policy_edits_before_next_completed_feedback": [],
+          "followup_sequence": "B \u2192 completed test feedback"
+        },
+        {
+          "event": "E0099",
+          "next_event": "E0102",
+          "label": "I",
+          "solved": 1,
+          "total": 12,
+          "note": "Trace failing seed 2; E0100 was requested before this result and is not a response.",
+          "flags": [],
+          "feedback_source_line": 99,
+          "next_action_start_line": 101,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0106",
+          "policy_edits_before_next_completed_feedback": [
+            "E0104"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0106",
+          "next_event": "E0108",
+          "label": "I",
+          "solved": 0,
+          "total": 4,
+          "note": "Inspect seed 1's task list and poses before excluding the static surface.",
+          "flags": [],
+          "feedback_source_line": 106,
+          "next_action_start_line": 107,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0112",
+          "policy_edits_before_next_completed_feedback": [
+            "E0110"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0112",
+          "next_event": "E0114",
+          "label": "I",
+          "solved": 0,
+          "total": 4,
+          "note": "Trace seed 1 before changing vacuum during transit.",
+          "flags": [],
+          "feedback_source_line": 112,
+          "next_action_start_line": 113,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0118",
+          "policy_edits_before_next_completed_feedback": [
+            "E0116"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0118",
+          "next_event": "E0120",
+          "label": "I",
+          "solved": 0,
+          "total": 4,
+          "note": "Trace seed 1 before lowering the parking height.",
+          "flags": [],
+          "feedback_source_line": 118,
+          "next_action_start_line": 119,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0124",
+          "policy_edits_before_next_completed_feedback": [
+            "E0122"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0124",
+          "next_event": "E0126",
+          "label": "I",
+          "solved": 0,
+          "total": 4,
+          "note": "Inspect seed 1's final placement before lateral parking.",
+          "flags": [],
+          "feedback_source_line": 124,
+          "next_action_start_line": 125,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0130",
+          "policy_edits_before_next_completed_feedback": [
+            "E0128"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0132",
+          "next_event": "E0134",
+          "label": "I",
+          "solved": 1,
+          "total": 10,
+          "note": "Attempted diagnostic command exits 143; actual seed-0 diagnosis follows at E0136.",
+          "flags": [],
+          "feedback_source_line": 132,
+          "next_action_start_line": 133,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0144",
+          "policy_edits_before_next_completed_feedback": [
+            "E0142"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0144",
+          "next_event": "E0146",
+          "label": "I",
+          "solved": 0,
+          "total": 4,
+          "note": "Trace seed 1 before correcting a moving parking goal.",
+          "flags": [],
+          "feedback_source_line": 144,
+          "next_action_start_line": 145,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0150",
+          "policy_edits_before_next_completed_feedback": [
+            "E0148"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0150",
+          "next_event": "E0152",
+          "label": "I",
+          "solved": 0,
+          "total": 1,
+          "note": "Inspect seed 1, then find/test simpler zero-obstruction scenes before editing.",
+          "flags": [],
+          "feedback_source_line": 150,
+          "next_action_start_line": 151,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0163",
+          "policy_edits_before_next_completed_feedback": [],
+          "followup_sequence": "I \u2192 completed test feedback"
+        },
+        {
+          "event": "E0163",
+          "next_event": "E0165",
+          "label": "I",
+          "solved": 0,
+          "total": 3,
+          "note": "Inspect failing zero-obstruction seed 14, then controlled grasp/placement probes.",
+          "flags": [],
+          "feedback_source_line": 163,
+          "next_action_start_line": 164,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0177",
+          "policy_edits_before_next_completed_feedback": [
+            "E0175"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0177",
+          "next_event": "E0179",
+          "label": "R",
+          "solved": 0,
+          "total": 1,
+          "note": "Immediate policy edit biases the final placement; no new intervening diagnostic tool.",
+          "flags": [],
+          "feedback_source_line": 177,
+          "next_action_start_line": 178,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0181",
+          "policy_edits_before_next_completed_feedback": [
+            "E0179"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0183",
+          "next_event": "E0185",
+          "label": "I",
+          "solved": 1,
+          "total": 4,
+          "note": "Inspect geometry of the sampled cases, then controller and fine-step grasp probes.",
+          "flags": [],
+          "feedback_source_line": 183,
+          "next_action_start_line": 184,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0193",
+          "policy_edits_before_next_completed_feedback": [
+            "E0191"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0193",
+          "next_event": "E0195",
+          "label": "I",
+          "solved": 1,
+          "total": 4,
+          "note": "Inspect phases/poses for failing seeds 0, 2, and 3.",
+          "flags": [],
+          "feedback_source_line": 193,
+          "next_action_start_line": 194,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0201",
+          "policy_edits_before_next_completed_feedback": [
+            "E0199"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0201",
+          "next_event": "E0203",
+          "label": "I",
+          "solved": 2,
+          "total": 5,
+          "note": "Inspect phases/poses for failing seeds 0, 2, and 4.",
+          "flags": [],
+          "feedback_source_line": 201,
+          "next_action_start_line": 202,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0207",
+          "policy_edits_before_next_completed_feedback": [
+            "E0205"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0207",
+          "next_event": "E0209",
+          "label": "I",
+          "solved": 1,
+          "total": 5,
+          "note": "Inspect failing scenes before changing parking separation.",
+          "flags": [],
+          "feedback_source_line": 207,
+          "next_action_start_line": 208,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0213",
+          "policy_edits_before_next_completed_feedback": [
+            "E0211"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0213",
+          "next_event": "E0215",
+          "label": "I",
+          "solved": 1,
+          "total": 5,
+          "note": "Trace failures and compare additional cases; diagnostic rather than a plain coverage sweep.",
+          "flags": [],
+          "feedback_source_line": 213,
+          "next_action_start_line": 214,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0221",
+          "policy_edits_before_next_completed_feedback": [
+            "E0219"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0221",
+          "next_event": "E0223",
+          "label": "B",
+          "solved": 3,
+          "total": 5,
+          "note": "Extend testing despite seeds 2 and 4 still failing; includes known failures and easier cases.",
+          "flags": [],
+          "feedback_source_line": 221,
+          "next_action_start_line": 222,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0223",
+          "policy_edits_before_next_completed_feedback": [],
+          "followup_sequence": "B \u2192 completed test feedback"
+        },
+        {
+          "event": "E0223",
+          "next_event": "E0225",
+          "label": "I",
+          "solved": 5,
+          "total": 9,
+          "note": "Inspect the multi-obstruction failures before edge-grasp changes.",
+          "flags": [],
+          "feedback_source_line": 223,
+          "next_action_start_line": 224,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0229",
+          "policy_edits_before_next_completed_feedback": [
+            "E0227"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0229",
+          "next_event": "E0231",
+          "label": "I",
+          "solved": 5,
+          "total": 11,
+          "note": "Inspect remaining failed scenes before geometry-scored parking.",
+          "flags": [],
+          "feedback_source_line": 229,
+          "next_action_start_line": 230,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0236",
+          "policy_edits_before_next_completed_feedback": [
+            "E0234"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0236",
+          "next_event": "E0238",
+          "label": "I",
+          "solved": 8,
+          "total": 11,
+          "note": "Inspect failed seeds 2, 3, and 5 before reserving a temporary-target slot.",
+          "flags": [],
+          "feedback_source_line": 236,
+          "next_action_start_line": 237,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0242",
+          "policy_edits_before_next_completed_feedback": [
+            "E0240"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0242",
+          "next_event": "E0244",
+          "label": "I",
+          "solved": 10,
+          "total": 11,
+          "note": "Trace the remaining seed-3 failure.",
+          "flags": [],
+          "feedback_source_line": 242,
+          "next_action_start_line": 243,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0248",
+          "policy_edits_before_next_completed_feedback": [
+            "E0246"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0248",
+          "next_event": "E0250",
+          "label": "I",
+          "solved": 10,
+          "total": 11,
+          "note": "Trace new seed-5 failure after fixing seed 3.",
+          "flags": [],
+          "feedback_source_line": 248,
+          "next_action_start_line": 249,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0254",
+          "policy_edits_before_next_completed_feedback": [
+            "E0252"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0254",
+          "next_event": "E0256",
+          "label": "I",
+          "solved": 10,
+          "total": 11,
+          "note": "Inspect seed 5's lift/ceiling state before capping verification height.",
+          "flags": [],
+          "feedback_source_line": 254,
+          "next_action_start_line": 255,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0260",
+          "policy_edits_before_next_completed_feedback": [
+            "E0258"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0263",
+          "next_event": "E0265",
+          "label": "I",
+          "solved": 18,
+          "total": 20,
+          "note": "Inspect failing seeds 18 and 22.",
+          "flags": [],
+          "feedback_source_line": 263,
+          "next_action_start_line": 264,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0271",
+          "policy_edits_before_next_completed_feedback": [
+            "E0269"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0271",
+          "next_event": "E0273",
+          "label": "I",
+          "solved": 0,
+          "total": 2,
+          "note": "Inspect seeds 18 and 22 again after both still fail.",
+          "flags": [],
+          "feedback_source_line": 271,
+          "next_action_start_line": 272,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0277",
+          "policy_edits_before_next_completed_feedback": [
+            "E0275"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0277",
+          "next_event": "E0279",
+          "label": "I",
+          "solved": 1,
+          "total": 2,
+          "note": "Seed 22 passes but 18 fails; inspect 18 rather than broaden.",
+          "flags": [],
+          "feedback_source_line": 277,
+          "next_action_start_line": 278,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0283",
+          "policy_edits_before_next_completed_feedback": [
+            "E0281"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0283",
+          "next_event": "E0285",
+          "label": "I",
+          "solved": 0,
+          "total": 1,
+          "note": "Inspect still-failing seed 18.",
+          "flags": [],
+          "feedback_source_line": 283,
+          "next_action_start_line": 284,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0289",
+          "policy_edits_before_next_completed_feedback": [
+            "E0287"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0289",
+          "next_event": "E0291",
+          "label": "R",
+          "solved": 5,
+          "total": 12,
+          "note": "Immediate carry-height edit after local failure plus regression failures.",
+          "flags": [],
+          "feedback_source_line": 289,
+          "next_action_start_line": 290,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0293",
+          "policy_edits_before_next_completed_feedback": [
+            "E0291"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0293",
+          "next_event": "E0295",
+          "label": "R",
+          "solved": 5,
+          "total": 12,
+          "note": "Restore low parking behavior after the local case and regression remain poor.",
+          "flags": [],
+          "feedback_source_line": 293,
+          "next_action_start_line": 294,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0297",
+          "policy_edits_before_next_completed_feedback": [
+            "E0295"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0297",
+          "next_event": "E0299",
+          "label": "R",
+          "solved": 8,
+          "total": 11,
+          "note": "Return to globally clear parking after an incomplete recovery of regression performance.",
+          "flags": [],
+          "feedback_source_line": 297,
+          "next_action_start_line": 298,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0301",
+          "policy_edits_before_next_completed_feedback": [
+            "E0299"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0301",
+          "next_event": "E0303",
+          "label": "I",
+          "solved": 10,
+          "total": 11,
+          "note": "Inspect remaining seed-10 failure.",
+          "flags": [],
+          "feedback_source_line": 301,
+          "next_action_start_line": 302,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0307",
+          "policy_edits_before_next_completed_feedback": [
+            "E0305"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0307",
+          "next_event": "E0311",
+          "label": "B",
+          "solved": 1,
+          "total": 2,
+          "note": "Seed 10 passes but 18 fails; nevertheless sample seeds 31\u201360. Motive unstated.",
+          "flags": [],
+          "feedback_source_line": 307,
+          "next_action_start_line": 308,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0311",
+          "policy_edits_before_next_completed_feedback": [],
+          "followup_sequence": "B \u2192 completed test feedback"
+        },
+        {
+          "event": "E0311",
+          "next_event": "E0313",
+          "label": "I",
+          "solved": 26,
+          "total": 30,
+          "note": "Inspect previously and newly failing seeds together.",
+          "flags": [],
+          "feedback_source_line": 311,
+          "next_action_start_line": 312,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0317",
+          "policy_edits_before_next_completed_feedback": [
+            "E0315"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0317",
+          "next_event": "E0319",
+          "label": "R",
+          "solved": 0,
+          "total": 4,
+          "note": "Restore the previous clearance margin, then end the first segment; resumed work is a separate prompted segment.",
+          "flags": [],
+          "feedback_source_line": 317,
+          "next_action_start_line": 318,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0342",
+          "policy_edits_before_next_completed_feedback": [
+            "E0319",
+            "E0340"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0342",
+          "next_event": "E0344",
+          "label": "I",
+          "solved": 11,
+          "total": 12,
+          "note": "Regression 0\u201310 passes but seed 18 still fails; inspect seed 18.",
+          "flags": [],
+          "feedback_source_line": 342,
+          "next_action_start_line": 343,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0348",
+          "policy_edits_before_next_completed_feedback": [
+            "E0346"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0351",
+          "next_event": "E0353",
+          "label": "I",
+          "solved": 1,
+          "total": 3,
+          "note": "Inspect seeds 39 and 45, which still fail.",
+          "flags": [],
+          "feedback_source_line": 351,
+          "next_action_start_line": 352,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0358",
+          "policy_edits_before_next_completed_feedback": [
+            "E0356"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0358",
+          "next_event": "E0360",
+          "label": "I",
+          "solved": 12,
+          "total": 13,
+          "note": "Targeted repairs 39/45 pass but regression seed 3 fails; investigate seed 3.",
+          "flags": [],
+          "feedback_source_line": 358,
+          "next_action_start_line": 359,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0366",
+          "policy_edits_before_next_completed_feedback": [
+            "E0364"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0370",
+          "next_event": "E0373",
+          "label": "I",
+          "solved": 28,
+          "total": 30,
+          "note": "Inspect failing seeds 15 and 26.",
+          "flags": [],
+          "feedback_source_line": 370,
+          "next_action_start_line": 372,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0378",
+          "policy_edits_before_next_completed_feedback": [
+            "E0376"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0380",
+          "next_event": "E0382",
+          "label": "I",
+          "solved": 24,
+          "total": 25,
+          "note": "Investigate recurrent seed-18 failure.",
+          "flags": [],
+          "feedback_source_line": 380,
+          "next_action_start_line": 381,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0387",
+          "policy_edits_before_next_completed_feedback": [
+            "E0385"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0389",
+          "next_event": "E0391",
+          "label": "I",
+          "solved": 25,
+          "total": 26,
+          "note": "Inspect seed 59 before changing parking order.",
+          "flags": [],
+          "feedback_source_line": 389,
+          "next_action_start_line": 390,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0396",
+          "policy_edits_before_next_completed_feedback": [
+            "E0394"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0401",
+          "next_event": "E0404",
+          "label": "T",
+          "solved": 29,
+          "total": 30,
+          "note": "Inspect reset/count capabilities, edit the tester, then test count 3; no visible targeted repair or acknowledgment of seed 85.",
+          "flags": [],
+          "feedback_source_line": 401,
+          "next_action_start_line": 403,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0411",
+          "policy_edits_before_next_completed_feedback": [],
+          "followup_sequence": "T \u2192 completed test feedback"
+        },
+        {
+          "event": "E0411",
+          "next_event": "E0413",
+          "label": "I",
+          "solved": 3,
+          "total": 5,
+          "note": "Inspect failed count-3 seeds 1 and 3.",
+          "flags": [],
+          "feedback_source_line": 411,
+          "next_action_start_line": 412,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0417",
+          "policy_edits_before_next_completed_feedback": [
+            "E0415"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0417",
+          "next_event": "E0419",
+          "label": "I",
+          "solved": 6,
+          "total": 7,
+          "note": "Targeted seeds 1/3 pass but count-3 regression seed 4 fails; inspect seed 4.",
+          "flags": [],
+          "feedback_source_line": 417,
+          "next_action_start_line": 418,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0423",
+          "policy_edits_before_next_completed_feedback": [
+            "E0421"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0437",
+          "next_event": "E0439",
+          "label": "R",
+          "solved": 13,
+          "total": 16,
+          "note": "Immediate policy edit after count-4 failures and a baseline regression failure.",
+          "flags": [],
+          "feedback_source_line": 437,
+          "next_action_start_line": 438,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0441",
+          "policy_edits_before_next_completed_feedback": [
+            "E0439"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0441",
+          "next_event": "E0443",
+          "label": "I",
+          "solved": 2,
+          "total": 3,
+          "note": "Inspect remaining count-4 seed 1 after other targeted cases pass.",
+          "flags": [],
+          "feedback_source_line": 441,
+          "next_action_start_line": 442,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0447",
+          "policy_edits_before_next_completed_feedback": [
+            "E0445"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0451",
+          "next_event": "E0453",
+          "label": "I",
+          "solved": 24,
+          "total": 25,
+          "note": "Inspect seed 93 after an ordinary sweep.",
+          "flags": [],
+          "feedback_source_line": 451,
+          "next_action_start_line": 452,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0458",
+          "policy_edits_before_next_completed_feedback": [
+            "E0456"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0458",
+          "next_event": "E0460",
+          "label": "I",
+          "solved": 15,
+          "total": 17,
+          "note": "Seed 93 is fixed but count-4 regression breaks; inspect count-4 seeds 0 and 1.",
+          "flags": [],
+          "feedback_source_line": 458,
+          "next_action_start_line": 459,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0464",
+          "policy_edits_before_next_completed_feedback": [
+            "E0462"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0469",
+          "next_event": "E0471",
+          "label": "I",
+          "solved": 17,
+          "total": 20,
+          "note": "Inspect count-4 seeds 5 and 6, two of three failures.",
+          "flags": [],
+          "feedback_source_line": 469,
+          "next_action_start_line": 470,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0475",
+          "policy_edits_before_next_completed_feedback": [
+            "E0473"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0475",
+          "next_event": "E0477",
+          "label": "I",
+          "solved": 11,
+          "total": 12,
+          "note": "Baseline passes but targeted count-4 seed 5 still fails; inspect seed 5.",
+          "flags": [],
+          "feedback_source_line": 475,
+          "next_action_start_line": 476,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0481",
+          "policy_edits_before_next_completed_feedback": [
+            "E0479"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0481",
+          "next_event": "E0483",
+          "label": "I",
+          "solved": 3,
+          "total": 4,
+          "note": "Targeted seed 5 still fails; inspect phases, then detailed lift variables.",
+          "flags": [],
+          "feedback_source_line": 481,
+          "next_action_start_line": 482,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0489",
+          "policy_edits_before_next_completed_feedback": [
+            "E0487"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0493",
+          "next_event": "E0495",
+          "label": "I",
+          "solved": 9,
+          "total": 10,
+          "note": "Inspect remaining count-4 seed 7.",
+          "flags": [],
+          "feedback_source_line": 493,
+          "next_action_start_line": 494,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0500",
+          "policy_edits_before_next_completed_feedback": [
+            "E0498"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0511",
+          "next_event": "E0513",
+          "label": "I",
+          "solved": 24,
+          "total": 25,
+          "note": "Inspect recurrent ordinary seed-53 failure.",
+          "flags": [],
+          "feedback_source_line": 511,
+          "next_action_start_line": 512,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0518",
+          "policy_edits_before_next_completed_feedback": [
+            "E0516"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        }
+      ],
+      "summary_output_inventory": [
+        {
+          "event": "E0079",
+          "summaries": [
+            [
+              0,
+              1
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0088",
+          "summaries": [
+            [
+              0,
+              3
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0094",
+          "summaries": [
+            [
+              1,
+              3
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0099",
+          "summaries": [
+            [
+              1,
+              12
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0106",
+          "summaries": [
+            [
+              0,
+              4
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0112",
+          "summaries": [
+            [
+              0,
+              4
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0118",
+          "summaries": [
+            [
+              0,
+              4
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0124",
+          "summaries": [
+            [
+              0,
+              4
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0130",
+          "summaries": [
+            [
+              1,
+              1
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0132",
+          "summaries": [
+            [
+              1,
+              10
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0144",
+          "summaries": [
+            [
+              0,
+              4
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0150",
+          "summaries": [
+            [
+              0,
+              1
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0163",
+          "summaries": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0177",
+          "summaries": [
+            [
+              0,
+              1
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0181",
+          "summaries": [
+            [
+              1,
+              1
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0183",
+          "summaries": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0193",
+          "summaries": [
+            [
+              1,
+              4
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0201",
+          "summaries": [
+            [
+              2,
+              5
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0207",
+          "summaries": [
+            [
+              1,
+              5
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0213",
+          "summaries": [
+            [
+              1,
+              5
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0221",
+          "summaries": [
+            [
+              3,
+              5
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0223",
+          "summaries": [
+            [
+              2,
+              6
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0229",
+          "summaries": [
+            [
+              5,
+              11
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0236",
+          "summaries": [
+            [
+              8,
+              11
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0242",
+          "summaries": [
+            [
+              10,
+              11
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0248",
+          "summaries": [
+            [
+              10,
+              11
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0254",
+          "summaries": [
+            [
+              10,
+              11
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0260",
+          "summaries": [
+            [
+              1,
+              1
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0263",
+          "summaries": [
+            [
+              18,
+              20
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0271",
+          "summaries": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0277",
+          "summaries": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0283",
+          "summaries": [
+            [
+              0,
+              1
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0289",
+          "summaries": [
+            [
+              0,
+              1
+            ],
+            [
+              5,
+              11
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0293",
+          "summaries": [
+            [
+              0,
+              1
+            ],
+            [
+              5,
+              11
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0297",
+          "summaries": [
+            [
+              8,
+              11
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0301",
+          "summaries": [
+            [
+              10,
+              11
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0307",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0311",
+          "summaries": [
+            [
+              26,
+              30
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0317",
+          "summaries": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0342",
+          "summaries": [
+            [
+              0,
+              1
+            ],
+            [
+              11,
+              11
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0348",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              11,
+              11
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0351",
+          "summaries": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0358",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              10,
+              11
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0366",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              11,
+              11
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0370",
+          "summaries": [
+            [
+              28,
+              30
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0378",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              11,
+              11
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0380",
+          "summaries": [
+            [
+              24,
+              25
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0387",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              11,
+              11
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0389",
+          "summaries": [
+            [
+              25,
+              26
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0396",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              11,
+              11
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0401",
+          "summaries": [
+            [
+              29,
+              30
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0411",
+          "summaries": [
+            [
+              3,
+              5
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0417",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              4,
+              5
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0423",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              11,
+              11
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0426",
+          "summaries": [
+            [
+              1,
+              5
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0437",
+          "summaries": [
+            [
+              3,
+              5
+            ],
+            [
+              10,
+              11
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0441",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0447",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              5,
+              5
+            ],
+            [
+              11,
+              11
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0451",
+          "summaries": [
+            [
+              24,
+              25
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0458",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              3,
+              5
+            ],
+            [
+              11,
+              11
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0464",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              5,
+              5
+            ],
+            [
+              11,
+              11
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0469",
+          "summaries": [
+            [
+              10,
+              10
+            ],
+            [
+              7,
+              10
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0475",
+          "summaries": [
+            [
+              0,
+              1
+            ],
+            [
+              11,
+              11
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0481",
+          "summaries": [
+            [
+              0,
+              1
+            ],
+            [
+              3,
+              3
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0489",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              5,
+              5
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0491",
+          "summaries": [
+            [
+              1,
+              1
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0493",
+          "summaries": [
+            [
+              9,
+              10
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0500",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              11,
+              11
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0502",
+          "summaries": [
+            [
+              10,
+              10
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0509",
+          "summaries": [
+            [
+              25,
+              25
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0511",
+          "summaries": [
+            [
+              24,
+              25
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0518",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              11,
+              11
+            ],
+            [
+              5,
+              5
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0523",
+          "summaries": [
+            [
+              3,
+              3
+            ],
+            [
+              3,
+              3
+            ],
+            [
+              3,
+              3
+            ],
+            [
+              3,
+              3
+            ],
+            [
+              3,
+              3
+            ]
+          ],
+          "any_failure": false
+        }
+      ]
+    },
+    {
+      "run_id": "codex_gpt56sol_r424_7e89c88a",
+      "directory": "environments/DynPushT2D/runs/codex_gpt56sol_r424_7e89c88a",
+      "model": "gpt-5.6-sol",
+      "environment": "DynPushT2D",
+      "replicate_seed": 424,
+      "source_hashes": {
+        "events.json": "1f3fc8e5685066ddf37c90056105d27fc2a4edc99e0a2c2b15640d9f9702d5b7",
+        "stream.jsonl": "7e89c88a5954b1f3319f32ba5d2f53a4fa760c9479dbd6252515fa4a02d18fc3"
+      },
+      "rows": [
+        {
+          "event": "E0034",
+          "next_event": "E0036",
+          "label": "R",
+          "solved": 0,
+          "total": 1,
+          "note": "200-step capped baseline test; next action changes the controller.",
+          "flags": [],
+          "feedback_source_line": 34,
+          "next_action_start_line": 35,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0038",
+          "policy_edits_before_next_completed_feedback": [
+            "E0036"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0038",
+          "next_event": "E0042",
+          "label": "R",
+          "solved": 0,
+          "total": 3,
+          "note": "300-step capped test; next main-stream action edits the controller. Parallel probe results are separate information.",
+          "flags": [],
+          "feedback_source_line": 38,
+          "next_action_start_line": 41,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0051",
+          "policy_edits_before_next_completed_feedback": [
+            "E0042",
+            "E0045",
+            "E0047"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0053",
+          "next_event": "E0055",
+          "label": "I",
+          "solved": 1,
+          "total": 5,
+          "note": "Trace the four failed seeds, printing phases, poses and errors before editing.",
+          "flags": [],
+          "feedback_source_line": 53,
+          "next_action_start_line": 54,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0059",
+          "policy_edits_before_next_completed_feedback": [
+            "E0057"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0059",
+          "next_event": "E0061",
+          "label": "I",
+          "solved": 3,
+          "total": 6,
+          "note": "Trace failed seeds 0\u20132 with controller modes and pose errors.",
+          "flags": [],
+          "feedback_source_line": 59,
+          "next_action_start_line": 60,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0065",
+          "policy_edits_before_next_completed_feedback": [
+            "E0063"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0065",
+          "next_event": "E0067",
+          "label": "I",
+          "solved": 5,
+          "total": 6,
+          "note": "Trace remaining failure seed 2 before changing routing.",
+          "flags": [],
+          "feedback_source_line": 65,
+          "next_action_start_line": 66,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0071",
+          "policy_edits_before_next_completed_feedback": [
+            "E0069"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0071",
+          "next_event": "E0073",
+          "label": "I",
+          "solved": 11,
+          "total": 12,
+          "note": "Trace failed seed 6 and inspect wall-limited navigation.",
+          "flags": [],
+          "feedback_source_line": 71,
+          "next_action_start_line": 72,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0081",
+          "policy_edits_before_next_completed_feedback": [
+            "E0079"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0081",
+          "next_event": "E0084",
+          "label": "R",
+          "solved": 0,
+          "total": 1,
+          "note": "Agent states a wall/rotation explanation, then adds clearance prepositioning.",
+          "flags": [],
+          "feedback_source_line": 81,
+          "next_action_start_line": 83,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0086",
+          "policy_edits_before_next_completed_feedback": [
+            "E0084"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0088",
+          "next_event": "E0090",
+          "label": "R",
+          "solved": 17,
+          "total": 20,
+          "note": "Change final orientation correction before retesting 13, 15 and 19.",
+          "flags": [],
+          "feedback_source_line": 88,
+          "next_action_start_line": 89,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0092",
+          "policy_edits_before_next_completed_feedback": [
+            "E0090"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        }
+      ],
+      "summary_output_inventory": [
+        {
+          "event": "E0034",
+          "summaries": [
+            [
+              0,
+              1
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0038",
+          "summaries": [
+            [
+              0,
+              3
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0051",
+          "summaries": [
+            [
+              1,
+              1
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0053",
+          "summaries": [
+            [
+              1,
+              5
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0059",
+          "summaries": [
+            [
+              3,
+              6
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0065",
+          "summaries": [
+            [
+              5,
+              6
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0071",
+          "summaries": [
+            [
+              11,
+              12
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0081",
+          "summaries": [
+            [
+              0,
+              1
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0086",
+          "summaries": [
+            [
+              3,
+              3
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0088",
+          "summaries": [
+            [
+              17,
+              20
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0092",
+          "summaries": [
+            [
+              3,
+              3
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0094",
+          "summaries": [
+            [
+              40,
+              40
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0099",
+          "summaries": [
+            [
+              40,
+              40
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0101",
+          "summaries": [
+            [
+              60,
+              60
+            ]
+          ],
+          "any_failure": false
+        }
+      ]
+    },
+    {
+      "run_id": "claude_opus55_high_r424_b71e4671",
+      "directory": "environments/Obstruction2D/runs/claude_opus55_high_r424_b71e4671",
+      "model": "claude-opus-5-5",
+      "environment": "Obstruction2D",
+      "replicate_seed": 424,
+      "source_hashes": {
+        "events.json": "9a09e780661b64e62464f77ae199c7bd4a4026777235aa444a3e5384d3055a69",
+        "stream.jsonl": "b71e467197959d981e5c7a73d8f6ca7bc3b48e42cec2c1bf6458fb86dc3591c8"
+      },
+      "rows": [
+        {
+          "event": "E0033",
+          "next_event": "E0043",
+          "label": "B",
+          "solved": 15,
+          "total": 16,
+          "note": "Compound command: launch larger seeds 16\u2013115 first, then request a layout dump of failed seed 4; message explicitly proposes both.",
+          "flags": [
+            "compound"
+          ],
+          "feedback_source_line": 33,
+          "next_action_start_line": 35,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0059",
+          "policy_edits_before_next_completed_feedback": [],
+          "followup_sequence": "B \u2192 completed test feedback"
+        },
+        {
+          "event": "E0059",
+          "next_event": "E0063",
+          "label": "I",
+          "solved": 96,
+          "total": 100,
+          "note": "First completed report from background sweep; inspect failed seeds 21 and 31.",
+          "flags": [],
+          "feedback_source_line": 59,
+          "next_action_start_line": 60,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0099",
+          "policy_edits_before_next_completed_feedback": [
+            "E0072",
+            "E0082"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0225",
+          "next_event": "E0231",
+          "label": "I",
+          "solved": 29,
+          "total": 40,
+          "note": "Debug failed seed 6 after the controller rewrite.",
+          "flags": [],
+          "feedback_source_line": 225,
+          "next_action_start_line": 228,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0241",
+          "policy_edits_before_next_completed_feedback": [
+            "E0241"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0241",
+          "next_event": "E0245",
+          "label": "I",
+          "solved": 38,
+          "total": 40,
+          "note": "Debug failed seed 5 and examine geometry before editing feasibility checks.",
+          "flags": [],
+          "feedback_source_line": 241,
+          "next_action_start_line": 242,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0288",
+          "policy_edits_before_next_completed_feedback": [
+            "E0254",
+            "E0258",
+            "E0261",
+            "E0271"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0288",
+          "next_event": "E0293",
+          "label": "I",
+          "solved": 99,
+          "total": 100,
+          "note": "Debug failed seed 75 and inspect its planned drop.",
+          "flags": [],
+          "feedback_source_line": 288,
+          "next_action_start_line": 289,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0302",
+          "policy_edits_before_next_completed_feedback": [
+            "E0302"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0430",
+          "next_event": "E0434",
+          "label": "I",
+          "solved": 294,
+          "total": 300,
+          "note": "First completed background sweep report; debug failed seed 577 before a shared repair.",
+          "flags": [],
+          "feedback_source_line": 430,
+          "next_action_start_line": 431,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0443",
+          "policy_edits_before_next_completed_feedback": [
+            "E0443"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        }
+      ],
+      "summary_output_inventory": [
+        {
+          "event": "E0033",
+          "summaries": [
+            [
+              15,
+              16
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0059",
+          "summaries": [
+            [
+              96,
+              100
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0099",
+          "summaries": [
+            [
+              120,
+              120
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0225",
+          "summaries": [
+            [
+              29,
+              40
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0241",
+          "summaries": [
+            [
+              38,
+              40
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0288",
+          "summaries": [
+            [
+              99,
+              100
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0302",
+          "summaries": [
+            [
+              10,
+              10
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0379",
+          "summaries": [
+            [
+              200,
+              200
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0430",
+          "summaries": [
+            [
+              294,
+              300
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0443",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0474",
+          "summaries": [
+            [
+              400,
+              400
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0570",
+          "summaries": [
+            [
+              300,
+              300
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0627",
+          "summaries": [
+            [
+              300,
+              300
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0647",
+          "summaries": [
+            [
+              700,
+              700
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0680",
+          "summaries": [
+            [
+              300,
+              300
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0760",
+          "summaries": [
+            [
+              700,
+              700
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0769",
+          "summaries": [
+            [
+              40,
+              40
+            ],
+            [
+              40,
+              40
+            ],
+            [
+              40,
+              40
+            ]
+          ],
+          "any_failure": false
+        }
+      ]
+    },
+    {
+      "run_id": "claude_opus55_high_r424_2a46a52d",
+      "directory": "environments/DynPushT2D/runs/claude_opus55_high_r424_2a46a52d",
+      "model": "claude-opus-5-5",
+      "environment": "DynPushT2D",
+      "replicate_seed": 424,
+      "source_hashes": {
+        "events.json": "d7f6f55262871cfdc23e066d4941a68dc5ff033920b24c985c8a108b1f05882c",
+        "stream.jsonl": "2a46a52d65bafc33df5d3f18d264f69b9376196f72dabc67e1a8c020bc636154"
+      },
+      "rows": [
+        {
+          "event": "E0196",
+          "next_event": "E0200",
+          "label": "O",
+          "solved": 238,
+          "total": 240,
+          "note": "Two of six parameter variants fail; next action traces successful default seed 200, not an identified failed case.",
+          "flags": [
+            "parameter_variants"
+          ],
+          "feedback_source_line": 196,
+          "next_action_start_line": 199,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0209",
+          "policy_edits_before_next_completed_feedback": [],
+          "followup_sequence": "O \u2192 completed test feedback"
+        },
+        {
+          "event": "E0209",
+          "next_event": "E0214",
+          "label": "I",
+          "solved": 78,
+          "total": 80,
+          "note": "Two failing variants identify seed 212; inspect its stalled planner with KMAX=50.",
+          "flags": [
+            "parameter_variants"
+          ],
+          "feedback_source_line": 209,
+          "next_action_start_line": 210,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0239",
+          "policy_edits_before_next_completed_feedback": [
+            "E0239"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        }
+      ],
+      "summary_output_inventory": [
+        {
+          "event": "E0174",
+          "summaries": [
+            [
+              8,
+              8
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0181",
+          "summaries": [
+            [
+              100,
+              100
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0187",
+          "summaries": [
+            [
+              40,
+              40
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0196",
+          "summaries": [
+            [
+              40,
+              40
+            ],
+            [
+              40,
+              40
+            ],
+            [
+              39,
+              40
+            ],
+            [
+              40,
+              40
+            ],
+            [
+              39,
+              40
+            ],
+            [
+              40,
+              40
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0209",
+          "summaries": [
+            [
+              39,
+              40
+            ],
+            [
+              39,
+              40
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0239",
+          "summaries": [
+            [
+              60,
+              60
+            ],
+            [
+              60,
+              60
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0255",
+          "summaries": [
+            [
+              60,
+              60
+            ],
+            [
+              60,
+              60
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0265",
+          "summaries": [
+            [
+              60,
+              60
+            ],
+            [
+              60,
+              60
+            ],
+            [
+              60,
+              60
+            ],
+            [
+              60,
+              60
+            ],
+            [
+              60,
+              60
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0282",
+          "summaries": [
+            [
+              60,
+              60
+            ],
+            [
+              60,
+              60
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0299",
+          "summaries": [
+            [
+              60,
+              60
+            ],
+            [
+              60,
+              60
+            ],
+            [
+              60,
+              60
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0306",
+          "summaries": [
+            [
+              60,
+              60
+            ],
+            [
+              60,
+              60
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0315",
+          "summaries": [
+            [
+              300,
+              300
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0397",
+          "summaries": [
+            [
+              60,
+              60
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0406",
+          "summaries": [
+            [
+              60,
+              60
+            ],
+            [
+              60,
+              60
+            ],
+            [
+              60,
+              60
+            ],
+            [
+              60,
+              60
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0418",
+          "summaries": [
+            [
+              500,
+              500
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0425",
+          "summaries": [
+            [
+              60,
+              60
+            ]
+          ],
+          "any_failure": false
+        }
+      ]
+    },
+    {
+      "run_id": "codex_gpt6astra_r424_51fd524e",
+      "directory": "environments/Obstruction2D/runs/codex_gpt6astra_r424_51fd524e",
+      "model": "gpt-6-astra",
+      "environment": "Obstruction2D",
+      "replicate_seed": 424,
+      "source_hashes": {
+        "events.json": "4cc7bd824b5ae1baf7106c7865912deab8cb8bae46100495da3172b6d978e624",
+        "stream.jsonl": "51fd524e002b3951d7427e0e39616d66693a4a82e4793bad5a63b22cb8328aef"
+      },
+      "rows": [
+        {
+          "event": "E0024",
+          "next_event": "E0026",
+          "label": "R",
+          "solved": 0,
+          "total": 5,
+          "note": "All five rollout results fail; immediately change contact height and storage.",
+          "flags": [],
+          "feedback_source_line": 24,
+          "next_action_start_line": 25,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0026",
+          "policy_edits_before_next_completed_feedback": [
+            "E0026"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0026",
+          "next_event": "E0029",
+          "label": "R",
+          "solved": 2,
+          "total": 5,
+          "note": "Two seeds pass; immediately change early-attachment detection.",
+          "flags": [],
+          "feedback_source_line": 26,
+          "next_action_start_line": 28,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0029",
+          "policy_edits_before_next_completed_feedback": [
+            "E0029"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0029",
+          "next_event": "E0031",
+          "label": "I",
+          "solved": 9,
+          "total": 10,
+          "note": "Read the current policy after the remaining seed-4 failure, before editing it.",
+          "flags": [],
+          "feedback_source_line": 29,
+          "next_action_start_line": 30,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0054",
+          "policy_edits_before_next_completed_feedback": [
+            "E0054",
+            "E0050"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0054",
+          "next_event": "E0063",
+          "label": "R",
+          "solved": 97,
+          "total": 100,
+          "note": "Wall-placement failures; however an already-running ten-seed success batch returns before the repair is launched.",
+          "flags": [
+            "competing_feedback"
+          ],
+          "feedback_source_line": 54,
+          "next_action_start_line": 57,
+          "outcome": "partial_success",
+          "eligible_primary": false,
+          "next_completed_feedback": "E0055",
+          "policy_edits_before_next_completed_feedback": [],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0082",
+          "next_event": "E0085",
+          "label": "I",
+          "solved": 0,
+          "total": 1,
+          "note": "Seed 151 fails; a separate 200-seed batch returns before the next inspection.",
+          "flags": [
+            "competing_feedback"
+          ],
+          "feedback_source_line": 82,
+          "next_action_start_line": 84,
+          "outcome": "complete_failure",
+          "eligible_primary": false,
+          "next_completed_feedback": "E0083",
+          "policy_edits_before_next_completed_feedback": [],
+          "followup_sequence": "I \u2192 completed test feedback"
+        },
+        {
+          "event": "E0083",
+          "next_event": "E0085",
+          "label": "I",
+          "solved": 199,
+          "total": 201,
+          "note": "One targeted scene passes plus 198/200 regression successes; inspect the completed four-obstruction seed-2 result.",
+          "flags": [],
+          "feedback_source_line": 83,
+          "next_action_start_line": 84,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0085",
+          "policy_edits_before_next_completed_feedback": [],
+          "followup_sequence": "I \u2192 completed test feedback"
+        },
+        {
+          "event": "E0085",
+          "next_event": "E0088",
+          "label": "R",
+          "solved": 0,
+          "total": 1,
+          "note": "Saved JSON contains the full one-case test (seed 2, count 4); next action repairs carried geometry.",
+          "flags": [],
+          "feedback_source_line": 85,
+          "next_action_start_line": 87,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0088",
+          "policy_edits_before_next_completed_feedback": [
+            "E0088"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0088",
+          "next_event": "E0091",
+          "label": "R",
+          "solved": 3,
+          "total": 4,
+          "note": "Seed 151 still fails while three count-4 cases pass; immediately reserve the final base footprint.",
+          "flags": [],
+          "feedback_source_line": 88,
+          "next_action_start_line": 89,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0091",
+          "policy_edits_before_next_completed_feedback": [
+            "E0091"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        }
+      ],
+      "summary_output_inventory": [
+        {
+          "event": "E0054",
+          "summaries": [
+            [
+              97,
+              100
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0063",
+          "summaries": [
+            [
+              100,
+              100
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0075",
+          "summaries": [
+            [
+              30,
+              30
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0083",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              198,
+              200
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0088",
+          "summaries": [
+            [
+              3,
+              3
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0091",
+          "summaries": [
+            [
+              100,
+              100
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0116",
+          "summaries": [
+            [
+              200,
+              200
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0136",
+          "summaries": [
+            [
+              1,
+              1
+            ],
+            [
+              100,
+              100
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0165",
+          "summaries": [
+            [
+              100,
+              100
+            ]
+          ],
+          "any_failure": false
+        }
+      ]
+    },
+    {
+      "run_id": "codex_gpt6astra_r424_4e86deee",
+      "directory": "environments/DynPushT2D/runs/codex_gpt6astra_r424_4e86deee",
+      "model": "gpt-6-astra",
+      "environment": "DynPushT2D",
+      "replicate_seed": 424,
+      "source_hashes": {
+        "events.json": "3fcb7217b7d2bbb3fac713466a830fd7f2fbd2383b0b130cc7db375caab3ee6d",
+        "stream.jsonl": "4e86deee34892d8751cac98b8df9a5f9c4195443aaa1b48c85c3bee26311d741"
+      },
+      "rows": [
+        {
+          "event": "E0028",
+          "next_event": "E0030",
+          "label": "I",
+          "solved": 0,
+          "total": 5,
+          "note": "Inspect the stored trace of failed seed 0.",
+          "flags": [],
+          "feedback_source_line": 28,
+          "next_action_start_line": 29,
+          "outcome": "complete_failure",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0035",
+          "policy_edits_before_next_completed_feedback": [
+            "E0035",
+            "E0039"
+          ],
+          "followup_sequence": "I \u2192 policy edit \u2192 completed test feedback"
+        },
+        {
+          "event": "E0035",
+          "next_event": "E0042",
+          "label": "R",
+          "solved": 0,
+          "total": 5,
+          "note": "Another policy/test call was launched before this result; its feedback arrives before a new response can be isolated.",
+          "flags": [
+            "competing_feedback"
+          ],
+          "feedback_source_line": 35,
+          "next_action_start_line": 41,
+          "outcome": "complete_failure",
+          "eligible_primary": false,
+          "next_completed_feedback": "E0039",
+          "policy_edits_before_next_completed_feedback": [],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0039",
+          "next_event": "E0042",
+          "label": "R",
+          "solved": 1,
+          "total": 5,
+          "note": "The trace inspection E0040 started before this result, so the first new action is the contact-selection edit.",
+          "flags": [],
+          "feedback_source_line": 39,
+          "next_action_start_line": 41,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0042",
+          "policy_edits_before_next_completed_feedback": [
+            "E0042"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0059",
+          "next_event": "E0066",
+          "label": "R",
+          "solved": 39,
+          "total": 40,
+          "note": "First complete failure report for seeds 20\u201359: producer E0055 ended, grep identifies seed 35 as the only failure, and tail reaches seed 59. Repair endpoints next.",
+          "flags": [],
+          "feedback_source_line": 59,
+          "next_action_start_line": 60,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0066",
+          "policy_edits_before_next_completed_feedback": [
+            "E0066"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0066",
+          "next_event": "E0068",
+          "label": "R",
+          "solved": 12,
+          "total": 17,
+          "note": "Inspect E0065 was already launched before this feedback; first new action edits contact sampling.",
+          "flags": [],
+          "feedback_source_line": 66,
+          "next_action_start_line": 67,
+          "outcome": "partial_success",
+          "eligible_primary": true,
+          "next_completed_feedback": "E0068",
+          "policy_edits_before_next_completed_feedback": [
+            "E0068"
+          ],
+          "followup_sequence": "R \u2192 completed test feedback"
+        },
+        {
+          "event": "E0134",
+          "next_event": "E0145",
+          "label": "B",
+          "solved": 299,
+          "total": 300,
+          "note": "Completed main_v3 report; the agent had already stated seed 516 was repaired and had launched final sweeps. New action starts another final batch.",
+          "flags": [
+            "superseded_failure"
+          ],
+          "feedback_source_line": 134,
+          "next_action_start_line": 135,
+          "outcome": "partial_success",
+          "eligible_primary": false,
+          "next_completed_feedback": "E0147",
+          "policy_edits_before_next_completed_feedback": [],
+          "followup_sequence": "B \u2192 completed test feedback"
+        }
+      ],
+      "summary_output_inventory": [
+        {
+          "event": "E0127",
+          "summaries": [
+            [
+              100,
+              100
+            ],
+            [
+              200,
+              200
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0134",
+          "summaries": [
+            [
+              299,
+              300
+            ]
+          ],
+          "any_failure": true
+        },
+        {
+          "event": "E0147",
+          "summaries": [
+            [
+              100,
+              100
+            ]
+          ],
+          "any_failure": false
+        },
+        {
+          "event": "E0159",
+          "summaries": [
+            [
+              300,
+              300
+            ],
+            [
+              300,
+              300
+            ]
+          ],
+          "any_failure": false
+        }
+      ]
+    }
+  ]
+}

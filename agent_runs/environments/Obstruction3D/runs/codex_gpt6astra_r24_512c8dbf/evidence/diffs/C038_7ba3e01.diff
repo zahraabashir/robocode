@@ -1,0 +1,107 @@
+diff --git a/approach.py b/approach.py
+index 1060e8d..afc47f7 100644
+--- a/approach.py
++++ b/approach.py
+@@ -21,7 +21,8 @@ class GeneratedApproach:
+         self.todo=obs+[self.block];self.index=0;self.phase='above';self.t=0;self.stall=0;self.last=None
+         self.attempt=0;self.wrist=np.pi/2;self.failed_places=[];self.obj=self.todo[0];self.destination=self.choose_destination(state)
+     def choose_destination(self,state):
+-        if self.obj==self.block:
++        self.placing_goal=self.obj==self.block and not any(o!=self.block for o in self.todo[self.index+1:])
++        if self.placing_goal:
+             p=self.pos(state,self.region).copy();p[2]+=self.size(state,self.region)[2]+self.size(state,self.obj)[2]+.001
+             return p
+         h=self.size(state,self.obj)
+@@ -72,13 +73,14 @@ class GeneratedApproach:
+                 actual=grabbed[0]
+                 self.todo=[o for j,o in enumerate(self.todo) if o!=actual or j<self.index]
+                 self.todo.insert(self.index,actual)
++                if actual==self.block and any(o!=self.block for o in self.todo[self.index+1:]):self.todo.append(self.block)
+                 self.obj=actual;self.destination=self.choose_destination(state);bp=self.pos(state,self.obj)
+             self.phase='lift';self.lift_xy=bp[:2].copy()
+         if self.phase=='release' and not held:
+             self.index+=1
+             if self.index>=len(self.todo):self.index=len(self.todo)-1
+             self.attempt=0;self.wrist=np.pi/2;self.failed_places=[];self.obj=self.todo[self.index];self.destination=self.choose_destination(state);self.phase='above';bp=self.pos(state,self.obj)
+-        if held and self.phase=='lower' and self.obj!=self.block and self.stall>=3:
++        if held and self.phase=='lower' and not self.placing_goal and self.stall>=3:
+             self.failed_places.append(self.destination[:2].copy());self.destination=self.choose_destination(state);self.phase='lift';self.lift_xy=bp[:2].copy();self.stall=0
+         grip=0
+         if self.phase=='above':dest=np.r_[model[:2],.30]
+diff --git a/count_fast_results.txt b/count_fast_results.txt
+new file mode 100644
+index 0000000..d30d21e
+--- /dev/null
++++ b/count_fast_results.txt
+@@ -0,0 +1,3 @@
++{"seed": 0, "count": 10, "success": true, "steps": 199, "seconds": 23.99, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "index": 6, "todo": 7, "stall": 1, "attempt": 0, "pos": [0.14442715048789978, 0.23301441967487335, 0.11100000888109207], "dest": [0.14442715048789978, 0.23301441967487335, 0.11099999847263098]}
++{"seed": 1, "count": 10, "success": true, "steps": 186, "seconds": 22.3, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "index": 6, "todo": 7, "stall": 1, "attempt": 0, "pos": [0.44773608446121216, -0.132277250289917, 0.11100002378225327], "dest": [0.44773608446121216, -0.132277250289917, 0.11099999847263098]}
++{"seed": 2, "count": 10, "success": true, "steps": 169, "seconds": 23.67, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "index": 4, "todo": 5, "stall": 1, "attempt": 0, "pos": [0.15949538350105286, 0.0742836594581604, 0.11100000143051147], "dest": [0.15949532389640808, 0.0742836520075798, 0.11099999847263098]}
+diff --git a/debug_count10.txt b/debug_count10.txt
+new file mode 100644
+index 0000000..290d473
+--- /dev/null
++++ b/debug_count10.txt
+@@ -0,0 +1,30 @@
++0 above obstruction7:Kinematic3DCuboid pos [0.1434 0.2641 0.1046] model [0.1543 0.001  0.2505] a [-0.0568  0.      0.      0.      0.1399  0.      0.18    0.     -0.06
++  0.      0.    ] stall 0
++10 grasp obstruction7:Kinematic3DCuboid pos [0.1434 0.2641 0.1046] model [0.1434 0.2641 0.3   ] a [-0. -0.  0.  0. -0. -0.  0.  0. -0. -0.  0.] stall 0
++20 carry obstruction7:Kinematic3DCuboid pos [0.1434 0.2641 0.24  ] model [0.1434 0.2641 0.2994] a [ 0.  0.  0.  0. -0.  0.  0.  0. -0.  0.  0.] stall 0
++30 above obstruction5:Kinematic3DCuboid pos [0.1585 0.1741 0.104 ] model [0.33  0.29  0.195] a [-0.      0.      0.      0.     -0.0519  0.      0.0533  0.     -0.1052
++  0.      0.    ] stall 0
++40 grasp obstruction5:Kinematic3DCuboid pos [0.1585 0.1741 0.104 ] model [0.1585 0.1741 0.172 ] a [ 0.      0.      0.      0.      0.0103 -0.     -0.0107  0.      0.0211
++ -0.     -1.    ] stall 0
++50 lower obstruction5:Kinematic3DCuboid pos [0.135 0.    0.12 ] model [0.135 0.    0.188] a [ 0.     -0.      0.      0.      0.0448  0.     -0.0634  0.      0.1082
++  0.      0.    ] stall 0
++60 align obstruction4:Kinematic3DCuboid pos [0.1843 0.233  0.1022] model [0.1843 0.233  0.3   ] a [ 0.0112  0.053   0.      0.      0.      0.      0.      0.     -0.
++  0.      0.    ] stall 0
++70 lift obstruction4:Kinematic3DCuboid pos [0.1843 0.233  0.2222] model [0.1843 0.233  0.276 ] a [ 0.      0.      0.      0.     -0.0336  0.      0.0787  0.     -0.1123
++ -0.      0.    ] stall 0
++80 release obstruction4:Kinematic3DCuboid pos [0.265  0.     0.0932] model [ 0.265 -0.     0.147] a [-0. -0.  0.  0.  0. -0.  0.  0.  0.  0.  0.] stall 0
++90 grasp obstruction1:Kinematic3DCuboid pos [0.1031 0.209  0.101 ] model [0.1031 0.209  0.26  ] a [-0.      0.      0.      0.      0.0277  0.     -0.0868  0.      0.1145
++  0.     -1.    ] stall 1
++100 carry obstruction1:Kinematic3DCuboid pos [0.1031 0.209  0.24  ] model [0.1031 0.209  0.295 ] a [-0.  0.  0.  0.  0. -0. -0.  0. -0. -0.  0.] stall 0
++110 above obstruction3:Kinematic3DCuboid pos [0.1466 0.221  0.0977] model [ 0.395 -0.     0.187] a [-0.      0.      0.      0.     -0.0536  0.      0.0508  0.     -0.1044
++  0.      0.    ] stall 0
++120 grasp obstruction3:Kinematic3DCuboid pos [0.1466 0.221  0.0977] model [0.1466 0.221  0.18  ] a [ 0.      0.      0.      0.      0.0466  0.     -0.0609  0.      0.1075
++ -0.     -1.    ] stall 0
++130 carry obstruction3:Kinematic3DCuboid pos [0.3266 0.26   0.24  ] model [0.3266 0.26   0.2903] a [ 0.18   0.039  0.     0.    -0.    -0.     0.     0.     0.     0.
++  0.   ] stall 1
++140 above obstruction0:Kinematic3DCuboid pos [0.1034 0.248  0.0951] model [0.465 0.29  0.219] a [ 0.     -0.      0.      0.     -0.0468 -0.      0.0606  0.     -0.1074
++  0.      0.    ] stall 0
++150 grasp obstruction0:Kinematic3DCuboid pos [0.1034 0.248  0.0951] model [0.1034 0.248  0.18  ] a [ 0.      0.      0.      0.      0.0466  0.     -0.0609  0.      0.1075
++ -0.     -1.    ] stall 0
++160 carry obstruction0:Kinematic3DCuboid pos [0.1034 0.248  0.24  ] model [0.1034 0.248  0.2849] a [ 0.  0.  0.  0.  0. -0. -0.  0.  0. -0.  0.] stall 0
++170 release obstruction0:Kinematic3DCuboid pos [ 0.135  -0.15    0.0861] model [ 0.135 -0.15   0.131] a [-0.  0.  0.  0. -0.  0.  0.  0. -0. -0.  1.] stall 1
+diff --git a/quick_results.txt b/quick_results.txt
+index a33587f..603bb28 100644
+--- a/quick_results.txt
++++ b/quick_results.txt
+@@ -1,2 +1,5 @@
+ {"seed": 0, "count": 2, "success": true, "steps": 86, "seconds": 12.06, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 1, "attempt": 0}
+ {"seed": 1, "count": 1, "success": true, "steps": 58, "seconds": 11.32, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 1, "attempt": 0}
++{"seed": 2, "count": 2, "success": true, "steps": 115, "seconds": 30.86, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 1, "attempt": 0}
++{"seed": 3, "count": 2, "success": true, "steps": 54, "seconds": 7.43, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 1, "attempt": 0}
++{"seed": 4, "count": 2, "success": true, "steps": 83, "seconds": 12.28, "phase": "release", "obj": "target_block:Kinematic3DCuboid", "stall": 1, "attempt": 0}
+diff --git a/test_sweep_extended.out b/test_sweep_extended.out
+index 8bc1c92..8f7dd5f 100644
+--- a/test_sweep_extended.out
++++ b/test_sweep_extended.out
+@@ -5,3 +5,17 @@
+ {"seed": 44, "count": 2, "success": true, "steps": 84, "sec": 4.0}
+ {"seed": 45, "count": 2, "success": true, "steps": 157, "sec": 21.43}
+ {"seed": 46, "count": 1, "success": true, "steps": 82, "sec": 10.57}
++{"seed": 47, "count": 0, "success": true, "steps": 40, "sec": 8.17}
++{"seed": 48, "count": 0, "success": true, "steps": 41, "sec": 3.35}
++{"seed": 49, "count": 0, "success": true, "steps": 44, "sec": 5.54}
++{"seed": 50, "count": 2, "success": true, "steps": 130, "sec": 16.06}
++{"seed": 51, "count": 1, "success": true, "steps": 82, "sec": 10.43}
++{"seed": 52, "count": 2, "success": true, "steps": 127, "sec": 10.47}
++{"seed": 53, "count": 2, "success": true, "steps": 130, "sec": 8.23}
++{"seed": 54, "count": 0, "success": true, "steps": 41, "sec": 2.71}
++{"seed": 55, "count": 2, "success": true, "steps": 122, "sec": 10.54}
++{"seed": 56, "count": 1, "success": true, "steps": 83, "sec": 5.43}
++{"seed": 57, "count": 0, "success": true, "steps": 42, "sec": 1.23}
++{"seed": 58, "count": 1, "success": true, "steps": 42, "sec": 5.51}
++{"seed": 59, "count": 2, "success": true, "steps": 128, "sec": 9.12}
++{"seed": 60, "count": 0, "success": true, "steps": 41, "sec": 2.96}

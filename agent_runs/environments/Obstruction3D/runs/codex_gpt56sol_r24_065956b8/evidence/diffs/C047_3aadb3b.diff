@@ -1,0 +1,21 @@
+diff --git a/approach.py b/approach.py
+index 73169d5..91328d9 100644
+--- a/approach.py
++++ b/approach.py
+@@ -185,6 +185,16 @@ class GeneratedApproach:
+         if self.phase == "target_anchor":
+             bxerr, byerr = self.anchor_bx-self.base_x, self.anchor_by-self.base_y
+             base_error = max(abs(bxerr), abs(byerr))
++            if self.phase_steps > 20:
++                if self.object.startswith("obstruction"):
++                    self.deferred.add(self.object)
++                    self.phase, self.phase_steps = "retract", 0
++                    return self._act_to(q, q, 1.0)
++                self.carry_rotation = None
++                self.pick_xyz = self._xyz(state, self.object)
++                self.goal_q = self._solve(self.pick_xyz + (0, 0, .18), q)
++                self.phase, self.phase_steps = "prepick", 0
++                return self._act_to(q, self.goal_q, 1.0)
+             if np.max(np.abs(self.goal_q-q)) < .012 and base_error < .005:
+                 self.phase, self.phase_steps = "close", 0
+             elif base_error >= .005:

@@ -1,0 +1,32 @@
+diff --git a/dbg4c.py b/dbg4c.py
+new file mode 100644
+index 0000000..b12992a
+--- /dev/null
++++ b/dbg4c.py
+@@ -0,0 +1,26 @@
++import sys
++import numpy as np
++from env_client import make_env
++import approach
++from approach import GeneratedApproach
++seed=int(sys.argv[1])
++env = make_env(); obs, info = env.reset(seed=seed, options={"object_count":4})
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++for r,p in ap.plans.items(): print(r, [(round(x,2),round(y,2),op) for (x,y),op in p if op!='none'])
++orig=ap._deviated
++def dev(state):
++    for r,(ex,ey,op,snap) in ap.expect.items():
++        o=ap.w.rovers[r]; x=float(state.get(o,'x')); y=float(state.get(o,'y'))
++        if abs(x-ex)>1e-3 or abs(y-ey)>1e-3: print(steps, r,'pos dev', (round(ex,3),round(ey,3)), (round(x,3),round(y,3)))
++        st=ap._snapshot(state,r)
++        if op!='none' : print(steps, r, op, 'snap', snap, '->', st, 'at', round(x,3), round(y,3))
++    return orig(state)
++ap._deviated=dev
++steps=0; done=False
++while not done and steps<int(sys.argv[2]) if len(sys.argv)>2 else 60:
++    a=ap.get_action(obs); obs,r,term,trunc,info=env.step(a); steps+=1; done=term
++print('steps',steps,term)
++T=lambda n: env.observation_space.get_type(n)
++for t in ['rover','objective','sample']:
++    for o in obs.get_objects(T(t)):
++        print(o.name,[round(float(obs.get(o,f)),2) for f in env.observation_space.type_features[T(t)]])

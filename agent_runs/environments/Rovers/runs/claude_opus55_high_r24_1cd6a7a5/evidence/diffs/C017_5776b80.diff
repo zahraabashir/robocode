@@ -1,0 +1,67 @@
+diff --git a/approach.py b/approach.py
+index 1f76749..854b20a 100644
+--- a/approach.py
++++ b/approach.py
+@@ -9,6 +9,7 @@ TMAX = 120
+ BAND = {"sample": -5 / 6, "calibrate": -0.5, "image": -1 / 6, "noop": 1 / 6,
+         "send": 0.5, "drop": 5 / 6}
+ SEND_PEN = 0
++HOME_TOL = 0.15
+ NOOP, CAL, IMG, SAMP, DROP, SEND = "noop", "calibrate", "image", "sample", "drop", "send"
+ 
+ 
+@@ -81,6 +82,12 @@ class RoverBFS:
+         free &= ~((X < lx + 0.71) & (Y < ly + 0.54))
+         self.hc = (int(np.argmin(np.abs(self.xs - self.home[0]))), int(np.argmin(np.abs(self.ys - self.home[1]))))
+         free[self.hc] = True
++        XX, YY = np.meshgrid(self.xs, self.ys, indexing="ij")
++        dh = np.hypot(XX - self.home[0], YY - self.home[1])
++        self.home_mask = (dh <= HOME_TOL) & free
++        self.home_mask[self.hc] = True
++        self.home_d = dh
++        self.finish_cell = {}
+         self.free = free
+         self.shape = free.shape
+         self.nobj = len(scene.opos)
+@@ -238,10 +245,15 @@ class RoverBFS:
+                         new[L2] = M.copy()
+             self.layers.append(new)
+             for L, R in new.items():
+-                if (L & self.SENTB) and not (L & self.STOREB) and R[hc]:
++                if (L & self.SENTB) and not (L & self.STOREB):
++                    Rh = R & self.home_mask
++                    if not Rh.any():
++                        continue
+                     S = L & ((1 << self.n) - 1)
+                     if S not in finish:
+                         finish[S] = (t, L)
++                        dd = np.where(Rh, self.home_d, np.inf)
++                        self.finish_cell[(t, L)] = tuple(int(v) for v in np.unravel_index(np.argmin(dd), dd.shape))
+             if wanted is not None and all(any((S & w) == w for S in finish) for w in wanted):
+                 break
+             if time_budget is not None and _t.time() - t_start > time_budget:
+@@ -250,7 +262,7 @@ class RoverBFS:
+ 
+     def extract(self, T, Lgoal):
+         """Backtrack from (T, Lgoal, home). Returns list of (cell, op) for steps 1..T."""
+-        c = self.hc
++        c = self.finish_cell.get((T, Lgoal), self.hc)
+         L = Lgoal
+         steps = []
+         W, Hh = self.shape
+diff --git a/res_approach_g.json b/res_approach_g.json
+new file mode 100644
+index 0000000..a18da89
+--- /dev/null
++++ b/res_approach_g.json
+@@ -0,0 +1 @@
++{"0": 25, "1": 20, "2": 19, "3": 21, "4": 21, "5": 25, "6": 20, "7": 21, "8": 21, "9": 22, "10": 22, "11": 19, "12": 23, "13": 23, "14": 29, "15": 23, "16": 22, "17": 21, "18": 21, "19": 25, "20": 27, "21": 20, "22": 23, "23": 18, "24": 19, "25": 20, "26": 21, "27": 21, "28": 22, "29": 21, "30": 22, "31": 25, "32": 20, "33": 23, "34": 19, "35": 18, "36": 21, "37": 18, "38": 23, "39": 22, "40": 21, "41": 19, "42": 22, "43": 25, "44": 20, "45": 21, "46": 20, "47": 19}
+\ No newline at end of file
+diff --git a/res_approach_wg.json b/res_approach_wg.json
+new file mode 100644
+index 0000000..8281f26
+--- /dev/null
++++ b/res_approach_wg.json
+@@ -0,0 +1 @@
++{"48": 18, "49": 22, "50": 22, "51": 21, "52": 21, "53": 21, "54": 20, "55": 27, "56": 23, "57": 16, "58": 26, "59": 22, "60": 22, "61": 20, "62": 22, "63": 22, "64": 22, "65": 18, "66": 21, "67": 21, "68": 20, "69": 21, "70": 20, "71": 21, "72": 22, "73": 23, "74": 20, "75": 18, "76": 22, "77": 20, "78": 21, "79": 23, "80": 21, "81": 20, "82": 20, "83": 21, "84": 22, "85": 20, "86": 21, "87": 23, "88": 20, "89": 29, "90": 21, "91": 23, "92": 23, "93": 22, "94": 19, "95": 21, "96": 21, "97": 27, "98": 23, "99": 22, "100": 24, "101": 18, "102": 22, "103": 21, "104": 21, "105": 20, "106": 19, "107": 23, "108": 19, "109": 20, "110": 20, "111": 20, "112": 18, "113": 19, "114": 20, "115": 21, "116": 21, "117": 25, "118": 20, "119": 21, "120": 19, "121": 20, "122": 20, "123": 21, "124": 22, "125": 18, "126": 19, "127": 21, "128": 21, "129": 22, "130": 24, "131": 21, "132": 25, "133": 20, "134": 23, "135": 20, "136": 21, "137": 21, "138": 22, "139": 23, "140": 18, "141": 20, "142": 22, "143": 23, "144": 19, "145": 23, "146": 20, "147": 18, "148": 20, "149": 16, "150": 21, "151": 27, "152": 27, "153": 22, "154": 20, "155": 18, "156": 21, "157": 22, "158": 20, "159": 22}
+\ No newline at end of file

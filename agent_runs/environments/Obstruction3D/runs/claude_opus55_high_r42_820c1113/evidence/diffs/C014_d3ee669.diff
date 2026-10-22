@@ -1,0 +1,112 @@
+diff --git a/approach.py b/approach.py
+index 4f7ed33..963c6f0 100644
+--- a/approach.py
++++ b/approach.py
+@@ -7,6 +7,7 @@ from kin import fk, ik, down_R, jac, rot_err
+ TABLE_Z = 0.075
+ TABLE_X = (0.10, 0.50)
+ TABLE_Y = (-0.40, 0.40)
++ROUTE_MARGIN = 0.02
+ SAFE_MARGIN = 0.03
+ VSTEP = 0.08
+ HSTEP = 0.10
+@@ -234,14 +235,8 @@ class GeneratedApproach:
+         self._set_tilt(p[:2], self.task['dest'])
+         self.phase = 'to_pick'
+         tool = fk(self.base, self.q)[:3, 3]
+-        sz = self._safe_z(None, 0.05)
+-        pick_above = np.array([p[0], p[1], sz])
+-        path = []
+-        if tool[2] < sz - 0.01:
+-            path += self._line(tool, np.array([tool[0], tool[1], sz]), VSTEP)
+-            tool = np.array([tool[0], tool[1], sz])
+-        path += self._line(tool, pick_above, HSTEP)
+-        path += self._line(pick_above, np.array([p[0], p[1], p[2] + he[2] + GRASP_DZ]), VSTEP)
++        pick = np.array([p[0], p[1], p[2] + he[2] + GRASP_DZ])
++        path = self._route(tool, pick, None, 0.036, 0.09)
+         self._set_path(path, self.task['yaw'])
+ 
+     def _mount(self):
+@@ -282,6 +277,53 @@ class GeneratedApproach:
+         k = np.round((ydes - y0) / np.pi)
+         return y0 + k * np.pi
+ 
++    def _need_z(self, xy, held, depth, rad, skip=()):
++        """Min tool z at xy so nothing within rad (xy) is hit."""
++        need = TABLE_Z + depth + 0.01
++        for n, (p, he) in self.objs.items():
++            if n == held or n in skip:
++                continue
++            dx = max(0.0, abs(xy[0] - p[0]) - he[0])
++            dy = max(0.0, abs(xy[1] - p[1]) - he[1])
++            if dx * dx + dy * dy < rad * rad:
++                need = max(need, p[2] + he[2] + depth + ROUTE_MARGIN)
++        return need
++
++    def _route(self, start, goal, held, depth, rad, approach=0.035, skip_start=(), skip_goal=()):
++        """Waypoints from start to goal: vertical exit, diagonal/flat transit, vertical entry."""
++        a = np.array([start[0], start[1], max(start[2], min(start[2] + approach, 0.30))])
++        g = np.array([goal[0], goal[1], goal[2] + approach])
++        # vertical exit only needed if tool low near objects
++        d = np.linalg.norm(g[:2] - a[:2])
++        ns = max(2, int(np.ceil(d / 0.01)))
++        need = []
++        for i in range(ns + 1):
++            f = i / ns
++            xy = a[:2] + (g[:2] - a[:2]) * f
++            sk = set()
++            if f < 0.3:
++                sk |= set(skip_start)
++            if f > 0.7:
++                sk |= set(skip_goal)
++            need.append(self._need_z(xy, held, depth, rad, sk))
++        need = np.array(need)
++        zs = a[2] + (g[2] - a[2]) * np.linspace(0, 1, ns + 1)
++        pts = []
++        if start[2] < a[2] - 1e-4:
++            pts.append(a)
++        if np.all(zs >= need):
++            pts += self._line(a, g, HSTEP)
++        else:
++            h = max(need.max(), a[2], g[2])
++            b = np.array([a[0], a[1], h]); c = np.array([g[0], g[1], h])
++            # try to skip vertical parts by diagonals where clear
++            pts += self._line(a, b, VSTEP) if h > a[2] + 1e-4 else []
++            pts += self._line(b, c, HSTEP)
++            if h > g[2] + 1e-4:
++                pts += self._line(c, g, VSTEP)
++        pts.append(np.asarray(goal, float))
++        return pts
++
+     def _safe_z(self, held, depth):
+         top = TABLE_Z
+         for n, (p, he) in self.objs.items():
+@@ -403,18 +445,10 @@ class GeneratedApproach:
+                 tool = fk(self.base, self.q)[:3, 3]
+                 self.grasp_off = tool[2] - p[2]   # tool z above object center
+                 dest = self.task['dest']
+-                sz = self._safe_z(n, self.grasp_off + he[2])
+-                up = np.array([tool[0], tool[1], sz])
+-                above = np.array([dest[0], dest[1], sz])
+                 place = np.array([dest[0], dest[1], self.task['surf'] + he[2] + self.grasp_off + PLACE_EPS])
+-                pts = self._line(tool, up, VSTEP)
+-                pts2 = self._line(up, above, HSTEP)
+-                pts3 = self._line(above, place, VSTEP)
+-                y0, y1 = self.task['yaw'], self.task['yaw_place']
+-                self.path = [(p_, y0) for p_ in pts]
+-                k = len(pts2)
+-                self.path += [(p_, y0 + (y1 - y0) * (i + 1) / k) for i, p_ in enumerate(pts2)]
+-                self.path += [(p_, y1) for p_ in pts3]
++                rad = max(0.09, np.hypot(he[0], he[1]) + 0.015)
++                pts = self._route(tool, place, n, max(self.grasp_off + he[2], 0.036), rad)
++                self.path = [(p_, self.task['yaw_place']) for p_ in pts]
+                 return None
+             self.wait += 1
+             if self.wait == 1:
+diff --git a/sweep3.txt b/sweep3.txt
+new file mode 100644
+index 0000000..a09d07f
+--- /dev/null
++++ b/sweep3.txt
+@@ -0,0 +1 @@
++success 100/100  mean steps(success) 26.1  max compute 0.3s

@@ -1,0 +1,16 @@
+diff --git a/kin.py b/kin.py
+index b5be755..f8d95ad 100644
+--- a/kin.py
++++ b/kin.py
+@@ -1,7 +1,6 @@
+ import numpy as np
+-from scipy.spatial.transform import Rotation
+ ORIGINS=[([0,0,.15643],np.pi),([0,.005375,-.12838],np.pi/2),([0,-.21038,-.006375],-np.pi/2),([0,.006375,-.21038],np.pi/2),([0,-.20843,-.006375],-np.pi/2),([0,0,-.10593],np.pi/2),([0,-.10593,0],-np.pi/2)]
+-MATS=[Rotation.from_euler('x',a).as_matrix() for p,a in ORIGINS]
++MATS=[np.array([[1.,0.,0.],[0.,np.cos(a),-np.sin(a)],[0.,np.sin(a),np.cos(a)]]) for p,a in ORIGINS]
+ Q0=np.array([0,-.35,-np.pi,-2.5,0,-.87,np.pi/2])
+ def fk(q,d=.18):
+  t=np.zeros(3);r=np.eye(3)
+diff --git a/probe_escape_dense.out b/probe_escape_dense.out
+new file mode 100644
+index 0000000..e69de29

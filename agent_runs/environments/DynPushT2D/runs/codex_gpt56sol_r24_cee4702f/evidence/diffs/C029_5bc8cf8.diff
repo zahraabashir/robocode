@@ -1,0 +1,65 @@
+diff --git a/approach.py b/approach.py
+index db6f690..6c9d036 100644
+--- a/approach.py
++++ b/approach.py
+@@ -17,6 +17,7 @@ class GeneratedApproach:
+         self.push_dir = np.array([1.0, 0.0])
+         self.start_pose = np.zeros(3)
+         self.nav = []
++        self.rot_y = -0.7
+ 
+     @staticmethod
+     def _angle(x):
+@@ -67,6 +68,8 @@ class GeneratedApproach:
+                 q = (cur[0]+dx, cur[1]+dy)
+                 if not (0 <= q[0] < n and 0 <= q[1] < n) or (q != st and blocked(*q)):
+                     continue
++                if dx and dy and (blocked(cur[0]+dx, cur[1]) or blocked(cur[0], cur[1]+dy)):
++                    continue
+                 nc = cost[cur] + math.hypot(dx,dy)
+                 if nc < cost.get(q, 1e30):
+                     cost[q], parent[q] = nc, cur
+@@ -101,11 +104,21 @@ class GeneratedApproach:
+ 
+         if self.mode == "choose":
+             branch_mismatch = pd < 0.06 and abs(goal_theta-theta) > 0.14
+-            if abs(ae) > 0.11 or branch_mismatch:
++            boundary_recover = min(obj) < 0.72 or max(obj) > 4.28
++            if (abs(ae) > 0.11 or branch_mismatch) and not boundary_recover:
+                 self.turn_sign = 1.0 if ae > 0.0 else -1.0
+                 self.mode = "rot_far"
+                 side = -self.turn_sign
+-                far0 = obj + self._world(np.array([side*(width*.5+.34), -.72*lv]), theta)
++                # Move the lever up the stem when the distal contact would
++                # crowd a robot boundary.
++                def lever_clear(frac):
++                    pts = [np.array([side*(width*.5+.34), -frac*lv]),
++                           np.array([side*(width*.5+.115), -frac*lv])]
++                    world = [obj+self._world(p,theta) for p in pts]
++                    return min(min(q[0]-.105,4.895-q[0],q[1]-.105,4.895-q[1]) for q in world)
++                frac = max((0.80, 0.68, 0.56), key=lever_clear)
++                self.rot_y = -frac*lv
++                far0 = obj + self._world(np.array([side*(width*.5+.34), self.rot_y]), theta)
+                 self.nav = self._plan(robot, far0, obj, theta, width, lh, lv)
+             elif pd > 0.018:
+                 self.push_dir = dp / max(pd, 1e-9)
+@@ -121,8 +134,8 @@ class GeneratedApproach:
+         if self.mode.startswith("rot"):
+             # Distal-stem side contact is a reliable long rotation lever.
+             side = -self.turn_sign
+-            far_local = np.array([side * (width * 0.5 + 0.34), -0.72 * lv])
+-            contact_local = np.array([side * (width * 0.5 + 0.115), -0.72 * lv])
++            far_local = np.array([side * (width * 0.5 + 0.34), self.rot_y])
++            contact_local = np.array([side * (width * 0.5 + 0.115), self.rot_y])
+             far = obj + self._world(far_local, theta)
+             contact = obj + self._world(contact_local, theta)
+             force = self._world(np.array([self.turn_sign, 0.0]), theta)
+@@ -150,7 +163,7 @@ class GeneratedApproach:
+                 current_ae = self._angle(goal_theta - theta)
+                 turned = abs(self._angle(theta - self.start_pose[2]))
+                 if (current_ae * self.turn_sign < 0.0 or abs(current_ae) < 0.055
+-                        or turned > 0.16 or self.count >= 10):
++                        or turned > 0.12 or self.count >= 8):
+                     self.mode = "rot_retreat"
+                 return self._safe(force, 0.016)
+             if np.linalg.norm(robot - far) < 0.04:

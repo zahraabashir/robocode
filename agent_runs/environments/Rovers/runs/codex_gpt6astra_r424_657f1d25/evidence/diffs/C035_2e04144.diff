@@ -1,0 +1,2439 @@
+diff --git a/approach_backup.py b/approach_backup.py
+deleted file mode 100644
+index e06bda3..0000000
+--- a/approach_backup.py
++++ /dev/null
+@@ -1,204 +0,0 @@
+-import math
+-import heapq
+-import numpy as np
+-
+-
+-class GeneratedApproach:
+-    """Feedback navigation and task allocation for the two rovers."""
+-    def __init__(self, action_space, observation_space, primitives):
+-        self.space = observation_space
+-        self.types = {t.name: t for t in observation_space.types}
+-
+-    def objects(self, state, kind):
+-        return sorted(state.get_objects(self.types[kind]), key=lambda o: o.name)
+-
+-    def xy(self, state, obj):
+-        return np.array([state.get(obj, 'x'), state.get(obj, 'y')], dtype=float)
+-
+-    def reset(self, state, info):
+-        self.rovers = self.objects(state, 'rover')
+-        self.objectives = self.objects(state, 'objective')
+-        self.samples = self.objects(state, 'sample')
+-        self.home = [self.xy(state, r) for r in self.rovers]
+-        self.lander = self.xy(state, self.objects(state, 'lander')[0])
+-        self.rects = []
+-        self.occluders = []
+-        for o in self.objects(state, 'obstacle'):
+-            p = self.xy(state, o)
+-            h = np.array([state.get(o, 'half_x'), state.get(o, 'half_y')])
+-            self.rects.append((p-h, p+h))
+-            if state.get(o, 'half_z') > .1:
+-                self.occluders.append((p-h, p+h))
+-        self.rects.append((np.array([-.05, -3.]), np.array([.05, 3.])))
+-        self.rects.append((self.lander-np.array([.3,.25]),self.lander+np.array([.3,.25])))
+-        axis = np.arange(-2.2, 2.201, .1)
+-        self.size = len(axis)
+-        xx, yy = np.meshgrid(axis, axis)
+-        self.points = np.column_stack([xx.ravel(), yy.ravel()])
+-        self.free = self.valid(self.points)
+-        self.masks = {}
+-        for k, o in enumerate(self.objectives):
+-            self.masks[('image',k)] = self.free & self.visible(self.points,self.xy(state,o),1.97)
+-        for k, o in enumerate(self.samples):
+-            self.masks[('sample',k)] = self.free & (np.linalg.norm(self.points-self.xy(state,o),axis=1)<.235)
+-        self.masks[('send',0)] = self.free & self.visible(self.points,self.lander,3.95)
+-        self.tasks = [None,None]
+-        self.paths = [[],[]]
+-        self.previous = [None,None]
+-        self.fail = [0,0]
+-        self.tick = 0
+-        self.last_op = [None, None]
+-        self.bad_views = {}
+-
+-    def valid(self, pts):
+-        good = np.all(np.abs(pts) <= 2.265, axis=-1)
+-        for lo,hi in self.rects:
+-            good &= np.linalg.norm(np.maximum(np.maximum(lo-pts,pts-hi),0),axis=-1) > .182
+-        return good
+-
+-    def visible(self, pts, target, radius):
+-        good = np.linalg.norm(pts-target,axis=1)<radius
+-        d = target-pts
+-        for lo,hi in self.occluders:
+-            inv = np.divide(1.,d,out=np.full_like(d,1e10),where=np.abs(d)>1e-10)
+-            a=(lo-pts)*inv; b=(hi-pts)*inv
+-            enter=np.max(np.minimum(a,b),axis=1)
+-            leave=np.min(np.maximum(a,b),axis=1)
+-            good &= ~((leave>=np.maximum(enter,0)) & (enter<=1) & (leave>=0))
+-        return good
+-
+-    def route(self, start, mask, other=None):
+-        # A multi-goal Dijkstra on a small occupancy grid.
+-        free=self.free.copy()
+-        if other is not None:
+-            free &= np.linalg.norm(self.points-other,axis=1)>.4
+-        starts=np.argsort(np.linalg.norm(self.points-start,axis=1))[:20]
+-        root=next((int(j) for j in starts if free[j]),int(starts[0]))
+-        dist={root:0.}; parent={}; queue=[(0.,root)]
+-        n=self.size
+-        end=None
+-        while queue:
+-            cost,j=heapq.heappop(queue)
+-            if cost!=dist[j]: continue
+-            if mask[j]: end=j;break
+-            x=j%n;y=j//n
+-            for dx,dy in ((1,0),(-1,0),(0,1),(0,-1),(1,1),(-1,1),(1,-1),(-1,-1)):
+-                nx=x+dx;ny=y+dy
+-                if nx<0 or nx>=n or ny<0 or ny>=n:continue
+-                k=ny*n+nx
+-                if not free[k]:continue
+-                if dx and dy and (not free[y*n+nx] or not free[ny*n+x]):continue
+-                v=cost+1.
+-                if v<dist.get(k,1e9):
+-                    dist[k]=v;parent[k]=j;heapq.heappush(queue,(v,k))
+-        if end is None:return [],1e6
+-        path=[end]
+-        while path[-1]!=root:path.append(parent[path[-1]])
+-        return [self.points[j].copy() for j in path[::-1]],dist[end]*.5
+-
+-    def have(self,s,k):
+-        o=self.objectives[k]
+-        return any(s.get(o,f)>0.5 for f in ('received_image','have_image_rover0','have_image_rover1'))
+-
+-    def needed(self,s):
+-        return [not any(s.get(o,'is_soil')==soil and any(s.get(o,f)>.5 for f in ('received_analysis','analyzed_rover0','analyzed_rover1')) for o in self.samples) for soil in (0,1)]
+-
+-    def pending(self,s,r):
+-        return any(s.get(o,'have_image_rover%d'%r)>.5 and s.get(o,'received_image')<.5 for o in self.objectives) or any(s.get(o,'analyzed_rover%d'%r)>.5 and s.get(o,'received_analysis')<.5 for o in self.samples)
+-
+-    def completed(self,s,r,task):
+-        kind,k=task
+-        if kind=='image':return self.have(s,k)
+-        if kind=='sample':return not self.needed(s)[int(s.get(self.samples[k],'is_soil'))]
+-        if kind=='send':return not self.pending(s,r)
+-        return s.get(self.rovers[r],'at_home')>.5
+-
+-    def choose(self,s,r,p,other):
+-        candidates=[]
+-        reserved=self.tasks[1-r]
+-        need=self.needed(s)
+-        for k,o in enumerate(self.objectives):
+-            if not self.have(s,k) and reserved!=('image',k):candidates.append(('image',k))
+-        if s.get(self.rovers[r],'store_full')<.5:
+-            for k,o in enumerate(self.samples):
+-                soil=int(s.get(o,'is_soil'))
+-                if need[soil] and not (reserved and reserved[0]=='sample' and int(s.get(self.samples[reserved[1]],'is_soil'))==soil):candidates.append(('sample',k))
+-        best=None;score=1e9;path=[]
+-        for task in candidates:
+-            pp,cost=self.route(p,self.masks[task],other)
+-            cost+=2 if task[0]=='image' else 0
+-            if cost<score and cost<1e5:best=task;score=cost;path=pp
+-        if best is None:
+-            if self.pending(s,r):best=('send',0);path,_=self.route(p,self.masks[best],other)
+-            else:
+-                best=('home',r)
+-                mask=np.linalg.norm(self.points-self.home[r],axis=1)<.08
+-                path,_=self.route(p,mask,other)
+-                path.append(self.home[r].copy())
+-        self.tasks[r]=best;self.paths[r]=path
+-
+-    def result_count(self, s, r):
+-        return sum(s.get(o, 'have_image_rover%d'%r) for o in self.objectives) + sum(s.get(o, 'analyzed_rover%d'%r) for o in self.samples)
+-
+-    def get_action(self, state):
+-        s=state; self.tick+=1
+-        action=np.zeros(8,dtype=np.float32)
+-        pos=[self.xy(s,r) for r in self.rovers]
+-        for r in range(2):
+-            p=pos[r];rob=self.rovers[r]
+-            if self.previous[r] is not None and np.linalg.norm(p-self.previous[r][0])<1e-5 and np.linalg.norm(self.previous[r][1])>.01:
+-                self.fail[r]+=1
+-            else:self.fail[r]=0
+-            task=self.tasks[r]
+-            last=self.last_op[r]
+-            if last is not None:
+-                old_task, old_p, old_op, old_count = last
+-                failed = ((old_op == -.5 and s.get(rob,'calibrated')<.5) or
+-                          (old_op == -1/6 and self.result_count(s,r)<=old_count) or
+-                          (old_op == .5 and old_task[0]=='send' and self.pending(s,r)))
+-                if failed and task==old_task and task[0] in ('image','send'):
+-                    self.masks[task] &= np.linalg.norm(self.points-p,axis=1)>.22
+-                    self.paths[r],_=self.route(p,self.masks[task],pos[1-r])
+-            if task is None or self.completed(s,r,task):
+-                self.choose(s,r,p,pos[1-r]);task=self.tasks[r]
+-            if self.fail[r]>=2:
+-                self.paths[r]=[]
+-                # Infer blocked configuration and route around it.
+-                blocked=p+self.previous[r][1]
+-                self.free[np.linalg.norm(self.points-blocked,axis=1)<.12]=False
+-                if task[0]=='home':mask=np.linalg.norm(self.points-self.home[r],axis=1)<.08
+-                else:mask=self.masks[task]
+-                self.paths[r],_=self.route(p,mask,pos[1-r])
+-                if task[0]=='home':self.paths[r].append(self.home[r].copy())
+-                elif not self.paths[r]:
+-                    self.tasks[r]=None
+-                    self.choose(s,r,p,pos[1-r]);task=self.tasks[r]
+-                self.fail[r]=0
+-            path=self.paths[r]
+-            while path and np.max(np.abs(path[0]-p))<.025:path.pop(0)
+-            dest=p.copy()
+-            selected=-1
+-            for pi,point in enumerate(path[:5]):
+-                d=point-p
+-                if np.max(np.abs(d))>.20001:break
+-                probes=p+np.linspace(0,1,5)[:,None]*d
+-                if np.all(self.valid(probes)) and np.linalg.norm(point-pos[1-r])>.4:dest=point.copy();selected=pi
+-                else:break
+-            if selected>0:del path[:selected]
+-            d=np.clip(dest-p,-.2,.2)
+-            q=p+d
+-            op=0.
+-            kind,k=task
+-            if kind=='sample' and np.linalg.norm(q-self.xy(s,self.samples[k]))<.247:op=-5/6
+-            elif kind=='image' and self.visible(q[None,:],self.xy(s,self.objectives[k]),1.99)[0]:
+-                op=-1/6 if s.get(rob,'calibrated')>.5 else -.5
+-                if path and np.linalg.norm(q-path[-1])>.06 and last is not None and last[0]==task and last[2] in (-.5,-1/6):op=0.
+-            elif kind=='send' and self.visible(q[None,:],self.lander,3.99)[0]:
+-                op=.5
+-                if path and np.linalg.norm(q-path[-1])>.06:op=0.
+-            if op==0 and s.get(rob,'store_full')>.5:op=5/6
+-            elif op==0 and self.pending(s,r) and self.visible(q[None,:],self.lander,3.99)[0]:op=.5
+-            action[r*4:r*4+2]=d;action[r*4+3]=op
+-            self.previous[r]=(p.copy(),d.copy())
+-            self.last_op[r]=(task,q.copy(),op,self.result_count(s,r))
+-        return action
+diff --git a/approach_greedy.py b/approach_greedy.py
+deleted file mode 100644
+index 922b727..0000000
+--- a/approach_greedy.py
++++ /dev/null
+@@ -1,211 +0,0 @@
+-import math
+-import heapq
+-import numpy as np
+-
+-
+-class GeneratedApproach:
+-    """Feedback navigation and task allocation for the two rovers."""
+-    def __init__(self, action_space, observation_space, primitives):
+-        self.space = observation_space
+-        self.types = {t.name: t for t in observation_space.types}
+-
+-    def objects(self, state, kind):
+-        return sorted(state.get_objects(self.types[kind]), key=lambda o: o.name)
+-
+-    def xy(self, state, obj):
+-        return np.array([state.get(obj, 'x'), state.get(obj, 'y')], dtype=float)
+-
+-    def reset(self, state, info):
+-        self.rovers = self.objects(state, 'rover')
+-        self.objectives = self.objects(state, 'objective')
+-        self.samples = self.objects(state, 'sample')
+-        self.home = [self.xy(state, r) for r in self.rovers]
+-        self.lander = self.xy(state, self.objects(state, 'lander')[0])
+-        self.rects = []
+-        self.occluders = []
+-        for o in self.objects(state, 'obstacle'):
+-            p = self.xy(state, o)
+-            h = np.array([state.get(o, 'half_x'), state.get(o, 'half_y')])
+-            self.rects.append((p-h, p+h))
+-            if state.get(o, 'half_z') > .1:
+-                self.occluders.append((p-h, p+h))
+-        self.rects.append((np.array([-.05, -3.]), np.array([.05, 3.])))
+-        self.rects.append((self.lander-np.array([.510,.334]),self.lander+np.array([.510,.334])))
+-        axis = np.arange(-2.2, 2.201, .1)
+-        self.size = len(axis)
+-        xx, yy = np.meshgrid(axis, axis)
+-        self.points = np.column_stack([xx.ravel(), yy.ravel()])
+-        self.free = self.valid(self.points)
+-        self.masks = {}
+-        for k, o in enumerate(self.objectives):
+-            self.masks[('image',k)] = self.free & self.visible(self.points,self.xy(state,o),1.97)
+-        for k, o in enumerate(self.samples):
+-            self.masks[('sample',k)] = self.free & self.sample_safe(state,self.points,k)
+-        self.masks[('send',0)] = self.free & self.visible(self.points,self.lander,3.8)
+-        self.tasks = [None,None]
+-        self.paths = [[],[]]
+-        self.previous = [None,None]
+-        self.fail = [0,0]
+-        self.tick = 0
+-        self.last_op = [None, None]
+-        self.bad_views = {}
+-
+-    def sample_safe(self, state, pts, k):
+-        target=self.samples[k]
+-        good=np.linalg.norm(pts-self.xy(state,target),axis=1)<.242
+-        for obj in self.samples:
+-            if state.get(obj,'is_soil')!=state.get(target,'is_soil'):
+-                good &= np.linalg.norm(pts-self.xy(state,obj),axis=1)>.255
+-        return good
+-
+-    def valid(self, pts):
+-        good = np.all(np.abs(pts) <= 2.265, axis=-1)
+-        for lo,hi in self.rects:
+-            good &= np.linalg.norm(np.maximum(np.maximum(lo-pts,pts-hi),0),axis=-1) > .182
+-        return good
+-
+-    def visible(self, pts, target, radius):
+-        good = np.linalg.norm(pts-target,axis=1)<radius
+-        d = target-pts
+-        length2 = np.maximum(np.sum(d*d,axis=1),1e-12)
+-        for lo,hi in self.occluders:
+-            center=(lo+hi)*.5
+-            t=np.clip(np.sum((center-pts)*d,axis=1)/length2,0,1)
+-            closest=pts+t[:,None]*d
+-            good &= np.linalg.norm(closest-center,axis=1)>.155
+-        return good
+-
+-    def route(self, start, mask, other=None):
+-        # A multi-goal Dijkstra on a small occupancy grid.
+-        free=self.free.copy()
+-        if other is not None:
+-            free &= np.linalg.norm(self.points-other,axis=1)>.4
+-        starts=np.argsort(np.linalg.norm(self.points-start,axis=1))[:20]
+-        root=next((int(j) for j in starts if free[j]),int(starts[0]))
+-        dist={root:0.}; parent={}; queue=[(0.,root)]
+-        n=self.size
+-        end=None
+-        while queue:
+-            cost,j=heapq.heappop(queue)
+-            if cost!=dist[j]: continue
+-            if mask[j]: end=j;break
+-            x=j%n;y=j//n
+-            for dx,dy in ((1,0),(-1,0),(0,1),(0,-1),(1,1),(-1,1),(1,-1),(-1,-1)):
+-                nx=x+dx;ny=y+dy
+-                if nx<0 or nx>=n or ny<0 or ny>=n:continue
+-                k=ny*n+nx
+-                if not free[k]:continue
+-                if dx and dy and (not free[y*n+nx] or not free[ny*n+x]):continue
+-                v=cost+1.+(.001 if dx and dy else 0.)
+-                if v<dist.get(k,1e9):
+-                    dist[k]=v;parent[k]=j;heapq.heappush(queue,(v,k))
+-        if end is None:return [],1e6
+-        path=[end]
+-        while path[-1]!=root:path.append(parent[path[-1]])
+-        return [self.points[j].copy() for j in path[::-1]],dist[end]*.5
+-
+-    def have(self,s,k):
+-        o=self.objectives[k]
+-        return any(s.get(o,f)>0.5 for f in ('received_image','have_image_rover0','have_image_rover1'))
+-
+-    def needed(self,s):
+-        return [not any(s.get(o,'is_soil')==soil and any(s.get(o,f)>.5 for f in ('received_analysis','analyzed_rover0','analyzed_rover1')) for o in self.samples) for soil in (0,1)]
+-
+-    def pending(self,s,r):
+-        return any(s.get(o,'have_image_rover%d'%r)>.5 and s.get(o,'received_image')<.5 for o in self.objectives) or any(s.get(o,'analyzed_rover%d'%r)>.5 and s.get(o,'received_analysis')<.5 for o in self.samples)
+-
+-    def completed(self,s,r,task):
+-        kind,k=task
+-        if kind=='image':return self.have(s,k)
+-        if kind=='sample':return not self.needed(s)[int(s.get(self.samples[k],'is_soil'))]
+-        if kind=='send':return not self.pending(s,r)
+-        return s.get(self.rovers[r],'at_home')>.5
+-
+-    def choose(self,s,r,p,other):
+-        candidates=[]
+-        reserved=self.tasks[1-r]
+-        need=self.needed(s)
+-        for k,o in enumerate(self.objectives):
+-            if not self.have(s,k) and reserved!=('image',k):candidates.append(('image',k))
+-        if s.get(self.rovers[r],'store_full')<.5:
+-            for k,o in enumerate(self.samples):
+-                soil=int(s.get(o,'is_soil'))
+-                if need[soil] and not (reserved and reserved[0]=='sample' and int(s.get(self.samples[reserved[1]],'is_soil'))==soil):candidates.append(('sample',k))
+-        best=None;score=1e9;path=[]
+-        for task in candidates:
+-            pp,cost=self.route(p,self.masks[task],other)
+-            cost+=2 if task[0]=='image' else 0
+-            if cost<score and cost<1e5:best=task;score=cost;path=pp
+-        if best is None:
+-            if self.pending(s,r):best=('send',0);path,_=self.route(p,self.masks[best],other)
+-            else:
+-                best=('home',r)
+-                mask=np.linalg.norm(self.points-self.home[r],axis=1)<.24
+-                path,_=self.route(p,mask,other)
+-                if s.get(self.rovers[r],'at_home')>.5:path=[]
+-        self.tasks[r]=best;self.paths[r]=path
+-
+-    def result_count(self, s, r):
+-        return sum(s.get(o, 'have_image_rover%d'%r) for o in self.objectives) + sum(s.get(o, 'analyzed_rover%d'%r) for o in self.samples)
+-
+-    def get_action(self, state):
+-        s=state; self.tick+=1
+-        action=np.zeros(8,dtype=np.float32)
+-        pos=[self.xy(s,r) for r in self.rovers]
+-        for r in range(2):
+-            p=pos[r];rob=self.rovers[r]
+-            if self.previous[r] is not None and np.linalg.norm(p-self.previous[r][0])<1e-5 and np.linalg.norm(self.previous[r][1])>.01:
+-                self.fail[r]+=1
+-            else:self.fail[r]=0
+-            task=self.tasks[r]
+-            last=self.last_op[r]
+-            if last is not None:
+-                old_task, old_p, old_op, old_count = last
+-                failed = ((old_op == -.5 and s.get(rob,'calibrated')<.5) or
+-                          (old_op == -1/6 and self.result_count(s,r)<=old_count) or
+-                          (old_op == .5 and old_task[0]=='send' and self.pending(s,r)))
+-                if failed and task==old_task and task[0] in ('image','send'):
+-                    self.masks[task] &= np.linalg.norm(self.points-p,axis=1)>.22
+-                    self.paths[r],_=self.route(p,self.masks[task],pos[1-r])
+-            if task is None or self.completed(s,r,task):
+-                self.choose(s,r,p,pos[1-r]);task=self.tasks[r]
+-            if self.fail[r]>=2:
+-                self.paths[r]=[]
+-                # Infer blocked configuration and route around it.
+-                blocked=p+self.previous[r][1]
+-                self.free[np.linalg.norm(self.points-blocked,axis=1)<.12]=False
+-                if task[0]=='home':mask=np.linalg.norm(self.points-self.home[r],axis=1)<.24
+-                else:mask=self.masks[task]
+-                self.paths[r],_=self.route(p,mask,pos[1-r])
+-                if task[0]!='home' and not self.paths[r]:
+-                    self.tasks[r]=None
+-                    self.choose(s,r,p,pos[1-r]);task=self.tasks[r]
+-                self.fail[r]=0
+-            path=self.paths[r]
+-            while path and np.max(np.abs(path[0]-p))<.025:path.pop(0)
+-            dest=p.copy()
+-            selected=-1
+-            for pi,point in enumerate(path[:5]):
+-                d=point-p
+-                if np.max(np.abs(d))>.20001:break
+-                probes=p+np.linspace(0,1,5)[:,None]*d
+-                if np.all(self.valid(probes)) and np.linalg.norm(point-pos[1-r])>.4:dest=point.copy();selected=pi
+-                else:break
+-            if selected>0:del path[:selected]
+-            d=np.clip(dest-p,-.2,.2)
+-            q=p+d
+-            op=0.
+-            kind,k=task
+-            if kind=='sample' and s.get(rob,'store_full')<.5 and self.sample_safe(s,q[None,:],k)[0]:op=-5/6
+-            elif kind=='image' and self.visible(q[None,:],self.xy(s,self.objectives[k]),1.99)[0]:
+-                op=-1/6 if s.get(rob,'calibrated')>.5 else -.5
+-                if path and np.linalg.norm(q-path[-1])>.06 and last is not None and last[0]==task and last[2] in (-.5,-1/6):op=0.
+-            elif kind=='send' and self.visible(q[None,:],self.lander,3.85)[0]:
+-                op=.5
+-                if path and np.linalg.norm(q-path[-1])>.06:op=0.
+-            if op==0 and s.get(rob,'store_full')>.5:op=5/6
+-            elif op==0 and self.pending(s,r) and self.visible(q[None,:],self.lander,3.85)[0]:op=.5
+-            action[r*4:r*4+2]=d;action[r*4+3]=op
+-            self.previous[r]=(p.copy(),d.copy())
+-            self.last_op[r]=(task,q.copy(),op,self.result_count(s,r))
+-        return action
+diff --git a/approach_no_plan.py b/approach_no_plan.py
+deleted file mode 100644
+index 14427d7..0000000
+--- a/approach_no_plan.py
++++ /dev/null
+@@ -1,225 +0,0 @@
+-import math
+-import heapq
+-import numpy as np
+-from task_planner import assign_tasks
+-
+-
+-class GeneratedApproach:
+-    """Feedback navigation and task allocation for the two rovers."""
+-    def __init__(self, action_space, observation_space, primitives):
+-        self.space = observation_space
+-        self.types = {t.name: t for t in observation_space.types}
+-
+-    def objects(self, state, kind):
+-        return sorted(state.get_objects(self.types[kind]), key=lambda o: o.name)
+-
+-    def xy(self, state, obj):
+-        return np.array([state.get(obj, 'x'), state.get(obj, 'y')], dtype=float)
+-
+-    def reset(self, state, info):
+-        self.rovers = self.objects(state, 'rover')
+-        self.objectives = self.objects(state, 'objective')
+-        self.samples = self.objects(state, 'sample')
+-        self.home = [self.xy(state, r) for r in self.rovers]
+-        self.lander = self.xy(state, self.objects(state, 'lander')[0])
+-        self.rects = []
+-        self.occluders = []
+-        for o in self.objects(state, 'obstacle'):
+-            p = self.xy(state, o)
+-            h = np.array([state.get(o, 'half_x'), state.get(o, 'half_y')])
+-            self.rects.append((p-h, p+h))
+-            if state.get(o, 'half_z') > .1:
+-                self.occluders.append((p-h, p+h))
+-        self.rects.append((np.array([-.05, -3.]), np.array([.05, 3.])))
+-        self.rects.append((self.lander-np.array([.510,.334]),self.lander+np.array([.510,.334])))
+-        axis = np.arange(-2.2, 2.201, .1)
+-        self.size = len(axis)
+-        xx, yy = np.meshgrid(axis, axis)
+-        self.points = np.column_stack([xx.ravel(), yy.ravel()])
+-        self.free = self.valid(self.points)
+-        self.masks = {}
+-        for k, o in enumerate(self.objectives):
+-            self.masks[('image',k)] = self.free & self.visible(self.points,self.xy(state,o),1.97)
+-        for k, o in enumerate(self.samples):
+-            self.masks[('sample',k)] = self.free & self.sample_safe(state,self.points,k)
+-        self.masks[('send',0)] = self.free & self.visible(self.points,self.lander,3.8)
+-        self.tasks = [None,None]
+-        self.paths = [[],[]]
+-        self.previous = [None,None]
+-        self.fail = [0,0]
+-        self.tick = 0
+-        self.last_op = [None, None]
+-        self.bad_views = {}
+-        self.schedule = None
+-
+-    def sample_safe(self, state, pts, k):
+-        target=self.samples[k]
+-        good=np.linalg.norm(pts-self.xy(state,target),axis=1)<.242
+-        for obj in self.samples:
+-            if state.get(obj,'is_soil')!=state.get(target,'is_soil'):
+-                good &= np.linalg.norm(pts-self.xy(state,obj),axis=1)>.255
+-        return good
+-
+-    def valid(self, pts):
+-        good = np.all(np.abs(pts) <= 2.265, axis=-1)
+-        for lo,hi in self.rects:
+-            good &= np.linalg.norm(np.maximum(np.maximum(lo-pts,pts-hi),0),axis=-1) > .182
+-        return good
+-
+-    def visible(self, pts, target, radius):
+-        good = np.linalg.norm(pts-target,axis=1)<radius
+-        d = target-pts
+-        length2 = np.maximum(np.sum(d*d,axis=1),1e-12)
+-        for lo,hi in self.occluders:
+-            center=(lo+hi)*.5
+-            t=np.clip(np.sum((center-pts)*d,axis=1)/length2,0,1)
+-            closest=pts+t[:,None]*d
+-            clearance=min(.155,float(np.linalg.norm(target-center))*.85)
+-            good &= np.linalg.norm(closest-center,axis=1)>clearance
+-        return good
+-
+-    def route(self, start, mask, other=None):
+-        # A multi-goal Dijkstra on a small occupancy grid.
+-        free=self.free.copy()
+-        if other is not None:
+-            free &= np.linalg.norm(self.points-other,axis=1)>.4
+-        starts=np.argsort(np.linalg.norm(self.points-start,axis=1))[:20]
+-        root=next((int(j) for j in starts if free[j]),int(starts[0]))
+-        dist={root:0.}; parent={}; queue=[(0.,root)]
+-        n=self.size
+-        end=None
+-        while queue:
+-            cost,j=heapq.heappop(queue)
+-            if cost!=dist[j]: continue
+-            if mask[j]: end=j;break
+-            x=j%n;y=j//n
+-            for dx,dy in ((1,0),(-1,0),(0,1),(0,-1),(1,1),(-1,1),(1,-1),(-1,-1)):
+-                nx=x+dx;ny=y+dy
+-                if nx<0 or nx>=n or ny<0 or ny>=n:continue
+-                k=ny*n+nx
+-                if not free[k]:continue
+-                if dx and dy and (not free[y*n+nx] or not free[ny*n+x]):continue
+-                v=cost+1.+(.001 if dx and dy else 0.)
+-                if v<dist.get(k,1e9):
+-                    dist[k]=v;parent[k]=j;heapq.heappush(queue,(v,k))
+-        if end is None:return [],1e6
+-        path=[end]
+-        while path[-1]!=root:path.append(parent[path[-1]])
+-        return [self.points[j].copy() for j in path[::-1]],dist[end]*.5
+-
+-    def have(self,s,k):
+-        o=self.objectives[k]
+-        return any(s.get(o,f)>0.5 for f in ('received_image','have_image_rover0','have_image_rover1'))
+-
+-    def needed(self,s):
+-        return [not any(s.get(o,'is_soil')==soil and any(s.get(o,f)>.5 for f in ('received_analysis','analyzed_rover0','analyzed_rover1')) for o in self.samples) for soil in (0,1)]
+-
+-    def pending(self,s,r):
+-        return any(s.get(o,'have_image_rover%d'%r)>.5 and s.get(o,'received_image')<.5 for o in self.objectives) or any(s.get(o,'analyzed_rover%d'%r)>.5 and s.get(o,'received_analysis')<.5 for o in self.samples)
+-
+-    def completed(self,s,r,task):
+-        kind,k=task
+-        if kind=='image':return self.have(s,k)
+-        if kind=='sample':return not self.needed(s)[int(s.get(self.samples[k],'is_soil'))]
+-        if kind=='send':return not self.pending(s,r)
+-        return s.get(self.rovers[r],'at_home')>.5
+-
+-    def choose(self,s,r,p,other):
+-        candidates=[]
+-        reserved=self.tasks[1-r]
+-        need=self.needed(s)
+-        for k,o in enumerate(self.objectives):
+-            if not self.have(s,k) and reserved!=('image',k):candidates.append(('image',k))
+-        if True:
+-            for k,o in enumerate(self.samples):
+-                soil=int(s.get(o,'is_soil'))
+-                if need[soil] and not (reserved and reserved[0]=='sample' and int(s.get(self.samples[reserved[1]],'is_soil'))==soil):candidates.append(('sample',k))
+-        if self.schedule is not None:
+-            schedule=self.schedule[r]
+-            while schedule:
+-                kind,k=schedule[0]
+-                if (kind=='image' and self.have(s,k)) or (kind=='soil' and not need[k]):schedule.pop(0)
+-                else:break
+-            if schedule:
+-                kind,k=schedule[0]
+-                planned=[t for t in candidates if t==schedule[0] or (kind=='soil' and t[0]=='sample' and int(s.get(self.samples[t[1]],'is_soil'))==k)]
+-                if planned:candidates=planned
+-            else:candidates=[]
+-        best=None;score=1e9;path=[]
+-        for task in candidates:
+-            pp,cost=self.route(p,self.masks[task],other)
+-            cost+=2 if task[0]=='image' else 0
+-            if cost<score and cost<1e5:best=task;score=cost;path=pp
+-        if best is None:
+-            if self.pending(s,r):best=('send',0);path,_=self.route(p,self.masks[best],other)
+-            else:
+-                best=('home',r)
+-                mask=np.linalg.norm(self.points-self.home[r],axis=1)<.24
+-                path,_=self.route(p,mask,other)
+-                if s.get(self.rovers[r],'at_home')>.5:path=[]
+-        self.tasks[r]=best;self.paths[r]=path
+-
+-    def result_count(self, s, r):
+-        return sum(s.get(o, 'have_image_rover%d'%r) for o in self.objectives) + sum(s.get(o, 'analyzed_rover%d'%r) for o in self.samples)
+-
+-    def get_action(self, state):
+-        s=state; self.tick+=1
+-        action=np.zeros(8,dtype=np.float32)
+-        pos=[self.xy(s,r) for r in self.rovers]
+-        for r in range(2):
+-            p=pos[r];rob=self.rovers[r]
+-            if self.previous[r] is not None and np.linalg.norm(p-self.previous[r][0])<1e-5 and np.linalg.norm(self.previous[r][1])>.01:
+-                self.fail[r]+=1
+-            else:self.fail[r]=0
+-            task=self.tasks[r]
+-            last=self.last_op[r]
+-            if last is not None:
+-                old_task, old_p, old_op, old_count = last
+-                failed = ((old_op == -.5 and s.get(rob,'calibrated')<.5) or
+-                          (old_op == -1/6 and self.result_count(s,r)<=old_count) or
+-                          (old_op == .5 and old_task[0]=='send' and self.pending(s,r)))
+-                if failed and task==old_task and task[0] in ('image','send'):
+-                    self.masks[task] &= np.linalg.norm(self.points-p,axis=1)>.22
+-                    self.paths[r],_=self.route(p,self.masks[task],pos[1-r])
+-            if task is None or self.completed(s,r,task):
+-                self.choose(s,r,p,pos[1-r]);task=self.tasks[r]
+-            if self.fail[r]>=2:
+-                self.paths[r]=[]
+-                # Infer blocked configuration and route around it.
+-                blocked=p+self.previous[r][1]
+-                self.free[np.linalg.norm(self.points-blocked,axis=1)<.12]=False
+-                if task[0]=='home':mask=np.linalg.norm(self.points-self.home[r],axis=1)<.24
+-                else:mask=self.masks[task]
+-                self.paths[r],_=self.route(p,mask,pos[1-r])
+-                if task[0]!='home' and not self.paths[r]:
+-                    self.tasks[r]=None
+-                    self.choose(s,r,p,pos[1-r]);task=self.tasks[r]
+-                self.fail[r]=0
+-            path=self.paths[r]
+-            while path and np.max(np.abs(path[0]-p))<.025:path.pop(0)
+-            dest=p.copy()
+-            selected=-1
+-            for pi,point in enumerate(path[:5]):
+-                d=point-p
+-                if np.max(np.abs(d))>.20001:break
+-                probes=p+np.linspace(0,1,5)[:,None]*d
+-                if np.all(self.valid(probes)) and np.linalg.norm(point-pos[1-r])>.4:dest=point.copy();selected=pi
+-                else:break
+-            if selected>0:del path[:selected]
+-            d=np.clip(dest-p,-.2,.2)
+-            q=p+d
+-            op=0.
+-            kind,k=task
+-            if kind=='sample' and s.get(rob,'store_full')<.5 and self.sample_safe(s,q[None,:],k)[0]:op=-5/6
+-            elif kind=='image' and self.visible(q[None,:],self.xy(s,self.objectives[k]),1.99)[0]:
+-                op=-1/6 if s.get(rob,'calibrated')>.5 else -.5
+-                if path and np.linalg.norm(q-path[-1])>.06 and last is not None and last[0]==task and last[2] in (-.5,-1/6):op=0.
+-            elif kind=='send' and self.visible(q[None,:],self.lander,3.85)[0]:
+-                op=.5
+-                if path and np.linalg.norm(q-path[-1])>.06:op=0.
+-            if op==0 and s.get(rob,'store_full')>.5:op=5/6
+-            elif op==0 and self.pending(s,r) and self.visible(q[None,:],self.lander,3.85)[0]:op=.5
+-            action[r*4:r*4+2]=d;action[r*4+3]=op
+-            self.previous[r]=(p.copy(),d.copy())
+-            self.last_op[r]=(task,q.copy(),op,self.result_count(s,r))
+-        return action
+diff --git a/approach_pipeline.py b/approach_pipeline.py
+deleted file mode 100644
+index 8fffc9c..0000000
+--- a/approach_pipeline.py
++++ /dev/null
+@@ -1,238 +0,0 @@
+-import math
+-import heapq
+-import numpy as np
+-from task_planner import assign_tasks
+-
+-
+-class GeneratedApproach:
+-    """Feedback navigation and task allocation for the two rovers."""
+-    def __init__(self, action_space, observation_space, primitives):
+-        self.space = observation_space
+-        self.types = {t.name: t for t in observation_space.types}
+-
+-    def objects(self, state, kind):
+-        return sorted(state.get_objects(self.types[kind]), key=lambda o: o.name)
+-
+-    def xy(self, state, obj):
+-        return np.array([state.get(obj, 'x'), state.get(obj, 'y')], dtype=float)
+-
+-    def reset(self, state, info):
+-        self.rovers = self.objects(state, 'rover')
+-        self.objectives = self.objects(state, 'objective')
+-        self.samples = self.objects(state, 'sample')
+-        self.home = [self.xy(state, r) for r in self.rovers]
+-        self.lander = self.xy(state, self.objects(state, 'lander')[0])
+-        self.rects = []
+-        self.occluders = []
+-        for o in self.objects(state, 'obstacle'):
+-            p = self.xy(state, o)
+-            h = np.array([state.get(o, 'half_x'), state.get(o, 'half_y')])
+-            self.rects.append((p-h, p+h))
+-            if state.get(o, 'half_z') > .1:
+-                self.occluders.append((p-h, p+h))
+-        self.rects.append((np.array([-.05, -3.]), np.array([.05, 3.])))
+-        self.rects.append((self.lander-np.array([.510,.334]),self.lander+np.array([.510,.334])))
+-        axis = np.arange(-2.2, 2.201, .1)
+-        self.size = len(axis)
+-        xx, yy = np.meshgrid(axis, axis)
+-        self.points = np.column_stack([xx.ravel(), yy.ravel()])
+-        self.free = self.valid(self.points)
+-        self.masks = {}
+-        for k, o in enumerate(self.objectives):
+-            self.masks[('image',k)] = self.free & self.visible(self.points,self.xy(state,o),1.97)
+-        for k, o in enumerate(self.samples):
+-            self.masks[('sample',k)] = self.free & self.sample_safe(state,self.points,k)
+-        self.masks[('send',0)] = self.free & self.visible(self.points,self.lander,3.8)
+-        self.tasks = [None,None]
+-        self.paths = [[],[]]
+-        self.previous = [None,None]
+-        self.fail = [0,0]
+-        self.tick = 0
+-        self.last_op = [None, None]
+-        self.bad_views = {}
+-        self.schedule = assign_tasks(self,state)
+-
+-    def sample_safe(self, state, pts, k):
+-        target=self.samples[k]
+-        good=np.linalg.norm(pts-self.xy(state,target),axis=1)<.242
+-        for obj in self.samples:
+-            if state.get(obj,'is_soil')!=state.get(target,'is_soil'):
+-                good &= np.linalg.norm(pts-self.xy(state,obj),axis=1)>.255
+-        return good
+-
+-    def valid(self, pts):
+-        good = np.all(np.abs(pts) <= 2.265, axis=-1)
+-        for lo,hi in self.rects:
+-            good &= np.linalg.norm(np.maximum(np.maximum(lo-pts,pts-hi),0),axis=-1) > .182
+-        return good
+-
+-    def visible(self, pts, target, radius):
+-        good = np.linalg.norm(pts-target,axis=1)<radius
+-        d = target-pts
+-        length2 = np.maximum(np.sum(d*d,axis=1),1e-12)
+-        for lo,hi in self.occluders:
+-            center=(lo+hi)*.5
+-            t=np.clip(np.sum((center-pts)*d,axis=1)/length2,0,1)
+-            closest=pts+t[:,None]*d
+-            clearance=min(.155,float(np.linalg.norm(target-center))*.85)
+-            good &= np.linalg.norm(closest-center,axis=1)>clearance
+-        return good
+-
+-    def route(self, start, mask, other=None):
+-        # A multi-goal Dijkstra on a small occupancy grid.
+-        free=self.free.copy()
+-        if other is not None:
+-            free &= np.linalg.norm(self.points-other,axis=1)>.4
+-        starts=np.argsort(np.linalg.norm(self.points-start,axis=1))[:20]
+-        root=next((int(j) for j in starts if free[j]),int(starts[0]))
+-        dist={root:0.}; parent={}; queue=[(0.,root)]
+-        n=self.size
+-        end=None
+-        while queue:
+-            cost,j=heapq.heappop(queue)
+-            if cost!=dist[j]: continue
+-            if mask[j]: end=j;break
+-            x=j%n;y=j//n
+-            for dx,dy in ((1,0),(-1,0),(0,1),(0,-1),(1,1),(-1,1),(1,-1),(-1,-1)):
+-                nx=x+dx;ny=y+dy
+-                if nx<0 or nx>=n or ny<0 or ny>=n:continue
+-                k=ny*n+nx
+-                if not free[k]:continue
+-                if dx and dy and (not free[y*n+nx] or not free[ny*n+x]):continue
+-                v=cost+1.+(.001 if dx and dy else 0.)
+-                if v<dist.get(k,1e9):
+-                    dist[k]=v;parent[k]=j;heapq.heappush(queue,(v,k))
+-        if end is None:return [],1e6
+-        path=[end]
+-        while path[-1]!=root:path.append(parent[path[-1]])
+-        return [self.points[j].copy() for j in path[::-1]],dist[end]*.5
+-
+-    def have(self,s,k):
+-        o=self.objectives[k]
+-        return any(s.get(o,f)>0.5 for f in ('received_image','have_image_rover0','have_image_rover1'))
+-
+-    def needed(self,s):
+-        return [not any(s.get(o,'is_soil')==soil and any(s.get(o,f)>.5 for f in ('received_analysis','analyzed_rover0','analyzed_rover1')) for o in self.samples) for soil in (0,1)]
+-
+-    def pending(self,s,r):
+-        return any(s.get(o,'have_image_rover%d'%r)>.5 and s.get(o,'received_image')<.5 for o in self.objectives) or any(s.get(o,'analyzed_rover%d'%r)>.5 and s.get(o,'received_analysis')<.5 for o in self.samples)
+-
+-    def completed(self,s,r,task):
+-        kind,k=task
+-        if kind=='image':return self.have(s,k)
+-        if kind=='sample':return not self.needed(s)[int(s.get(self.samples[k],'is_soil'))]
+-        if kind=='send':return not self.pending(s,r)
+-        return s.get(self.rovers[r],'at_home')>.5
+-
+-    def choose(self,s,r,p,other):
+-        candidates=[]
+-        reserved=self.tasks[1-r]
+-        need=self.needed(s)
+-        for k,o in enumerate(self.objectives):
+-            if not self.have(s,k) and reserved!=('image',k):candidates.append(('image',k))
+-        if True:
+-            for k,o in enumerate(self.samples):
+-                soil=int(s.get(o,'is_soil'))
+-                if need[soil] and not (reserved and reserved[0]=='sample' and int(s.get(self.samples[reserved[1]],'is_soil'))==soil):candidates.append(('sample',k))
+-        if self.schedule is not None:
+-            schedule=self.schedule[r]
+-            while schedule:
+-                kind,k=schedule[0]
+-                if (kind=='image' and self.have(s,k)) or (kind=='soil' and not need[k]):schedule.pop(0)
+-                else:break
+-            if schedule:
+-                kind,k=schedule[0]
+-                planned=[t for t in candidates if t==schedule[0] or (kind=='soil' and t[0]=='sample' and int(s.get(self.samples[t[1]],'is_soil'))==k)]
+-                if planned:candidates=planned
+-            else:candidates=[]
+-        best=None;score=1e9;path=[]
+-        for task in candidates:
+-            pp,cost=self.route(p,self.masks[task],other)
+-            cost+=2 if task[0]=='image' else 0
+-            if cost<score and cost<1e5:best=task;score=cost;path=pp
+-        if best is None and candidates and self.schedule is not None:
+-            self.schedule=None
+-            self.choose(s,r,p,other)
+-            return
+-        if best is None:
+-            if self.pending(s,r) and s.get(self.rovers[r],'at_home')>.5:best=('send',0);path,_=self.route(p,self.masks[best],other)
+-            else:
+-                best=('home',r)
+-                mask=np.linalg.norm(self.points-self.home[r],axis=1)<.24
+-                path,_=self.route(p,mask,other)
+-                if s.get(self.rovers[r],'at_home')>.5:path=[]
+-        self.tasks[r]=best;self.paths[r]=path
+-
+-    def result_count(self, s, r):
+-        return sum(s.get(o, 'have_image_rover%d'%r) for o in self.objectives) + sum(s.get(o, 'analyzed_rover%d'%r) for o in self.samples)
+-
+-    def get_action(self, state):
+-        s=state; self.tick+=1
+-        action=np.zeros(8,dtype=np.float32)
+-        pos=[self.xy(s,r) for r in self.rovers]
+-        for r in range(2):
+-            p=pos[r];rob=self.rovers[r]
+-            if self.previous[r] is not None and np.linalg.norm(p-self.previous[r][0])<1e-5 and np.linalg.norm(self.previous[r][1])>.01:
+-                self.fail[r]+=1
+-            else:self.fail[r]=0
+-            task=self.tasks[r]
+-            last=self.last_op[r]
+-            if last is not None:
+-                old_task, old_p, old_op, old_count = last
+-                failed = ((old_task[0]=='image' and old_op == -.5 and s.get(rob,'calibrated')<.5) or
+-                          (old_task[0]=='image' and old_op == -1/6 and self.result_count(s,r)<=old_count) or
+-                          (old_op == .5 and old_task[0]=='send' and self.pending(s,r)))
+-                if failed and task==old_task and task[0] in ('image','send'):
+-                    self.masks[task] &= np.linalg.norm(self.points-p,axis=1)>.22
+-                    self.paths[r],_=self.route(p,self.masks[task],pos[1-r])
+-            if task is None or self.completed(s,r,task):
+-                self.choose(s,r,p,pos[1-r]);task=self.tasks[r]
+-            if self.fail[r]>=2:
+-                self.paths[r]=[]
+-                # Infer blocked configuration and route around it.
+-                blocked=p+self.previous[r][1]
+-                self.free[np.linalg.norm(self.points-blocked,axis=1)<.12]=False
+-                if task[0]=='home':mask=np.linalg.norm(self.points-self.home[r],axis=1)<.24
+-                else:mask=self.masks[task]
+-                self.paths[r],_=self.route(p,mask,pos[1-r])
+-                if task[0]!='home' and not self.paths[r]:
+-                    self.tasks[r]=None
+-                    self.choose(s,r,p,pos[1-r]);task=self.tasks[r]
+-                self.fail[r]=0
+-            path=self.paths[r]
+-            while path and np.max(np.abs(path[0]-p))<.025:path.pop(0)
+-            dest=p.copy()
+-            selected=-1
+-            for pi,point in enumerate(path[:5]):
+-                d=point-p
+-                if np.max(np.abs(d))>.20001:break
+-                probes=p+np.linspace(0,1,5)[:,None]*d
+-                if np.all(self.valid(probes)) and np.linalg.norm(point-pos[1-r])>.4:dest=point.copy();selected=pi
+-                else:break
+-            if selected>0:del path[:selected]
+-            d=np.clip(dest-p,-.2,.2)
+-            q=p+d
+-            op=0.
+-            kind,k=task
+-            if kind=='sample' and s.get(rob,'store_full')<.5 and self.sample_safe(s,q[None,:],k)[0]:op=-5/6
+-            elif kind=='image' and self.visible(q[None,:],self.xy(s,self.objectives[k]),1.99)[0]:
+-                op=-1/6 if s.get(rob,'calibrated')>.5 else -.5
+-                if path and np.linalg.norm(q-path[-1])>.06 and last is not None and last[0]==task and last[2] in (-.5,-1/6):op=0.
+-            elif kind=='send' and self.visible(q[None,:],self.lander,3.85)[0]:
+-                op=.5
+-                if path and np.linalg.norm(q-path[-1])>.06:op=0.
+-            if op==0 and s.get(rob,'store_full')>.5:op=5/6
+-            elif op==0 and self.pending(s,r) and self.visible(q[None,:],self.lander,3.85)[0]:op=.5
+-            # Use otherwise idle travel steps for camera work.
+-            if op in (0.,.5) and np.linalg.norm(d)>.01:
+-                visible=[]
+-                for j,o in enumerate(self.objectives):
+-                    if s.get(o,'have_image_rover%d'%r)<.5 and self.visible(q[None,:],self.xy(s,o),1.97)[0]:
+-                        visible.append((float(np.linalg.norm(q-self.xy(s,o))),j))
+-                if visible:
+-                    _,j=min(visible)
+-                    if not self.have(s,j):op=-1/6 if s.get(rob,'calibrated')>.5 else -.5
+-            action[r*4:r*4+2]=d;action[r*4+3]=op
+-            self.previous[r]=(p.copy(),d.copy())
+-            self.last_op[r]=(task,q.copy(),op,self.result_count(s,r))
+-        return action
+diff --git a/approach_planned_before_pipeline.py b/approach_planned_before_pipeline.py
+deleted file mode 100644
+index 8bdab39..0000000
+--- a/approach_planned_before_pipeline.py
++++ /dev/null
+@@ -1,229 +0,0 @@
+-import math
+-import heapq
+-import numpy as np
+-from task_planner import assign_tasks
+-
+-
+-class GeneratedApproach:
+-    """Feedback navigation and task allocation for the two rovers."""
+-    def __init__(self, action_space, observation_space, primitives):
+-        self.space = observation_space
+-        self.types = {t.name: t for t in observation_space.types}
+-
+-    def objects(self, state, kind):
+-        return sorted(state.get_objects(self.types[kind]), key=lambda o: o.name)
+-
+-    def xy(self, state, obj):
+-        return np.array([state.get(obj, 'x'), state.get(obj, 'y')], dtype=float)
+-
+-    def reset(self, state, info):
+-        self.rovers = self.objects(state, 'rover')
+-        self.objectives = self.objects(state, 'objective')
+-        self.samples = self.objects(state, 'sample')
+-        self.home = [self.xy(state, r) for r in self.rovers]
+-        self.lander = self.xy(state, self.objects(state, 'lander')[0])
+-        self.rects = []
+-        self.occluders = []
+-        for o in self.objects(state, 'obstacle'):
+-            p = self.xy(state, o)
+-            h = np.array([state.get(o, 'half_x'), state.get(o, 'half_y')])
+-            self.rects.append((p-h, p+h))
+-            if state.get(o, 'half_z') > .1:
+-                self.occluders.append((p-h, p+h))
+-        self.rects.append((np.array([-.05, -3.]), np.array([.05, 3.])))
+-        self.rects.append((self.lander-np.array([.510,.334]),self.lander+np.array([.510,.334])))
+-        axis = np.arange(-2.2, 2.201, .1)
+-        self.size = len(axis)
+-        xx, yy = np.meshgrid(axis, axis)
+-        self.points = np.column_stack([xx.ravel(), yy.ravel()])
+-        self.free = self.valid(self.points)
+-        self.masks = {}
+-        for k, o in enumerate(self.objectives):
+-            self.masks[('image',k)] = self.free & self.visible(self.points,self.xy(state,o),1.97)
+-        for k, o in enumerate(self.samples):
+-            self.masks[('sample',k)] = self.free & self.sample_safe(state,self.points,k)
+-        self.masks[('send',0)] = self.free & self.visible(self.points,self.lander,3.8)
+-        self.tasks = [None,None]
+-        self.paths = [[],[]]
+-        self.previous = [None,None]
+-        self.fail = [0,0]
+-        self.tick = 0
+-        self.last_op = [None, None]
+-        self.bad_views = {}
+-        self.schedule = assign_tasks(self,state)
+-
+-    def sample_safe(self, state, pts, k):
+-        target=self.samples[k]
+-        good=np.linalg.norm(pts-self.xy(state,target),axis=1)<.242
+-        for obj in self.samples:
+-            if state.get(obj,'is_soil')!=state.get(target,'is_soil'):
+-                good &= np.linalg.norm(pts-self.xy(state,obj),axis=1)>.255
+-        return good
+-
+-    def valid(self, pts):
+-        good = np.all(np.abs(pts) <= 2.265, axis=-1)
+-        for lo,hi in self.rects:
+-            good &= np.linalg.norm(np.maximum(np.maximum(lo-pts,pts-hi),0),axis=-1) > .182
+-        return good
+-
+-    def visible(self, pts, target, radius):
+-        good = np.linalg.norm(pts-target,axis=1)<radius
+-        d = target-pts
+-        length2 = np.maximum(np.sum(d*d,axis=1),1e-12)
+-        for lo,hi in self.occluders:
+-            center=(lo+hi)*.5
+-            t=np.clip(np.sum((center-pts)*d,axis=1)/length2,0,1)
+-            closest=pts+t[:,None]*d
+-            clearance=min(.155,float(np.linalg.norm(target-center))*.85)
+-            good &= np.linalg.norm(closest-center,axis=1)>clearance
+-        return good
+-
+-    def route(self, start, mask, other=None):
+-        # A multi-goal Dijkstra on a small occupancy grid.
+-        free=self.free.copy()
+-        if other is not None:
+-            free &= np.linalg.norm(self.points-other,axis=1)>.4
+-        starts=np.argsort(np.linalg.norm(self.points-start,axis=1))[:20]
+-        root=next((int(j) for j in starts if free[j]),int(starts[0]))
+-        dist={root:0.}; parent={}; queue=[(0.,root)]
+-        n=self.size
+-        end=None
+-        while queue:
+-            cost,j=heapq.heappop(queue)
+-            if cost!=dist[j]: continue
+-            if mask[j]: end=j;break
+-            x=j%n;y=j//n
+-            for dx,dy in ((1,0),(-1,0),(0,1),(0,-1),(1,1),(-1,1),(1,-1),(-1,-1)):
+-                nx=x+dx;ny=y+dy
+-                if nx<0 or nx>=n or ny<0 or ny>=n:continue
+-                k=ny*n+nx
+-                if not free[k]:continue
+-                if dx and dy and (not free[y*n+nx] or not free[ny*n+x]):continue
+-                v=cost+1.+(.001 if dx and dy else 0.)
+-                if v<dist.get(k,1e9):
+-                    dist[k]=v;parent[k]=j;heapq.heappush(queue,(v,k))
+-        if end is None:return [],1e6
+-        path=[end]
+-        while path[-1]!=root:path.append(parent[path[-1]])
+-        return [self.points[j].copy() for j in path[::-1]],dist[end]*.5
+-
+-    def have(self,s,k):
+-        o=self.objectives[k]
+-        return any(s.get(o,f)>0.5 for f in ('received_image','have_image_rover0','have_image_rover1'))
+-
+-    def needed(self,s):
+-        return [not any(s.get(o,'is_soil')==soil and any(s.get(o,f)>.5 for f in ('received_analysis','analyzed_rover0','analyzed_rover1')) for o in self.samples) for soil in (0,1)]
+-
+-    def pending(self,s,r):
+-        return any(s.get(o,'have_image_rover%d'%r)>.5 and s.get(o,'received_image')<.5 for o in self.objectives) or any(s.get(o,'analyzed_rover%d'%r)>.5 and s.get(o,'received_analysis')<.5 for o in self.samples)
+-
+-    def completed(self,s,r,task):
+-        kind,k=task
+-        if kind=='image':return self.have(s,k)
+-        if kind=='sample':return not self.needed(s)[int(s.get(self.samples[k],'is_soil'))]
+-        if kind=='send':return not self.pending(s,r)
+-        return s.get(self.rovers[r],'at_home')>.5
+-
+-    def choose(self,s,r,p,other):
+-        candidates=[]
+-        reserved=self.tasks[1-r]
+-        need=self.needed(s)
+-        for k,o in enumerate(self.objectives):
+-            if not self.have(s,k) and reserved!=('image',k):candidates.append(('image',k))
+-        if True:
+-            for k,o in enumerate(self.samples):
+-                soil=int(s.get(o,'is_soil'))
+-                if need[soil] and not (reserved and reserved[0]=='sample' and int(s.get(self.samples[reserved[1]],'is_soil'))==soil):candidates.append(('sample',k))
+-        if self.schedule is not None:
+-            schedule=self.schedule[r]
+-            while schedule:
+-                kind,k=schedule[0]
+-                if (kind=='image' and self.have(s,k)) or (kind=='soil' and not need[k]):schedule.pop(0)
+-                else:break
+-            if schedule:
+-                kind,k=schedule[0]
+-                planned=[t for t in candidates if t==schedule[0] or (kind=='soil' and t[0]=='sample' and int(s.get(self.samples[t[1]],'is_soil'))==k)]
+-                if planned:candidates=planned
+-            else:candidates=[]
+-        best=None;score=1e9;path=[]
+-        for task in candidates:
+-            pp,cost=self.route(p,self.masks[task],other)
+-            cost+=2 if task[0]=='image' else 0
+-            if cost<score and cost<1e5:best=task;score=cost;path=pp
+-        if best is None and candidates and self.schedule is not None:
+-            self.schedule=None
+-            self.choose(s,r,p,other)
+-            return
+-        if best is None:
+-            if self.pending(s,r):best=('send',0);path,_=self.route(p,self.masks[best],other)
+-            else:
+-                best=('home',r)
+-                mask=np.linalg.norm(self.points-self.home[r],axis=1)<.24
+-                path,_=self.route(p,mask,other)
+-                if s.get(self.rovers[r],'at_home')>.5:path=[]
+-        self.tasks[r]=best;self.paths[r]=path
+-
+-    def result_count(self, s, r):
+-        return sum(s.get(o, 'have_image_rover%d'%r) for o in self.objectives) + sum(s.get(o, 'analyzed_rover%d'%r) for o in self.samples)
+-
+-    def get_action(self, state):
+-        s=state; self.tick+=1
+-        action=np.zeros(8,dtype=np.float32)
+-        pos=[self.xy(s,r) for r in self.rovers]
+-        for r in range(2):
+-            p=pos[r];rob=self.rovers[r]
+-            if self.previous[r] is not None and np.linalg.norm(p-self.previous[r][0])<1e-5 and np.linalg.norm(self.previous[r][1])>.01:
+-                self.fail[r]+=1
+-            else:self.fail[r]=0
+-            task=self.tasks[r]
+-            last=self.last_op[r]
+-            if last is not None:
+-                old_task, old_p, old_op, old_count = last
+-                failed = ((old_op == -.5 and s.get(rob,'calibrated')<.5) or
+-                          (old_op == -1/6 and self.result_count(s,r)<=old_count) or
+-                          (old_op == .5 and old_task[0]=='send' and self.pending(s,r)))
+-                if failed and task==old_task and task[0] in ('image','send'):
+-                    self.masks[task] &= np.linalg.norm(self.points-p,axis=1)>.22
+-                    self.paths[r],_=self.route(p,self.masks[task],pos[1-r])
+-            if task is None or self.completed(s,r,task):
+-                self.choose(s,r,p,pos[1-r]);task=self.tasks[r]
+-            if self.fail[r]>=2:
+-                self.paths[r]=[]
+-                # Infer blocked configuration and route around it.
+-                blocked=p+self.previous[r][1]
+-                self.free[np.linalg.norm(self.points-blocked,axis=1)<.12]=False
+-                if task[0]=='home':mask=np.linalg.norm(self.points-self.home[r],axis=1)<.24
+-                else:mask=self.masks[task]
+-                self.paths[r],_=self.route(p,mask,pos[1-r])
+-                if task[0]!='home' and not self.paths[r]:
+-                    self.tasks[r]=None
+-                    self.choose(s,r,p,pos[1-r]);task=self.tasks[r]
+-                self.fail[r]=0
+-            path=self.paths[r]
+-            while path and np.max(np.abs(path[0]-p))<.025:path.pop(0)
+-            dest=p.copy()
+-            selected=-1
+-            for pi,point in enumerate(path[:5]):
+-                d=point-p
+-                if np.max(np.abs(d))>.20001:break
+-                probes=p+np.linspace(0,1,5)[:,None]*d
+-                if np.all(self.valid(probes)) and np.linalg.norm(point-pos[1-r])>.4:dest=point.copy();selected=pi
+-                else:break
+-            if selected>0:del path[:selected]
+-            d=np.clip(dest-p,-.2,.2)
+-            q=p+d
+-            op=0.
+-            kind,k=task
+-            if kind=='sample' and s.get(rob,'store_full')<.5 and self.sample_safe(s,q[None,:],k)[0]:op=-5/6
+-            elif kind=='image' and self.visible(q[None,:],self.xy(s,self.objectives[k]),1.99)[0]:
+-                op=-1/6 if s.get(rob,'calibrated')>.5 else -.5
+-                if path and np.linalg.norm(q-path[-1])>.06 and last is not None and last[0]==task and last[2] in (-.5,-1/6):op=0.
+-            elif kind=='send' and self.visible(q[None,:],self.lander,3.85)[0]:
+-                op=.5
+-                if path and np.linalg.norm(q-path[-1])>.06:op=0.
+-            if op==0 and s.get(rob,'store_full')>.5:op=5/6
+-            elif op==0 and self.pending(s,r) and self.visible(q[None,:],self.lander,3.85)[0]:op=.5
+-            action[r*4:r*4+2]=d;action[r*4+3]=op
+-            self.previous[r]=(p.copy(),d.copy())
+-            self.last_op[r]=(task,q.copy(),op,self.result_count(s,r))
+-        return action
+diff --git a/debug_policy.py b/debug_policy.py
+deleted file mode 100644
+index c67a0cb..0000000
+--- a/debug_policy.py
++++ /dev/null
+@@ -1,11 +0,0 @@
+-from env_client import make_env
+-from approach import GeneratedApproach
+-import sys
+-E=make_env();s,info=E.reset(seed=int(sys.argv[1]));A=GeneratedApproach(E.action_space,E.observation_space,{})
+-A.reset(s,info)
+-for t in range(80):
+- ac=A.get_action(s)
+- if t<15 or t%5==0:print(t, [A.xy(s,r).round(3).tolist() for r in A.rovers], A.tasks,ac.round(3).tolist(),[[(p.round(3)).tolist() for p in path[:3]] for path in A.paths],flush=True)
+- s,r,d,tr,i=E.step(ac)
+- if d:break
+-E.close()
+diff --git a/inspect_collision.py b/inspect_collision.py
+deleted file mode 100644
+index 22be539..0000000
+--- a/inspect_collision.py
++++ /dev/null
+@@ -1,14 +0,0 @@
+-import sys,numpy as np
+-from env_client import make_env
+-from approach import GeneratedApproach
+-E=make_env();s,i=E.reset(seed=int(sys.argv[1]));A=GeneratedApproach(E.action_space,E.observation_space,{});A.reset(s,i)
+-for t in range(100):
+- a=A.get_action(s);ss,_,done,tr,_=E.step(a)
+- for r,rob in enumerate(A.rovers):
+-  p=A.xy(s,rob);q=p+a[r*4:r*4+2]
+-  if np.linalg.norm(q-p)>.01 and np.linalg.norm(A.xy(ss,rob)-p)<1e-5:
+-   print('COLLISION',t,r,'from',p,'to',q,'task',A.tasks[r])
+-   print('nearest',sorted([(float(np.linalg.norm(np.maximum(np.maximum(lo-q,q-hi),0))),lo.tolist(),hi.tolist()) for lo,hi in A.rects])[:3])
+- s=ss
+- if done:break
+-E.close()
+diff --git a/inspect_env.py b/inspect_env.py
+deleted file mode 100644
+index 12ec7cb..0000000
+--- a/inspect_env.py
++++ /dev/null
+@@ -1,12 +0,0 @@
+-from env_client import make_env
+-import numpy as np
+-E=make_env(); s,i=E.reset(seed=0)
+-print('INFO',i,'max',E.max_steps)
+-for name in s.get_object_names():
+- o=s.get_object_from_name(name)
+- print(name,{f:s.get(o,f) for f in E.observation_space.type_features[o.type]})
+-for op in [-.5,-1/6,.5]:
+- a=np.zeros(8);a[3]=a[7]=op
+- s,r,t,tr,i=E.step(a)
+- print('OP',op,[(n, {f:s.get(s.get_object_from_name(n),f) for f in E.observation_space.type_features[s.get_object_from_name(n).type]}) for n in s.get_object_names() if n.startswith(('rover','objective'))])
+-E.close()
+diff --git a/inspect_seed.py b/inspect_seed.py
+deleted file mode 100644
+index 68d4e30..0000000
+--- a/inspect_seed.py
++++ /dev/null
+@@ -1,10 +0,0 @@
+-import sys,numpy as np
+-from env_client import make_env
+-from approach import GeneratedApproach
+-E=make_env();s,i=E.reset(seed=int(sys.argv[1]));A=GeneratedApproach(E.action_space,E.observation_space,{});A.reset(s,i)
+-print('schedule',A.schedule)
+-for o in A.objectives:
+- p=A.xy(s,o);print(o.name,p,'mask',np.sum(A.masks[('image',A.objectives.index(o))]))
+- for ob in A.objects(s,'obstacle'):
+-  if np.linalg.norm(p-A.xy(s,ob))<.5:print('near',ob.name,A.xy(s,ob),s.get(ob,'half_x'),np.linalg.norm(p-A.xy(s,ob)))
+-E.close()
+diff --git a/probe_crosslos.py b/probe_crosslos.py
+deleted file mode 100644
+index b227ce0..0000000
+--- a/probe_crosslos.py
++++ /dev/null
+@@ -1,18 +0,0 @@
+-import numpy as np
+-from env_client import make_env
+-e=make_env();s,_=e.reset(seed=0);rs=[s.get_object_from_name('rover'+str(i)) for i in range(2)]
+-def xy(i):return np.array([s.get(rs[i],f) for f in ('x','y')])
+-def st(i,op=0,d=(0,0)):
+- global s
+- a=np.zeros(8,np.float32);a[4*i:4*i+2]=d;a[4*i+3]=op;s,*_=e.step(a)
+-def go(i,p):
+- for t in range(40):
+-  d=np.clip(np.array(p)-xy(i),-.2,.2)
+-  if np.max(abs(d))<1e-5:return
+-  old=xy(i);st(i,d=d)
+-  if np.linalg.norm(xy(i)-old)<1e-5:print('blocked',old,p);return
+-for p in [(-1.5,-.3),(-1.8,.8),(-1.1,1.2),(-.4,1.2)]:go(1,p)
+-for j in range(5):
+- st(1,-.5);st(1,-1/6)
+- print('cross photos',xy(1),[(o.name,s.get(o,'have_image_rover1')) for o in s.get_objects(e.observation_space.get_type('objective'))])
+-e.close()
+diff --git a/probe_dynamic_radio.py b/probe_dynamic_radio.py
+deleted file mode 100644
+index a79110b..0000000
+--- a/probe_dynamic_radio.py
++++ /dev/null
+@@ -1,25 +0,0 @@
+-from env_client import make_env
+-from approach import GeneratedApproach
+-import numpy as np
+-for seed in [1212,549]:
+- e=make_env();s,i=e.reset(seed=seed,options={'object_count':4});a=GeneratedApproach(e.action_space,e.observation_space,{});a.reset(s,i)
+- def p(r):return a.xy(s,a.rovers[r])
+- def pending():return [(str(o),f) for o,f in a.radio_evidence(s,0)]
+- for t in range(180):
+-  ev=a.radio_evidence(s,0);act=a.get_action(s);s,*_=e.step(act)
+-  if act[3]>.4 and act[3]<.6 and ev:
+-   success=any(s.get(o,f)>.5 for o,f in ev)
+-   print(seed,t,'send',p(0),p(1),success,'pending',pending(),flush=True)
+-   if t>22 and not success and s.get(a.rovers[1],'at_home')>.5:break
+- else:e.close();continue
+- for k in range(15):
+-  target=np.array([.9,0]) if seed==1212 else np.array([.7,.1]);d=np.clip(target-p(0),-.2,.2);act=np.zeros(8);act[:2]=d;act[3]=.5;s,*_=e.step(act)
+-  print(seed,'known',p(0),p(1),'pending',pending(),flush=True)
+-  if np.max(np.abs(d))<.005:break
+- for dest in [(-1,-1.51),(-1,-1),(-.6,-1),(-1,-1.75)]:
+-  for k in range(20):
+-   d=np.clip(np.array(dest)-p(1),-.2,.2);act=np.zeros(8);act[3]=.5;act[4:6]=d
+-   s,*_=e.step(act)
+-   print(seed,'intervene',p(0),p(1),'pending',pending(),flush=True)
+-   if np.max(np.abs(d))<.005:break
+- e.close()
+diff --git a/probe_lander.py b/probe_lander.py
+deleted file mode 100644
+index b5251fd..0000000
+--- a/probe_lander.py
++++ /dev/null
+@@ -1,31 +0,0 @@
+-from env_client import make_env
+-import numpy as np
+-
+-def p(s):
+- o=s.get_object_from_name('rover1');return np.array([s.get(o,'x'),s.get(o,'y')])
+-def st(e,s,dx=0,dy=0):
+- a=np.zeros(8);a[4:6]=[dx,dy];t,*_=e.step(a);return t
+-
+-def goto(e,s,target):
+- for _ in range(50):
+-  d=np.clip(np.array(target)-p(s),-.1,.1)
+-  if np.linalg.norm(d)<1e-5:break
+-  old=p(s);s=st(e,s,*d)
+-  if np.allclose(old,p(s)):break
+- return s
+-for x in [-2.25,-2.2,-2.1,-2,-1.9,-1.8,-1.7,-1.6,-1.5,-1.4,-1.3,-1.2,-1.1]:
+- e=make_env();s,_=e.reset(seed=29)
+- s=goto(e,s,[-1,-1]);s=goto(e,s,[x,-1])
+- for _ in range(160):
+-  old=p(s);s=st(e,s,dy=-.01)
+-  if np.allclose(old,p(s)):break
+- print('vertical',x,p(s))
+- e.close()
+-for y in [-2.25,-2.2,-2.1,-2,-1.9,-1.8,-1.7,-1.6,-1.5,-1.4,-1.3]:
+- e=make_env();s,_=e.reset(seed=29)
+- s=goto(e,s,[-1,y])
+- for _ in range(140):
+-  old=p(s);s=st(e,s,dx=-.01)
+-  if np.allclose(old,p(s)):break
+- print('horizontal',y,p(s))
+- e.close()
+diff --git a/probe_lander_exact.py b/probe_lander_exact.py
+deleted file mode 100644
+index 0404383..0000000
+--- a/probe_lander_exact.py
++++ /dev/null
+@@ -1,19 +0,0 @@
+-from env_client import make_env
+-import numpy as np
+-for mode in ['front','side']:
+- e=make_env();s,_=e.reset(seed=29);o=s.get_object_from_name('rover1')
+- def p():return np.array([s.get(o,'x'),s.get(o,'y')])
+- def st(d):
+-  global s
+-  a=np.zeros(8);a[4:6]=d;s,*_=e.step(a)
+- targets=[[-1,-1],[-1.9,-1],[-1.9,-1.46]] if mode=='front' else [[-1.19,-1.75]]
+- for target in targets:
+-  for k in range(50):
+-   d=np.clip(np.array(target)-p(),-.1,.1)
+-   if np.linalg.norm(d)<1e-6:break
+-   st(d)
+- for k in range(400):
+-  old=p();st([0,-.0001] if mode=='front' else [-.0001,0])
+-  if np.allclose(p(),old,atol=1e-7,rtol=0):break
+- print(mode,p(),k)
+- e.close()
+diff --git a/probe_los_details.py b/probe_los_details.py
+deleted file mode 100644
+index f493bbb..0000000
+--- a/probe_los_details.py
++++ /dev/null
+@@ -1,20 +0,0 @@
+-import numpy as np
+-from env_client import make_env
+-from approach import GeneratedApproach
+-for seed in [2,3,4]:
+- e=make_env();s,info=e.reset(seed=seed);p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,info)
+- for t in range(65):s,*_=e.step(p.get_action(s))
+- print('\nSEED',seed,'tasks',p.tasks)
+- for r,rob in enumerate(p.rovers):
+-  x=p.xy(s,rob);print('rover',r,x,'cal',s.get(rob,'calibrated'))
+-  task=p.tasks[r]
+-  target=p.lander if task[0]=='send' else p.xy(s,p.objectives[task[1]]) if task[0]=='image' else x
+-  d=target-x;print('target',target,'dist',np.linalg.norm(d))
+-  for ob in p.objects(s,'obstacle'):
+-   q=p.xy(s,ob);a=np.clip(np.dot(q-x,d)/(np.dot(d,d)+1e-20),0,1);dl=np.linalg.norm(q-x-a*d)
+-   if dl<.5:print('near LOS',ob.name,q,'distance',dl,'t',a,'half',s.get(ob,'half_x'),s.get(ob,'half_z'))
+-  for delta in [(0,0),(.1,0),(.1,0),(0,.1),(-.1,0),(-.1,0),(-.1,0),(0,-.1),(0,-.1)]:
+-   a=np.zeros(8,np.float32);a[r*4:r*4+2]=delta;a[r*4+3]=-.5 if task[0]=='image' else .5
+-   s,*_=e.step(a)
+-   print('probe',r,p.xy(s,rob),'cal',s.get(rob,'calibrated'),'pending',p.pending(s,r))
+- e.close()
+diff --git a/probe_los_threshold.py b/probe_los_threshold.py
+deleted file mode 100644
+index 4816ba7..0000000
+--- a/probe_los_threshold.py
++++ /dev/null
+@@ -1,18 +0,0 @@
+-import numpy as np
+-from env_client import make_env
+-from probe_policy_old import GeneratedApproach
+-for seed,rr,points in [(4,1,[(-1.8,0),(-1.75,0),(-1.7,0),(-1.65,0),(-1.6,0)]),(3,0,[(1.4,.1),(1.3,.1),(1.3,.2),(1.2,.1)])]:
+- for pt in points:
+-  e=make_env();s,info=e.reset(seed=seed);p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,info)
+-  for t in range(55):s,*_=e.step(p.get_action(s))
+-  rob=p.rovers[rr]
+-  for t in range(6):
+-   a=np.zeros(8,np.float32);a[rr*4:rr*4+2]=np.clip(np.array(pt)-p.xy(s,rob),-.2,.2);a[rr*4+3]=-.5 if seed==4 else .5;s,*_=e.step(a)
+-  target=p.xy(s,p.objectives[2]) if seed==4 else p.lander
+-  start=p.xy(s,rob);d=target-start
+-  distances=[]
+-  for ob in p.objects(s,'obstacle')+p.rovers:
+-   if ob==rob:continue
+-   q=p.xy(s,ob);u=np.clip(np.dot(q-start,d)/np.dot(d,d),0,1);distances.append((round(np.linalg.norm(q-start-u*d),3),ob.name))
+-  print(seed,pt,'cal',s.get(rob,'calibrated'),'pending',p.pending(s,rr),'near',sorted(distances)[:4])
+-  e.close()
+diff --git a/probe_motion.py b/probe_motion.py
+deleted file mode 100644
+index d6c986d..0000000
+--- a/probe_motion.py
++++ /dev/null
+@@ -1,28 +0,0 @@
+-from env_client import make_env
+-import numpy as np
+-
+-def vals(s,n='rover0'):
+- o=s.get_object_from_name(n);return [s.get(o,f) for f in ['x','y','theta','at_home']]
+-def step(e,dx=0,dy=0,dt=0):
+- a=np.zeros(8);a[:3]=[dx,dy,dt];t,*_=e.step(a);return t
+-for y in [-2.30,-2.25,-2.2,-2,-1.5,-1,-.5,0,.5,1,1.5,1.75,2,2.25,2.3]:
+- e=make_env();s,_=e.reset(seed=0)
+- while abs(vals(s)[1]-y)>.001:
+-  old=vals(s);s=step(e,dy=np.clip(y-old[1],-.2,.2))
+-  if vals(s)==old:break
+- for _ in range(20):
+-  old=vals(s);s=step(e,dx=-.05)
+-  if vals(s)==old:break
+- print('wall scan',y,vals(s))
+- e.close()
+-for mode in ['east','south','wall','home']:
+- e=make_env();s,_=e.reset(seed=0)
+- for k in range(160):
+-  old=vals(s)
+-  if mode=='east':s=step(e,dx=.01)
+-  if mode=='south':s=step(e,dy=-.01)
+-  if mode=='wall':s=step(e,dx=-.01)
+-  if mode=='home':s=step(e,dx=.01)
+-  if vals(s)==old or (mode=='home' and vals(s)[-1]==0):break
+- print('exact',mode,vals(s),k)
+- e.close()
+diff --git a/probe_pillar.py b/probe_pillar.py
+deleted file mode 100644
+index 9e7e3f4..0000000
+--- a/probe_pillar.py
++++ /dev/null
+@@ -1,40 +0,0 @@
+-from env_client import make_env
+-import numpy as np
+-
+-def p(s):
+- o=s.get_object_from_name('rover0');return np.array([s.get(o,'x'),s.get(o,'y')])
+-def st(e,s,d):
+- a=np.zeros(8);a[:2]=d;t,*_=e.step(a);return t
+-
+-def go(e,s,target):
+- for _ in range(60):
+-  d=np.clip(np.array(target)-p(s),-.1,.1)
+-  if np.linalg.norm(d)<1e-5:break
+-  old=p(s);s=st(e,s,d)
+-  if np.allclose(old,p(s)): print('STUCK',p(s),'towards',target);break
+- return s
+-for mode in ['diag','left','front','right']:
+- e=make_env();s,_=e.reset(seed=60)
+- if mode=='diag':
+-  for o in s.get_objects(e.observation_space.get_type('obstacle')):
+-   print(str(o),[s.get(o,f) for f in ['x','y','half_x','half_y']])
+-  s=go(e,s,[1.,.4]);s=go(e,s,[1.5,.2]);print('start',p(s));s=st(e,s,[-.2,-.2]);print('diag',p(s))
+- elif mode=='front':
+-  s=go(e,s,[1.,.4]);s=go(e,s,[1.45038712,.4])
+-  for _ in range(500):
+-   old=p(s);s=st(e,s,[0,-.001])
+-   if np.allclose(old,p(s)):break
+-  print(mode,p(s))
+- elif mode=='right':
+-  s=go(e,s,[2.,-1.75]);s=go(e,s,[2.,-.21976596])
+-  for _ in range(600):
+-   old=p(s);s=st(e,s,[-.001,0])
+-   if np.allclose(old,p(s)):break
+-  print(mode,p(s))
+- elif mode=='left':
+-  s=go(e,s,[1.,.4]);s=go(e,s,[1.30000012,.4])
+-  for _ in range(500):
+-   old=p(s);s=st(e,s,[0,-.001])
+-   if np.allclose(old,p(s)):break
+-  print(mode,p(s))
+- e.close()
+diff --git a/probe_pillar_axis.py b/probe_pillar_axis.py
+deleted file mode 100644
+index 4e53ca6..0000000
+--- a/probe_pillar_axis.py
++++ /dev/null
+@@ -1,19 +0,0 @@
+-from env_client import make_env
+-import numpy as np
+-for dy in [-.27,-.24,-.2,-.1,0,.1,.2,.24,.27]:
+- e=make_env();s,_=e.reset(seed=60);o=s.get_object_from_name('rover0')
+- def p():return np.array([s.get(o,'x'),s.get(o,'y')])
+- def st(d):
+-  global s
+-  a=np.zeros(8);a[:2]=d;s,*_=e.step(a)
+- for target in [[1.,-.21976596+dy],[1.15,-.21976596+dy]]:
+-  for k in range(40):
+-   d=np.clip(np.array(target)-p(),-.2,.2)
+-   if np.linalg.norm(d)<1e-5:break
+-   old=p();st(d)
+-   if np.allclose(old,p()):break
+- for k in range(40):
+-  old=p();st([.005,0])
+-  if np.allclose(old,p()):break
+- print(dy,p(),flush=True)
+- e.close()
+diff --git a/probe_pillar_shape.py b/probe_pillar_shape.py
+deleted file mode 100644
+index 724f56c..0000000
+--- a/probe_pillar_shape.py
++++ /dev/null
+@@ -1,19 +0,0 @@
+-from env_client import make_env
+-import numpy as np
+-for dx in [-.3,-.27,-.25,-.23,-.21,-.18,-.15,-.1,-.05,0,.05,.10,.15]:
+- e=make_env();s,_=e.reset(seed=60);o=s.get_object_from_name('rover0')
+- def p():return np.array([s.get(o,'x'),s.get(o,'y')])
+- def st(d):
+-  global s
+-  a=np.zeros(8);a[:2]=d;s,*_=e.step(a)
+- for target in [[1.,.4],[1.45038712+dx,.4],[1.45038712+dx,.1]]:
+-  for k in range(40):
+-   d=np.clip(np.array(target)-p(),-.2,.2)
+-   if np.linalg.norm(d)<1e-5:break
+-   old=p();st(d)
+-   if np.allclose(old,p()):break
+- for k in range(50):
+-  old=p();st([0,-.01])
+-  if np.allclose(old,p()):break
+- print(dx,p(),flush=True)
+- e.close()
+diff --git a/probe_policy_old.py b/probe_policy_old.py
+deleted file mode 100644
+index e24294f..0000000
+--- a/probe_policy_old.py
++++ /dev/null
+@@ -1,183 +0,0 @@
+-import math
+-import heapq
+-import numpy as np
+-
+-
+-class GeneratedApproach:
+-    """Feedback navigation and task allocation for the two rovers."""
+-    def __init__(self, action_space, observation_space, primitives):
+-        self.space = observation_space
+-        self.types = {t.name: t for t in observation_space.types}
+-
+-    def objects(self, state, kind):
+-        return sorted(state.get_objects(self.types[kind]), key=lambda o: o.name)
+-
+-    def xy(self, state, obj):
+-        return np.array([state.get(obj, 'x'), state.get(obj, 'y')], dtype=float)
+-
+-    def reset(self, state, info):
+-        self.rovers = self.objects(state, 'rover')
+-        self.objectives = self.objects(state, 'objective')
+-        self.samples = self.objects(state, 'sample')
+-        self.home = [self.xy(state, r) for r in self.rovers]
+-        self.lander = self.xy(state, self.objects(state, 'lander')[0])
+-        self.rects = []
+-        self.occluders = []
+-        for o in self.objects(state, 'obstacle'):
+-            p = self.xy(state, o)
+-            h = np.array([state.get(o, 'half_x'), state.get(o, 'half_y')])
+-            self.rects.append((p-h, p+h))
+-            if state.get(o, 'half_z') > .1:
+-                self.occluders.append((p-h, p+h))
+-        self.rects.append((np.array([-.05, -3.]), np.array([.05, 3.])))
+-        self.rects.append((self.lander-np.array([.3,.25]),self.lander+np.array([.3,.25])))
+-        axis = np.arange(-2.2, 2.201, .1)
+-        self.size = len(axis)
+-        xx, yy = np.meshgrid(axis, axis)
+-        self.points = np.column_stack([xx.ravel(), yy.ravel()])
+-        self.free = self.valid(self.points)
+-        self.masks = {}
+-        for k, o in enumerate(self.objectives):
+-            self.masks[('image',k)] = self.free & self.visible(self.points,self.xy(state,o),1.97)
+-        for k, o in enumerate(self.samples):
+-            self.masks[('sample',k)] = self.free & (np.linalg.norm(self.points-self.xy(state,o),axis=1)<.235)
+-        self.masks[('send',0)] = self.free & self.visible(self.points,self.lander,3.95)
+-        self.tasks = [None,None]
+-        self.paths = [[],[]]
+-        self.previous = [None,None]
+-        self.fail = [0,0]
+-        self.tick = 0
+-
+-    def valid(self, pts):
+-        good = np.all(np.abs(pts) <= 2.265, axis=-1)
+-        for lo,hi in self.rects:
+-            good &= np.linalg.norm(np.maximum(np.maximum(lo-pts,pts-hi),0),axis=-1) > .182
+-        return good
+-
+-    def visible(self, pts, target, radius):
+-        good = np.linalg.norm(pts-target,axis=1)<radius
+-        d = target-pts
+-        for lo,hi in self.occluders:
+-            inv = np.divide(1.,d,out=np.full_like(d,1e10),where=np.abs(d)>1e-10)
+-            a=(lo-pts)*inv; b=(hi-pts)*inv
+-            enter=np.max(np.minimum(a,b),axis=1)
+-            leave=np.min(np.maximum(a,b),axis=1)
+-            good &= ~((leave>=np.maximum(enter,0)) & (enter<=1) & (leave>=0))
+-        return good
+-
+-    def route(self, start, mask, other=None):
+-        # A multi-goal Dijkstra on a small occupancy grid.
+-        free=self.free.copy()
+-        if other is not None:
+-            free &= np.linalg.norm(self.points-other,axis=1)>.4
+-        starts=np.argsort(np.linalg.norm(self.points-start,axis=1))[:20]
+-        root=next((int(j) for j in starts if free[j]),int(starts[0]))
+-        dist={root:0.}; parent={}; queue=[(0.,root)]
+-        n=self.size
+-        end=None
+-        while queue:
+-            cost,j=heapq.heappop(queue)
+-            if cost!=dist[j]: continue
+-            if mask[j]: end=j;break
+-            x=j%n;y=j//n
+-            for dx,dy in ((1,0),(-1,0),(0,1),(0,-1),(1,1),(-1,1),(1,-1),(-1,-1)):
+-                nx=x+dx;ny=y+dy
+-                if nx<0 or nx>=n or ny<0 or ny>=n:continue
+-                k=ny*n+nx
+-                if not free[k]:continue
+-                if dx and dy and (not free[y*n+nx] or not free[ny*n+x]):continue
+-                v=cost+1.
+-                if v<dist.get(k,1e9):
+-                    dist[k]=v;parent[k]=j;heapq.heappush(queue,(v,k))
+-        if end is None:return [],1e6
+-        path=[end]
+-        while path[-1]!=root:path.append(parent[path[-1]])
+-        return [self.points[j].copy() for j in path[::-1]],dist[end]*.5
+-
+-    def have(self,s,k):
+-        o=self.objectives[k]
+-        return any(s.get(o,f)>0.5 for f in ('received_image','have_image_rover0','have_image_rover1'))
+-
+-    def needed(self,s):
+-        return [not any(s.get(o,'is_soil')==soil and any(s.get(o,f)>.5 for f in ('received_analysis','analyzed_rover0','analyzed_rover1')) for o in self.samples) for soil in (0,1)]
+-
+-    def pending(self,s,r):
+-        return any(s.get(o,'have_image_rover%d'%r)>.5 and s.get(o,'received_image')<.5 for o in self.objectives) or any(s.get(o,'analyzed_rover%d'%r)>.5 and s.get(o,'received_analysis')<.5 for o in self.samples)
+-
+-    def completed(self,s,r,task):
+-        kind,k=task
+-        if kind=='image':return self.have(s,k)
+-        if kind=='sample':return not self.needed(s)[int(s.get(self.samples[k],'is_soil'))]
+-        if kind=='send':return not self.pending(s,r)
+-        return s.get(self.rovers[r],'at_home')>.5
+-
+-    def choose(self,s,r,p,other):
+-        candidates=[]
+-        reserved=self.tasks[1-r]
+-        need=self.needed(s)
+-        for k,o in enumerate(self.objectives):
+-            if not self.have(s,k) and reserved!=('image',k):candidates.append(('image',k))
+-        if s.get(self.rovers[r],'store_full')<.5:
+-            for k,o in enumerate(self.samples):
+-                soil=int(s.get(o,'is_soil'))
+-                if need[soil] and not (reserved and reserved[0]=='sample' and int(s.get(self.samples[reserved[1]],'is_soil'))==soil):candidates.append(('sample',k))
+-        best=None;score=1e9;path=[]
+-        for task in candidates:
+-            pp,cost=self.route(p,self.masks[task],other)
+-            cost+=2 if task[0]=='image' else 0
+-            if cost<score and cost<1e5:best=task;score=cost;path=pp
+-        if best is None:
+-            if self.pending(s,r):best=('send',0);path,_=self.route(p,self.masks[best],other)
+-            else:
+-                best=('home',r)
+-                mask=np.linalg.norm(self.points-self.home[r],axis=1)<.08
+-                path,_=self.route(p,mask,other)
+-                path.append(self.home[r].copy())
+-        self.tasks[r]=best;self.paths[r]=path
+-
+-    def get_action(self, state):
+-        s=state; self.tick+=1
+-        action=np.zeros(8,dtype=np.float32)
+-        pos=[self.xy(s,r) for r in self.rovers]
+-        for r in range(2):
+-            p=pos[r];rob=self.rovers[r]
+-            if self.previous[r] is not None and np.linalg.norm(p-self.previous[r][0])<1e-5 and np.linalg.norm(self.previous[r][1])>.01:
+-                self.fail[r]+=1
+-            else:self.fail[r]=0
+-            task=self.tasks[r]
+-            if task is None or self.completed(s,r,task):
+-                self.choose(s,r,p,pos[1-r]);task=self.tasks[r]
+-            if self.fail[r]>=2:
+-                self.paths[r]=[]
+-                # Infer blocked configuration and route around it.
+-                blocked=p+self.previous[r][1]
+-                self.free[np.linalg.norm(self.points-blocked,axis=1)<.12]=False
+-                if task[0]=='home':mask=np.linalg.norm(self.points-self.home[r],axis=1)<.08
+-                else:mask=self.masks[task]
+-                self.paths[r],_=self.route(p,mask,pos[1-r])
+-                if task[0]=='home':self.paths[r].append(self.home[r].copy())
+-                self.fail[r]=0
+-            path=self.paths[r]
+-            while path and np.max(np.abs(path[0]-p))<.025:path.pop(0)
+-            dest=p.copy()
+-            selected=-1
+-            for pi,point in enumerate(path[:5]):
+-                d=point-p
+-                if np.max(np.abs(d))>.20001:break
+-                probes=p+np.linspace(0,1,5)[:,None]*d
+-                if np.all(self.valid(probes)) and np.linalg.norm(point-pos[1-r])>.4:dest=point.copy();selected=pi
+-                else:break
+-            if selected>0:del path[:selected]
+-            d=np.clip(dest-p,-.2,.2)
+-            q=p+d
+-            op=0.
+-            kind,k=task
+-            if kind=='sample' and np.linalg.norm(q-self.xy(s,self.samples[k]))<.247:op=-5/6
+-            elif kind=='image' and self.visible(q[None,:],self.xy(s,self.objectives[k]),1.99)[0]:
+-                op=-1/6 if s.get(rob,'calibrated')>.5 else -.5
+-            elif kind=='send' and self.visible(q[None,:],self.lander,3.99)[0]:op=.5
+-            if op==0 and s.get(rob,'store_full')>.5:op=5/6
+-            elif op==0 and self.pending(s,r) and self.visible(q[None,:],self.lander,3.99)[0]:op=.5
+-            action[r*4:r*4+2]=d;action[r*4+3]=op
+-            self.previous[r]=(p.copy(),d.copy())
+-        return action
+diff --git a/probe_radio_memory.py b/probe_radio_memory.py
+deleted file mode 100644
+index bbad7bd..0000000
+--- a/probe_radio_memory.py
++++ /dev/null
+@@ -1,10 +0,0 @@
+-from env_client import make_env
+-from approach import GeneratedApproach
+-import sys
+-E=make_env();s,i=E.reset(seed=int(sys.argv[1]),options={'object_count':4} if len(sys.argv)>2 else None);A=GeneratedApproach(E.action_space,E.observation_space,{});A.reset(s,i)
+-for t in range(180):
+- ac=A.get_action(s)
+- if t<30 or t%10==0:print(t,[A.xy(s,r).round(3).tolist() for r in A.rovers],A.tasks,ac[[3,7]].round(2).tolist(),'good',[[p.round(3).tolist() for p in ps] for ps in A.good_radio],flush=True)
+- s,_,term,tr,_=E.step(ac)
+- if term:break
+-E.close()
+diff --git a/probe_rover_los.py b/probe_rover_los.py
+deleted file mode 100644
+index c5ac47c..0000000
+--- a/probe_rover_los.py
++++ /dev/null
+@@ -1,9 +0,0 @@
+-import numpy as np
+-from env_client import make_env
+-from probe_policy_old import GeneratedApproach
+-e=make_env();s,info=e.reset(seed=3);p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,info)
+-for _ in range(55):s,*_=e.step(p.get_action(s))
+-for d in [(0,0),(0,-.1),(0,-.1),(.1,0),(.1,0)]:
+- a=np.zeros(8,np.float32);a[4:6]=d;a[3]=.5;s,*_=e.step(a)
+- print(p.xy(s,p.rovers[0]),p.xy(s,p.rovers[1]),'pending',p.pending(s,0))
+-e.close()
+diff --git a/probe_send_distance.py b/probe_send_distance.py
+deleted file mode 100644
+index ca8481c..0000000
+--- a/probe_send_distance.py
++++ /dev/null
+@@ -1,13 +0,0 @@
+-import numpy as np
+-from env_client import make_env
+-from probe_policy_old import GeneratedApproach
+-for pt in [(1.4,0),(1.3,.2),(1.39,.1),(1.38,.1),(1.37,.1),(1.36,.1)]:
+- e=make_env();s,info=e.reset(seed=3);p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,info)
+- for _ in range(55):s,*_=e.step(p.get_action(s))
+- a=np.zeros(8,np.float32);a[:2]=np.array(pt)-p.xy(s,p.rovers[0]);a[3]=.5;s,*_=e.step(a)
+- print(pt,'dist',np.linalg.norm(np.array(pt)-p.lander),'pending',p.pending(s,0))
+- if pt==(1.4,0):
+-  x=np.array([1.4,.1]);d=p.lander-x
+-  for o in p.objects(s,'obstacle'):
+-   q=p.xy(s,o);u=np.clip(np.dot(q-x,d)/np.dot(d,d),0,1);print(o.name,q,'dist',np.linalg.norm(q-x-u*d),'half',s.get(o,'half_x'),s.get(o,'half_z'))
+- e.close()
+diff --git a/probe_shape.py b/probe_shape.py
+deleted file mode 100644
+index 7327995..0000000
+--- a/probe_shape.py
++++ /dev/null
+@@ -1,18 +0,0 @@
+-from env_client import make_env
+-import numpy as np
+-
+-def p(s):
+- o=s.get_object_from_name('rover0');return np.array([s.get(o,'x'),s.get(o,'y')])
+-def step(e,s,dx=0,dy=0):
+- a=np.zeros(8);a[:2]=[dx,dy];t,*_=e.step(a);return t
+-for y in [-.1987184,.0312816,.0212816,.0112816,-.4287184,1.60,1.57,1.58,1.59,1.60,1.62,1.64,1.68,1.70,1.73,1.75,2.0]:
+- e=make_env();s,_=e.reset(seed=0)
+- for k in range(30):
+-  d=np.clip(y-p(s)[1],-.2,.2)
+-  if abs(d)<1e-6:break
+-  s=step(e,s,dy=d)
+- for k in range(130):
+-  old=p(s);s=step(e,s,dx=-.005)
+-  if np.allclose(p(s),old):break
+- print(y,p(s))
+- e.close()
+diff --git a/probe_visibility.py b/probe_visibility.py
+deleted file mode 100644
+index ebfbe1d..0000000
+--- a/probe_visibility.py
++++ /dev/null
+@@ -1,28 +0,0 @@
+-import numpy as np
+-from env_client import make_env
+-
+-def run(seed=0):
+- env=make_env(); s,_=env.reset(seed=seed)
+- rs=[s.get_object_from_name('rover'+str(i)) for i in range(2)]
+- def xy(i):return np.array([s.get(rs[i],f) for f in ('x','y')])
+- def step(i,op=0,d=(0,0)):
+-  nonlocal s
+-  a=np.zeros(8,np.float32);a[4*i:4*i+2]=d;a[4*i+3]=op
+-  s,*_=env.step(a)
+- def go(i,target):
+-  for _ in range(50):
+-   p=xy(i);d=np.clip(np.array(target)-p,-.2,.2)
+-   if np.max(np.abs(d))<1e-5:return True
+-   step(i,d=d)
+-   if np.linalg.norm(xy(i)-p)<1e-5:print('blocked',i,xy(i),target);return False
+- def ims():return [(o.name,int(s.get(o,'have_image_rover0')),int(s.get(o,'have_image_rover1')),int(s.get(o,'received_image'))) for o in s.get_objects(env.observation_space.get_type('objective'))]
+- go(0,(1,.5));step(0,-.5);step(0,-1/6);step(0,-.5);step(0,-1/6);print('photo',xy(0),ims())
+- step(0,.5);print('send high',ims())
+- go(0,(1,-1.75));step(0,.5);print('send home',ims())
+- go(1,(-1.4,-.1));step(1,-5/6);print('sample at',xy(1),[(o.name,int(s.get(o,'analyzed_rover1'))) for o in s.get_objects(env.observation_space.get_type('sample'))])
+- go(1,(-1.4,0));step(1,-5/6);step(1,.5);print('sample/send',xy(1),[(o.name,int(s.get(o,'analyzed_rover1')),int(s.get(o,'received_analysis'))) for o in s.get_objects(env.observation_space.get_type('sample'))])
+- step(1,5/6);print('drop',s.get(rs[1],'store_full'))
+- go(1,(-1.8,.35));step(1,-.5);step(1,-1/6);print('left photo',xy(1),ims())
+- go(0,(.4,-1.75));go(0,(-.4,-1.75));print('cross bottom',xy(0))
+- env.close()
+-run()
+diff --git a/scan_results.txt b/scan_results.txt
+deleted file mode 100644
+index 61d17e9..0000000
+--- a/scan_results.txt
++++ /dev/null
+@@ -1,12 +0,0 @@
+-PROGRESS 5000
+-PROGRESS 5100
+-PROGRESS 5200
+-PROGRESS 5300
+-PROGRESS 5400
+-PROGRESS 5500
+-PROGRESS 5600
+-PROGRESS 5700
+-PROGRESS 5800
+-5828 ['sample0_unreachable']
+-PROGRESS 5900
+-DONE 1
+diff --git a/stats200.json b/stats200.json
+deleted file mode 100644
+index 7635566..0000000
+--- a/stats200.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[{"seed": 200, "n": 1, "success": true, "steps": 21, "time": 0.103, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 201, "n": 1, "success": true, "steps": 60, "time": 0.333, "bad": [2, 0, 29], "ops": [1, 1, 31, 2, 2]}, {"seed": 202, "n": 1, "success": true, "steps": 30, "time": 0.195, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 203, "n": 1, "success": true, "steps": 29, "time": 0.181, "bad": [0, 1, 0], "ops": [2, 1, 3, 2, 2]}, {"seed": 204, "n": 3, "success": true, "steps": 22, "time": 0.19, "bad": [0, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 205, "n": 2, "success": true, "steps": 30, "time": 0.188, "bad": [2, 0, 8], "ops": [2, 2, 11, 2, 2]}, {"seed": 206, "n": 2, "success": true, "steps": 21, "time": 0.106, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 207, "n": 1, "success": true, "steps": 25, "time": 0.116, "bad": [0, 1, 0], "ops": [2, 1, 3, 2, 2]}, {"seed": 208, "n": 3, "success": true, "steps": 27, "time": 0.226, "bad": [0, 1, 0], "ops": [4, 3, 5, 2, 2]}, {"seed": 209, "n": 3, "success": true, "steps": 26, "time": 0.164, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 210, "n": 1, "success": true, "steps": 23, "time": 0.165, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 211, "n": 1, "success": true, "steps": 19, "time": 0.149, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 212, "n": 1, "success": true, "steps": 29, "time": 0.348, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 213, "n": 1, "success": true, "steps": 27, "time": 0.219, "bad": [2, 2, 0], "ops": [3, 1, 2, 2, 2]}, {"seed": 214, "n": 1, "success": true, "steps": 23, "time": 0.175, "bad": [0, 0, 7], "ops": [1, 1, 9, 2, 2]}, {"seed": 215, "n": 3, "success": true, "steps": 33, "time": 0.276, "bad": [0, 0, 0], "ops": [3, 3, 5, 2, 2]}, {"seed": 216, "n": 3, "success": true, "steps": 25, "time": 0.199, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 217, "n": 3, "success": true, "steps": 27, "time": 0.181, "bad": [2, 0, 0], "ops": [4, 4, 4, 4, 2]}, {"seed": 218, "n": 2, "success": true, "steps": 28, "time": 0.217, "bad": [2, 2, 0], "ops": [4, 2, 4, 2, 2]}, {"seed": 219, "n": 1, "success": true, "steps": 39, "time": 0.213, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 220, "n": 3, "success": true, "steps": 37, "time": 0.284, "bad": [4, 1, 1], "ops": [4, 3, 4, 4, 2]}, {"seed": 221, "n": 2, "success": true, "steps": 23, "time": 0.193, "bad": [0, 0, 0], "ops": [2, 2, 2, 2, 2]}, {"seed": 222, "n": 2, "success": true, "steps": 26, "time": 0.207, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 223, "n": 2, "success": true, "steps": 34, "time": 0.228, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 224, "n": 3, "success": true, "steps": 23, "time": 0.203, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 225, "n": 3, "success": true, "steps": 28, "time": 0.199, "bad": [0, 1, 0], "ops": [5, 4, 2, 2, 2]}, {"seed": 226, "n": 3, "success": true, "steps": 23, "time": 0.198, "bad": [0, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 227, "n": 2, "success": true, "steps": 21, "time": 0.201, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 228, "n": 2, "success": true, "steps": 25, "time": 0.121, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 229, "n": 2, "success": true, "steps": 26, "time": 0.221, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 230, "n": 2, "success": true, "steps": 33, "time": 0.232, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 231, "n": 1, "success": true, "steps": 27, "time": 0.261, "bad": [0, 0, 1], "ops": [1, 1, 4, 2, 2]}, {"seed": 232, "n": 2, "success": true, "steps": 26, "time": 0.182, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 233, "n": 1, "success": true, "steps": 22, "time": 0.156, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 234, "n": 2, "success": true, "steps": 28, "time": 0.195, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 235, "n": 3, "success": true, "steps": 38, "time": 0.226, "bad": [4, 0, 0], "ops": [4, 4, 4, 6, 2]}, {"seed": 236, "n": 2, "success": true, "steps": 21, "time": 0.137, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 237, "n": 3, "success": true, "steps": 30, "time": 0.226, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 238, "n": 2, "success": true, "steps": 21, "time": 0.153, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 239, "n": 3, "success": true, "steps": 28, "time": 0.214, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 240, "n": 3, "success": true, "steps": 26, "time": 0.153, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 241, "n": 2, "success": true, "steps": 28, "time": 0.203, "bad": [0, 2, 0], "ops": [4, 2, 3, 2, 2]}, {"seed": 242, "n": 3, "success": true, "steps": 31, "time": 0.238, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 243, "n": 3, "success": true, "steps": 34, "time": 0.269, "bad": [2, 2, 0], "ops": [5, 3, 3, 2, 2]}, {"seed": 244, "n": 3, "success": true, "steps": 24, "time": 0.203, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 245, "n": 3, "success": true, "steps": 32, "time": 0.215, "bad": [0, 0, 0], "ops": [5, 5, 4, 2, 2]}, {"seed": 246, "n": 3, "success": true, "steps": 29, "time": 0.226, "bad": [2, 0, 0], "ops": [3, 3, 4, 4, 2]}, {"seed": 247, "n": 1, "success": true, "steps": 24, "time": 0.157, "bad": [2, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 248, "n": 2, "success": true, "steps": 26, "time": 0.181, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 249, "n": 3, "success": true, "steps": 24, "time": 0.183, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 250, "n": 2, "success": true, "steps": 39, "time": 0.236, "bad": [4, 0, 0], "ops": [2, 2, 3, 4, 2]}, {"seed": 251, "n": 1, "success": true, "steps": 20, "time": 0.148, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 252, "n": 3, "success": true, "steps": 28, "time": 0.193, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 253, "n": 2, "success": true, "steps": 22, "time": 0.166, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 254, "n": 1, "success": true, "steps": 19, "time": 0.14, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 255, "n": 1, "success": true, "steps": 38, "time": 0.231, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 256, "n": 2, "success": true, "steps": 36, "time": 0.181, "bad": [2, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 257, "n": 3, "success": true, "steps": 29, "time": 0.211, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 258, "n": 2, "success": true, "steps": 26, "time": 0.184, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 259, "n": 1, "success": true, "steps": 27, "time": 0.182, "bad": [2, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 260, "n": 3, "success": true, "steps": 32, "time": 0.214, "bad": [2, 2, 3], "ops": [5, 3, 8, 2, 2]}, {"seed": 261, "n": 2, "success": true, "steps": 29, "time": 0.102, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 262, "n": 3, "success": false, "steps": 200, "time": 2.204, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 263, "n": 3, "success": true, "steps": 25, "time": 0.17, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 264, "n": 1, "success": true, "steps": 22, "time": 0.143, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 265, "n": 3, "success": true, "steps": 34, "time": 0.19, "bad": [5, 2, 0], "ops": [6, 4, 5, 2, 2]}, {"seed": 266, "n": 2, "success": true, "steps": 29, "time": 0.123, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 267, "n": 2, "success": true, "steps": 22, "time": 0.183, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 268, "n": 3, "success": true, "steps": 31, "time": 0.145, "bad": [0, 1, 0], "ops": [6, 5, 3, 2, 2]}, {"seed": 269, "n": 3, "success": true, "steps": 24, "time": 0.187, "bad": [0, 1, 0], "ops": [4, 3, 4, 2, 2]}, {"seed": 270, "n": 2, "success": true, "steps": 20, "time": 0.143, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 271, "n": 3, "success": true, "steps": 24, "time": 0.163, "bad": [0, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 272, "n": 1, "success": true, "steps": 22, "time": 0.164, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 273, "n": 1, "success": true, "steps": 24, "time": 0.156, "bad": [0, 0, 7], "ops": [1, 1, 10, 2, 2]}, {"seed": 274, "n": 2, "success": true, "steps": 38, "time": 0.214, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 275, "n": 1, "success": true, "steps": 22, "time": 0.134, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 276, "n": 2, "success": true, "steps": 24, "time": 0.128, "bad": [1, 1, 0], "ops": [3, 2, 2, 2, 2]}, {"seed": 277, "n": 1, "success": true, "steps": 24, "time": 0.159, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 278, "n": 2, "success": true, "steps": 26, "time": 0.133, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 279, "n": 2, "success": true, "steps": 24, "time": 0.126, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 280, "n": 2, "success": true, "steps": 35, "time": 0.206, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 281, "n": 2, "success": true, "steps": 26, "time": 0.184, "bad": [2, 1, 0], "ops": [3, 2, 4, 2, 2]}, {"seed": 282, "n": 3, "success": true, "steps": 25, "time": 0.163, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 283, "n": 1, "success": true, "steps": 20, "time": 0.143, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 284, "n": 1, "success": true, "steps": 35, "time": 0.216, "bad": [2, 0, 0], "ops": [1, 1, 3, 4, 2]}, {"seed": 285, "n": 3, "success": true, "steps": 28, "time": 0.182, "bad": [0, 0, 1], "ops": [3, 3, 4, 2, 2]}, {"seed": 286, "n": 1, "success": true, "steps": 20, "time": 0.13, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 287, "n": 3, "success": true, "steps": 27, "time": 0.208, "bad": [2, 3, 0], "ops": [6, 3, 4, 2, 2]}, {"seed": 288, "n": 1, "success": true, "steps": 21, "time": 0.148, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 289, "n": 2, "success": true, "steps": 27, "time": 0.199, "bad": [0, 1, 0], "ops": [3, 2, 3, 2, 2]}, {"seed": 290, "n": 1, "success": true, "steps": 22, "time": 0.137, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 291, "n": 1, "success": true, "steps": 25, "time": 0.157, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 292, "n": 3, "success": true, "steps": 26, "time": 0.185, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 293, "n": 1, "success": true, "steps": 22, "time": 0.164, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 294, "n": 1, "success": true, "steps": 36, "time": 0.205, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 295, "n": 1, "success": true, "steps": 23, "time": 0.159, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 296, "n": 1, "success": true, "steps": 24, "time": 0.169, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 297, "n": 1, "success": true, "steps": 20, "time": 0.08, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 298, "n": 2, "success": true, "steps": 23, "time": 0.137, "bad": [2, 0, 0], "ops": [2, 2, 2, 2, 2]}, {"seed": 299, "n": 3, "success": true, "steps": 26, "time": 0.195, "bad": [0, 0, 0], "ops": [3, 3, 5, 2, 2]}, {"seed": 300, "n": 1, "success": true, "steps": 23, "time": 0.151, "bad": [0, 0, 4], "ops": [1, 1, 7, 2, 2]}, {"seed": 301, "n": 1, "success": true, "steps": 34, "time": 0.212, "bad": [2, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 302, "n": 3, "success": true, "steps": 24, "time": 0.197, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 303, "n": 2, "success": true, "steps": 36, "time": 0.244, "bad": [5, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 304, "n": 3, "success": true, "steps": 27, "time": 0.217, "bad": [0, 0, 0], "ops": [3, 3, 5, 2, 2]}, {"seed": 305, "n": 1, "success": true, "steps": 21, "time": 0.17, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 306, "n": 3, "success": true, "steps": 33, "time": 0.253, "bad": [4, 1, 0], "ops": [4, 3, 3, 2, 2]}, {"seed": 307, "n": 3, "success": true, "steps": 29, "time": 0.252, "bad": [2, 0, 0], "ops": [3, 3, 5, 4, 2]}, {"seed": 308, "n": 2, "success": true, "steps": 27, "time": 0.2, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 309, "n": 2, "success": true, "steps": 22, "time": 0.177, "bad": [0, 1, 0], "ops": [3, 2, 3, 2, 2]}, {"seed": 310, "n": 1, "success": true, "steps": 24, "time": 0.17, "bad": [0, 0, 7], "ops": [1, 1, 9, 2, 2]}, {"seed": 311, "n": 2, "success": true, "steps": 35, "time": 0.243, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 312, "n": 1, "success": true, "steps": 25, "time": 0.153, "bad": [0, 0, 2], "ops": [1, 1, 5, 2, 2]}, {"seed": 313, "n": 1, "success": true, "steps": 23, "time": 0.147, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 314, "n": 2, "success": true, "steps": 27, "time": 0.247, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 315, "n": 2, "success": true, "steps": 22, "time": 0.166, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 316, "n": 1, "success": true, "steps": 21, "time": 0.138, "bad": [0, 0, 5], "ops": [1, 1, 8, 2, 2]}, {"seed": 317, "n": 1, "success": true, "steps": 23, "time": 0.16, "bad": [0, 0, 8], "ops": [1, 1, 11, 2, 2]}, {"seed": 318, "n": 1, "success": true, "steps": 21, "time": 0.151, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 319, "n": 3, "success": true, "steps": 33, "time": 0.276, "bad": [0, 0, 0], "ops": [3, 3, 5, 2, 2]}, {"seed": 320, "n": 1, "success": true, "steps": 35, "time": 0.186, "bad": [0, 0, 13], "ops": [1, 1, 16, 2, 2]}, {"seed": 321, "n": 2, "success": true, "steps": 23, "time": 0.184, "bad": [0, 0, 0], "ops": [2, 2, 2, 2, 2]}, {"seed": 322, "n": 1, "success": true, "steps": 22, "time": 0.121, "bad": [2, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 323, "n": 3, "success": true, "steps": 25, "time": 0.178, "bad": [0, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 324, "n": 2, "success": true, "steps": 25, "time": 0.198, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 325, "n": 1, "success": true, "steps": 25, "time": 0.172, "bad": [0, 0, 1], "ops": [1, 1, 4, 2, 2]}, {"seed": 326, "n": 1, "success": true, "steps": 23, "time": 0.157, "bad": [2, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 327, "n": 2, "success": true, "steps": 25, "time": 0.171, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 328, "n": 1, "success": true, "steps": 28, "time": 0.166, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 329, "n": 3, "success": true, "steps": 26, "time": 0.179, "bad": [2, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 330, "n": 2, "success": true, "steps": 40, "time": 0.269, "bad": [0, 1, 0], "ops": [3, 2, 4, 2, 2]}, {"seed": 331, "n": 1, "success": true, "steps": 30, "time": 0.188, "bad": [0, 2, 0], "ops": [3, 1, 3, 2, 2]}, {"seed": 332, "n": 2, "success": true, "steps": 29, "time": 0.219, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 333, "n": 1, "success": true, "steps": 26, "time": 0.142, "bad": [2, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 334, "n": 2, "success": true, "steps": 24, "time": 0.194, "bad": [0, 1, 0], "ops": [3, 2, 4, 2, 2]}, {"seed": 335, "n": 1, "success": true, "steps": 22, "time": 0.172, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 336, "n": 2, "success": true, "steps": 29, "time": 0.211, "bad": [2, 2, 0], "ops": [4, 2, 3, 2, 2]}, {"seed": 337, "n": 1, "success": true, "steps": 24, "time": 0.165, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 338, "n": 2, "success": true, "steps": 25, "time": 0.206, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 339, "n": 1, "success": true, "steps": 23, "time": 0.116, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 340, "n": 1, "success": true, "steps": 26, "time": 0.167, "bad": [0, 0, 6], "ops": [1, 1, 8, 2, 2]}, {"seed": 341, "n": 3, "success": true, "steps": 25, "time": 0.229, "bad": [0, 0, 0], "ops": [3, 3, 5, 2, 2]}, {"seed": 342, "n": 3, "success": true, "steps": 32, "time": 0.24, "bad": [0, 0, 1], "ops": [3, 3, 5, 2, 2]}, {"seed": 343, "n": 1, "success": true, "steps": 25, "time": 0.282, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 344, "n": 1, "success": true, "steps": 25, "time": 0.159, "bad": [0, 1, 0], "ops": [2, 1, 3, 2, 2]}, {"seed": 345, "n": 1, "success": true, "steps": 19, "time": 0.147, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 346, "n": 2, "success": true, "steps": 23, "time": 0.181, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 347, "n": 3, "success": true, "steps": 27, "time": 0.209, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 348, "n": 1, "success": true, "steps": 27, "time": 0.34, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 349, "n": 3, "success": false, "steps": 200, "time": 3.08, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 350, "n": 2, "success": true, "steps": 31, "time": 0.181, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 351, "n": 2, "success": true, "steps": 47, "time": 0.282, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 352, "n": 1, "success": true, "steps": 24, "time": 0.18, "bad": [2, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 353, "n": 1, "success": true, "steps": 29, "time": 0.17, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 354, "n": 3, "success": true, "steps": 27, "time": 0.231, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 355, "n": 2, "success": true, "steps": 22, "time": 0.167, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 356, "n": 1, "success": true, "steps": 25, "time": 0.185, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 357, "n": 2, "success": true, "steps": 32, "time": 0.257, "bad": [0, 1, 3], "ops": [4, 3, 5, 2, 2]}, {"seed": 358, "n": 3, "success": true, "steps": 27, "time": 0.216, "bad": [2, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 359, "n": 2, "success": true, "steps": 29, "time": 0.21, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 360, "n": 3, "success": true, "steps": 31, "time": 0.238, "bad": [2, 0, 0], "ops": [4, 4, 3, 2, 2]}, {"seed": 361, "n": 3, "success": true, "steps": 29, "time": 0.241, "bad": [0, 0, 4], "ops": [3, 3, 8, 2, 2]}, {"seed": 362, "n": 3, "success": true, "steps": 31, "time": 0.184, "bad": [2, 0, 0], "ops": [4, 4, 4, 2, 2]}, {"seed": 363, "n": 1, "success": true, "steps": 20, "time": 0.162, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 364, "n": 2, "success": true, "steps": 24, "time": 0.183, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 365, "n": 1, "success": true, "steps": 23, "time": 0.167, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 366, "n": 1, "success": true, "steps": 21, "time": 0.147, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 367, "n": 3, "success": true, "steps": 30, "time": 0.244, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 368, "n": 3, "success": true, "steps": 28, "time": 0.227, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 369, "n": 3, "success": true, "steps": 35, "time": 0.282, "bad": [0, 0, 0], "ops": [3, 3, 5, 2, 2]}, {"seed": 370, "n": 2, "success": true, "steps": 39, "time": 0.266, "bad": [0, 0, 1], "ops": [2, 2, 4, 2, 2]}, {"seed": 371, "n": 3, "success": true, "steps": 30, "time": 0.223, "bad": [0, 0, 0], "ops": [4, 4, 4, 2, 2]}, {"seed": 372, "n": 2, "success": true, "steps": 38, "time": 0.249, "bad": [2, 1, 9], "ops": [3, 2, 12, 2, 2]}, {"seed": 373, "n": 2, "success": true, "steps": 28, "time": 0.192, "bad": [2, 2, 0], "ops": [4, 2, 3, 2, 2]}, {"seed": 374, "n": 3, "success": true, "steps": 27, "time": 0.204, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 375, "n": 1, "success": true, "steps": 21, "time": 0.118, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 376, "n": 2, "success": true, "steps": 23, "time": 0.189, "bad": [2, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 377, "n": 3, "success": true, "steps": 31, "time": 0.217, "bad": [0, 0, 2], "ops": [3, 3, 7, 2, 2]}, {"seed": 378, "n": 2, "success": true, "steps": 37, "time": 0.236, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 379, "n": 3, "success": true, "steps": 30, "time": 0.234, "bad": [0, 0, 0], "ops": [4, 4, 4, 2, 2]}, {"seed": 380, "n": 2, "success": true, "steps": 22, "time": 0.142, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 381, "n": 3, "success": true, "steps": 25, "time": 0.209, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 382, "n": 1, "success": true, "steps": 26, "time": 0.175, "bad": [0, 0, 1], "ops": [1, 1, 4, 2, 2]}, {"seed": 383, "n": 1, "success": true, "steps": 26, "time": 0.171, "bad": [2, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 384, "n": 1, "success": true, "steps": 31, "time": 0.195, "bad": [2, 0, 11], "ops": [1, 1, 13, 2, 2]}, {"seed": 385, "n": 3, "success": true, "steps": 28, "time": 0.208, "bad": [0, 0, 0], "ops": [4, 4, 5, 2, 2]}, {"seed": 386, "n": 2, "success": true, "steps": 30, "time": 0.207, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 387, "n": 2, "success": true, "steps": 37, "time": 0.254, "bad": [1, 1, 0], "ops": [3, 2, 4, 2, 2]}, {"seed": 388, "n": 2, "success": true, "steps": 24, "time": 0.187, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 389, "n": 1, "success": true, "steps": 24, "time": 0.184, "bad": [0, 0, 5], "ops": [1, 1, 7, 2, 2]}, {"seed": 390, "n": 2, "success": true, "steps": 22, "time": 0.157, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 391, "n": 1, "success": true, "steps": 32, "time": 0.223, "bad": [0, 1, 0], "ops": [2, 1, 3, 2, 2]}, {"seed": 392, "n": 3, "success": true, "steps": 27, "time": 0.213, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 393, "n": 3, "success": true, "steps": 27, "time": 0.212, "bad": [0, 1, 0], "ops": [4, 3, 2, 2, 2]}, {"seed": 394, "n": 1, "success": true, "steps": 21, "time": 0.125, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 395, "n": 2, "success": true, "steps": 27, "time": 0.194, "bad": [2, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 396, "n": 2, "success": true, "steps": 27, "time": 0.205, "bad": [0, 0, 0], "ops": [2, 2, 2, 2, 2]}, {"seed": 397, "n": 3, "success": true, "steps": 27, "time": 0.208, "bad": [0, 0, 0], "ops": [3, 3, 5, 2, 2]}, {"seed": 398, "n": 3, "success": true, "steps": 27, "time": 0.198, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 399, "n": 3, "success": true, "steps": 26, "time": 0.179, "bad": [2, 0, 0], "ops": [3, 3, 3, 4, 2]}]
+\ No newline at end of file
+diff --git a/stats200.txt b/stats200.txt
+deleted file mode 100644
+index 7788e14..0000000
+--- a/stats200.txt
++++ /dev/null
+@@ -1,23 +0,0 @@
+-{'seed': 200, 'n': 1, 'success': True, 'steps': 21, 'time': 0.103, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
+-{'seed': 210, 'n': 1, 'success': True, 'steps': 23, 'time': 0.165, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
+-{'seed': 220, 'n': 3, 'success': True, 'steps': 37, 'time': 0.284, 'bad': [4, 1, 1], 'ops': [4, 3, 4, 4, 2]}
+-{'seed': 230, 'n': 2, 'success': True, 'steps': 33, 'time': 0.232, 'bad': [0, 0, 0], 'ops': [2, 2, 4, 2, 2]}
+-{'seed': 240, 'n': 3, 'success': True, 'steps': 26, 'time': 0.153, 'bad': [0, 0, 0], 'ops': [3, 3, 3, 2, 2]}
+-{'seed': 250, 'n': 2, 'success': True, 'steps': 39, 'time': 0.236, 'bad': [4, 0, 0], 'ops': [2, 2, 3, 4, 2]}
+-{'seed': 260, 'n': 3, 'success': True, 'steps': 32, 'time': 0.214, 'bad': [2, 2, 3], 'ops': [5, 3, 8, 2, 2]}
+-{'seed': 262, 'n': 3, 'success': False, 'steps': 200, 'time': 2.204, 'bad': [0, 0, 0], 'ops': [2, 2, 4, 2, 2]}
+-{'seed': 270, 'n': 2, 'success': True, 'steps': 20, 'time': 0.143, 'bad': [0, 0, 0], 'ops': [2, 2, 3, 2, 2]}
+-{'seed': 280, 'n': 2, 'success': True, 'steps': 35, 'time': 0.206, 'bad': [0, 0, 0], 'ops': [2, 2, 4, 2, 2]}
+-{'seed': 290, 'n': 1, 'success': True, 'steps': 22, 'time': 0.137, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
+-{'seed': 300, 'n': 1, 'success': True, 'steps': 23, 'time': 0.151, 'bad': [0, 0, 4], 'ops': [1, 1, 7, 2, 2]}
+-{'seed': 310, 'n': 1, 'success': True, 'steps': 24, 'time': 0.17, 'bad': [0, 0, 7], 'ops': [1, 1, 9, 2, 2]}
+-{'seed': 320, 'n': 1, 'success': True, 'steps': 35, 'time': 0.186, 'bad': [0, 0, 13], 'ops': [1, 1, 16, 2, 2]}
+-{'seed': 330, 'n': 2, 'success': True, 'steps': 40, 'time': 0.269, 'bad': [0, 1, 0], 'ops': [3, 2, 4, 2, 2]}
+-{'seed': 340, 'n': 1, 'success': True, 'steps': 26, 'time': 0.167, 'bad': [0, 0, 6], 'ops': [1, 1, 8, 2, 2]}
+-{'seed': 349, 'n': 3, 'success': False, 'steps': 200, 'time': 3.08, 'bad': [0, 0, 0], 'ops': [2, 2, 4, 2, 2]}
+-{'seed': 350, 'n': 2, 'success': True, 'steps': 31, 'time': 0.181, 'bad': [0, 0, 0], 'ops': [2, 2, 3, 2, 2]}
+-{'seed': 360, 'n': 3, 'success': True, 'steps': 31, 'time': 0.238, 'bad': [2, 0, 0], 'ops': [4, 4, 3, 2, 2]}
+-{'seed': 370, 'n': 2, 'success': True, 'steps': 39, 'time': 0.266, 'bad': [0, 0, 1], 'ops': [2, 2, 4, 2, 2]}
+-{'seed': 380, 'n': 2, 'success': True, 'steps': 22, 'time': 0.142, 'bad': [0, 0, 0], 'ops': [2, 2, 4, 2, 2]}
+-{'seed': 390, 'n': 2, 'success': True, 'steps': 22, 'time': 0.157, 'bad': [0, 0, 0], 'ops': [2, 2, 3, 2, 2]}
+-SUMMARY 198 200 mean 28.83 max_time 3.08
+diff --git a/stats_final2000.txt b/stats_final2000.txt
+deleted file mode 100644
+index 444e391..0000000
+--- a/stats_final2000.txt
++++ /dev/null
+@@ -1,11 +0,0 @@
+-{'seed': 2000, 'n': 1, 'success': True, 'steps': 22, 'time': 0.105, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
+-{'seed': 2010, 'n': 3, 'success': True, 'steps': 24, 'time': 0.222, 'bad': [0, 0, 0], 'ops': [3, 3, 2, 2, 2]}
+-{'seed': 2020, 'n': 1, 'success': True, 'steps': 23, 'time': 0.103, 'bad': [0, 0, 7], 'ops': [1, 1, 10, 2, 2]}
+-{'seed': 2030, 'n': 1, 'success': True, 'steps': 19, 'time': 0.106, 'bad': [0, 0, 6], 'ops': [1, 1, 9, 2, 2]}
+-{'seed': 2040, 'n': 2, 'success': True, 'steps': 21, 'time': 0.143, 'bad': [0, 0, 0], 'ops': [2, 2, 2, 2, 2]}
+-{'seed': 2050, 'n': 2, 'success': True, 'steps': 22, 'time': 0.182, 'bad': [0, 0, 0], 'ops': [2, 2, 3, 2, 2]}
+-{'seed': 2060, 'n': 1, 'success': True, 'steps': 23, 'time': 0.189, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
+-{'seed': 2070, 'n': 2, 'success': True, 'steps': 24, 'time': 0.22, 'bad': [0, 0, 0], 'ops': [2, 2, 3, 2, 2]}
+-{'seed': 2080, 'n': 3, 'success': True, 'steps': 26, 'time': 0.241, 'bad': [0, 0, 0], 'ops': [3, 3, 3, 2, 2]}
+-{'seed': 2090, 'n': 2, 'success': True, 'steps': 23, 'time': 0.167, 'bad': [0, 0, 7], 'ops': [2, 2, 9, 2, 2]}
+-SUMMARY 100 100 mean 23.54 max_time 0.271
+diff --git a/stats_final4.txt b/stats_final4.txt
+deleted file mode 100644
+index d61343e..0000000
+--- a/stats_final4.txt
++++ /dev/null
+@@ -1,11 +0,0 @@
+-{'seed': 1200, 'n': 4, 'success': True, 'steps': 26, 'time': 0.169, 'bad': [0, 0, 0], 'ops': [5, 5, 4, 2, 2]}
+-{'seed': 1210, 'n': 4, 'success': True, 'steps': 24, 'time': 0.292, 'bad': [0, 0, 0], 'ops': [5, 5, 4, 2, 2]}
+-{'seed': 1220, 'n': 4, 'success': True, 'steps': 23, 'time': 0.206, 'bad': [0, 0, 0], 'ops': [5, 5, 3, 2, 2]}
+-{'seed': 1230, 'n': 4, 'success': True, 'steps': 29, 'time': 0.306, 'bad': [0, 1, 0], 'ops': [5, 4, 4, 2, 2]}
+-{'seed': 1240, 'n': 4, 'success': True, 'steps': 26, 'time': 0.271, 'bad': [0, 0, 0], 'ops': [4, 4, 3, 2, 2]}
+-{'seed': 1250, 'n': 4, 'success': True, 'steps': 24, 'time': 0.227, 'bad': [0, 0, 0], 'ops': [4, 4, 4, 2, 2]}
+-{'seed': 1260, 'n': 4, 'success': True, 'steps': 28, 'time': 0.211, 'bad': [0, 0, 0], 'ops': [4, 4, 3, 2, 2]}
+-{'seed': 1270, 'n': 4, 'success': True, 'steps': 28, 'time': 0.302, 'bad': [0, 0, 0], 'ops': [4, 4, 3, 2, 2]}
+-{'seed': 1280, 'n': 4, 'success': True, 'steps': 24, 'time': 0.234, 'bad': [0, 0, 0], 'ops': [4, 4, 4, 2, 2]}
+-{'seed': 1290, 'n': 4, 'success': True, 'steps': 26, 'time': 0.265, 'bad': [0, 1, 0], 'ops': [5, 4, 3, 2, 2]}
+-SUMMARY 100 100 mean 26.88 max_time 0.384
+diff --git a/stats_final400.txt b/stats_final400.txt
+deleted file mode 100644
+index 433c359..0000000
+--- a/stats_final400.txt
++++ /dev/null
+@@ -1,21 +0,0 @@
+-{'seed': 400, 'n': 3, 'success': True, 'steps': 23, 'time': 0.191, 'bad': [0, 0, 0], 'ops': [3, 3, 3, 2, 2]}
+-{'seed': 410, 'n': 2, 'success': True, 'steps': 22, 'time': 0.217, 'bad': [0, 0, 0], 'ops': [2, 2, 4, 2, 2]}
+-{'seed': 420, 'n': 2, 'success': True, 'steps': 21, 'time': 0.178, 'bad': [0, 0, 0], 'ops': [2, 2, 2, 2, 2]}
+-{'seed': 430, 'n': 1, 'success': True, 'steps': 22, 'time': 0.17, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
+-{'seed': 440, 'n': 1, 'success': True, 'steps': 20, 'time': 0.117, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
+-{'seed': 450, 'n': 1, 'success': True, 'steps': 25, 'time': 0.175, 'bad': [0, 0, 0], 'ops': [1, 1, 2, 2, 2]}
+-{'seed': 460, 'n': 1, 'success': True, 'steps': 21, 'time': 0.129, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
+-{'seed': 470, 'n': 3, 'success': True, 'steps': 27, 'time': 0.254, 'bad': [0, 1, 0], 'ops': [4, 3, 2, 2, 2]}
+-{'seed': 480, 'n': 3, 'success': True, 'steps': 21, 'time': 0.228, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
+-{'seed': 490, 'n': 2, 'success': True, 'steps': 21, 'time': 0.212, 'bad': [0, 0, 0], 'ops': [2, 2, 4, 2, 2]}
+-{'seed': 500, 'n': 2, 'success': True, 'steps': 25, 'time': 0.18, 'bad': [0, 0, 0], 'ops': [2, 2, 3, 2, 2]}
+-{'seed': 510, 'n': 1, 'success': True, 'steps': 24, 'time': 0.145, 'bad': [0, 0, 4], 'ops': [1, 1, 7, 2, 2]}
+-{'seed': 520, 'n': 1, 'success': True, 'steps': 18, 'time': 0.147, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
+-{'seed': 530, 'n': 1, 'success': True, 'steps': 23, 'time': 0.101, 'bad': [0, 0, 0], 'ops': [1, 1, 2, 2, 2]}
+-{'seed': 540, 'n': 1, 'success': True, 'steps': 19, 'time': 0.127, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
+-{'seed': 550, 'n': 3, 'success': True, 'steps': 29, 'time': 0.178, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
+-{'seed': 560, 'n': 3, 'success': True, 'steps': 23, 'time': 0.197, 'bad': [0, 0, 0], 'ops': [3, 3, 3, 2, 2]}
+-{'seed': 570, 'n': 1, 'success': True, 'steps': 22, 'time': 0.172, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
+-{'seed': 580, 'n': 1, 'success': True, 'steps': 21, 'time': 0.156, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
+-{'seed': 590, 'n': 2, 'success': True, 'steps': 23, 'time': 0.195, 'bad': [0, 0, 0], 'ops': [2, 2, 3, 2, 2]}
+-SUMMARY 200 200 mean 23.35 max_time 0.496
+diff --git a/stats_final_latest.txt b/stats_final_latest.txt
+index 9f32b6c..6c09e4a 100644
+--- a/stats_final_latest.txt
++++ b/stats_final_latest.txt
+@@ -2,3 +2,7 @@
+ {'seed': 10, 'n': 3, 'success': True, 'steps': 22, 'time': 0.194, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
+ {'seed': 20, 'n': 3, 'success': True, 'steps': 27, 'time': 0.266, 'bad': [0, 0, 0], 'ops': [4, 3, 2, 2, 2]}
+ {'seed': 30, 'n': 1, 'success': True, 'steps': 34, 'time': 0.24, 'bad': [0, 0, 4], 'ops': [1, 1, 6, 2, 2]}
++{'seed': 40, 'n': 2, 'success': True, 'steps': 25, 'time': 0.201, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
++{'seed': 50, 'n': 3, 'success': True, 'steps': 24, 'time': 0.233, 'bad': [0, 0, 0], 'ops': [3, 3, 3, 2, 2]}
++{'seed': 60, 'n': 1, 'success': True, 'steps': 22, 'time': 0.138, 'bad': [0, 0, 0], 'ops': [1, 1, 2, 2, 2]}
++{'seed': 70, 'n': 2, 'success': True, 'steps': 22, 'time': 0.135, 'bad': [0, 1, 0], 'ops': [3, 2, 3, 2, 2]}
+diff --git a/stats_final_latest4.txt b/stats_final_latest4.txt
+index ca24e99..7786e47 100644
+--- a/stats_final_latest4.txt
++++ b/stats_final_latest4.txt
+@@ -2,3 +2,5 @@
+ {'seed': 1210, 'n': 4, 'success': True, 'steps': 24, 'time': 0.253, 'bad': [0, 0, 0], 'ops': [5, 5, 4, 2, 2]}
+ {'seed': 1220, 'n': 4, 'success': True, 'steps': 23, 'time': 0.201, 'bad': [0, 0, 0], 'ops': [5, 5, 3, 2, 2]}
+ {'seed': 1230, 'n': 4, 'success': True, 'steps': 29, 'time': 0.261, 'bad': [0, 1, 0], 'ops': [5, 4, 4, 2, 2]}
++{'seed': 1240, 'n': 4, 'success': True, 'steps': 26, 'time': 0.245, 'bad': [0, 0, 0], 'ops': [4, 4, 3, 2, 2]}
++{'seed': 1250, 'n': 4, 'success': True, 'steps': 24, 'time': 0.243, 'bad': [0, 0, 0], 'ops': [4, 4, 4, 2, 2]}
+diff --git a/stats_greedy.txt b/stats_greedy.txt
+deleted file mode 100644
+index a179298..0000000
+--- a/stats_greedy.txt
++++ /dev/null
+@@ -1,11 +0,0 @@
+-{'seed': 0, 'n': 3, 'success': True, 'steps': 36, 'time': 0.199, 'bad': [0, 0, 3], 'ops': [3, 3, 6, 2, 2]}
+-{'seed': 10, 'n': 3, 'success': True, 'steps': 25, 'time': 0.178, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
+-{'seed': 20, 'n': 3, 'success': True, 'steps': 33, 'time': 0.293, 'bad': [0, 0, 0], 'ops': [3, 3, 3, 2, 2]}
+-{'seed': 30, 'n': 1, 'success': True, 'steps': 22, 'time': 0.191, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
+-{'seed': 40, 'n': 2, 'success': True, 'steps': 26, 'time': 0.21, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
+-{'seed': 50, 'n': 3, 'success': True, 'steps': 28, 'time': 0.187, 'bad': [0, 0, 0], 'ops': [3, 3, 3, 2, 2]}
+-{'seed': 60, 'n': 1, 'success': True, 'steps': 28, 'time': 0.17, 'bad': [2, 0, 2], 'ops': [1, 1, 4, 2, 2]}
+-{'seed': 70, 'n': 2, 'success': True, 'steps': 25, 'time': 0.198, 'bad': [0, 0, 0], 'ops': [2, 2, 3, 2, 2]}
+-{'seed': 80, 'n': 3, 'success': True, 'steps': 27, 'time': 0.174, 'bad': [0, 1, 0], 'ops': [5, 4, 2, 2, 2]}
+-{'seed': 90, 'n': 2, 'success': True, 'steps': 31, 'time': 0.214, 'bad': [0, 1, 1], 'ops': [3, 2, 4, 2, 2]}
+-SUMMARY 100 100 mean 26.41 max_time 0.309
+diff --git a/stats_octagon.txt b/stats_octagon.txt
+deleted file mode 100644
+index 9ab335d..0000000
+--- a/stats_octagon.txt
++++ /dev/null
+@@ -1,11 +0,0 @@
+-{'seed': 0, 'n': 3, 'success': True, 'steps': 28, 'time': 0.138, 'bad': [0, 0, 0], 'ops': [3, 3, 2, 2, 2]}
+-{'seed': 10, 'n': 3, 'success': True, 'steps': 22, 'time': 0.171, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
+-{'seed': 20, 'n': 3, 'success': True, 'steps': 27, 'time': 0.222, 'bad': [0, 0, 0], 'ops': [4, 3, 2, 2, 2]}
+-{'seed': 30, 'n': 1, 'success': True, 'steps': 24, 'time': 0.163, 'bad': [0, 0, 4], 'ops': [1, 1, 6, 2, 2]}
+-{'seed': 40, 'n': 2, 'success': True, 'steps': 25, 'time': 0.151, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
+-{'seed': 50, 'n': 3, 'success': True, 'steps': 24, 'time': 0.206, 'bad': [0, 0, 0], 'ops': [3, 3, 3, 2, 2]}
+-{'seed': 60, 'n': 1, 'success': True, 'steps': 22, 'time': 0.174, 'bad': [0, 0, 0], 'ops': [1, 1, 2, 2, 2]}
+-{'seed': 70, 'n': 2, 'success': True, 'steps': 22, 'time': 0.218, 'bad': [0, 1, 0], 'ops': [3, 2, 3, 2, 2]}
+-{'seed': 80, 'n': 3, 'success': True, 'steps': 23, 'time': 0.214, 'bad': [0, 1, 0], 'ops': [4, 3, 2, 2, 2]}
+-{'seed': 90, 'n': 2, 'success': True, 'steps': 29, 'time': 0.187, 'bad': [0, 0, 0], 'ops': [4, 4, 2, 2, 2]}
+-SUMMARY 100 100 mean 23.63 max_time 0.267
+diff --git a/stats_pipeline.json b/stats_pipeline.json
+deleted file mode 100644
+index b1b43f6..0000000
+--- a/stats_pipeline.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[{"seed": 0, "n": 3, "success": true, "steps": 28, "time": 0.211, "bad": [0, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 1, "n": 2, "success": true, "steps": 21, "time": 0.198, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 2, "n": 3, "success": true, "steps": 21, "time": 0.219, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 3, "n": 3, "success": true, "steps": 24, "time": 0.236, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 4, "n": 3, "success": true, "steps": 23, "time": 0.22, "bad": [0, 0, 0], "ops": [3, 3, 5, 2, 2]}, {"seed": 5, "n": 3, "success": true, "steps": 25, "time": 0.27, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 6, "n": 2, "success": true, "steps": 21, "time": 0.197, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 7, "n": 3, "success": true, "steps": 27, "time": 0.246, "bad": [2, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 8, "n": 3, "success": true, "steps": 26, "time": 0.204, "bad": [0, 0, 0], "ops": [4, 4, 2, 2, 2]}, {"seed": 9, "n": 2, "success": true, "steps": 28, "time": 0.253, "bad": [4, 0, 2], "ops": [2, 2, 5, 2, 2]}, {"seed": 10, "n": 3, "success": true, "steps": 22, "time": 0.212, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 11, "n": 1, "success": true, "steps": 20, "time": 0.144, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 12, "n": 2, "success": true, "steps": 24, "time": 0.19, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 13, "n": 3, "success": true, "steps": 27, "time": 0.272, "bad": [0, 1, 0], "ops": [4, 3, 3, 2, 2]}, {"seed": 14, "n": 1, "success": true, "steps": 31, "time": 0.227, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 15, "n": 3, "success": true, "steps": 27, "time": 0.28, "bad": [0, 0, 0], "ops": [4, 4, 3, 2, 2]}, {"seed": 16, "n": 2, "success": true, "steps": 23, "time": 0.209, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 17, "n": 3, "success": true, "steps": 23, "time": 0.239, "bad": [0, 1, 0], "ops": [4, 3, 2, 2, 2]}, {"seed": 18, "n": 3, "success": true, "steps": 24, "time": 0.223, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 19, "n": 2, "success": true, "steps": 30, "time": 0.243, "bad": [4, 0, 5], "ops": [2, 2, 7, 2, 2]}, {"seed": 20, "n": 3, "success": true, "steps": 27, "time": 0.163, "bad": [0, 0, 0], "ops": [4, 3, 2, 2, 2]}, {"seed": 21, "n": 1, "success": true, "steps": 23, "time": 0.155, "bad": [0, 0, 6], "ops": [1, 1, 8, 2, 2]}, {"seed": 22, "n": 3, "success": true, "steps": 24, "time": 0.246, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 23, "n": 1, "success": true, "steps": 20, "time": 0.162, "bad": [2, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 24, "n": 2, "success": true, "steps": 20, "time": 0.193, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 25, "n": 2, "success": true, "steps": 20, "time": 0.183, "bad": [2, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 26, "n": 3, "success": true, "steps": 26, "time": 0.253, "bad": [0, 0, 0], "ops": [4, 4, 2, 2, 2]}, {"seed": 27, "n": 1, "success": true, "steps": 22, "time": 0.166, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 28, "n": 2, "success": true, "steps": 24, "time": 0.158, "bad": [0, 0, 0], "ops": [2, 2, 2, 2, 2]}, {"seed": 29, "n": 3, "success": true, "steps": 23, "time": 0.204, "bad": [0, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 30, "n": 1, "success": true, "steps": 24, "time": 0.142, "bad": [0, 0, 4], "ops": [1, 1, 6, 2, 2]}, {"seed": 31, "n": 2, "success": true, "steps": 27, "time": 0.236, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 32, "n": 3, "success": true, "steps": 21, "time": 0.227, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 33, "n": 3, "success": true, "steps": 27, "time": 0.236, "bad": [0, 0, 0], "ops": [4, 4, 3, 2, 2]}, {"seed": 34, "n": 1, "success": true, "steps": 20, "time": 0.084, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 35, "n": 1, "success": true, "steps": 20, "time": 0.144, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 36, "n": 2, "success": true, "steps": 21, "time": 0.168, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 37, "n": 1, "success": true, "steps": 20, "time": 0.156, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 38, "n": 1, "success": true, "steps": 21, "time": 0.167, "bad": [2, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 39, "n": 3, "success": true, "steps": 25, "time": 0.203, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 40, "n": 2, "success": true, "steps": 25, "time": 0.19, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 41, "n": 2, "success": true, "steps": 21, "time": 0.179, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 42, "n": 1, "success": true, "steps": 23, "time": 0.16, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 43, "n": 2, "success": true, "steps": 29, "time": 0.208, "bad": [4, 0, 0], "ops": [2, 2, 2, 4, 2]}, {"seed": 44, "n": 3, "success": true, "steps": 23, "time": 0.195, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 45, "n": 3, "success": true, "steps": 24, "time": 0.207, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 46, "n": 2, "success": true, "steps": 21, "time": 0.18, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 47, "n": 1, "success": true, "steps": 25, "time": 0.169, "bad": [0, 0, 6], "ops": [1, 1, 7, 2, 2]}, {"seed": 48, "n": 1, "success": true, "steps": 20, "time": 0.128, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 49, "n": 1, "success": true, "steps": 22, "time": 0.144, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 50, "n": 3, "success": true, "steps": 23, "time": 0.168, "bad": [0, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 51, "n": 2, "success": true, "steps": 25, "time": 0.105, "bad": [2, 0, 4], "ops": [2, 2, 8, 2, 2]}, {"seed": 52, "n": 3, "success": true, "steps": 23, "time": 0.154, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 53, "n": 3, "success": true, "steps": 30, "time": 0.137, "bad": [0, 0, 0], "ops": [6, 6, 4, 2, 2]}, {"seed": 54, "n": 1, "success": true, "steps": 21, "time": 0.131, "bad": [0, 0, 5], "ops": [1, 1, 7, 2, 2]}, {"seed": 55, "n": 3, "success": true, "steps": 27, "time": 0.215, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 56, "n": 2, "success": true, "steps": 25, "time": 0.178, "bad": [0, 1, 0], "ops": [3, 2, 3, 2, 2]}, {"seed": 57, "n": 1, "success": true, "steps": 18, "time": 0.117, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 58, "n": 2, "success": true, "steps": 32, "time": 0.218, "bad": [2, 0, 4], "ops": [2, 2, 7, 4, 2]}, {"seed": 59, "n": 3, "success": true, "steps": 23, "time": 0.209, "bad": [0, 0, 0], "ops": [3, 3, 5, 2, 2]}, {"seed": 60, "n": 1, "success": true, "steps": 22, "time": 0.16, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 61, "n": 2, "success": true, "steps": 21, "time": 0.175, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 62, "n": 2, "success": true, "steps": 25, "time": 0.164, "bad": [0, 0, 5], "ops": [2, 2, 7, 2, 2]}, {"seed": 63, "n": 2, "success": true, "steps": 26, "time": 0.18, "bad": [0, 0, 4], "ops": [2, 2, 7, 2, 2]}, {"seed": 64, "n": 2, "success": true, "steps": 23, "time": 0.163, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 65, "n": 1, "success": true, "steps": 19, "time": 0.137, "bad": [0, 0, 7], "ops": [1, 1, 10, 2, 2]}, {"seed": 66, "n": 3, "success": true, "steps": 23, "time": 0.175, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 67, "n": 3, "success": true, "steps": 24, "time": 0.171, "bad": [0, 2, 0], "ops": [5, 3, 4, 2, 2]}, {"seed": 68, "n": 2, "success": true, "steps": 22, "time": 0.135, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 69, "n": 1, "success": true, "steps": 22, "time": 0.146, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 70, "n": 2, "success": true, "steps": 22, "time": 0.104, "bad": [0, 1, 0], "ops": [3, 2, 3, 2, 2]}, {"seed": 71, "n": 3, "success": true, "steps": 23, "time": 0.16, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 72, "n": 3, "success": true, "steps": 23, "time": 0.194, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 73, "n": 3, "success": true, "steps": 34, "time": 0.259, "bad": [2, 1, 0], "ops": [5, 4, 3, 2, 2]}, {"seed": 74, "n": 1, "success": true, "steps": 24, "time": 0.162, "bad": [0, 0, 7], "ops": [1, 1, 10, 2, 2]}, {"seed": 75, "n": 2, "success": true, "steps": 19, "time": 0.169, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 76, "n": 2, "success": true, "steps": 24, "time": 0.166, "bad": [0, 0, 6], "ops": [2, 2, 9, 2, 2]}, {"seed": 77, "n": 1, "success": true, "steps": 20, "time": 0.146, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 78, "n": 3, "success": true, "steps": 26, "time": 0.212, "bad": [0, 0, 0], "ops": [4, 4, 4, 2, 2]}, {"seed": 79, "n": 1, "success": true, "steps": 24, "time": 0.16, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 80, "n": 3, "success": true, "steps": 23, "time": 0.197, "bad": [0, 1, 0], "ops": [4, 3, 2, 2, 2]}, {"seed": 81, "n": 1, "success": true, "steps": 20, "time": 0.146, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 82, "n": 3, "success": true, "steps": 34, "time": 0.268, "bad": [2, 0, 6], "ops": [3, 3, 8, 2, 2]}, {"seed": 83, "n": 3, "success": true, "steps": 24, "time": 0.209, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 84, "n": 2, "success": true, "steps": 25, "time": 0.189, "bad": [0, 0, 0], "ops": [3, 2, 3, 2, 2]}, {"seed": 85, "n": 3, "success": true, "steps": 22, "time": 0.203, "bad": [1, 1, 0], "ops": [4, 3, 4, 2, 2]}, {"seed": 86, "n": 3, "success": true, "steps": 22, "time": 0.199, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 87, "n": 2, "success": true, "steps": 23, "time": 0.189, "bad": [0, 0, 0], "ops": [3, 2, 3, 2, 2]}, {"seed": 88, "n": 2, "success": true, "steps": 22, "time": 0.183, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 89, "n": 3, "success": true, "steps": 58, "time": 0.432, "bad": [6, 0, 0], "ops": [5, 5, 5, 4, 2]}, {"seed": 90, "n": 2, "success": true, "steps": 29, "time": 0.172, "bad": [0, 0, 0], "ops": [4, 4, 2, 2, 2]}, {"seed": 91, "n": 3, "success": true, "steps": 24, "time": 0.198, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 92, "n": 2, "success": true, "steps": 24, "time": 0.192, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 93, "n": 3, "success": true, "steps": 27, "time": 0.215, "bad": [0, 1, 0], "ops": [6, 5, 3, 2, 2]}, {"seed": 94, "n": 1, "success": true, "steps": 22, "time": 0.144, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 95, "n": 2, "success": true, "steps": 22, "time": 0.102, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 96, "n": 3, "success": true, "steps": 25, "time": 0.163, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 97, "n": 1, "success": true, "steps": 27, "time": 0.182, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 98, "n": 2, "success": true, "steps": 24, "time": 0.199, "bad": [0, 0, 0], "ops": [2, 2, 2, 2, 2]}, {"seed": 99, "n": 3, "success": true, "steps": 26, "time": 0.209, "bad": [0, 0, 0], "ops": [4, 4, 3, 2, 2]}]
+\ No newline at end of file
+diff --git a/stats_pipeline.txt b/stats_pipeline.txt
+deleted file mode 100644
+index 7c7e334..0000000
+--- a/stats_pipeline.txt
++++ /dev/null
+@@ -1,11 +0,0 @@
+-{'seed': 0, 'n': 3, 'success': True, 'steps': 28, 'time': 0.211, 'bad': [0, 0, 0], 'ops': [3, 3, 2, 2, 2]}
+-{'seed': 10, 'n': 3, 'success': True, 'steps': 22, 'time': 0.212, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
+-{'seed': 20, 'n': 3, 'success': True, 'steps': 27, 'time': 0.163, 'bad': [0, 0, 0], 'ops': [4, 3, 2, 2, 2]}
+-{'seed': 30, 'n': 1, 'success': True, 'steps': 24, 'time': 0.142, 'bad': [0, 0, 4], 'ops': [1, 1, 6, 2, 2]}
+-{'seed': 40, 'n': 2, 'success': True, 'steps': 25, 'time': 0.19, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
+-{'seed': 50, 'n': 3, 'success': True, 'steps': 23, 'time': 0.168, 'bad': [0, 0, 0], 'ops': [3, 3, 2, 2, 2]}
+-{'seed': 60, 'n': 1, 'success': True, 'steps': 22, 'time': 0.16, 'bad': [0, 0, 0], 'ops': [1, 1, 2, 2, 2]}
+-{'seed': 70, 'n': 2, 'success': True, 'steps': 22, 'time': 0.104, 'bad': [0, 1, 0], 'ops': [3, 2, 3, 2, 2]}
+-{'seed': 80, 'n': 3, 'success': True, 'steps': 23, 'time': 0.197, 'bad': [0, 1, 0], 'ops': [4, 3, 2, 2, 2]}
+-{'seed': 90, 'n': 2, 'success': True, 'steps': 29, 'time': 0.172, 'bad': [0, 0, 0], 'ops': [4, 4, 2, 2, 2]}
+-SUMMARY 100 100 mean 24.19 max_time 0.432
+diff --git a/stats_planned.json b/stats_planned.json
+deleted file mode 100644
+index cbd360a..0000000
+--- a/stats_planned.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[{"seed": 0, "n": 3, "success": true, "steps": 40, "time": 0.233, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 1, "n": 2, "success": true, "steps": 22, "time": 0.132, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 2, "n": 3, "success": true, "steps": 26, "time": 0.193, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 3, "n": 3, "success": true, "steps": 24, "time": 0.185, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 4, "n": 3, "success": true, "steps": 24, "time": 0.179, "bad": [0, 0, 0], "ops": [3, 3, 5, 2, 2]}, {"seed": 5, "n": 3, "success": true, "steps": 32, "time": 0.208, "bad": [2, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 6, "n": 2, "success": true, "steps": 27, "time": 0.186, "bad": [0, 0, 0], "ops": [3, 2, 3, 2, 2]}, {"seed": 7, "n": 3, "success": true, "steps": 26, "time": 0.194, "bad": [2, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 8, "n": 3, "success": true, "steps": 27, "time": 0.199, "bad": [0, 0, 0], "ops": [4, 4, 2, 2, 2]}, {"seed": 9, "n": 2, "success": true, "steps": 25, "time": 0.18, "bad": [0, 0, 2], "ops": [2, 2, 5, 2, 2]}, {"seed": 10, "n": 3, "success": true, "steps": 23, "time": 0.171, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 11, "n": 1, "success": true, "steps": 21, "time": 0.136, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 12, "n": 2, "success": true, "steps": 25, "time": 0.185, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 13, "n": 3, "success": true, "steps": 28, "time": 0.188, "bad": [0, 1, 0], "ops": [4, 3, 3, 2, 2]}, {"seed": 14, "n": 1, "success": true, "steps": 42, "time": 0.249, "bad": [0, 0, 3], "ops": [1, 1, 6, 2, 2]}, {"seed": 15, "n": 3, "success": true, "steps": 28, "time": 0.182, "bad": [0, 0, 0], "ops": [4, 4, 3, 2, 2]}, {"seed": 16, "n": 2, "success": true, "steps": 24, "time": 0.172, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 17, "n": 3, "success": true, "steps": 39, "time": 0.243, "bad": [0, 1, 0], "ops": [4, 3, 3, 2, 2]}, {"seed": 18, "n": 3, "success": true, "steps": 27, "time": 0.18, "bad": [2, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 19, "n": 2, "success": true, "steps": 29, "time": 0.199, "bad": [2, 0, 0], "ops": [2, 2, 2, 2, 2]}, {"seed": 20, "n": 3, "success": true, "steps": 34, "time": 0.204, "bad": [0, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 21, "n": 1, "success": true, "steps": 23, "time": 0.139, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 22, "n": 3, "success": true, "steps": 26, "time": 0.169, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 23, "n": 1, "success": true, "steps": 21, "time": 0.159, "bad": [2, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 24, "n": 2, "success": true, "steps": 21, "time": 0.162, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 25, "n": 2, "success": true, "steps": 26, "time": 0.198, "bad": [2, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 26, "n": 3, "success": true, "steps": 28, "time": 0.194, "bad": [0, 0, 0], "ops": [4, 4, 3, 2, 2]}, {"seed": 27, "n": 1, "success": true, "steps": 23, "time": 0.122, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 28, "n": 2, "success": true, "steps": 25, "time": 0.146, "bad": [0, 0, 0], "ops": [2, 2, 2, 2, 2]}, {"seed": 29, "n": 3, "success": true, "steps": 24, "time": 0.185, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 30, "n": 1, "success": true, "steps": 27, "time": 0.176, "bad": [0, 0, 7], "ops": [1, 1, 9, 2, 2]}, {"seed": 31, "n": 2, "success": true, "steps": 30, "time": 0.168, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 32, "n": 3, "success": true, "steps": 22, "time": 0.182, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 33, "n": 3, "success": true, "steps": 28, "time": 0.155, "bad": [0, 0, 0], "ops": [4, 4, 3, 2, 2]}, {"seed": 34, "n": 1, "success": true, "steps": 23, "time": 0.18, "bad": [0, 0, 8], "ops": [1, 1, 11, 2, 2]}, {"seed": 35, "n": 1, "success": true, "steps": 21, "time": 0.167, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 36, "n": 2, "success": true, "steps": 21, "time": 0.157, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 37, "n": 1, "success": true, "steps": 21, "time": 0.16, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 38, "n": 1, "success": true, "steps": 22, "time": 0.16, "bad": [2, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 39, "n": 3, "success": true, "steps": 30, "time": 0.182, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 40, "n": 2, "success": true, "steps": 28, "time": 0.206, "bad": [2, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 41, "n": 2, "success": true, "steps": 22, "time": 0.129, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 42, "n": 1, "success": true, "steps": 24, "time": 0.16, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 43, "n": 2, "success": true, "steps": 32, "time": 0.218, "bad": [4, 1, 0], "ops": [4, 2, 2, 4, 2]}, {"seed": 44, "n": 3, "success": true, "steps": 24, "time": 0.172, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 45, "n": 3, "success": true, "steps": 25, "time": 0.188, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 46, "n": 2, "success": true, "steps": 23, "time": 0.191, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 47, "n": 1, "success": true, "steps": 24, "time": 0.164, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 48, "n": 1, "success": true, "steps": 21, "time": 0.14, "bad": [0, 0, 1], "ops": [1, 1, 4, 2, 2]}, {"seed": 49, "n": 1, "success": true, "steps": 23, "time": 0.178, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 50, "n": 3, "success": true, "steps": 39, "time": 0.248, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 51, "n": 2, "success": true, "steps": 28, "time": 0.193, "bad": [2, 0, 6], "ops": [2, 2, 10, 2, 2]}, {"seed": 52, "n": 3, "success": true, "steps": 31, "time": 0.23, "bad": [2, 0, 4], "ops": [3, 3, 8, 2, 2]}, {"seed": 53, "n": 3, "success": true, "steps": 32, "time": 0.213, "bad": [0, 0, 0], "ops": [6, 6, 4, 2, 2]}, {"seed": 54, "n": 1, "success": true, "steps": 22, "time": 0.159, "bad": [0, 0, 6], "ops": [1, 1, 8, 2, 2]}, {"seed": 55, "n": 3, "success": true, "steps": 33, "time": 0.205, "bad": [0, 0, 0], "ops": [4, 4, 4, 2, 2]}, {"seed": 56, "n": 2, "success": true, "steps": 26, "time": 0.153, "bad": [0, 1, 0], "ops": [3, 2, 3, 2, 2]}, {"seed": 57, "n": 1, "success": true, "steps": 19, "time": 0.139, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 58, "n": 2, "success": true, "steps": 33, "time": 0.15, "bad": [2, 0, 4], "ops": [2, 2, 7, 4, 2]}, {"seed": 59, "n": 3, "success": true, "steps": 24, "time": 0.189, "bad": [0, 0, 0], "ops": [3, 3, 5, 2, 2]}, {"seed": 60, "n": 1, "success": true, "steps": 28, "time": 0.186, "bad": [2, 0, 2], "ops": [1, 1, 4, 2, 2]}, {"seed": 61, "n": 2, "success": true, "steps": 22, "time": 0.167, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 62, "n": 2, "success": true, "steps": 26, "time": 0.161, "bad": [0, 0, 7], "ops": [2, 2, 9, 2, 2]}, {"seed": 63, "n": 2, "success": true, "steps": 30, "time": 0.173, "bad": [0, 0, 5], "ops": [2, 2, 8, 2, 2]}, {"seed": 64, "n": 2, "success": true, "steps": 26, "time": 0.185, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 65, "n": 1, "success": true, "steps": 20, "time": 0.129, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 66, "n": 3, "success": true, "steps": 24, "time": 0.177, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 67, "n": 3, "success": true, "steps": 25, "time": 0.134, "bad": [0, 2, 0], "ops": [5, 3, 4, 2, 2]}, {"seed": 68, "n": 2, "success": true, "steps": 25, "time": 0.108, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 69, "n": 1, "success": true, "steps": 29, "time": 0.151, "bad": [2, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 70, "n": 2, "success": true, "steps": 23, "time": 0.178, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 71, "n": 3, "success": true, "steps": 30, "time": 0.177, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 72, "n": 3, "success": true, "steps": 25, "time": 0.19, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 73, "n": 3, "success": true, "steps": 34, "time": 0.189, "bad": [2, 1, 6], "ops": [5, 4, 9, 2, 2]}, {"seed": 74, "n": 1, "success": true, "steps": 23, "time": 0.129, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 75, "n": 2, "success": true, "steps": 20, "time": 0.12, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 76, "n": 2, "success": true, "steps": 26, "time": 0.168, "bad": [0, 0, 8], "ops": [2, 2, 11, 2, 2]}, {"seed": 77, "n": 1, "success": true, "steps": 21, "time": 0.128, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 78, "n": 3, "success": true, "steps": 27, "time": 0.119, "bad": [0, 0, 0], "ops": [4, 4, 4, 2, 2]}, {"seed": 79, "n": 1, "success": true, "steps": 26, "time": 0.161, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 80, "n": 3, "success": true, "steps": 28, "time": 0.203, "bad": [0, 1, 0], "ops": [5, 4, 3, 2, 2]}, {"seed": 81, "n": 1, "success": true, "steps": 21, "time": 0.136, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 82, "n": 3, "success": true, "steps": 34, "time": 0.229, "bad": [2, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 83, "n": 3, "success": true, "steps": 25, "time": 0.188, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 84, "n": 2, "success": true, "steps": 27, "time": 0.179, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 85, "n": 3, "success": true, "steps": 23, "time": 0.151, "bad": [1, 1, 0], "ops": [4, 3, 4, 2, 2]}, {"seed": 86, "n": 3, "success": true, "steps": 23, "time": 0.183, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 87, "n": 2, "success": true, "steps": 29, "time": 0.193, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 88, "n": 2, "success": true, "steps": 24, "time": 0.169, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 89, "n": 3, "success": false, "steps": 200, "time": 4.042, "bad": [6, 0, 0], "ops": [5, 5, 4, 3, 1]}, {"seed": 90, "n": 2, "success": true, "steps": 30, "time": 0.167, "bad": [0, 0, 0], "ops": [4, 4, 2, 2, 2]}, {"seed": 91, "n": 3, "success": true, "steps": 25, "time": 0.154, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 92, "n": 2, "success": true, "steps": 25, "time": 0.163, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 93, "n": 3, "success": true, "steps": 29, "time": 0.22, "bad": [2, 1, 0], "ops": [6, 5, 3, 2, 2]}, {"seed": 94, "n": 1, "success": true, "steps": 24, "time": 0.159, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 95, "n": 2, "success": true, "steps": 23, "time": 0.203, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 96, "n": 3, "success": true, "steps": 39, "time": 0.215, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 97, "n": 1, "success": true, "steps": 28, "time": 0.18, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 98, "n": 2, "success": true, "steps": 26, "time": 0.175, "bad": [0, 0, 0], "ops": [2, 2, 2, 2, 2]}, {"seed": 99, "n": 3, "success": true, "steps": 28, "time": 0.173, "bad": [0, 0, 0], "ops": [4, 4, 3, 2, 2]}]
+\ No newline at end of file
+diff --git a/stats_planned.txt b/stats_planned.txt
+deleted file mode 100644
+index c1fcaa5..0000000
+--- a/stats_planned.txt
++++ /dev/null
+@@ -1,12 +0,0 @@
+-{'seed': 0, 'n': 3, 'success': True, 'steps': 40, 'time': 0.233, 'bad': [0, 0, 0], 'ops': [3, 3, 3, 2, 2]}
+-{'seed': 10, 'n': 3, 'success': True, 'steps': 23, 'time': 0.171, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
+-{'seed': 20, 'n': 3, 'success': True, 'steps': 34, 'time': 0.204, 'bad': [0, 0, 0], 'ops': [3, 3, 2, 2, 2]}
+-{'seed': 30, 'n': 1, 'success': True, 'steps': 27, 'time': 0.176, 'bad': [0, 0, 7], 'ops': [1, 1, 9, 2, 2]}
+-{'seed': 40, 'n': 2, 'success': True, 'steps': 28, 'time': 0.206, 'bad': [2, 0, 0], 'ops': [2, 2, 4, 2, 2]}
+-{'seed': 50, 'n': 3, 'success': True, 'steps': 39, 'time': 0.248, 'bad': [0, 0, 0], 'ops': [3, 3, 3, 2, 2]}
+-{'seed': 60, 'n': 1, 'success': True, 'steps': 28, 'time': 0.186, 'bad': [2, 0, 2], 'ops': [1, 1, 4, 2, 2]}
+-{'seed': 70, 'n': 2, 'success': True, 'steps': 23, 'time': 0.178, 'bad': [0, 0, 0], 'ops': [2, 2, 4, 2, 2]}
+-{'seed': 80, 'n': 3, 'success': True, 'steps': 28, 'time': 0.203, 'bad': [0, 1, 0], 'ops': [5, 4, 3, 2, 2]}
+-{'seed': 89, 'n': 3, 'success': False, 'steps': 200, 'time': 4.042, 'bad': [6, 0, 0], 'ops': [5, 5, 4, 3, 1]}
+-{'seed': 90, 'n': 2, 'success': True, 'steps': 30, 'time': 0.167, 'bad': [0, 0, 0], 'ops': [4, 4, 2, 2, 2]}
+-SUMMARY 99 100 mean 28.09 max_time 4.042
+diff --git a/stats_planned2.json b/stats_planned2.json
+deleted file mode 100644
+index 379fd40..0000000
+--- a/stats_planned2.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[{"seed": 0, "n": 3, "success": true, "steps": 32, "time": 0.185, "bad": [0, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 1, "n": 2, "success": true, "steps": 22, "time": 0.171, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 2, "n": 3, "success": true, "steps": 23, "time": 0.184, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 3, "n": 3, "success": true, "steps": 24, "time": 0.189, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 4, "n": 3, "success": true, "steps": 24, "time": 0.176, "bad": [0, 0, 0], "ops": [3, 3, 5, 2, 2]}, {"seed": 5, "n": 3, "success": true, "steps": 26, "time": 0.143, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 6, "n": 2, "success": true, "steps": 23, "time": 0.155, "bad": [0, 0, 2], "ops": [2, 2, 5, 2, 2]}, {"seed": 7, "n": 3, "success": true, "steps": 26, "time": 0.177, "bad": [2, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 8, "n": 3, "success": true, "steps": 27, "time": 0.224, "bad": [0, 0, 0], "ops": [4, 4, 2, 2, 2]}, {"seed": 9, "n": 2, "success": true, "steps": 25, "time": 0.19, "bad": [0, 0, 2], "ops": [2, 2, 5, 2, 2]}, {"seed": 10, "n": 3, "success": true, "steps": 23, "time": 0.176, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 11, "n": 1, "success": true, "steps": 21, "time": 0.109, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 12, "n": 2, "success": true, "steps": 25, "time": 0.09, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 13, "n": 3, "success": true, "steps": 28, "time": 0.123, "bad": [0, 1, 0], "ops": [4, 3, 3, 2, 2]}, {"seed": 14, "n": 1, "success": true, "steps": 31, "time": 0.108, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 15, "n": 3, "success": true, "steps": 28, "time": 0.12, "bad": [0, 0, 0], "ops": [4, 4, 3, 2, 2]}, {"seed": 16, "n": 2, "success": true, "steps": 24, "time": 0.131, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 17, "n": 3, "success": true, "steps": 24, "time": 0.149, "bad": [0, 1, 0], "ops": [4, 3, 2, 2, 2]}, {"seed": 18, "n": 3, "success": true, "steps": 27, "time": 0.176, "bad": [2, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 19, "n": 2, "success": true, "steps": 29, "time": 0.184, "bad": [2, 0, 0], "ops": [2, 2, 2, 2, 2]}, {"seed": 20, "n": 3, "success": true, "steps": 34, "time": 0.226, "bad": [0, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 21, "n": 1, "success": true, "steps": 23, "time": 0.144, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 22, "n": 3, "success": true, "steps": 26, "time": 0.144, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 23, "n": 1, "success": true, "steps": 21, "time": 0.17, "bad": [2, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 24, "n": 2, "success": true, "steps": 21, "time": 0.154, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 25, "n": 2, "success": true, "steps": 21, "time": 0.149, "bad": [2, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 26, "n": 3, "success": true, "steps": 28, "time": 0.217, "bad": [0, 0, 0], "ops": [4, 4, 2, 2, 2]}, {"seed": 27, "n": 1, "success": true, "steps": 23, "time": 0.16, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 28, "n": 2, "success": true, "steps": 25, "time": 0.15, "bad": [0, 0, 0], "ops": [2, 2, 2, 2, 2]}, {"seed": 29, "n": 3, "success": true, "steps": 24, "time": 0.158, "bad": [0, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 30, "n": 1, "success": true, "steps": 27, "time": 0.183, "bad": [0, 0, 7], "ops": [1, 1, 9, 2, 2]}, {"seed": 31, "n": 2, "success": true, "steps": 28, "time": 0.196, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 32, "n": 3, "success": true, "steps": 22, "time": 0.149, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 33, "n": 3, "success": true, "steps": 28, "time": 0.14, "bad": [0, 0, 0], "ops": [4, 4, 3, 2, 2]}, {"seed": 34, "n": 1, "success": true, "steps": 21, "time": 0.085, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 35, "n": 1, "success": true, "steps": 21, "time": 0.089, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 36, "n": 2, "success": true, "steps": 21, "time": 0.135, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 37, "n": 1, "success": true, "steps": 21, "time": 0.124, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 38, "n": 1, "success": true, "steps": 22, "time": 0.121, "bad": [2, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 39, "n": 3, "success": true, "steps": 30, "time": 0.168, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 40, "n": 2, "success": true, "steps": 26, "time": 0.182, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 41, "n": 2, "success": true, "steps": 22, "time": 0.118, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 42, "n": 1, "success": true, "steps": 24, "time": 0.122, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 43, "n": 2, "success": true, "steps": 32, "time": 0.209, "bad": [4, 1, 0], "ops": [4, 2, 2, 4, 2]}, {"seed": 44, "n": 3, "success": true, "steps": 24, "time": 0.178, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 45, "n": 3, "success": true, "steps": 25, "time": 0.197, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 46, "n": 2, "success": true, "steps": 23, "time": 0.147, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 47, "n": 1, "success": true, "steps": 24, "time": 0.161, "bad": [0, 0, 0], "ops": [1, 1, 1, 2, 2]}, {"seed": 48, "n": 1, "success": true, "steps": 21, "time": 0.145, "bad": [0, 0, 1], "ops": [1, 1, 4, 2, 2]}, {"seed": 49, "n": 1, "success": true, "steps": 23, "time": 0.162, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 50, "n": 3, "success": true, "steps": 24, "time": 0.147, "bad": [0, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 51, "n": 2, "success": true, "steps": 28, "time": 0.165, "bad": [2, 0, 6], "ops": [2, 2, 10, 2, 2]}, {"seed": 52, "n": 3, "success": true, "steps": 25, "time": 0.146, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 53, "n": 3, "success": true, "steps": 32, "time": 0.197, "bad": [0, 0, 0], "ops": [6, 6, 4, 2, 2]}, {"seed": 54, "n": 1, "success": true, "steps": 22, "time": 0.16, "bad": [0, 0, 6], "ops": [1, 1, 8, 2, 2]}, {"seed": 55, "n": 3, "success": true, "steps": 33, "time": 0.21, "bad": [0, 0, 0], "ops": [4, 4, 4, 2, 2]}, {"seed": 56, "n": 2, "success": true, "steps": 26, "time": 0.172, "bad": [0, 1, 0], "ops": [3, 2, 3, 2, 2]}, {"seed": 57, "n": 1, "success": true, "steps": 19, "time": 0.144, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 58, "n": 2, "success": true, "steps": 33, "time": 0.209, "bad": [2, 0, 4], "ops": [2, 2, 7, 4, 2]}, {"seed": 59, "n": 3, "success": true, "steps": 24, "time": 0.168, "bad": [0, 0, 0], "ops": [3, 3, 5, 2, 2]}, {"seed": 60, "n": 1, "success": true, "steps": 28, "time": 0.189, "bad": [2, 0, 2], "ops": [1, 1, 4, 2, 2]}, {"seed": 61, "n": 2, "success": true, "steps": 22, "time": 0.169, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 62, "n": 2, "success": true, "steps": 26, "time": 0.164, "bad": [0, 0, 7], "ops": [2, 2, 9, 2, 2]}, {"seed": 63, "n": 2, "success": true, "steps": 30, "time": 0.185, "bad": [0, 0, 5], "ops": [2, 2, 8, 2, 2]}, {"seed": 64, "n": 2, "success": true, "steps": 25, "time": 0.172, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 65, "n": 1, "success": true, "steps": 20, "time": 0.132, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 66, "n": 3, "success": true, "steps": 24, "time": 0.191, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 67, "n": 3, "success": true, "steps": 25, "time": 0.191, "bad": [0, 2, 0], "ops": [5, 3, 4, 2, 2]}, {"seed": 68, "n": 2, "success": true, "steps": 25, "time": 0.144, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 69, "n": 1, "success": true, "steps": 23, "time": 0.171, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 70, "n": 2, "success": true, "steps": 23, "time": 0.182, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 71, "n": 3, "success": true, "steps": 24, "time": 0.196, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 72, "n": 3, "success": true, "steps": 25, "time": 0.194, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 73, "n": 3, "success": true, "steps": 34, "time": 0.235, "bad": [2, 1, 6], "ops": [5, 4, 9, 2, 2]}, {"seed": 74, "n": 1, "success": true, "steps": 23, "time": 0.11, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 75, "n": 2, "success": true, "steps": 20, "time": 0.173, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 76, "n": 2, "success": true, "steps": 26, "time": 0.163, "bad": [0, 0, 8], "ops": [2, 2, 11, 2, 2]}, {"seed": 77, "n": 1, "success": true, "steps": 21, "time": 0.153, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 78, "n": 3, "success": true, "steps": 27, "time": 0.197, "bad": [0, 0, 0], "ops": [4, 4, 4, 2, 2]}, {"seed": 79, "n": 1, "success": true, "steps": 26, "time": 0.149, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 80, "n": 3, "success": true, "steps": 25, "time": 0.181, "bad": [0, 1, 0], "ops": [4, 3, 2, 2, 2]}, {"seed": 81, "n": 1, "success": true, "steps": 21, "time": 0.159, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 82, "n": 3, "success": true, "steps": 34, "time": 0.199, "bad": [2, 0, 0], "ops": [3, 3, 2, 2, 2]}, {"seed": 83, "n": 3, "success": true, "steps": 25, "time": 0.145, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 84, "n": 2, "success": true, "steps": 27, "time": 0.186, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 85, "n": 3, "success": true, "steps": 23, "time": 0.17, "bad": [1, 1, 0], "ops": [4, 3, 4, 2, 2]}, {"seed": 86, "n": 3, "success": true, "steps": 23, "time": 0.195, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 87, "n": 2, "success": true, "steps": 24, "time": 0.156, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 88, "n": 2, "success": true, "steps": 24, "time": 0.171, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 89, "n": 3, "success": false, "steps": 200, "time": 4.43, "bad": [6, 0, 0], "ops": [5, 5, 4, 3, 1]}, {"seed": 90, "n": 2, "success": true, "steps": 30, "time": 0.173, "bad": [0, 0, 0], "ops": [4, 4, 2, 2, 2]}, {"seed": 91, "n": 3, "success": true, "steps": 25, "time": 0.188, "bad": [0, 0, 0], "ops": [3, 3, 4, 2, 2]}, {"seed": 92, "n": 2, "success": true, "steps": 25, "time": 0.18, "bad": [0, 0, 0], "ops": [2, 2, 3, 2, 2]}, {"seed": 93, "n": 3, "success": true, "steps": 30, "time": 0.199, "bad": [2, 1, 0], "ops": [6, 5, 3, 2, 2]}, {"seed": 94, "n": 1, "success": true, "steps": 24, "time": 0.15, "bad": [0, 0, 0], "ops": [1, 1, 2, 2, 2]}, {"seed": 95, "n": 2, "success": true, "steps": 23, "time": 0.197, "bad": [0, 0, 0], "ops": [2, 2, 4, 2, 2]}, {"seed": 96, "n": 3, "success": true, "steps": 26, "time": 0.185, "bad": [0, 0, 0], "ops": [3, 3, 3, 2, 2]}, {"seed": 97, "n": 1, "success": true, "steps": 28, "time": 0.181, "bad": [0, 0, 0], "ops": [1, 1, 3, 2, 2]}, {"seed": 98, "n": 2, "success": true, "steps": 26, "time": 0.185, "bad": [0, 0, 0], "ops": [2, 2, 2, 2, 2]}, {"seed": 99, "n": 3, "success": true, "steps": 28, "time": 0.192, "bad": [0, 0, 0], "ops": [4, 4, 3, 2, 2]}]
+\ No newline at end of file
+diff --git a/stats_planned2.txt b/stats_planned2.txt
+deleted file mode 100644
+index 649db49..0000000
+--- a/stats_planned2.txt
++++ /dev/null
+@@ -1,12 +0,0 @@
+-{'seed': 0, 'n': 3, 'success': True, 'steps': 32, 'time': 0.185, 'bad': [0, 0, 0], 'ops': [3, 3, 2, 2, 2]}
+-{'seed': 10, 'n': 3, 'success': True, 'steps': 23, 'time': 0.176, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
+-{'seed': 20, 'n': 3, 'success': True, 'steps': 34, 'time': 0.226, 'bad': [0, 0, 0], 'ops': [3, 3, 2, 2, 2]}
+-{'seed': 30, 'n': 1, 'success': True, 'steps': 27, 'time': 0.183, 'bad': [0, 0, 7], 'ops': [1, 1, 9, 2, 2]}
+-{'seed': 40, 'n': 2, 'success': True, 'steps': 26, 'time': 0.182, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
+-{'seed': 50, 'n': 3, 'success': True, 'steps': 24, 'time': 0.147, 'bad': [0, 0, 0], 'ops': [3, 3, 2, 2, 2]}
+-{'seed': 60, 'n': 1, 'success': True, 'steps': 28, 'time': 0.189, 'bad': [2, 0, 2], 'ops': [1, 1, 4, 2, 2]}
+-{'seed': 70, 'n': 2, 'success': True, 'steps': 23, 'time': 0.182, 'bad': [0, 0, 0], 'ops': [2, 2, 4, 2, 2]}
+-{'seed': 80, 'n': 3, 'success': True, 'steps': 25, 'time': 0.181, 'bad': [0, 1, 0], 'ops': [4, 3, 2, 2, 2]}
+-{'seed': 89, 'n': 3, 'success': False, 'steps': 200, 'time': 4.43, 'bad': [6, 0, 0], 'ops': [5, 5, 4, 3, 1]}
+-{'seed': 90, 'n': 2, 'success': True, 'steps': 30, 'time': 0.173, 'bad': [0, 0, 0], 'ops': [4, 4, 2, 2, 2]}
+-SUMMARY 99 100 mean 26.97 max_time 4.43
+diff --git a/stats_recovery.txt b/stats_recovery.txt
+deleted file mode 100644
+index b621d07..0000000
+--- a/stats_recovery.txt
++++ /dev/null
+@@ -1,11 +0,0 @@
+-{'seed': 600, 'n': 1, 'success': True, 'steps': 27, 'time': 0.102, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
+-{'seed': 610, 'n': 2, 'success': True, 'steps': 22, 'time': 0.161, 'bad': [0, 0, 0], 'ops': [2, 2, 4, 2, 2]}
+-{'seed': 620, 'n': 3, 'success': True, 'steps': 24, 'time': 0.191, 'bad': [0, 0, 0], 'ops': [4, 4, 2, 2, 2]}
+-{'seed': 630, 'n': 2, 'success': True, 'steps': 25, 'time': 0.153, 'bad': [0, 0, 0], 'ops': [2, 2, 4, 2, 2]}
+-{'seed': 640, 'n': 3, 'success': True, 'steps': 23, 'time': 0.212, 'bad': [0, 0, 0], 'ops': [3, 3, 2, 2, 2]}
+-{'seed': 650, 'n': 3, 'success': True, 'steps': 24, 'time': 0.191, 'bad': [0, 0, 0], 'ops': [3, 3, 4, 2, 2]}
+-{'seed': 660, 'n': 2, 'success': True, 'steps': 28, 'time': 0.213, 'bad': [0, 0, 0], 'ops': [2, 2, 3, 2, 2]}
+-{'seed': 670, 'n': 1, 'success': True, 'steps': 22, 'time': 0.154, 'bad': [0, 0, 0], 'ops': [1, 1, 3, 2, 2]}
+-{'seed': 680, 'n': 3, 'success': True, 'steps': 27, 'time': 0.151, 'bad': [0, 0, 0], 'ops': [4, 4, 3, 2, 2]}
+-{'seed': 690, 'n': 3, 'success': True, 'steps': 24, 'time': 0.206, 'bad': [0, 0, 0], 'ops': [3, 3, 3, 2, 2]}
+-SUMMARY 100 100 mean 23.55 max_time 0.26
+diff --git a/test_many.txt b/test_many.txt
+deleted file mode 100644
+index ed68f53..0000000
+--- a/test_many.txt
++++ /dev/null
+@@ -1,100 +0,0 @@
+-RESULT 1000 {'object_count': 4} True 31 1.739
+-RESULT 1001 {'object_count': 4} True 33 1.545
+-RESULT 1002 {'object_count': 4} True 26 1.307
+-RESULT 1003 {'object_count': 4} True 31 1.565
+-RESULT 1004 {'object_count': 4} True 31 1.403
+-RESULT 1005 {'object_count': 4} True 26 1.235
+-RESULT 1006 {'object_count': 4} True 30 1.668
+-RESULT 1007 {'object_count': 4} True 28 1.632
+-RESULT 1008 {'object_count': 4} True 31 1.951
+-RESULT 1009 {'object_count': 4} True 25 1.711
+-RESULT 1010 {'object_count': 4} True 40 2.848
+-RESULT 1011 {'object_count': 4} True 28 2.18
+-RESULT 1012 {'object_count': 4} True 34 1.981
+-RESULT 1013 {'object_count': 4} True 27 1.437
+-RESULT 1014 {'object_count': 4} True 29 1.946
+-RESULT 1015 {'object_count': 4} True 30 2.258
+-RESULT 1016 {'object_count': 4} True 31 2.827
+-RESULT 1017 {'object_count': 4} True 27 1.333
+-RESULT 1018 {'object_count': 4} True 33 1.189
+-RESULT 1019 {'object_count': 4} True 27 0.667
+-RESULT 1020 {'object_count': 4} True 25 1.11
+-RESULT 1021 {'object_count': 4} True 29 1.456
+-RESULT 1022 {'object_count': 4} True 29 1.239
+-RESULT 1023 {'object_count': 4} True 36 1.633
+-RESULT 1024 {'object_count': 4} True 29 1.218
+-RESULT 1025 {'object_count': 4} True 32 1.322
+-RESULT 1026 {'object_count': 4} True 29 1.187
+-RESULT 1027 {'object_count': 4} True 26 0.743
+-RESULT 1028 {'object_count': 4} True 42 1.501
+-RESULT 1029 {'object_count': 4} True 33 1.779
+-RESULT 1030 {'object_count': 4} True 32 1.654
+-RESULT 1031 {'object_count': 4} True 30 1.289
+-RESULT 1032 {'object_count': 4} True 31 1.158
+-RESULT 1033 {'object_count': 4} True 25 0.817
+-RESULT 1034 {'object_count': 4} True 32 1.37
+-RESULT 1035 {'object_count': 4} True 30 1.002
+-RESULT 1036 {'object_count': 4} True 31 1.031
+-RESULT 1037 {'object_count': 4} True 26 1.023
+-RESULT 1038 {'object_count': 4} True 26 1.144
+-RESULT 1039 {'object_count': 4} True 35 1.546
+-RESULT 1040 {'object_count': 4} True 28 1.006
+-RESULT 1041 {'object_count': 4} True 28 1.111
+-RESULT 1042 {'object_count': 4} True 33 1.342
+-RESULT 1043 {'object_count': 4} True 29 1.178
+-RESULT 1044 {'object_count': 4} True 26 1.189
+-RESULT 1045 {'object_count': 4} True 29 1.297
+-RESULT 1046 {'object_count': 4} True 26 0.904
+-RESULT 1047 {'object_count': 4} True 33 1.568
+-RESULT 1048 {'object_count': 4} True 27 1.129
+-RESULT 1049 {'object_count': 4} True 32 1.174
+-RESULT 1050 {'object_count': 4} True 29 0.886
+-RESULT 1051 {'object_count': 4} True 36 1.491
+-RESULT 1052 {'object_count': 4} True 39 1.194
+-RESULT 1053 {'object_count': 4} True 29 1.031
+-RESULT 1054 {'object_count': 4} True 28 1.298
+-RESULT 1055 {'object_count': 4} True 27 1.168
+-RESULT 1056 {'object_count': 4} True 37 1.421
+-RESULT 1057 {'object_count': 4} True 29 1.069
+-RESULT 1058 {'object_count': 4} True 39 3.17
+-RESULT 1059 {'object_count': 4} True 29 1.463
+-RESULT 1060 {'object_count': 4} True 29 2.188
+-RESULT 1061 {'object_count': 4} True 31 2.024
+-RESULT 1062 {'object_count': 4} True 28 1.644
+-RESULT 1063 {'object_count': 4} True 26 2.027
+-RESULT 1064 {'object_count': 4} True 39 2.745
+-RESULT 1065 {'object_count': 4} True 32 2.617
+-RESULT 1066 {'object_count': 4} True 28 2.739
+-RESULT 1067 {'object_count': 4} True 30 2.436
+-RESULT 1068 {'object_count': 4} True 27 1.846
+-RESULT 1069 {'object_count': 4} True 33 2.191
+-RESULT 1070 {'object_count': 4} True 30 2.156
+-RESULT 1071 {'object_count': 4} True 26 1.245
+-RESULT 1072 {'object_count': 4} True 32 1.927
+-RESULT 1073 {'object_count': 4} True 27 2.066
+-RESULT 1074 {'object_count': 4} True 33 1.913
+-RESULT 1075 {'object_count': 4} True 28 1.159
+-RESULT 1076 {'object_count': 4} True 33 1.312
+-RESULT 1077 {'object_count': 4} True 28 1.181
+-RESULT 1078 {'object_count': 4} True 29 1.2
+-RESULT 1079 {'object_count': 4} True 33 1.112
+-RESULT 1080 {'object_count': 4} True 27 0.985
+-RESULT 1081 {'object_count': 4} True 29 1.06
+-RESULT 1082 {'object_count': 4} True 27 1.198
+-RESULT 1083 {'object_count': 4} True 31 1.61
+-RESULT 1084 {'object_count': 4} True 27 1.241
+-RESULT 1085 {'object_count': 4} True 32 1.326
+-RESULT 1086 {'object_count': 4} True 27 0.963
+-RESULT 1087 {'object_count': 4} True 32 1.188
+-RESULT 1088 {'object_count': 4} True 24 1.059
+-RESULT 1089 {'object_count': 4} True 26 0.833
+-RESULT 1090 {'object_count': 4} True 28 1.208
+-RESULT 1091 {'object_count': 4} True 27 0.954
+-RESULT 1092 {'object_count': 4} True 28 1.118
+-RESULT 1093 {'object_count': 4} True 35 1.145
+-RESULT 1094 {'object_count': 4} True 28 0.904
+-RESULT 1095 {'object_count': 4} True 34 1.315
+-RESULT 1096 {'object_count': 4} True 34 1.127
+-RESULT 1097 {'object_count': 4} True 28 0.811
+-RESULT 1098 {'object_count': 4} True 33 1.101
+-RESULT 1099 {'object_count': 4} True 36 1.082
+diff --git a/test_refined.txt b/test_refined.txt
+deleted file mode 100644
+index 7b5e3a7..0000000
+--- a/test_refined.txt
++++ /dev/null
+@@ -1,100 +0,0 @@
+-RESULT 0 {'object_count': 3} True 36 2.5
+-RESULT 1 {'object_count': 2} True 22 1.041
+-RESULT 2 {'object_count': 3} True 22 1.062
+-RESULT 3 {'object_count': 3} True 36 1.911
+-RESULT 4 {'object_count': 3} True 25 1.362
+-RESULT 5 {'object_count': 3} True 38 1.79
+-RESULT 6 {'object_count': 2} True 26 1.049
+-RESULT 7 {'object_count': 3} True 32 1.281
+-RESULT 8 {'object_count': 3} True 24 1.222
+-RESULT 9 {'object_count': 2} True 29 1.167
+-RESULT 10 {'object_count': 3} True 25 1.169
+-RESULT 11 {'object_count': 1} True 21 0.992
+-RESULT 12 {'object_count': 2} True 26 1.752
+-RESULT 13 {'object_count': 3} True 30 2.0
+-RESULT 14 {'object_count': 1} True 34 1.552
+-RESULT 15 {'object_count': 3} True 29 1.514
+-RESULT 16 {'object_count': 2} True 26 1.382
+-RESULT 17 {'object_count': 3} True 33 1.73
+-RESULT 18 {'object_count': 3} True 27 1.328
+-RESULT 19 {'object_count': 2} True 30 1.563
+-RESULT 20 {'object_count': 3} True 33 1.949
+-RESULT 21 {'object_count': 1} True 23 1.962
+-RESULT 22 {'object_count': 3} True 28 2.07
+-RESULT 23 {'object_count': 1} True 19 1.207
+-RESULT 24 {'object_count': 2} True 26 1.816
+-RESULT 25 {'object_count': 2} True 23 1.446
+-RESULT 26 {'object_count': 3} True 31 1.648
+-RESULT 27 {'object_count': 1} True 24 1.176
+-RESULT 28 {'object_count': 2} True 42 3.474
+-RESULT 29 {'object_count': 3} True 25 2.071
+-RESULT 30 {'object_count': 1} True 22 1.438
+-RESULT 31 {'object_count': 2} True 29 1.847
+-RESULT 32 {'object_count': 3} True 28 1.38
+-RESULT 33 {'object_count': 3} True 34 1.813
+-RESULT 34 {'object_count': 1} True 21 0.518
+-RESULT 35 {'object_count': 1} True 22 0.542
+-RESULT 36 {'object_count': 2} True 21 0.937
+-RESULT 37 {'object_count': 1} True 23 0.92
+-RESULT 38 {'object_count': 1} True 22 0.449
+-RESULT 39 {'object_count': 3} True 32 1.309
+-RESULT 40 {'object_count': 2} True 29 1.087
+-RESULT 41 {'object_count': 2} True 21 1.041
+-RESULT 42 {'object_count': 1} True 28 0.88
+-RESULT 43 {'object_count': 2} True 34 1.224
+-RESULT 44 {'object_count': 3} True 24 0.595
+-RESULT 45 {'object_count': 3} True 29 1.218
+-RESULT 46 {'object_count': 2} True 24 1.584
+-RESULT 47 {'object_count': 1} True 26 1.292
+-RESULT 48 {'object_count': 1} True 21 0.576
+-RESULT 49 {'object_count': 1} True 42 1.431
+-RESULT 50 {'object_count': 3} True 28 1.212
+-RESULT 51 {'object_count': 2} True 23 1.149
+-RESULT 52 {'object_count': 3} True 27 1.267
+-RESULT 53 {'object_count': 3} True 26 0.64
+-RESULT 54 {'object_count': 1} True 21 0.575
+-RESULT 55 {'object_count': 3} True 29 1.279
+-RESULT 56 {'object_count': 2} True 28 1.159
+-RESULT 57 {'object_count': 1} True 18 0.49
+-RESULT 58 {'object_count': 2} True 33 0.862
+-RESULT 59 {'object_count': 3} True 24 1.097
+-RESULT 60 {'object_count': 1} True 28 0.951
+-RESULT 61 {'object_count': 2} True 25 0.673
+-RESULT 62 {'object_count': 2} True 27 0.594
+-RESULT 63 {'object_count': 2} True 30 0.91
+-RESULT 64 {'object_count': 2} True 27 0.997
+-RESULT 65 {'object_count': 1} True 20 0.852
+-RESULT 66 {'object_count': 3} True 27 1.079
+-RESULT 67 {'object_count': 3} True 25 0.486
+-RESULT 68 {'object_count': 2} True 25 1.04
+-RESULT 69 {'object_count': 1} True 24 1.172
+-RESULT 70 {'object_count': 2} True 25 0.989
+-RESULT 71 {'object_count': 3} True 26 1.007
+-RESULT 72 {'object_count': 3} True 30 0.701
+-RESULT 73 {'object_count': 3} True 24 0.907
+-RESULT 74 {'object_count': 1} True 24 1.082
+-RESULT 75 {'object_count': 2} True 24 1.036
+-RESULT 76 {'object_count': 2} True 27 1.18
+-RESULT 77 {'object_count': 1} True 23 0.508
+-RESULT 78 {'object_count': 3} True 27 1.111
+-RESULT 79 {'object_count': 1} True 32 1.215
+-RESULT 80 {'object_count': 3} True 28 1.194
+-RESULT 81 {'object_count': 1} True 24 1.588
+-RESULT 82 {'object_count': 3} True 32 1.635
+-RESULT 83 {'object_count': 3} True 27 2.003
+-RESULT 84 {'object_count': 2} True 27 2.134
+-RESULT 85 {'object_count': 3} True 23 1.459
+-RESULT 86 {'object_count': 3} True 23 1.577
+-RESULT 87 {'object_count': 2} True 33 2.287
+-RESULT 88 {'object_count': 2} True 24 1.429
+-RESULT 89 {'object_count': 3} True 37 3.407
+-RESULT 90 {'object_count': 2} True 31 2.851
+-RESULT 91 {'object_count': 3} True 30 2.424
+-RESULT 92 {'object_count': 2} True 26 2.167
+-RESULT 93 {'object_count': 3} True 30 2.011
+-RESULT 94 {'object_count': 1} True 25 1.403
+-RESULT 95 {'object_count': 2} True 24 1.842
+-RESULT 96 {'object_count': 3} True 32 2.013
+-RESULT 97 {'object_count': 1} True 47 2.412
+-RESULT 98 {'object_count': 2} True 25 1.781
+-RESULT 99 {'object_count': 3} True 31 2.06
+diff --git a/test_results.txt b/test_results.txt
+deleted file mode 100644
+index 3ffde72..0000000
+--- a/test_results.txt
++++ /dev/null
+@@ -1,31 +0,0 @@
+-RESULT 0 {'object_count': 3} True 35 0.459
+-RESULT 1 {'object_count': 2} True 22 0.304
+-RESULT 2 {'object_count': 3} True 22 0.231
+-RESULT 3 {'object_count': 3} True 30 0.413
+-RESULT 4 {'object_count': 3} True 25 0.399
+-RESULT 5 {'object_count': 3} True 41 0.625
+-RESULT 6 {'object_count': 2} True 21 0.251
+-RESULT 7 {'object_count': 3} True 32 0.338
+-RESULT 8 {'object_count': 3} True 29 0.427
+-RESULT 9 {'object_count': 2} True 29 0.476
+-RESULT 10 {'object_count': 3} True 28 0.408
+-RESULT 11 {'object_count': 1} True 21 0.308
+-RESULT 12 {'object_count': 2} True 27 0.252
+-RESULT 13 {'object_count': 3} True 36 0.492
+-RESULT 14 {'object_count': 1} True 34 0.432
+-RESULT 15 {'object_count': 3} True 25 0.331
+-RESULT 16 {'object_count': 2} True 26 0.347
+-RESULT 17 {'object_count': 3} True 32 0.489
+-RESULT 18 {'object_count': 3} True 25 0.37
+-RESULT 19 {'object_count': 2} True 30 0.431
+-RESULT 20 {'object_count': 3} True 30 0.19
+-RESULT 21 {'object_count': 1} True 23 0.402
+-RESULT 22 {'object_count': 3} True 26 0.304
+-RESULT 23 {'object_count': 1} True 19 0.237
+-RESULT 24 {'object_count': 2} True 26 0.357
+-RESULT 25 {'object_count': 2} True 23 0.3
+-RESULT 26 {'object_count': 3} True 28 0.43
+-RESULT 27 {'object_count': 1} True 24 0.32
+-RESULT 28 {'object_count': 2} True 44 0.502
+-RESULT 29 {'object_count': 3} False 250 5.23
+-FAILED [('home', 0), ('sample', 4)] [('rover0', {'x': 1.0, 'y': -1.75, 'theta': -3.1415927410125732, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}), ('rover1', {'x': -2.0, 'y': -1.399999976158142, 'theta': 0.0, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 0.0}), ('objective0', {'x': -0.5211005806922913, 'y': 2.0225868225097656, 'z': 0.20100000500679016, 'have_image_rover0': 1.0, 'have_image_rover1': 0.0, 'received_image': 1.0}), ('objective1', {'x': -1.959802269935608, 'y': 2.032264471054077, 'z': 0.20100000500679016, 'have_image_rover0': 0.0, 'have_image_rover1': 0.0, 'received_image': 0.0}), ('objective2', {'x': 0.5849767923355103, 'y': 1.883683443069458, 'z': 0.20100000500679016, 'have_image_rover0': 1.0, 'have_image_rover1': 0.0, 'received_image': 1.0}), ('sample0', {'x': 0.7705432772636414, 'y': 0.23597754538059235, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}), ('sample1', {'x': 1.6593462228775024, 'y': -0.3176131248474121, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 1.0, 'analyzed_rover1': 0.0, 'received_analysis': 1.0}), ('sample2', {'x': 2.14742112159729, 'y': 1.3751660585403442, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}), ('sample3', {'x': -1.9218065738677979, 'y': 0.9597395658493042, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}), ('sample4', {'x': -2.344602584838867, 'y': -1.656410813331604, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}), ('sample5', {'x': 0.237486332654953, 'y': -0.09099745005369186, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0})]
+diff --git a/test_results_more.txt b/test_results_more.txt
+deleted file mode 100644
+index 30cf7eb..0000000
+--- a/test_results_more.txt
++++ /dev/null
+@@ -1,101 +0,0 @@
+-RESULT 29 {'object_count': 3} True 34 0.645
+-RESULT 30 {'object_count': 1} True 22 0.367
+-RESULT 31 {'object_count': 2} True 32 0.92
+-RESULT 32 {'object_count': 3} True 28 0.923
+-RESULT 33 {'object_count': 3} True 34 1.012
+-RESULT 34 {'object_count': 1} True 21 0.805
+-RESULT 35 {'object_count': 1} True 21 0.9
+-RESULT 36 {'object_count': 2} True 22 0.801
+-RESULT 37 {'object_count': 1} True 24 0.919
+-RESULT 38 {'object_count': 1} True 22 0.422
+-RESULT 39 {'object_count': 3} True 27 0.871
+-RESULT 40 {'object_count': 2} True 34 0.591
+-RESULT 41 {'object_count': 2} True 21 0.834
+-RESULT 42 {'object_count': 1} True 28 0.543
+-RESULT 43 {'object_count': 2} True 34 0.85
+-RESULT 44 {'object_count': 3} True 24 0.828
+-RESULT 45 {'object_count': 3} True 30 1.27
+-RESULT 46 {'object_count': 2} True 23 0.767
+-RESULT 47 {'object_count': 1} True 26 1.056
+-RESULT 48 {'object_count': 1} True 21 0.649
+-RESULT 49 {'object_count': 1} True 38 1.174
+-RESULT 50 {'object_count': 3} True 30 0.638
+-RESULT 51 {'object_count': 2} True 23 0.428
+-RESULT 52 {'object_count': 3} True 28 0.851
+-RESULT 53 {'object_count': 3} True 25 0.466
+-RESULT 54 {'object_count': 1} True 22 0.488
+-RESULT 55 {'object_count': 3} True 29 0.498
+-RESULT 56 {'object_count': 2} True 27 0.372
+-RESULT 57 {'object_count': 1} True 19 0.257
+-RESULT 58 {'object_count': 2} True 30 0.416
+-RESULT 59 {'object_count': 3} True 27 0.353
+-RESULT 60 {'object_count': 1} True 23 0.309
+-RESULT 61 {'object_count': 2} True 27 0.386
+-RESULT 62 {'object_count': 2} True 29 0.406
+-RESULT 63 {'object_count': 2} True 30 0.426
+-RESULT 64 {'object_count': 2} True 27 0.362
+-RESULT 65 {'object_count': 1} True 20 0.276
+-RESULT 66 {'object_count': 3} True 27 0.445
+-RESULT 67 {'object_count': 3} True 25 0.357
+-RESULT 68 {'object_count': 2} True 25 0.346
+-RESULT 69 {'object_count': 1} True 29 0.406
+-RESULT 70 {'object_count': 2} True 25 0.36
+-RESULT 71 {'object_count': 3} True 31 0.434
+-RESULT 72 {'object_count': 3} True 29 0.413
+-RESULT 73 {'object_count': 3} True 24 0.367
+-RESULT 74 {'object_count': 1} True 23 0.302
+-RESULT 75 {'object_count': 2} True 26 0.357
+-RESULT 76 {'object_count': 2} True 27 0.384
+-RESULT 77 {'object_count': 1} True 23 0.31
+-RESULT 78 {'object_count': 3} True 27 0.398
+-RESULT 79 {'object_count': 1} True 35 0.465
+-RESULT 80 {'object_count': 3} True 26 0.397
+-RESULT 81 {'object_count': 1} True 23 0.354
+-RESULT 82 {'object_count': 3} True 32 0.487
+-RESULT 83 {'object_count': 3} True 28 0.431
+-RESULT 84 {'object_count': 2} True 26 0.59
+-RESULT 85 {'object_count': 3} True 23 0.528
+-RESULT 86 {'object_count': 3} True 23 0.487
+-RESULT 87 {'object_count': 2} True 35 1.007
+-RESULT 88 {'object_count': 2} True 25 0.507
+-RESULT 89 {'object_count': 3} True 37 0.726
+-RESULT 90 {'object_count': 2} True 32 0.393
+-RESULT 91 {'object_count': 3} True 30 0.385
+-RESULT 92 {'object_count': 2} True 25 0.298
+-RESULT 93 {'object_count': 3} True 30 0.406
+-RESULT 94 {'object_count': 1} True 24 0.673
+-RESULT 95 {'object_count': 2} True 25 0.995
+-RESULT 96 {'object_count': 3} True 32 1.2
+-RESULT 97 {'object_count': 1} True 49 2.105
+-RESULT 98 {'object_count': 2} True 25 1.228
+-RESULT 99 {'object_count': 3} True 28 1.095
+-RESULT 100 {'object_count': 3} True 37 1.394
+-RESULT 101 {'object_count': 1} True 23 1.671
+-RESULT 102 {'object_count': 2} True 27 1.291
+-RESULT 103 {'object_count': 2} True 26 1.465
+-RESULT 104 {'object_count': 3} True 25 1.166
+-RESULT 105 {'object_count': 1} True 25 0.97
+-RESULT 106 {'object_count': 2} True 23 1.046
+-RESULT 107 {'object_count': 1} True 23 1.081
+-RESULT 108 {'object_count': 1} True 22 1.106
+-RESULT 109 {'object_count': 2} True 26 0.967
+-RESULT 110 {'object_count': 2} True 24 0.955
+-RESULT 111 {'object_count': 2} True 23 1.196
+-RESULT 112 {'object_count': 1} True 29 1.045
+-RESULT 113 {'object_count': 1} True 24 1.129
+-RESULT 114 {'object_count': 1} True 29 1.097
+-RESULT 115 {'object_count': 2} True 31 1.352
+-RESULT 116 {'object_count': 1} False 250 13.889
+-FAILED [('home', 0), ('sample', 5)] [('rover0', {'x': 1.0, 'y': -1.75, 'theta': -3.1415927410125732, 'store_full': 0.0, 'calibrated': 0.0, 'at_home': 1.0}), ('rover1', {'x': -1.5, 'y': 0.3999998867511749, 'theta': 0.0, 'store_full': 1.0, 'calibrated': 0.0, 'at_home': 0.0}), ('objective0', {'x': 0.3243560194969177, 'y': 1.8972790241241455, 'z': 0.20100000500679016, 'have_image_rover0': 1.0, 'have_image_rover1': 0.0, 'received_image': 1.0}), ('sample0', {'x': -0.9633942246437073, 'y': -2.3797810077667236, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 1.0, 'received_analysis': 1.0}), ('sample1', {'x': -1.9395066499710083, 'y': -0.37688443064689636, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}), ('sample2', {'x': -1.3768526315689087, 'y': 0.30743154883384705, 'z': 0.006000000052154064, 'is_soil': 0.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 1.0, 'received_analysis': 0.0}), ('sample3', {'x': -1.8997358083724976, 'y': 1.3095738887786865, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}), ('sample4', {'x': -0.1688850373029709, 'y': 1.3331273794174194, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0}), ('sample5', {'x': -1.4924739599227905, 'y': 0.6196938753128052, 'z': 0.0035000001080334187, 'is_soil': 1.0, 'analyzed_rover0': 0.0, 'analyzed_rover1': 0.0, 'received_analysis': 0.0})]
+-RESULT 117 {'object_count': 1} True 33 2.036
+-RESULT 118 {'object_count': 2} True 30 1.838
+-RESULT 119 {'object_count': 2} True 22 1.861
+-RESULT 120 {'object_count': 1} True 24 1.882
+-RESULT 121 {'object_count': 1} True 22 1.418
+-RESULT 122 {'object_count': 3} True 26 1.122
+-RESULT 123 {'object_count': 1} True 30 2.132
+-RESULT 124 {'object_count': 3} True 28 2.825
+-RESULT 125 {'object_count': 2} True 23 1.838
+-RESULT 126 {'object_count': 1} True 22 2.261
+-RESULT 127 {'object_count': 2} True 35 2.355
+-RESULT 128 {'object_count': 3} True 36 1.905
+diff --git a/test_stats.py b/test_stats.py
+index 6e15b72..2601c23 100644
+--- a/test_stats.py
++++ b/test_stats.py
+@@ -2,9 +2,7 @@ from env_client import make_env
+ from approach import GeneratedApproach
+ import numpy as np
+ import time,json,argparse
+-P=argparse.ArgumentParser();P.add_argument('--no-plan',action='store_true');P.add_argument('--start',type=int,default=0);P.add_argument('--n',type=int,default=100);P.add_argument('--count',type=int);P.add_argument('--out',default='stats.json');a=P.parse_args();out=[]
+-if a.no_plan:
+- from approach_no_plan import GeneratedApproach
++P=argparse.ArgumentParser();P.add_argument('--start',type=int,default=0);P.add_argument('--n',type=int,default=100);P.add_argument('--count',type=int);P.add_argument('--out',default='stats.json');a=P.parse_args();out=[]
+ for seed in range(a.start,a.start+a.n):
+  e=make_env();s,info=e.reset(seed=seed,options={'object_count':a.count} if a.count else None);ap=GeneratedApproach(e.action_space,e.observation_space,{});st=time.time();ap.reset(s,info);tm=time.time()-st
+  bad=[0,0,0];ops=[0,0,0,0,0];success=False

@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 2b2f35e..b72fad0 100644
+--- a/approach.py
++++ b/approach.py
+@@ -258,7 +258,7 @@ class GeneratedApproach:
+                 self.mode = "move_retreat"
+                 self.retreat_count = 0
+                 return self._safe(-self.push_dir, 0.018)
+-            speed = 0.016 if pd < 0.12 else (0.038 if pd > 0.55 else 0.024)
++            speed = 0.016 if pd < 0.12 else (0.032 if pd > 0.55 else 0.024)
+             return self._safe((com + self.push_dir * 0.20) - robot, speed)
+         # Break contact along the exact reverse push direction. Recomputing a
+         # COM-relative far point after the T rotates can route through the T.

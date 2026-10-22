@@ -1,0 +1,12 @@
+diff --git a/test_approach.py b/test_approach.py
+index 3d83868..7ec792f 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -17,6 +17,6 @@ for seed in seeds:
+         steps += 1
+         if term or trunc: break
+     nobj = len(ap.sc.objectives)
+-    print(f"seed {seed} nobj {nobj} steps {steps} term {term} plan {tp:.2f}s assign {ap.assign} pathlens {[len(p['path'])-1 for p in ap.plans]}", flush=True)
++    print(f"seed {seed} nobj {nobj} steps {steps} term {term} plan {tp:.2f}s", flush=True)
+     res.append(steps if term else 9999)
+ print("mean", np.mean(res), "fails", sum(r == 9999 for r in res))

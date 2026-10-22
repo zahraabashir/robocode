@@ -1,0 +1,24 @@
+diff --git a/approach.py b/approach.py
+index ef94456..ded4325 100644
+--- a/approach.py
++++ b/approach.py
+@@ -144,6 +144,10 @@ class GeneratedApproach:
+             self._choose_task(state)
+             self.carry_rotation = None
+             self.pick_xyz = self._xyz(state, self.object)
++            if self.object.startswith("obstruction"):
++                # Pinch near the top: center-height grasps can put fingertips
++                # into the target plate or an immediately adjacent blocker.
++                self.pick_xyz[2] += .8*self._get(state, self.object, "half_extent_z")
+             if self.object == "target_block":
+                 u = np.clip((self.pick_xyz[0]-.3359817)/(.4644086-.3359817), 0, 1)
+                 self.anchor_q = np.array((0, .25+.2*u, -np.pi, -2.30+.2*u,
+@@ -224,6 +228,8 @@ class GeneratedApproach:
+                 # Retry through a collision-safe overhead approach.
+                 self.carry_rotation = None
+                 self.pick_xyz = self._xyz(state, self.object)
++                if self.object.startswith("obstruction"):
++                    self.pick_xyz[2] += .8*self._get(state, self.object, "half_extent_z")
+                 if self.object == "target_block":
+                     self.goal_q = _HOME.copy()
+                     self.phase, self.phase_steps = "target_home", 0

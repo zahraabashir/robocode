@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 0ec8578..b72fad0 100644
+--- a/approach.py
++++ b/approach.py
+@@ -147,7 +147,7 @@ class GeneratedApproach:
+                 com0 = com0 + np.array([-self.push_dir[1], self.push_dir[0]])*self.line_offset
+                 far0 = np.clip(com0 - self.push_dir*0.76, 0.105, 4.895)
+                 self.nav = self._plan(robot, far0, obj, theta, width, lh, lv)
+-                if pd < 0.18:
++                if pd < 0.15:
+                     self.nav = []
+             else:
+                 return np.zeros(2, dtype=float)

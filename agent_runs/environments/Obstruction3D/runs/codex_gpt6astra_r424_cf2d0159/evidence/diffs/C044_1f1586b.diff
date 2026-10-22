@@ -1,0 +1,34 @@
+diff --git a/sweep_final_count5.log b/sweep_final_count5.log
+index db85172..504f40c 100644
+--- a/sweep_final_count5.log
++++ b/sweep_final_count5.log
+@@ -3,3 +3,11 @@
+ {"seed": 2, "count": 5, "success": true, "steps": 173, "phase": "release", "goal": "target_block", "seconds": 3.34, "grasp": 0.0}
+ {"seed": 3, "count": 5, "success": true, "steps": 119, "phase": "release", "goal": "target_block", "seconds": 2.4, "grasp": 0.0}
+ {"seed": 4, "count": 5, "success": true, "steps": 211, "phase": "release", "goal": "target_block", "seconds": 3.77, "grasp": 0.0}
++{"seed": 5, "count": 5, "success": true, "steps": 260, "phase": "release", "goal": "target_block", "seconds": 4.67, "grasp": 0.0}
++{"seed": 6, "count": 5, "success": true, "steps": 261, "phase": "release", "goal": "target_block", "seconds": 4.74, "grasp": 0.0}
++{"seed": 7, "count": 5, "success": true, "steps": 247, "phase": "release", "goal": "target_block", "seconds": 4.82, "grasp": 0.0}
++{"seed": 8, "count": 5, "success": true, "steps": 288, "phase": "release", "goal": "target_block", "seconds": 6.14, "grasp": 0.0}
++{"seed": 9, "count": 5, "success": true, "steps": 356, "phase": "release", "goal": "target_block", "seconds": 7.93, "grasp": 0.0}
++{"seed": 10, "count": 5, "success": false, "steps": 196, "phase": "lift", "goal": "target_block", "seconds": 3.79, "grasp": 1.0}
++{"seed": 11, "count": 5, "success": true, "steps": 260, "phase": "release", "goal": "target_block", "seconds": 5.0, "grasp": 0.0}
++{"seed": 12, "count": 5, "success": true, "steps": 295, "phase": "release", "goal": "target_block", "seconds": 5.7, "grasp": 0.0}
+diff --git a/test_reuse.py b/test_reuse.py
+new file mode 100644
+index 0000000..b560951
+--- /dev/null
++++ b/test_reuse.py
+@@ -0,0 +1,12 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import time
++E=make_env(); policy=GeneratedApproach(E.action_space,E.observation_space,{})
++for seed,count in [(2,2),(91,0),(22,1),(103,5),(17,10)]:
++ state,info=E.reset(seed=seed,options={'object_count':count})
++ begin=time.monotonic();policy.reset(state,info)
++ for step in range(E.max_steps):
++  state,reward,done,truncated,info=E.step(policy.get_action(state))
++  if done or truncated:break
++ print(seed,count,done,step+1,round(time.monotonic()-begin,3),flush=True)
++E.close()

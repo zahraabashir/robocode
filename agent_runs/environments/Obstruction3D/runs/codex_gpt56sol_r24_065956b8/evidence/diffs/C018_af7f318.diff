@@ -1,0 +1,13 @@
+diff --git a/probe_instances.py b/probe_instances.py
+index 69744c6..a5fa577 100644
+--- a/probe_instances.py
++++ b/probe_instances.py
+@@ -184,7 +184,7 @@ def full_place(seed):
+         print("LIFT", drive(qlift, -1.), snapshot(s)["target_block"])
+         if seed == 111:
+             for gi in range(12):
+-                a = np.zeros(11, np.float32); a[10] = 1.
++                a = np.zeros(11, np.float32); a[3] = .05; a[10] = 1.
+                 s, r, term, trunc, _ = env.step(a)
+                 print("OPEN", gi, snapshot(s)["robot"]["finger_state"], snapshot(s)["robot"]["grasp_active"], snapshot(s)["target_block"]["grasp_active"])
+             return

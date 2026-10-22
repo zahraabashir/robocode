@@ -1,0 +1,47 @@
+diff --git a/probe_grasp.py b/probe_grasp.py
+index 8817979..4ce49dd 100644
+--- a/probe_grasp.py
++++ b/probe_grasp.py
+@@ -42,5 +42,41 @@ def main():
+     env.close()
+ 
+ 
++def random_search(seed=0, steps=1000):
++    """Look for any attachment while broadly random-walking configuration."""
++    rng = np.random.default_rng(seed + 991)
++    env = make_env()
++    state, _ = env.reset(seed=seed)
++    initial = snapshot(state)
++    print("seed", seed, "objects", initial)
++    last_positions = {k: (v.get("pose_x"), v.get("pose_y"), v.get("pose_z"))
++                      for k, v in initial.items() if "pose_x" in v}
++    for t in range(steps):
++        action = np.zeros(11, dtype=np.float32)
++        # Persistent random motion explores configurations better than white noise.
++        action[:10] = rng.choice([-0.2, 0.0, 0.2], size=10, p=[0.3, 0.4, 0.3])
++        action[10] = -1.0
++        state, reward, term, trunc, info = env.step(action)
++        snap = snapshot(state)
++        moved = []
++        for k, old in last_positions.items():
++            new = tuple(snap[k].get(x) for x in ("pose_x", "pose_y", "pose_z"))
++            if max(abs(a - b) for a, b in zip(old, new)) > 1e-5:
++                moved.append((k, old, new))
++            last_positions[k] = new
++        if moved or snap["robot"]["grasp_active"]:
++            print("EVENT", t, "a", action.tolist(), "moved", moved,
++                  "robot", snap["robot"])
++        if snap["robot"]["grasp_active"] or term or trunc:
++            print("END", t, reward, term, trunc, snap)
++            break
++    env.close()
++
++
+ if __name__ == "__main__":
+-    main()
++    import argparse
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--random", action="store_true")
++    parser.add_argument("--seed", type=int, default=0)
++    args = parser.parse_args()
++    random_search(args.seed) if args.random else main()

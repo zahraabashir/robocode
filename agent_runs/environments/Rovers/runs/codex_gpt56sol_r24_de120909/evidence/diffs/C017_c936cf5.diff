@@ -1,0 +1,59 @@
+diff --git a/approach.py b/approach.py
+index 4cdd5d7..08aa295 100644
+--- a/approach.py
++++ b/approach.py
+@@ -33,7 +33,7 @@ class GeneratedApproach:
+         self.last_ops=["noop","noop"]
+         # Pick one concrete sample of each required kind and give it to the rover
+         # already on that side of the wall.
+-        self.sample_jobs = [set(), set()]
++        self.sample_jobs = [{}, {}]
+         for soil in (False, True):
+             choices=[]
+             land=self._get(state,"lander")[0]
+@@ -48,7 +48,7 @@ class GeneratedApproach:
+                 choices.append((int(trapped),math.dist(self.home[owner],(x,y)),owner,o.name))
+             if choices:
+                 _,_,owner,name=min(choices)
+-                self.sample_jobs[owner].add(soil)
++                self.sample_jobs[owner][soil]=name
+ 
+     def _radio_points(self,s,i):
+         land=self._get(s,"lander")[0]; q=(s.get(land,"x"),s.get(land,"y"))
+@@ -188,7 +188,7 @@ class GeneratedApproach:
+             for o,q in need:
+                 # Already photographed by this rover: only needs sending.
+                 if s.get(o,"have_image_rover%d"%i)>.5: continue
+-                if math.dist(pos,q)<=1.90 and self._los(pos,q,rects):
++                if math.dist(pos,q)<=1.72 and self._los(pos,q,rects):
+                     return (("image" if s.get(r,"calibrated")>.5 else "calibrate"),pos)
+                 cs=self._candidates(s,q,1.9,True)
+                 if cs:
+@@ -199,14 +199,14 @@ class GeneratedApproach:
+             return ("nav_send",self._radio(i))
+         # Execute the preassigned one-stone/one-soil jobs (possibly both on one rover).
+         soil=None
+-        for kind in sorted(self.sample_jobs[i]):
++        chosen_name=None
++        for kind,name in sorted(self.sample_jobs[i].items()):
+             matching=[o for o in self._get(s,"sample") if bool(s.get(o,"is_soil")>.5)==kind]
+             if not any(s.get(o,"received_analysis")>.5 for o in matching):
+-                soil=kind; break
++                soil=kind; chosen_name=name; break
+         if soil is None: return ("home",self.home[i])
+         matching=[o for o in self._get(s,"sample") if bool(s.get(o,"is_soil")>.5)==soil]
+-        samples=[o for o in matching if s.get(o,"received_analysis")<.5 and
+-                 ((s.get(o,"x")>=0) == (i==0))]
++        samples=[s.get_object_from_name(chosen_name)]
+         if samples:
+             candidates=[]
+             for o in samples:
+@@ -245,6 +245,8 @@ class GeneratedApproach:
+                         goals=[target]; tolerance=.15
+                     self.paths[i]=self._astar(pos,goals,rects,tolerance)
+                     self.targets[i]=key; self.stalls[i]=0
++                    if not self.paths[i] and task!="nav_sample" and self._free(target,rects):
++                        self.paths[i]=[target]
+                 while self.paths[i] and math.dist(pos,self.paths[i][0])<.05: self.paths[i].pop(0)
+                 if self.paths[i]:
+                     wp=self.paths[i][0]

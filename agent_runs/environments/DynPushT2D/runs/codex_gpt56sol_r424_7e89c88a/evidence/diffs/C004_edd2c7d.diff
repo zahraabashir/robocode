@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 7b387f0..8e52236 100644
+--- a/approach.py
++++ b/approach.py
+@@ -27,6 +27,7 @@ class GeneratedApproach:
+         # Conservative clearance for the initial positioning phase.
+         staging = block - direction * 0.13
+         target = staging if np.linalg.norm(robot - staging) > 0.035 else block + direction * 0.08
+-        move = np.clip(target - robot, self.low, self.high)
++        # The server checks the open interval despite the advertised Box bounds.
++        move = np.clip(target - robot, self.low + 1e-6, self.high - 1e-6)
+         self.step += 1
+         return move.astype(float)

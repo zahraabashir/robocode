@@ -1,0 +1,54 @@
+diff --git a/approach.py b/approach.py
+index 3dec854..920561e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -66,9 +66,10 @@ class GeneratedApproach:
+                 if held is not None:
+                     self.goal=held.name;self.phase='lift';self.height=min(.35,ee[2]+.025);continue
+                 a[3:10]=self.config(self.height)-q
++                a[10]=1
+                 if np.max(abs(a[3:10]))<1e-4:
+-                    if self.height>p[2]+.055:
+-                        self.height=max(p[2]+.055,self.height-.025);continue
++                    if self.height>p[2]+.05:
++                        self.height=max(p[2]+.05,self.height-.025);continue
+                     self.phase='close';continue
+             elif self.phase=='close':
+                 if held is not None:self.goal=held.name;self.phase='lift';self.height=ee[2]+.025;continue
+diff --git a/probe_cluster_grasp.log b/probe_cluster_grasp.log
+index 3154f50..5d416d3 100644
+--- a/probe_cluster_grasp.log
++++ b/probe_cluster_grasp.log
+@@ -12,3 +12,8 @@ SUCCESS 2.356194490192345 0 0 z 0.15499999999999986 held ['obstruction1'] goal o
+ SUCCESS 2.356194490192345 0.015 0 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
+ SUCCESS 2.356194490192345 -0.015 0 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
+ SUCCESS 2.356194490192345 0 0.015 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 2.356194490192345 0 -0.015 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 1.5707963267948966 0 0 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 1.5707963267948966 0.015 0 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 1.5707963267948966 -0.015 0 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
++SUCCESS 1.5707963267948966 0 0.015 z 0.15499999999999986 held ['obstruction1'] goal obstruction1 goalpos [0.14757776 0.10241975 0.1028325 ]
+diff --git a/sweep_count0.log b/sweep_count0.log
+new file mode 100644
+index 0000000..264282d
+--- /dev/null
++++ b/sweep_count0.log
+@@ -0,0 +1 @@
++{"seed": 0, "count": 0, "success": true, "steps": 40, "phase": "release", "goal": "target_block", "seconds": 12.82, "grasp": 0.0}
+diff --git a/sweep_count1.log b/sweep_count1.log
+new file mode 100644
+index 0000000..e69de29
+diff --git a/sweep_count10.log b/sweep_count10.log
+new file mode 100644
+index 0000000..e69de29
+diff --git a/sweep_count5.log b/sweep_count5.log
+new file mode 100644
+index 0000000..e69de29
+diff --git a/sweep_initial.log b/sweep_initial.log
+new file mode 100644
+index 0000000..28f132c
+--- /dev/null
++++ b/sweep_initial.log
+@@ -0,0 +1,2 @@
++{"seed": 5, "count": null, "success": true, "steps": 126, "phase": "release", "goal": "target_block", "seconds": 5.89, "grasp": 0.0}
++{"seed": 6, "count": null, "success": true, "steps": 83, "phase": "release", "goal": "target_block", "seconds": 4.74, "grasp": 0.0}

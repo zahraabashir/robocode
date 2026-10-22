@@ -1,0 +1,19 @@
+diff --git a/approach.py b/approach.py
+index ebecc8b..ed784db 100644
+--- a/approach.py
++++ b/approach.py
+@@ -621,9 +621,12 @@ class GeneratedApproach:
+             karr = np.ceil(dcur / CELLS_PER_STEP)
+             blk = np.zeros(S.N, dtype=bool)
+             for kk in range(len(traj)):
+-                sel = (karr == kk) if kk < len(traj) - 1 else (karr >= kk)
+-                if kk == 0:
++                if kk == len(traj) - 1:
++                    sel = karr >= kk
++                elif kk == 0:
+                     sel = karr <= 0
++                else:
++                    sel = karr == kk
+                 if not sel.any():
+                     continue
+                 px_, py_ = traj[kk]

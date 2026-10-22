@@ -1,0 +1,108 @@
+diff --git a/approach.py b/approach.py
+index 3500d44..d397b67 100644
+--- a/approach.py
++++ b/approach.py
+@@ -132,7 +132,10 @@ class GeneratedApproach:
+         if tool[2] < Z_SAFE - 0.01:
+             wps.append(np.array([tool[0], tool[1], Z_SAFE]))
+         wps.append(np.array([p[0], p[1], Z_SAFE]))
+-        wps.append(np.array([p[0], p[1], top + 0.02]))
++        lo = p[2] - h[2] + 0.044
++        hi = top + 0.033
++        gz = 0.5 * (lo + hi) if hi > lo else hi - 0.002
++        wps.append(np.array([p[0], p[1], gz]))
+         self._set_path(state, wps, self.grasp_yaw)
+         self.phase = 'to_grasp'
+ 
+diff --git a/explore16.py b/explore16.py
+index 19a6262..2048cac 100644
+--- a/explore16.py
++++ b/explore16.py
+@@ -25,7 +25,7 @@ obs,_=env.reset(seed=seed); R=obs.get_object_from_name('robot'); B=obs.get_objec
+ base=(obs.get(R,'pos_base_x'), obs.get(R,'pos_base_y'), obs.get(R,'pos_base_rot'))
+ bp=np.array([obs.get(B,f) for f in ['pose_x','pose_y','pose_z']]); h=[obs.get(B,f) for f in ['half_extent_x','half_extent_y','half_extent_z']]
+ print(name,bp,h)
+-for dz in np.arange(0.05,-0.03,-0.004):
++for dz in np.arange(0.05,-0.005,-0.004):
+     obs,_=env.reset(seed=seed)
+     move(bp+[0,0,h[2]+0.08]); r=move(bp+[0,0,h[2]+dz],n=20)
+     tz=tool_fk(q_of(obs),base)[2,3]
+diff --git a/o16a.txt b/o16a.txt
+new file mode 100644
+index 0000000..3c8929a
+--- /dev/null
++++ b/o16a.txt
+@@ -0,0 +1,15 @@
++obstruction0 [0.10343256 0.24800321 0.09505477] [0.019350724294781685, 0.01815853640437126, 0.010054769925773144]
++dz 0.05 reached True tool-top 0.05 grasp [] 0.0
++dz 0.046 reached True tool-top 0.046 grasp [] 0.0
++dz 0.042 reached True tool-top 0.042 grasp [] 0.0
++dz 0.038 reached True tool-top 0.038 grasp [] 0.0
++dz 0.034 reached True tool-top 0.034 grasp ['obstruction0'] 0.47
++dz 0.03 reached True tool-top 0.03 grasp ['obstruction0'] 0.47
++dz 0.026 reached True tool-top 0.026 grasp ['obstruction0'] 0.47
++dz 0.022 reached True tool-top 0.022 grasp ['obstruction0'] 0.47
++dz 0.018 reached True tool-top 0.018 grasp [] 0.0
++dz 0.014 reached True tool-top 0.014 grasp [] 0.0
++dz 0.01 reached True tool-top 0.01 grasp [] 0.0
++dz 0.006 reached False tool-top 0.0097 grasp [] 0.0
++dz 0.002 reached False tool-top 0.0098 grasp [] 0.0
++dz -0.002 reached False tool-top 0.0103 grasp [] 0.0
+diff --git a/o16b.txt b/o16b.txt
+index aef1d61..47d2b3a 100644
+--- a/o16b.txt
++++ b/o16b.txt
+@@ -1,21 +1,15 @@
+-obstruction1 [0.10313927 0.20900817 0.10099424] [0.018631789833307266, 0.015414612367749214, 0.0159942377358675]
++target_block [0.33598167 0.17328143 0.1       ] [0.03128708153963089, 0.022474881261587143, 0.02500000037252903]
+ dz 0.05 reached True tool-top 0.05 grasp [] 0.0
+ dz 0.046 reached True tool-top 0.046 grasp [] 0.0
+ dz 0.042 reached True tool-top 0.042 grasp [] 0.0
+ dz 0.038 reached True tool-top 0.038 grasp [] 0.0
+-dz 0.034 reached True tool-top 0.034 grasp ['obstruction1'] 0.55
+-dz 0.03 reached True tool-top 0.03 grasp ['obstruction1'] 0.55
+-dz 0.026 reached True tool-top 0.026 grasp [] 0.0
+-dz 0.022 reached True tool-top 0.022 grasp [] 0.0
+-dz 0.018 reached True tool-top 0.0181 grasp [] 0.0
+-dz 0.014 reached False tool-top 0.0174 grasp [] 0.0
+-dz 0.01 reached False tool-top 0.0206 grasp [] 0.0
+-dz 0.006 reached False tool-top 0.0209 grasp [] 0.0
+-dz 0.002 reached False tool-top 0.0177 grasp [] 0.0
+-dz -0.002 reached False tool-top 0.0185 grasp [] 0.0
+-dz -0.006 reached False tool-top 0.0198 grasp [] 0.0
+-dz -0.01 reached False tool-top 0.0215 grasp [] 0.0
+-dz -0.014 reached False tool-top 0.0189 grasp [] 0.0
+-dz -0.018 reached False tool-top 0.0212 grasp [] 0.0
+-dz -0.022 reached False tool-top 0.0188 grasp [] 0.0
+-dz -0.026 reached False tool-top 0.0217 grasp [] 0.0
++dz 0.034 reached True tool-top 0.0341 grasp ['target_block'] 0.25
++dz 0.03 reached True tool-top 0.0301 grasp ['target_block'] 0.25
++dz 0.026 reached True tool-top 0.0261 grasp ['target_block'] 0.25
++dz 0.022 reached True tool-top 0.0221 grasp ['target_block'] 0.25
++dz 0.018 reached True tool-top 0.018 grasp ['target_block'] 0.25
++dz 0.014 reached True tool-top 0.014 grasp ['target_block'] 0.25
++dz 0.01 reached True tool-top 0.01 grasp ['target_block'] 0.25
++dz 0.006 reached True tool-top 0.006 grasp ['target_block'] 0.25
++dz 0.002 reached True tool-top 0.002 grasp ['target_block'] 0.25
++dz -0.002 reached True tool-top -0.002 grasp ['target_block'] 0.25
+diff --git a/o16c.txt b/o16c.txt
+new file mode 100644
+index 0000000..f5b6e5b
+--- /dev/null
++++ b/o16c.txt
+@@ -0,0 +1,15 @@
++obstruction0 [0.17032762 0.069209   0.09800124] [0.016574330627918243, 0.015622656792402267, 0.013001245446503162]
++dz 0.05 reached True tool-top 0.05 grasp [] 0.0
++dz 0.046 reached True tool-top 0.046 grasp [] 0.0
++dz 0.042 reached True tool-top 0.0421 grasp [] 0.0
++dz 0.038 reached True tool-top 0.038 grasp [] 0.0
++dz 0.034 reached True tool-top 0.034 grasp ['obstruction0'] 0.52
++dz 0.03 reached True tool-top 0.03 grasp ['obstruction0'] 0.52
++dz 0.026 reached True tool-top 0.026 grasp ['obstruction0'] 0.52
++dz 0.022 reached True tool-top 0.022 grasp ['obstruction0'] 0.52
++dz 0.018 reached True tool-top 0.018 grasp ['obstruction0'] 0.52
++dz 0.014 reached True tool-top 0.0141 grasp [] 0.0
++dz 0.01 reached True tool-top 0.0101 grasp [] 0.0
++dz 0.006 reached True tool-top 0.0061 grasp [] 0.0
++dz 0.002 reached True tool-top 0.002 grasp [] 0.0
++dz -0.002 reached True tool-top -0.002 grasp [] 0.0

@@ -1,0 +1,117 @@
+diff --git a/probe_grasp.py b/probe_grasp.py
+index 4ce49dd..d7156c5 100644
+--- a/probe_grasp.py
++++ b/probe_grasp.py
+@@ -1,82 +1,45 @@
+-"""Focused black-box probes for Obstruction3D grasp mechanics."""
++"""Try simple base-alignment grasps and report attachment-transform semantics."""
+ 
+ import numpy as np
+ 
+ from env_client import make_env
+ 
+ 
+-def read(state, obj, names):
+-    return {name: float(state.get(obj, name)) for name in names}
+-
+-
+-def snapshot(state):
+-    out = {}
+-    for name in state.get_object_names():
+-        obj = state.get_object_from_name(name)
+-        try:
+-            out[name] = read(state, obj, ["pose_x", "pose_y", "pose_z", "grasp_active"])
+-        except Exception:
+-            out[name] = read(state, obj, [
+-                "pos_base_x", "pos_base_y", "pos_base_rot",
+-                "joint_1", "joint_2", "joint_3", "joint_4", "joint_5",
+-                "joint_6", "joint_7", "finger_state", "grasp_active",
+-                "grasp_tf_x", "grasp_tf_y", "grasp_tf_z",
+-            ])
+-    return out
++def value(state, name, feature):
++    return state.get(state.get_object_from_name(name), feature)
+ 
+ 
+ def main():
++    # The nominal arm extends along world +x; test y alignment plus small x/joint offsets.
++    candidates = []
++    for dx in (0.0, -0.05, -0.1, -0.2):
++        for j2 in (0.0, -0.1, 0.1, -0.2, 0.2):
++            for j4 in (0.0, -0.1, 0.1):
++                candidates.append((dx, j2, j4))
+     env = make_env()
+-    state, info = env.reset(seed=0)
+-    print("max_steps", env.max_steps, "info", info)
+-    print(snapshot(state))
+-    for label, action in [
+-        ("close", [0] * 10 + [-1]),
+-        ("open", [0] * 10 + [1]),
+-        ("all_joint_plus", [0, 0, 0] + [0.2] * 7 + [0]),
+-        ("all_joint_minus", [0, 0, 0] + [-0.2] * 7 + [0]),
+-        ("base_plus", [0.2, 0.2, 0.2] + [0] * 8),
+-    ]:
+-        state, reward, term, trunc, info = env.step(np.asarray(action, dtype=np.float32))
+-        print(label, reward, term, trunc, info, snapshot(state))
+-    env.close()
+-
+-
+-def random_search(seed=0, steps=1000):
+-    """Look for any attachment while broadly random-walking configuration."""
+-    rng = np.random.default_rng(seed + 991)
+-    env = make_env()
+-    state, _ = env.reset(seed=seed)
+-    initial = snapshot(state)
+-    print("seed", seed, "objects", initial)
+-    last_positions = {k: (v.get("pose_x"), v.get("pose_y"), v.get("pose_z"))
+-                      for k, v in initial.items() if "pose_x" in v}
+-    for t in range(steps):
+-        action = np.zeros(11, dtype=np.float32)
+-        # Persistent random motion explores configurations better than white noise.
+-        action[:10] = rng.choice([-0.2, 0.0, 0.2], size=10, p=[0.3, 0.4, 0.3])
+-        action[10] = -1.0
+-        state, reward, term, trunc, info = env.step(action)
+-        snap = snapshot(state)
+-        moved = []
+-        for k, old in last_positions.items():
+-            new = tuple(snap[k].get(x) for x in ("pose_x", "pose_y", "pose_z"))
+-            if max(abs(a - b) for a, b in zip(old, new)) > 1e-5:
+-                moved.append((k, old, new))
+-            last_positions[k] = new
+-        if moved or snap["robot"]["grasp_active"]:
+-            print("EVENT", t, "a", action.tolist(), "moved", moved,
+-                  "robot", snap["robot"])
+-        if snap["robot"]["grasp_active"] or term or trunc:
+-            print("END", t, reward, term, trunc, snap)
++    for dx, j2, j4 in candidates:
++        state, _ = env.reset(seed=0)
++        target_y = value(state, "target_block", "pose_y")
++        move = np.zeros(11, dtype=np.float32)
++        move[0], move[1], move[4], move[6] = dx, target_y, j2, j4
++        state, _, _, _, _ = env.step(move)
++        close = np.zeros(11, dtype=np.float32)
++        close[10] = -1.0
++        state, _, _, _, _ = env.step(close)
++        active = value(state, "robot", "grasp_active")
++        if active:
++            robot = state.get_object_from_name("robot")
++            tf = [state.get(robot, "grasp_tf_" + c) for c in "xyz"]
++            quat = [state.get(robot, "grasp_tf_q" + c) for c in "xyzw"]
++            held = [n for n in state.get_object_names()
++                    if n != "robot" and value(state, n, "grasp_active")]
++            print("SUCCESS", dx, j2, j4, "held", held, "tf", tf, quat,
++                  "finger", state.get(robot, "finger_state"))
+             break
++    else:
++        print("no grasp in", len(candidates), "candidates")
+     env.close()
+ 
+ 
+ if __name__ == "__main__":
+-    import argparse
+-    parser = argparse.ArgumentParser()
+-    parser.add_argument("--random", action="store_true")
+-    parser.add_argument("--seed", type=int, default=0)
+-    args = parser.parse_args()
+-    random_search(args.seed) if args.random else main()
++    main()

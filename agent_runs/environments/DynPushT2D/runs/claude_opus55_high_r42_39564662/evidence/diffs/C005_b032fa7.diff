@@ -1,0 +1,293 @@
+diff --git a/approach.py b/approach.py
+index a562a4a..8664548 100644
+--- a/approach.py
++++ b/approach.py
+@@ -6,6 +6,7 @@ AMAX = 0.0499
+ LO, HI = 0.1 + 1e-3, 4.9 - 1e-3
+ POS_TOL, ANG_TOL = 0.03, np.deg2rad(8.0)
+ K_ANG = 0.8
++LOOKAHEAD = 8
+ 
+ 
+ def cost(bx, by, bt, goal):
+@@ -22,6 +23,7 @@ class GeneratedApproach:
+         self.action_space = action_space
+         self.queue = []
+         self.g = None
++        self.lookahead = LOOKAHEAD
+ 
+     def reset(self, state, info):
+         self.queue = []
+@@ -29,6 +31,13 @@ class GeneratedApproach:
+         self.goal = np.array(state[29:32], dtype=float)
+         self.expect = None
+         self.mode = None
++        import time as _t
++        self.t_start = _t.time()
++        self.pts = self.g.boundary_points(0.05)
++        lpx = self.pts[:, 0] + self.pts[:, 2] * (R_ROBOT + 0.045)
++        lpy = self.pts[:, 1] + self.pts[:, 3] * (R_ROBOT + 0.045)
++        self.pre_ok = self.g.closest(lpx, lpy)[4] > R_ROBOT + 0.03
++        self.angs = np.deg2rad(np.array([-40, -25, -12, 0, 12, 25, 40]))
+ 
+     # ---------------- navigation -----------------
+     def _seg_free(self, pose, ax, ay, bx_, by_, m):
+@@ -130,18 +139,15 @@ class GeneratedApproach:
+         return tdist, path
+ 
+     # ---------------- planning -----------------
+-    def _plan(self, obs):
++    def _eval(self, pose, robot, fine):
++        """Evaluate all single push segments from (pose, robot). Returns dict or None."""
+         g = self.g
+-        pose = np.array(obs[0:3], float)
+-        robot = np.array(obs[16:18], float)
+         goal = self.goal
+-        J0 = cost(pose[0], pose[1], pose[2], goal)
+-        fine = J0 < 0.12
++        J0 = float(cost(pose[0], pose[1], pose[2], goal))
+         step = AMAX if not fine else AMAX / 3
+         nsteps = 40 if not fine else 30
+-        pts = g.boundary_points(0.05)
++        pts = self.pts
+         c, s = np.cos(pose[2]), np.sin(pose[2])
+-        # contact center (robot center touching) and pre-point in world
+         lcx = pts[:, 0] + pts[:, 2] * (R_ROBOT + 0.003)
+         lcy = pts[:, 1] + pts[:, 3] * (R_ROBOT + 0.003)
+         wcx = pose[0] + c * lcx - s * lcy
+@@ -151,14 +157,11 @@ class GeneratedApproach:
+         wpx = pose[0] + c * lpx - s * lpy
+         wpy = pose[1] + s * lpx + c * lpy
+         inb = (wcx > LO) & (wcx < HI) & (wcy > LO) & (wcy < HI) & (wpx > LO) & (wpx < HI) & (wpy > LO) & (wpy < HI)
+-        # pre-point must be free
+-        _, _, _, _, dpre = g.closest(lpx, lpy)
+-        inb &= dpre > R_ROBOT + 0.03
++        inb &= self.pre_ok
+         idx = np.nonzero(inb)[0]
+         if len(idx) == 0:
+             return None
+         pre = np.stack([wpx[idx], wpy[idx]], 1)
+-        # retreat if robot is close to the block
+         rlx = c * (robot[0] - pose[0]) + s * (robot[1] - pose[1])
+         rly = -s * (robot[0] - pose[0]) + c * (robot[1] - pose[1])
+         _, _, rnx, rny, rd = g.closest(np.array([rlx]), np.array([rly]))
+@@ -170,13 +173,12 @@ class GeneratedApproach:
+                 retreat = cand
+         start = robot if retreat is None else retreat
+         tdist, pathf = self._plan_paths(pose, start, pre)
++        tdist = tdist + 0.045
+         if retreat is not None:
+             tdist = tdist + np.hypot(*(retreat - robot))
+-        tdist = tdist + 0.045
+-        # world inward normal
+         nwx = -(c * pts[idx, 2] - s * pts[idx, 3])
+         nwy = -(s * pts[idx, 2] + c * pts[idx, 3])
+-        angs = np.deg2rad(np.array([-40, -25, -12, 0, 12, 25, 40]))
++        angs = self.angs
+         K = len(idx) * len(angs)
+         ci = np.repeat(np.arange(len(idx)), len(angs))
+         aa = np.tile(angs, len(idx))
+@@ -186,14 +188,14 @@ class GeneratedApproach:
+         bx = np.full(K, pose[0]); by = np.full(K, pose[1]); bt = np.full(K, pose[2])
+         rx = wcx[idx][ci].copy(); ry = wcy[idx][ci].copy()
+         valid = np.isfinite(tdist[ci])
+-        travel = tdist[ci] / AMAX + 1.0
+-        # current wall margin
++        travel = np.ceil(tdist[ci] / AMAX) + 1.0
+         cx0, cy0 = corners_world(g, pose[0], pose[1], pose[2])
+         m0 = min(cx0.min(), cy0.min(), 5 - cx0.max(), 5 - cy0.max())
+         wall_lim = min(0.06, m0 - 0.01)
+         best_score = np.full(K, -np.inf)
+         best_n = np.zeros(K, int)
+         best_J = np.full(K, np.inf)
++        fin = np.zeros((K, 5))
+         alive = valid.copy()
+         for k in range(1, nsteps + 1):
+             bx, by, bt, rx, ry = sim_step(g, bx, by, bt, rx, ry, ux, uy)
+@@ -201,40 +203,85 @@ class GeneratedApproach:
+             cxw, cyw = corners_world(g, bx, by, bt)
+             mm = np.minimum(np.minimum(cxw.min(0), cyw.min(0)), np.minimum(5 - cxw.max(0), 5 - cyw.max(0)))
+             alive &= mm > wall_lim
++            if not alive.any():
++                break
+             J = cost(bx, by, bt, goal)
+             J = np.where(solved(bx, by, bt, goal), J - 0.5, J)
+-            steps_k = k if not fine else k / 3.0
++            steps_k = k if not fine else np.ceil(k / 3.0)
+             sc = (J0 - J) / (travel + steps_k + 1.0)
+             upd = alive & (sc > best_score)
+             best_score = np.where(upd, sc, best_score)
+             best_n = np.where(upd, k, best_n)
+             best_J = np.where(upd, J, best_J)
+-        j = int(np.argmax(best_score))
+-        if not np.isfinite(best_score[j]) or best_score[j] <= 0:
++            if upd.any():
++                fin[upd] = np.stack([bx, by, bt, rx, ry], 1)[upd]
++        steps_n = best_n if not fine else np.ceil(best_n / 3.0)
++        return dict(J0=J0, score=best_score, n=best_n, J=best_J, fin=fin, ci=ci, idx=idx,
++                    ux=ux, uy=uy, travel=travel, tot=travel + steps_n + 1.0, pathf=pathf,
++                    retreat=retreat, wc=np.stack([wcx, wcy], 1), fine=fine)
++
++    def _plan(self, obs):
++        pose = np.array(obs[0:3], float)
++        robot = np.array(obs[16:18], float)
++        J0 = float(cost(pose[0], pose[1], pose[2], self.goal))
++        fine = J0 < 0.12
++        E = self._eval(pose, robot, fine)
++        if E is None:
+             return None
+-        n = int(best_n[j])
+-        wp = pathf(ci[j])
+-        if retreat is not None:
+-            wp = [retreat] + wp
++        sc = E['score']
++        order = np.argsort(-sc)
++        j = int(order[0])
++        if not np.isfinite(sc[j]) or sc[j] <= 0:
++            return None
++        import time as _t
++        if self.lookahead > 0 and not fine and _t.time() - self.t_start < 25.0:
++            best_val, best_j = -np.inf, j
++            seen = set()
++            cnt = 0
++            for jj in order:
++                if cnt >= self.lookahead or not np.isfinite(sc[jj]) or sc[jj] <= 0:
++                    break
++                key = (E['ci'][jj] // 2, int(E['n'][jj] // 8))
++                if key in seen:
++                    continue
++                seen.add(key)
++                cnt += 1
++                f = E['fin'][jj]
++                t1 = E['tot'][jj]
++                J1 = E['J'][jj]
++                val = (E['J0'] - J1) / t1
++                if J1 > -0.2:  # not solved
++                    fine2 = J1 + 0.0 < 0.12
++                    E2 = self._eval(f[0:3], f[3:5], fine2)
++                    if E2 is not None:
++                        s2 = (E['J0'] - E2['J']) / (t1 + E2['tot'])
++                        s2 = np.where(E2['score'] > -np.inf, s2, -np.inf)
++                        val = max(val, float(np.max(s2)))
++                if val > best_val:
++                    best_val, best_j = val, int(jj)
++            j = best_j
++        return self._build(E, j, robot)
++
++    def _build(self, E, j, robot):
++        ci = E['ci']; idx = E['idx']
++        n = int(E['n'][j])
++        wp = E['pathf'](ci[j])
++        if E['retreat'] is not None:
++            wp = [E['retreat']] + wp
+         acts = []
+         cur = robot.copy()
+-        for w in wp + [np.array([wcx[idx][ci[j]], wcy[idx][ci[j]]])]:
++        for w in wp + [E['wc'][idx][ci[j]]]:
+             w = np.asarray(w, float)
+-            while True:
+-                d = w - cur
+-                L = np.hypot(*d)
+-                if L < 1e-9:
+-                    break
+-                nst = int(np.ceil(L / AMAX - 1e-9))
+-                a = d / nst
+-                for _ in range(nst):
+-                    acts.append(('nav', a.copy()))
+-                cur = w.copy()
+-                break
+-        # push
+-        a = np.array([ux[j], uy[j]])
+-        if fine:
+-            # combine into fewer steps
++            d = w - cur
++            L = np.hypot(*d)
++            if L < 1e-9:
++                continue
++            nst = int(np.ceil(L / AMAX - 1e-9))
++            for _ in range(nst):
++                acts.append(('nav', d / nst))
++            cur = w.copy()
++        a = np.array([E['ux'][j], E['uy'][j]])
++        if E['fine']:
+             tot = a * n
+             L = np.hypot(*tot)
+             nst = max(1, int(np.ceil(L / AMAX - 1e-9)))
+@@ -243,7 +290,7 @@ class GeneratedApproach:
+         else:
+             for _ in range(n):
+                 acts.append(('push', a.copy()))
+-        self.dbg = (best_score[j], best_J[j], n, travel[j], J0)
++        self.dbg = (E['score'][j], E['J'][j], n, E['travel'][j], E['J0'])
+         return acts
+ 
+     def get_action(self, state):
+diff --git a/big_200_250.txt b/big_200_250.txt
+new file mode 100644
+index 0000000..a6ad36e
+--- /dev/null
++++ b/big_200_250.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 129.52
+diff --git a/big_250_300.txt b/big_250_300.txt
+new file mode 100644
+index 0000000..106a1db
+--- /dev/null
++++ b/big_250_300.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 122.12
+diff --git a/big_300_350.txt b/big_300_350.txt
+new file mode 100644
+index 0000000..0476caa
+--- /dev/null
++++ b/big_300_350.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 128.42
+diff --git a/big_350_400.txt b/big_350_400.txt
+new file mode 100644
+index 0000000..d5e520b
+--- /dev/null
++++ b/big_350_400.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 127.04
+diff --git a/big_400_450.txt b/big_400_450.txt
+new file mode 100644
+index 0000000..ea4235e
+--- /dev/null
++++ b/big_400_450.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 128.32
+diff --git a/big_450_500.txt b/big_450_500.txt
+new file mode 100644
+index 0000000..af35d9c
+--- /dev/null
++++ b/big_450_500.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 121.3
+diff --git a/big_500_550.txt b/big_500_550.txt
+new file mode 100644
+index 0000000..670cd7f
+--- /dev/null
++++ b/big_500_550.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 125.32
+diff --git a/big_550_600.txt b/big_550_600.txt
+new file mode 100644
+index 0000000..cd49c6f
+--- /dev/null
++++ b/big_550_600.txt
+@@ -0,0 +1 @@
++K 0.8 succ 1.0 meansteps 127.42
+diff --git a/sweep.py b/sweep.py
+index b485eb5..81cde69 100644
+--- a/sweep.py
++++ b/sweep.py
+@@ -1,7 +1,7 @@
+ import sys, time, numpy as np
+ from env_client import make_env
+ import approach
+-K=float(sys.argv[1]); approach.K_ANG=K
++K=float(sys.argv[1]); approach.K_ANG=K; approach.LOOKAHEAD=int(sys.argv[3]) if len(sys.argv)>3 else 8
+ seeds=[int(x) for x in sys.argv[2].split(',')] if ',' in sys.argv[2] else range(*map(int,sys.argv[2].split(':')))
+ env=make_env(); res=[]; steps=[]
+ for sd in seeds:

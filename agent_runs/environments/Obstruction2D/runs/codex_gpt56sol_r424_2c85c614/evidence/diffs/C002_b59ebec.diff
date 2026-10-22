@@ -1,0 +1,84 @@
+diff --git a/approach.py b/approach.py
+new file mode 100644
+index 0000000..a8e421c
+--- /dev/null
++++ b/approach.py
+@@ -0,0 +1,43 @@
++"""Reactive policy for Obstruction2DEnv."""
++
++import math
++import numpy as np
++
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.action_space = action_space
++        self.types = {t.name: t for t in observation_space.types}
++        self.phase = "approach"
++
++    def reset(self, state, info):
++        self.phase = "approach"
++
++    def _one(self, state, type_name):
++        return state.get_objects(self.types[type_name])[0]
++
++    def get_action(self, state):
++        robot = self._one(state, "crv_robot")
++        block = self._one(state, "target_block")
++        surface = self._one(state, "target_surface")
++        rx, ry = state.get(robot, "x"), state.get(robot, "y")
++        theta = state.get(robot, "theta")
++        arm = state.get(robot, "arm_joint")
++        vacuum = state.get(robot, "vacuum")
++        bx, by = state.get(block, "x"), state.get(block, "y")
++        sx, sy = state.get(surface, "x"), state.get(surface, "y")
++
++        # First baseline: approach/grasp the block, then translate it to the surface.
++        carrying = vacuum > 0.5 and math.hypot(bx - sx, by - sy) > 0.03
++        tx, ty = (sx, sy) if carrying else (bx, by)
++        desired = math.atan2(ty - ry, tx - rx)
++        err = (desired - theta + math.pi) % (2 * math.pi) - math.pi
++        dist = math.hypot(tx - rx, ty - ry)
++        target_arm = max(0.0, dist - 0.02)
++        action = np.zeros(5, dtype=np.float32)
++        if abs(err) > 0.05:
++            action[2] = np.clip(err, -0.196, 0.196)
++        else:
++            action[3] = np.clip(target_arm - arm, -0.1, 0.1)
++        action[4] = 1.0
++        return np.clip(action, self.action_space.low, self.action_space.high).astype(np.float32)
+diff --git a/probe_env.py b/probe_env.py
+new file mode 100644
+index 0000000..85a00b6
+--- /dev/null
++++ b/probe_env.py
+@@ -0,0 +1,29 @@
++"""Small black-box probes; never imported by approach.py."""
++
++import argparse
++import numpy as np
++from env_client import make_env
++
++
++def dump(state):
++    for name in sorted(state.get_object_names()):
++        obj = state.get_object_from_name(name)
++        fs = state.type_features[obj.type]
++        vals = [state.get(obj, f) for f in fs]
++        print(name, obj.type.name, dict(zip(fs, np.round(vals, 4))))
++
++
++if __name__ == "__main__":
++    ap = argparse.ArgumentParser()
++    ap.add_argument("--seed", type=int, default=0)
++    ap.add_argument("--steps", type=int, default=0)
++    args = ap.parse_args()
++    env = make_env()
++    obs, info = env.reset(seed=args.seed)
++    print("max_steps", env.max_steps, "info", info)
++    dump(obs)
++    for i in range(args.steps):
++        obs, rew, term, trunc, info = env.step(np.array([0, 0, 0, 0, 1], np.float32))
++        print("step", i + 1, rew, term, trunc)
++        dump(obs)
++    env.close()

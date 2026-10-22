@@ -1,0 +1,206 @@
+diff --git a/approach.py b/approach.py
+index ed09c2b..6073f57 100644
+--- a/approach.py
++++ b/approach.py
+@@ -34,6 +34,9 @@ class GeneratedApproach:
+         self.escape = 0
+         self.done = set()
+         self.released = None
++        self.fails = {}
++        self.carry_th = DOWN
++        self._last_tilt = 0.0
+ 
+     # ------------------------------------------------------------------
+     def _parse(self, s):
+@@ -64,16 +67,62 @@ class GeneratedApproach:
+         return a.astype(np.float32)
+ 
+     # ---------------- geometry ----------------
+-    def _parts(self, robot, held=None, held_off=None, held_depth=None):
++    def _gripper_geom(self, robot, a):
++        """Gripper corners relative to robot center for tilt a (theta = DOWN + a)."""
++        arm, gw, gh = robot["maxarm"], robot["gw"], robot["gh"]
++        d = (np.sin(a), -np.cos(a))
++        p = (np.cos(a), np.sin(a))
++        L = arm + gw / 2
++        cs = []
++        for sd in (-1, 1):
++            for sp in (-1, 1):
++                cs.append((L * d[0] + sd * gw / 2 * d[0] + sp * gh / 2 * p[0],
++                           L * d[1] + sd * gw / 2 * d[1] + sp * gh / 2 * p[1]))
++        return cs, d, p
++
++    def _parts(self, robot, held=None, held_off=None, held_depth=None, tilt=0.0):
+         """Footprint parts relative to robot x: (lo, hi, depth below robot y)."""
+         arm = robot["maxarm"]
+-        parts = [(-robot["r"], robot["r"], robot["r"]),
+-                 (-robot["gh"] / 2, robot["gh"] / 2, arm + robot["gw"])]
++        if abs(tilt) < 1e-6:
++            parts = [(-robot["r"], robot["r"], robot["r"]),
++                     (-robot["gh"] / 2, robot["gh"] / 2, arm + robot["gw"])]
++        else:
++            cs, d, p = self._gripper_geom(robot, tilt)
++            xs = [c[0] for c in cs]
++            ys = [c[1] for c in cs]
++            ex, ey = arm * d[0], arm * d[1]
++            parts = [(-robot["r"], robot["r"], robot["r"]),
++                     (min(xs), max(xs), -min(ys)),
++                     (min(0.0, ex) - 0.005, max(0.0, ex) + 0.005, -ey)]
+         if held is not None:
+             # held_off: object left edge relative to robot x; held_depth: robot y - object bottom
+             parts.append((held_off, held_off + held["w"], held_depth))
+         return parts
+ 
++    def _contact(self, robot, rx, obj, a):
++        """Robot y at which gripper (tilt a) at robot x rx touches obj top; None if no overlap."""
++        if abs(a) < 1e-6:
++            if min(rx + robot["gh"] / 2, obj["x"] + obj["w"]) - max(rx - robot["gh"] / 2, obj["x"]) < 0.012:
++                return None
++            return obj["top"] + robot["maxarm"] + robot["gw"] + GRASP_GAP
++        arm, gw, gh = robot["maxarm"], robot["gw"], robot["gh"]
++        d = (np.sin(a), -np.cos(a))
++        p = (np.cos(a), np.sin(a))
++        Lb = arm + gw
++        p1 = (Lb * d[0] - gh / 2 * p[0], Lb * d[1] - gh / 2 * p[1])
++        p2 = (Lb * d[0] + gh / 2 * p[0], Lb * d[1] + gh / 2 * p[1])
++        if p1[0] > p2[0]:
++            p1, p2 = p2, p1
++        o0, o1 = obj["x"] - rx, obj["x"] + obj["w"] - rx
++        lo_, hi_ = max(o0, p1[0]), min(o1, p2[0])
++        if hi_ - lo_ < 0.012:
++            return None
++        def rel_y(x):
++            t = (x - p1[0]) / (p2[0] - p1[0])
++            return p1[1] + t * (p2[1] - p1[1])
++        m = min(rel_y(lo_), rel_y(hi_))
++        return obj["top"] - m + GRASP_GAP
++
+     def _req(self, x, parts, obst):
+         """Min robot y at horizontal position x so no part collides."""
+         req = 0.0
+@@ -110,11 +159,11 @@ class GeneratedApproach:
+         return robot["r"] + 1e-3, W - robot["r"] - 1e-3
+ 
+     # ---------------- motion ----------------
+-    def _move(self, robot, tx, ty, parts, obst, vac):
++    def _move(self, robot, tx, ty, parts, obst, vac, th=DOWN):
+         """One step toward (tx, ty) staying above clearance profile. Returns (action, arrived)."""
+         x, y = robot["x"], robot["y"]
+         ymax = H - robot["r"] - 1e-3
+-        dth = float(np.clip(DOWN - robot["th"], -0.19, 0.19))
++        dth = float(np.clip(th - robot["th"], -0.19, 0.19))
+         darm = float(np.clip(robot["maxarm"] - robot["arm"], -0.1, 0.1))
+         posture_ok = abs(dth) < 1e-4 and abs(darm) < 1e-4
+         if abs(tx - x) < 1e-5 and abs(ty - y) < 3e-5 and posture_ok:
+@@ -157,7 +206,8 @@ class GeneratedApproach:
+         best = None
+         cands = list(np.linspace(cmin, cmax, max(2, int((cmax - cmin) / 0.002) + 1)))
+         cands.append(center)
+-        gmax = max(0.0, bw / 2 - 0.004)
++        gvert = max(0.0, bw / 2 - 0.004)
++        gmax = bw / 2 + 0.05
+         place_depth = None
+         for c in cands:
+             c = float(np.clip(c, cmin, cmax))
+@@ -180,7 +230,7 @@ class GeneratedApproach:
+                     continue
+                 if self._req(c + g, parts, [(o["x"], o["x"] + o["w"], o["top"])]) > ty + 1e-6:
+                     blockers.add(o["name"])
+-            cost = (len(blockers), abs(g) > 1e-6, abs(g), abs(c - center))
++            cost = (len(blockers), abs(g) > gvert + 1e-9, abs(g) > 1e-6, abs(g), abs(c - center))
+             if best is None or cost < best[0]:
+                 best = (cost, c, g, blockers)
+         if best is None:
+@@ -189,27 +239,36 @@ class GeneratedApproach:
+         return best[1], best[2], best[3]
+ 
+     def _grasp_x(self, robot, obj, objs, prefer_g=0.0):
+-        """Choose robot x to grasp obj (reachable, collision free)."""
++        """Choose robot x (and tilt) to grasp obj. Sets self._last_tilt, self._last_grasp_ok."""
+         lo, hi = self._xlim(robot)
+-        parts = self._parts(robot)
+         obst = self._obst(objs, exclude=(obj["name"],))
+-        ty = obj["top"] + robot["maxarm"] + robot["gw"] + GRASP_GAP
+         gmax = max(0.0, obj["w"] / 2 - 0.004)
+         best = None
+-        for g in np.linspace(-gmax, gmax, 41).tolist() + [prefer_g, 0.0]:
+-            if abs(g) > gmax + 1e-9:
+-                continue
+-            x = obj["cx"] + g
+-            if x < lo or x > hi:
+-                continue
+-            ok = self._req(x, parts, obst) <= ty + 1e-9
+-            cost = (not ok, abs(g - prefer_g))
+-            if best is None or cost < best[0]:
+-                best = (cost, x)
++        cands = [obj["cx"] + g for g in np.linspace(-gmax, gmax, 41).tolist() + [prefer_g, 0.0]]
++        cands = [x for x in cands if lo <= x <= hi]
++        tilts = [0.0]
++        if not cands:
++            cands = [float(np.clip(obj["cx"], lo, hi))]
++            sgn = 1.0 if obj["cx"] > cands[0] else -1.0
++            tilts = [sgn * k * 0.05 for k in range(1, 19)]
++        for x in cands:
++            for a in tilts:
++                ty = self._contact(robot, x, obj, a)
++                if ty is None:
++                    continue
++                parts = self._parts(robot, tilt=a)
++                ok = self._req(x, parts, obst) <= ty + 1e-9
++                cost = (not ok, abs(a), abs(x - obj["cx"] - prefer_g))
++                if best is None or cost < best[0]:
++                    best = (cost, x, ty, a)
++                break
+         if best is None:
+-            return float(np.clip(obj["cx"], lo, hi)), ty
++            self._last_tilt = 0.0
++            x = float(np.clip(obj["cx"], lo, hi))
++            return x, obj["top"] + robot["maxarm"] + robot["gw"] + GRASP_GAP
+         self._last_grasp_ok = not best[0][0]
+-        return best[1], ty
++        self._last_tilt = best[3]
++        return best[1], best[2]
+ 
+     def _grasp_ok(self, robot, obj, objs, prefer_g=0.0):
+         self._last_grasp_ok = False
+@@ -368,9 +427,12 @@ class GeneratedApproach:
+                 if self.cur == "target_block" and self.kind == "stage":
+                     prefer = self.stage_g
+                 gx, gty = self._grasp_x(robot, obj, objs, prefer)
+-                parts = self._parts(robot)
++                tilt = self._last_tilt
++                if self.fails.get(self.cur, 0) > 0:
++                    gty -= 0.002 * self.fails[self.cur]
++                parts = self._parts(robot, tilt=tilt)
+                 obst = self._obst_pick(objs, obj["name"])
+-                act, arrived = self._move(robot, gx, gty, parts, obst, 0.0)
++                act, arrived = self._move(robot, gx, gty, parts, obst, 0.0, th=DOWN + tilt)
+                 self.released = None
+                 if not arrived:
+                     lands = (abs(robot["x"] + float(act[0]) - gx) < 1e-5
+@@ -391,6 +453,7 @@ class GeneratedApproach:
+                     self.mode = "pick"
+                     continue
+                 self.g_actual = robot["x"] - obj["cx"]
++                self.carry_th = robot["th"]
+                 self.depth = robot["y"] - obj["y"]
+                 if self.kind == "place":
+                     self.drop = self.place_c
+@@ -413,13 +476,15 @@ class GeneratedApproach:
+                 if robot["vac"] < 0.5:
+                     self.mode = "pick"
+                     continue
+-                parts = self._parts(robot, obj, obj["x"] - robot["x"], robot["y"] - obj["y"])
++                ctilt = self.carry_th - DOWN
++                parts = self._parts(robot, obj, obj["x"] - robot["x"], robot["y"] - obj["y"], tilt=ctilt)
+                 obst = self._obst(objs, exclude=(obj["name"],))
+                 tx = self.drop + (robot["x"] - obj["cx"])
+                 ty = robot["y"] - obj["y"] + self.drop_bot
+-                act, arrived = self._move(robot, tx, ty, parts, obst, 1.0)
++                act, arrived = self._move(robot, tx, ty, parts, obst, 1.0, th=self.carry_th)
+                 # detect failed grasp: object not following
+                 if abs(robot["y"] - obj["y"] - self.depth) > 5e-3:
++                    self.fails[self.cur] = self.fails.get(self.cur, 0) + 1
+                     self.mode = "pick"
+                     return self._act(0, 0, 0, 0, 0.0)
+                 if not arrived:

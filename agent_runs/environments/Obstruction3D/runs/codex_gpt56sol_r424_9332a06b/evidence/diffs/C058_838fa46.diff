@@ -1,0 +1,38 @@
+diff --git a/release_probe_seed1.py b/release_probe_seed1.py
+new file mode 100644
+index 0000000..c6f021b
+--- /dev/null
++++ b/release_probe_seed1.py
+@@ -0,0 +1,32 @@
++"""Concise diagnostics for seed 1 with no obstructions."""
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++
++env = make_env()
++s, info = env.reset(seed=1, options={"object_count": 0})
++p = GeneratedApproach(env.action_space, env.observation_space, {})
++p.reset(s, info)
++was_held = False
++for t in range(env.max_steps):
++    a = p.get_action(s)
++    old_mode = p.mode
++    s, _, done, trunc, _ = env.step(a)
++    rob = s.get_object_from_name("robot")
++    blk = s.get_object_from_name("target_block")
++    held = s.get(blk, "grasp_active") > .5
++    if held and not was_held:
++        print("GRASP", t, "candidate", p.pick_i,
++              "finger", s.get(rob, "finger_state"),
++              "tf", [round(s.get(rob, "grasp_tf_" + c), 5) for c in "xyz"],
++              "qtf", [round(s.get(rob, "grasp_tf_q" + c), 5) for c in "xyzw"])
++    if old_mode == "release" and (p.release_t <= 8 or p.release_t % 10 == 0):
++        print("RELEASE", t, p.release_t, "finger", round(s.get(rob,"finger_state"),4),
++              "rheld", s.get(rob,"grasp_active"), "bheld", s.get(blk,"grasp_active"),
++              "xyz", [round(s.get(blk, "pose_" + c), 5) for c in "xyz"],
++              "a", [round(float(x), 3) for x in a])
++    was_held = held
++    if done or trunc:
++        print("RESULT", t + 1, done, trunc)
++        break
++env.close()

@@ -1,0 +1,62 @@
+diff --git a/approach.py b/approach.py
+index b4e43c2..5cf6406 100644
+--- a/approach.py
++++ b/approach.py
+@@ -29,9 +29,18 @@ class GeneratedApproach:
+         x=self._v(state,name,"pose_x")
+         if x<.23: base=(.18,-2.50,-.75)
+         else: base=(.35+2*(x-.336),-2.20+1.5*(x-.336),-.60+.8*(x-.336))
+-        self.pick_poses=[base,(base[0]-.08,base[1],base[2]),(base[0]+.08,base[1],base[2]),
+-                         (base[0],base[1]-.10,base[2]-.10),(base[0],base[1]+.10,base[2]+.10),
+-                         (base[0],base[1],base[2]-.18),(base[0],base[1],base[2]+.18)]
++        triples=[base,(base[0]-.08,base[1],base[2]),(base[0]+.08,base[1],base[2]),
++                 (base[0],base[1]-.10,base[2]-.10),(base[0],base[1]+.10,base[2]+.10),
++                 (base[0],base[1],base[2]-.18),(base[0],base[1],base[2]+.18)]
++        self.pick_poses=[]
++        for q2,q4,q6 in triples:
++            self.pick_poses.append((np.array([0.,q2,-np.pi,q4,0.,q6,np.pi/2]),.00135,None))
++        if name!="target_block":
++            # A second, highly folded grasp family reaches the tiny obstructions.
++            q=np.array([-1.6368,2.41,-2.6184,2.66,-1.0464,2.23,-1.8828])
++            bx=min(-.12,-.12+x-.219855)
++            for d in [0.,-.12,.12]:
++                qq=q.copy(); qq[5]+=d; self.pick_poses.append((qq,.196424,bx))
+         if name=="target_block": self.dest=self.region[:2].copy(); self.rest_z=.110
+         else:
+             k=self.task_i; self.dest=np.array([.16+.07*(k%4), -.36 if k%2==0 else .36])
+@@ -51,10 +60,11 @@ class GeneratedApproach:
+             else: return a
+         if self._held(state) and self.mode=="pick": self._start_calibration(state)
+         if self.mode=="pick":
+-            x,y,z=self._xyz(state,self.object_name); q2,q4,q6=self.pick_poses[self.pick_i]
+-            target=np.array([0.,q2,-np.pi,q4,0.,q6,np.pi/2]); rob=state.get_object_from_name("robot")
++            x,y,z=self._xyz(state,self.object_name); target,yoff,bx=self.pick_poses[self.pick_i]
++            rob=state.get_object_from_name("robot")
+             cur=np.array([state.get(rob,"joint_%d"%j) for j in range(1,8)])
+-            a[1]=np.clip(y-.00135-self._v(state,"robot","pos_base_y"),-.2,.2)
++            a[1]=np.clip(y-yoff-self._v(state,"robot","pos_base_y"),-.2,.2)
++            if bx is not None: a[0]=np.clip(bx-self._v(state,"robot","pos_base_x"),-.2,.2)
+             a[3:10]=np.clip(target-cur,-.2,.2); a[10]=1. if self.pick_t<7 else -1.
+             self.pick_t+=1
+             if self.pick_t>=12:
+diff --git a/scan_obstacle.py b/scan_obstacle.py
+new file mode 100644
+index 0000000..b6177ad
+--- /dev/null
++++ b/scan_obstacle.py
+@@ -0,0 +1,15 @@
++import concurrent.futures,itertools,numpy as np
++from env_client import make_env
++def v(s,n,f):return s.get(s.get_object_from_name(n),f)
++def trial(c):
++ e=make_env();s,_=e.reset(seed=0);name='obstruction0';tar=np.array([0,c[0],-np.pi,c[1],0,c[2],np.pi/2]);y=v(s,name,'pose_y')
++ for t in range(12):
++  r=s.get_object_from_name('robot');cur=np.array([s.get(r,'joint_%d'%i) for i in range(1,8)]);a=np.zeros(11,np.float32)
++  a[1]=np.clip(y-.00135-v(s,'robot','pos_base_y'),-.2,.2);a[3:10]=np.clip(tar-cur,-.2,.2);a[10]=1 if t<7 else -1
++  s,*_=e.step(a)
++  if v(s,'robot','grasp_active')>.5:e.close();return c,True
++ e.close();return c,False
++cs=list(itertools.product([.05,.12,.19,.26,.33],[-2.55,-2.4,-2.25,-2.1],[-1.05,-.85,-.65,-.45]))
++with concurrent.futures.ThreadPoolExecutor(max_workers=12) as ex:
++ for c,o in ex.map(trial,cs):
++  if o:print('SUCCESS',c,flush=True)

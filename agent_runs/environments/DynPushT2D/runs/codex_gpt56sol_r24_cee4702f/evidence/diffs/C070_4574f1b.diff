@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 4f58a52..e44242d 100644
+--- a/approach.py
++++ b/approach.py
+@@ -215,7 +215,7 @@ class GeneratedApproach:
+             disturbed = (np.linalg.norm(obj-self.start_pose[:2]) > 0.012 or
+                          abs(self._angle(theta-self.start_pose[2])) > 0.018)
+             if disturbed:
+-                if pd < self.start_pd - 0.002 and abs(ae) < 0.16:
++                if pd < 0.60 and pd < self.start_pd - 0.002 and abs(ae) < 0.16:
+                     self.mode, self.nav = "move_push", []
+                     self.count = 0
+                     self.start_pose = np.array([obj[0], obj[1], theta])

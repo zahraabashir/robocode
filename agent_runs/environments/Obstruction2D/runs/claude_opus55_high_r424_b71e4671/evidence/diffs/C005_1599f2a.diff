@@ -1,0 +1,102 @@
+diff --git a/approach.py b/approach.py
+index 77a18be..8a08531 100644
+--- a/approach.py
++++ b/approach.py
+@@ -123,6 +123,22 @@ class GeneratedApproach:
+         cx = (r[0] + r[1]) / 2
+         return (cx + d, r[3] + GAP + self.arm + self.gw)
+ 
++    def _pick_ok(self, r, d, obstacles):
++        """Is the grasp pose over r at offset d clear of other obstacles?"""
++        px, py = self._pick_pose(r, d)
++        if not (XMIN <= px <= XMAX) or py > YMAX:
++            return False
++        req = float(self._safe(np.array([px]), self._assembly(), obstacles)[0])
++        return req <= py + 1e-6
++
++    def _d_options(self, r):
++        lo, hi = self._grasp_d(r)
++        if lo > hi:
++            return []
++        c = float(np.clip(0.0, lo, hi))
++        opts = [c] + list(np.linspace(lo, hi, 9))
++        return sorted(set(float(v) for v in opts), key=lambda v: abs(v - c))
++
+     def _held_rel(self, r, d):
+         rx, ry = self._pick_pose(r, d)
+         return (r[0] - rx, r[1] - rx, r[2] - ry)
+@@ -157,18 +173,19 @@ class GeneratedApproach:
+         pos = start
+         cur = dict(orects)
+         block_obs = (br[0], br[1], br[3])
++        bd_opts = self._d_options(br)
+         e = 0.004
+         lefts = np.arange(sx0 + e, sx1 - bw - e + 1e-9, 0.004)
+         if len(lefts) == 0:
+             lefts = np.array([(sx0 + sx1) / 2 - bw / 2])
+         for n in R:
+             r = cur[n]
+-            lo_o, hi_o = self._grasp_d(r)
+-            if lo_o > hi_o:
++            others = [(q[0], q[1], q[3]) for m, q in cur.items() if m != n] + [block_obs]
++            dl = [v for v in self._d_options(r) if self._pick_ok(r, v, others)]
++            if not dl:
+                 return None
+-            d = float(np.clip(0.0, lo_o, hi_o))
++            d = dl[0]
+             pick = self._pick_pose(r, d)
+-            others = [(q[0], q[1], q[3]) for m, q in cur.items() if m != n] + [block_obs]
+             c1 = self._leg_cost(pos, pick, boxes0, others + [(r[0], r[1], r[3])])
+             held = self._held_rel(r, d)
+             boxes_h = self._assembly(held)
+@@ -191,6 +208,10 @@ class GeneratedApproach:
+                 if ty > YMAX:
+                     continue
+                 dpose = (tx, ty)
++                nob = (left, left + w, DROP_BOT + h)
++                obs_after = [(q[0], q[1], q[3]) for m, q in cur.items() if m != n] + [nob]
++                if not any(self._pick_ok(br, v, obs_after) for v in bd_opts[:5]):
++                    continue
+                 c2 = self._leg_cost(pick, dpose, boxes_h, others)
+                 c3 = abs(tx - (br[0] + br[1]) / 2) / STEP
+                 sc = c2 + c3
+@@ -206,7 +227,9 @@ class GeneratedApproach:
+             pos = dpose
+         obst_final = [(q[0], q[1], q[3]) for q in cur.values()]
+         bestp = None
+-        for d in np.unique(np.clip(np.array([0.0, lo, hi, (lo + hi) / 2]), lo, hi)):
++        for d in bd_opts:
++            if not self._pick_ok(br, d, obst_final):
++                continue
+             pick = self._pick_pose(br, d)
+             held = self._held_rel(br, d)
+             boxes_h = self._assembly(held)
+diff --git a/dbg.py b/dbg.py
+index 06ef7d7..d7eef52 100644
+--- a/dbg.py
++++ b/dbg.py
+@@ -9,9 +9,9 @@ obs, info = env.reset(seed=seed); ap.reset(obs, info)
+ r = obs.get_object_from_name('robot')
+ for t in range(env.max_steps):
+     a = ap.get_action(obs)
+-    ph=ap.phase
++    ph=ap.leg
+     obs, rew, te, tr, _ = env.step(a)
+     if t%every==0 or te:
+-        print(t, ph, ap.target, np.round(a,3), [round(float(obs.get(r,f)),3) for f in ['x','y','theta','arm_joint','vacuum']])
++        print(t, ph, np.round(a,3), [round(float(obs.get(r,f)),3) for f in ['x','y','theta','arm_joint','vacuum']])
+     if te: print("DONE", t+1); break
+ env.close()
+diff --git a/test_approach.py b/test_approach.py
+index c855e24..f575ff3 100644
+--- a/test_approach.py
++++ b/test_approach.py
+@@ -14,7 +14,7 @@ def run(seed, verbose=False):
+         obs, r, te, tr, _ = env.step(a)
+         if te or tr: break
+     env.close()
+-    return te, t_+1, info.get('object_count'), ap.phase
++    return te, t_+1, info.get('object_count'), getattr(ap,'leg',None)
+ if __name__ == "__main__":
+     if len(sys.argv)>3: OC=int(sys.argv[3])
+     seeds = range(int(sys.argv[1]), int(sys.argv[2]))

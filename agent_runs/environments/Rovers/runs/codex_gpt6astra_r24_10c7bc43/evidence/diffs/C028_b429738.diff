@@ -1,0 +1,134 @@
+diff --git a/approach.py b/approach.py
+index 91d9276..9557a1c 100644
+--- a/approach.py
++++ b/approach.py
+@@ -47,12 +47,13 @@ class GeneratedApproach:
+         self.graph=csr_matrix((np.ones(len(rows)),(rows,cols)),shape=(len(self.points),len(self.points)))
+     def visible(self,p,target,limit):
+         p=np.atleast_2d(p); target=np.asarray(target)
+-        ok=np.linalg.norm(p-target,axis=1)<limit-.025
++        ok=np.linalg.norm(p-target,axis=1)<(3.91 if limit>3 else limit-.025)
+         # Low mounds do not occlude the camera, but pillars and wall do.
+         boxes=self.boxes[:-1][(self.boxes[:-1,2]<.2)]
+         delta=target-p
+         for b in boxes:
+-            lo=b[:2]-b[2:];hi=b[:2]+b[2:]
++            padding=.05 if limit>3 else 0.
++            lo=b[:2]-b[2:]-padding;hi=b[:2]+b[2:]+padding
+             with np.errstate(divide='ignore',invalid='ignore'):
+                 t1=(lo-p)/delta;t2=(hi-p)/delta
+             near=np.maximum(np.min(np.stack([t1,t2]),axis=0).max(axis=1),.001)
+@@ -108,7 +109,14 @@ class GeneratedApproach:
+             if best is None: best=(self.nearest(self.homes[i]),'home',None,None)
+             target,task,o,j=best
+             if task=='send' and self.visible(p,self.lander,4)[0] and not self.send_bad[i,start]:
+-                target=self.nearest(self.homes[i]);task='home'
++                navbest=None;navcost=np.inf
++                for mask,nt,no,nj in candidates:
++                    if nt=='send':continue
++                    dd=dist+.001*np.minimum(self.home_dist[i],1e4);dd[~mask]=np.inf
++                    ni=int(np.argmin(dd))
++                    if dd[ni]<navcost:navcost=dd[ni];navbest=(ni,nt,no,nj)
++                if navbest is not None:target,task,o,j=navbest
++                else:target=self.nearest(self.homes[i]);task='home'
+             if task=='sample': kinds.add(j)
+             if task=='image': assigned.add(j)
+             targetpos=self.points[target]
+diff --git a/assignment_minimax_results.jsonl b/assignment_minimax_results.jsonl
+new file mode 100644
+index 0000000..d2b4547
+--- /dev/null
++++ b/assignment_minimax_results.jsonl
+@@ -0,0 +1,11 @@
++{"seed": 0, "base": {"steps": 39, "success": true, "seconds": 2.385}, "candidate": {"steps": 52, "success": true, "seconds": 3.705}}
++{"seed": 1, "base": {"steps": 23, "success": true, "seconds": 1.557}, "candidate": {"steps": 34, "success": true, "seconds": 2.298}}
++{"seed": 2, "base": {"steps": 23, "success": true, "seconds": 1.563}, "candidate": {"steps": 37, "success": true, "seconds": 2.418}}
++{"seed": 3, "base": {"steps": 28, "success": true, "seconds": 1.684}, "candidate": {"steps": 44, "success": true, "seconds": 3.115}}
++{"seed": 4, "base": {"steps": 26, "success": true, "seconds": 1.956}, "candidate": {"steps": 36, "success": true, "seconds": 2.538}}
++{"seed": 5, "base": {"steps": 30, "success": true, "seconds": 1.931}, "candidate": {"steps": 43, "success": true, "seconds": 2.382}}
++{"seed": 6, "base": {"steps": 20, "success": true, "seconds": 0.653}, "candidate": {"steps": 32, "success": true, "seconds": 1.212}}
++{"seed": 7, "base": {"steps": 32, "success": true, "seconds": 1.352}, "candidate": {"steps": 39, "success": true, "seconds": 1.586}}
++{"seed": 8, "base": {"steps": 25, "success": true, "seconds": 1.038}, "candidate": {"steps": 54, "success": true, "seconds": 2.49}}
++{"seed": 9, "base": {"steps": 28, "success": true, "seconds": 0.715}, "candidate": {"steps": 37, "success": true, "seconds": 1.326}}
++{"seed": 10, "base": {"steps": 30, "success": true, "seconds": 1.215}, "candidate": {"steps": 36, "success": true, "seconds": 1.946}}
+diff --git a/assignment_results.jsonl b/assignment_results.jsonl
+new file mode 100644
+index 0000000..9444fb2
+--- /dev/null
++++ b/assignment_results.jsonl
+@@ -0,0 +1,2 @@
++{"seed": 0, "base": {"steps": 39, "success": true, "seconds": 1.39}, "candidate": {"steps": 33, "success": true, "seconds": 1.286}}
++{"seed": 1, "base": {"steps": 23, "success": true, "seconds": 0.623}, "candidate": {"steps": 23, "success": true, "seconds": 1.093}}
+diff --git a/larger_stress.jsonl b/larger_stress.jsonl
+new file mode 100644
+index 0000000..d757283
+--- /dev/null
++++ b/larger_stress.jsonl
+@@ -0,0 +1,31 @@
++{"seed": 100, "n": 4, "steps": 33, "success": true, "sec": 1.022}
++{"seed": 101, "n": 4, "steps": 27, "success": true, "sec": 1.146}
++{"seed": 102, "n": 4, "steps": 31, "success": true, "sec": 1.22}
++{"seed": 103, "n": 4, "steps": 31, "success": true, "sec": 1.694}
++{"seed": 104, "n": 4, "steps": 28, "success": true, "sec": 1.517}
++{"seed": 105, "n": 4, "steps": 29, "success": true, "sec": 2.117}
++{"seed": 106, "n": 4, "steps": 28, "success": true, "sec": 1.968}
++{"seed": 107, "n": 4, "steps": 30, "success": true, "sec": 1.784}
++{"seed": 108, "n": 4, "steps": 28, "success": true, "sec": 1.762}
++{"seed": 109, "n": 4, "steps": 27, "success": true, "sec": 1.478}
++{"seed": 110, "n": 4, "steps": 48, "success": true, "sec": 2.766}
++{"seed": 111, "n": 4, "steps": 33, "success": true, "sec": 2.03}
++{"seed": 112, "n": 4, "steps": 31, "success": true, "sec": 1.518}
++{"seed": 113, "n": 4, "steps": 26, "success": true, "sec": 1.8}
++{"seed": 114, "n": 4, "steps": 28, "success": true, "sec": 1.886}
++{"seed": 115, "n": 4, "steps": 29, "success": true, "sec": 1.199}
++{"seed": 116, "n": 4, "steps": 26, "success": true, "sec": 1.156}
++{"seed": 117, "n": 4, "steps": 24, "success": true, "sec": 0.626}
++{"seed": 118, "n": 4, "steps": 25, "success": true, "sec": 0.836}
++{"seed": 119, "n": 4, "steps": 30, "success": true, "sec": 1.16}
++{"seed": 120, "n": 4, "steps": 31, "success": true, "sec": 1.189}
++{"seed": 121, "n": 4, "steps": 30, "success": true, "sec": 0.984}
++{"seed": 122, "n": 4, "steps": 25, "success": true, "sec": 0.674}
++{"seed": 123, "n": 4, "steps": 32, "success": true, "sec": 1.295}
++{"seed": 124, "n": 4, "steps": 32, "success": true, "sec": 1.165}
++{"seed": 125, "n": 4, "steps": 31, "success": true, "sec": 1.085}
++{"seed": 126, "n": 4, "steps": 26, "success": true, "sec": 0.715}
++{"seed": 127, "n": 4, "steps": 31, "success": true, "sec": 1.589}
++{"seed": 128, "n": 4, "steps": 31, "success": true, "sec": 1.13}
++{"seed": 129, "n": 4, "steps": 32, "success": true, "sec": 1.784}
++{"seed": 130, "n": 4, "steps": 32, "success": true, "sec": 1.103}
+diff --git a/travel_ops.jsonl b/travel_ops.jsonl
+new file mode 100644
+index 0000000..1b955ae
+--- /dev/null
++++ b/travel_ops.jsonl
+@@ -0,0 +1,30 @@
++{"seed": 0, "n": 3, "steps": 39, "success": true, "sec": 0.424}
++{"seed": 1, "n": 2, "steps": 23, "success": true, "sec": 0.362}
++{"seed": 2, "n": 3, "steps": 23, "success": true, "sec": 0.248}
++{"seed": 3, "n": 3, "steps": 28, "success": true, "sec": 0.427}
++{"seed": 4, "n": 3, "steps": 26, "success": true, "sec": 0.455}
++{"seed": 5, "n": 3, "steps": 30, "success": true, "sec": 0.579}
++{"seed": 6, "n": 2, "steps": 20, "success": true, "sec": 0.276}
++{"seed": 7, "n": 3, "steps": 32, "success": true, "sec": 0.491}
++{"seed": 8, "n": 3, "steps": 25, "success": true, "sec": 0.398}
++{"seed": 9, "n": 2, "steps": 28, "success": true, "sec": 0.424}
++{"seed": 10, "n": 3, "steps": 30, "success": true, "sec": 0.51}
++{"seed": 11, "n": 1, "steps": 29, "success": true, "sec": 0.282}
++{"seed": 12, "n": 2, "steps": 26, "success": true, "sec": 0.845}
++{"seed": 13, "n": 3, "steps": 34, "success": true, "sec": 1.37}
++{"seed": 14, "n": 1, "steps": 37, "success": true, "sec": 1.168}
++{"seed": 15, "n": 3, "steps": 35, "success": true, "sec": 1.528}
++{"seed": 16, "n": 2, "steps": 26, "success": true, "sec": 1.498}
++{"seed": 17, "n": 3, "steps": 31, "success": true, "sec": 2.575}
++{"seed": 18, "n": 3, "steps": 26, "success": true, "sec": 1.964}
++{"seed": 19, "n": 2, "steps": 32, "success": true, "sec": 1.972}
++{"seed": 20, "n": 3, "steps": 32, "success": true, "sec": 1.788}
++{"seed": 21, "n": 1, "steps": 31, "success": true, "sec": 1.817}
++{"seed": 22, "n": 3, "steps": 25, "success": true, "sec": 1.727}
++{"seed": 23, "n": 1, "steps": 20, "success": true, "sec": 0.697}
++{"seed": 24, "n": 2, "steps": 25, "success": true, "sec": 1.693}
++{"seed": 25, "n": 2, "steps": 23, "success": true, "sec": 1.638}
++{"seed": 26, "n": 3, "steps": 26, "success": true, "sec": 1.334}
++{"seed": 27, "n": 1, "steps": 24, "success": true, "sec": 1.523}
++{"seed": 28, "n": 2, "steps": 25, "success": true, "sec": 1.308}
++{"seed": 29, "n": 3, "steps": 28, "success": true, "sec": 1.983}

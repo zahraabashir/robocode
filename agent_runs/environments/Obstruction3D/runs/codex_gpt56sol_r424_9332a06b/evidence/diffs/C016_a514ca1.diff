@@ -1,0 +1,25 @@
+diff --git a/approach.py b/approach.py
+index 93052a9..e47f188 100644
+--- a/approach.py
++++ b/approach.py
+@@ -67,6 +67,8 @@ class GeneratedApproach:
+             else:
+                 d=.04*self.cal_sign; a += self.B[:,self.cal_i]*d; a[10]=-1.
+                 self.last_pos=feat; self.last_delta=d; return a
++        if self.mode=="release":
++            a[10]=1.; self.release_t+=1; return a
+         goals=[np.array([pos[0],pos[1],.24]),np.array([self.region[0],self.region[1],.24]),
+                np.array([self.region[0],self.region[1],.115])]
+         goal=goals[self.waypoint]; poserr=goal-pos
+@@ -79,11 +81,6 @@ class GeneratedApproach:
+             if self.waypoint>=3: self.mode="release"; self.release_t=0
+             else: self._start_calibration(state)
+             a[10]=-1.; return a
+-        if self.mode=="release":
+-            # Open, then retract the hand so contact cannot keep the grasp latched.
+-            a[10]=1.
+-            self.release_t+=1
+-            return a
+         u=np.linalg.solve(self.J.T@self.J+1e-5*np.eye(5),self.J.T@np.clip(err,-.06,.06))
+         u=np.clip(u,-.10,.10)
+         a += self.B@u

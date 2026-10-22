@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index 1b94f4f..9b2cd70 100644
+--- a/approach.py
++++ b/approach.py
+@@ -29,7 +29,7 @@ class GeneratedApproach:
+         x=self._v(state,name,"pose_x")
+         if x<.23: base=(.18,-2.50,-.75)
+         else: base=(.35+2*(x-.336),-2.20+1.5*(x-.336),-.60+.8*(x-.336))
+-        triples=[base,(base[0]-.08,base[1],base[2]),(base[0]+.08,base[1],base[2]),
++        triples=[(base[0]-.10,base[1],base[2]),base,(base[0]+.08,base[1],base[2]),
+                  (base[0],base[1]-.10,base[2]-.10),(base[0],base[1]+.10,base[2]+.10),
+                  (base[0],base[1],base[2]-.18),(base[0],base[1],base[2]+.18)]
+         if x<.23:

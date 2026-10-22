@@ -1,0 +1,459 @@
+diff --git a/approach.py b/approach.py
+new file mode 100644
+index 0000000..a6e4d1b
+--- /dev/null
++++ b/approach.py
+@@ -0,0 +1,322 @@
++import math
++import numpy as np
++
++WORLD_X = (0.0, 1.618)
++ROBOT_Y_MAX = 0.895
++FLOOR = 0.1
++ARM = 0.2          # extended arm length we use
++GW = 0.01          # gripper width (along arm)
++GH = 0.07          # gripper height (perpendicular)
++BASE_R = 0.1
++TIP = ARM + GW     # distance from robot center to gripper tip (pointing down)
++
++
++def _rect_bbox(state, o):
++    x = float(state.get(o, "x")); y = float(state.get(o, "y"))
++    w = float(state.get(o, "width")); h = float(state.get(o, "height"))
++    th = float(state.get(o, "theta"))
++    if abs(th) < 1e-6:
++        return (x, y, x + w, y + h)
++    c, s = math.cos(th), math.sin(th)
++    pts = [(x, y), (x + w * c, y + w * s), (x - h * s, y + h * c),
++           (x + w * c - h * s, y + w * s + h * c)]
++    xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
++    return (min(xs), min(ys), max(xs), max(ys))
++
++
++def _circle_rect_dist(cx, cy, b):
++    dx = max(b[0] - cx, 0.0, cx - b[2])
++    dy = max(b[1] - cy, 0.0, cy - b[3])
++    return math.hypot(dx, dy)
++
++
++def _overlap(a, b, m=0.0):
++    return a[0] < b[2] + m and b[0] < a[2] + m and a[1] < b[3] + m and b[1] < a[3] + m
++
++
++class GeneratedApproach:
++    def __init__(self, action_space, observation_space, primitives):
++        self.low = np.array(action_space.low, dtype=np.float32)
++        self.high = np.array(action_space.high, dtype=np.float32)
++
++    # ------------------------------------------------------------------
++    def reset(self, state, info):
++        self.state = state
++        self.gen = self._plan()
++        self.vac = 0.0
++
++    def get_action(self, state):
++        self.state = state
++        try:
++            a = next(self.gen)
++        except StopIteration:
++            self.gen = self._plan()
++            try:
++                a = next(self.gen)
++            except StopIteration:
++                a = np.zeros(5, dtype=np.float32)
++        a = np.clip(np.asarray(a, dtype=np.float32), self.low, self.high)
++        return a
++
++    # ------------------------------------------------------------------
++    def _objs(self):
++        s = self.state
++        robot = None; block = None; surf = None; obst = []
++        for n in sorted(s.get_object_names()):
++            o = s.get_object_from_name(n)
++            tn = o.type.name
++            if tn == "crv_robot":
++                robot = o
++            elif tn == "target_block":
++                block = o
++            elif tn == "target_surface":
++                surf = o
++            else:
++                obst.append(o)
++        return robot, block, surf, obst
++
++    def _rpos(self):
++        r = self._objs()[0]
++        s = self.state
++        return (float(s.get(r, "x")), float(s.get(r, "y")),
++                float(s.get(r, "theta")), float(s.get(r, "arm_joint")))
++
++    # ------------------------------------------------------------------
++    def _act(self, dx=0.0, dy=0.0, dth=0.0, darm=0.0):
++        return np.array([dx, dy, dth, darm, self.vac], dtype=np.float32)
++
++    def _goto(self, tx=None, ty=None, tol=1e-4, max_steps=200):
++        """Move towards (tx, ty); yields actions. Returns True on success."""
++        stuck = 0
++        last = None
++        for _ in range(max_steps):
++            x, y, th, aj = self._rpos()
++            gx = x if tx is None else tx
++            gy = y if ty is None else ty
++            ex, ey = gx - x, gy - y
++            if abs(ex) <= tol and abs(ey) <= tol:
++                return True
++            if last is not None and abs(last[0] - x) < 1e-7 and abs(last[1] - y) < 1e-7:
++                stuck += 1
++                if stuck >= 2:
++                    return False
++            else:
++                stuck = 0
++            last = (x, y)
++            yield self._act(float(np.clip(ex, -0.05, 0.05)), float(np.clip(ey, -0.05, 0.05)))
++        return False
++
++    def _setup_pose(self):
++        # rise, orient downwards, extend arm
++        x, y, th, aj = self._rpos()
++        yield from self._goto(None, ROBOT_Y_MAX)
++        for _ in range(60):
++            x, y, th, aj = self._rpos()
++            eth = math.atan2(math.sin(-math.pi / 2 - th), math.cos(-math.pi / 2 - th))
++            ea = ARM - aj
++            if abs(eth) < 1e-4 and abs(ea) < 1e-4:
++                break
++            yield np.array([0, 0, np.clip(eth, -0.19, 0.19), np.clip(ea, -0.1, 0.1), self.vac],
++                           dtype=np.float32)
++
++    # ------------------------------------------------------------------
++    def _others_bboxes(self, exclude):
++        robot, block, surf, obst = self._objs()
++        out = []
++        for o in [block] + obst:
++            if o in exclude:
++                continue
++            out.append(_rect_bbox(self.state, o))
++        return out
++
++    def _descent_free(self, rx, ry_final, carried_bbox_final, others, margin=0.01):
++        """Check vertical descent from travel height to ry_final at x=rx is collision free."""
++        # base circle sweep: check at the final (lowest) position -- sweep is vertical,
++        # and anything below is covered by checking the column.
++        for b in others:
++            # circle swept vertically from ry_final upwards
++            cy = min(max(ry_final, b[1]), ROBOT_Y_MAX)
++            cy = max(cy, ry_final)
++            if _circle_rect_dist(rx, cy, b) < BASE_R + margin:
++                return False
++            # arm + gripper column
++            col = (rx - GH / 2, ry_final - TIP, rx + GH / 2, ROBOT_Y_MAX)
++            if _overlap(col, b, margin * 0.3):
++                return False
++            if carried_bbox_final is not None:
++                cb = carried_bbox_final
++                colc = (cb[0], cb[1], cb[2], cb[3] + (ROBOT_Y_MAX - ry_final))
++                if _overlap(colc, b, margin * 0.5):
++                    return False
++        return True
++
++    def _choose_grasp_x(self, o, others):
++        b = _rect_bbox(self.state, o)
++        top = b[3]
++        ry = top + TIP + 0.003
++        lo = b[0] + GH / 2 - 0.01
++        hi = b[2] - GH / 2 + 0.01
++        cx = (b[0] + b[2]) / 2
++        if hi < lo:
++            lo = hi = cx
++        cands = sorted(np.linspace(lo, hi, 21).tolist() + [cx], key=lambda v: abs(v - cx))
++        for gx in cands:
++            if gx < WORLD_X[0] + BASE_R + 0.002 or gx > WORLD_X[1] - BASE_R - 0.002:
++                continue
++            if self._descent_free(gx, ry, None, others):
++                return gx
++        return None
++
++    def _pick(self, o):
++        """Pick object o. Yields actions; returns (dx_off) offset of object x relative to robot."""
++        others = self._others_bboxes([o])
++        gx = self._choose_grasp_x(o, others)
++        if gx is None:
++            return False
++        b = _rect_bbox(self.state, o)
++        yield from self._goto(None, ROBOT_Y_MAX)
++        yield from self._goto(gx, None)
++        ry = b[3] + TIP + 0.003
++        ok = yield from self._goto(None, ry, tol=1e-4)
++        self.vac = 1.0
++        yield self._act()
++        yield self._act()
++        # lift
++        yield from self._goto(None, ROBOT_Y_MAX)
++        nb = _rect_bbox(self.state, o)
++        if nb[1] < b[1] + 0.05:
++            # grasp failed
++            self.vac = 0.0
++            yield self._act()
++            return False
++        return True
++
++    def _place_at(self, o, target_left, target_bottom):
++        x, y, _, _ = self._rpos()
++        b = _rect_bbox(self.state, o)
++        rx = x + (target_left - b[0])
++        yield from self._goto(rx, None)
++        x, y, _, _ = self._rpos()
++        b = _rect_bbox(self.state, o)
++        ry = y - (b[1] - target_bottom)
++        yield from self._goto(None, ry, tol=1e-4)
++
++    # ------------------------------------------------------------------
++    def _final_placement(self):
++        robot, block, surf, obst = self._objs()
++        s = self.state
++        sb = _rect_bbox(s, surf)
++        bb = _rect_bbox(s, block)
++        bw = bb[2] - bb[0]
++        left = sb[0] + (sb[2] - sb[0] - bw) / 2
++        return left, sb[3] + 0.008, sb
++
++    def _blocking(self):
++        """Obstructions that interfere with placing the block on the surface."""
++        robot, block, surf, obst = self._objs()
++        s = self.state
++        left, bottom, sb = self._final_placement()
++        bb = _rect_bbox(s, block)
++        bw, bh = bb[2] - bb[0], bb[3] - bb[1]
++        final_bb = (left, bottom, left + bw, bottom + bh)
++        rx = left + bw / 2
++        ry = bottom + bh + TIP + 0.003
++        res = []
++        for o in obst:
++            ob = _rect_bbox(s, o)
++            if not self._descent_free(rx, ry, final_bb, [ob], margin=0.015):
++                res.append(o)
++            elif ob[0] < sb[2] and ob[2] > sb[0] and ob[1] < sb[3] + 0.05:
++                res.append(o)
++        return res
++
++    def _find_spot(self, o):
++        """Find (left, bottom) to park obstruction o."""
++        robot, block, surf, obst = self._objs()
++        s = self.state
++        ob = _rect_bbox(s, o)
++        w, h = ob[2] - ob[0], ob[3] - ob[1]
++        # offset of grasp relative to object left
++        x, y, _, _ = self._rpos()
++        goff = x - ob[0]
++        sb = _rect_bbox(s, surf)
++        others = self._others_bboxes([o])
++        left_f, bottom_f, _ = self._final_placement()
++        bb = _rect_bbox(s, block)
++        bw = bb[2] - bb[0]
++        # forbidden zone around the surface / final block placement
++        fz = (min(sb[0], left_f) - 0.13, max(sb[2], left_f + bw) + 0.13)
++        levels = [FLOOR + 0.005]
++        best = None
++        xs = np.arange(WORLD_X[0] + 0.01, WORLD_X[1] - w - 0.01, 0.01)
++        for bottom in levels:
++            for lx in xs:
++                if lx < fz[1] and lx + w > fz[0]:
++                    continue
++                rx = lx + goff
++                if rx < BASE_R + 0.003 or rx > WORLD_X[1] - BASE_R - 0.003:
++                    continue
++                cand = (lx, bottom, lx + w, bottom + h)
++                bad = False
++                for b in others:
++                    if _overlap(cand, b, 0.02):
++                        bad = True
++                        break
++                if bad:
++                    continue
++                ry = bottom + h + (y - ob[3])
++                if not self._descent_free(rx, ry, cand, others, margin=0.015):
++                    continue
++                cost = abs(rx - x)
++                if best is None or cost < best[0]:
++                    best = (cost, lx, bottom)
++            if best is not None:
++                break
++        if best is None:
++            # fallback: park in the air high above in the far region
++            far = WORLD_X[1] - w - 0.15 if (sb[0] + sb[2]) / 2 < WORLD_X[1] / 2 else 0.15
++            return far, 0.45
++        return best[1], best[2]
++
++    def _plan(self):
++        self.vac = 0.0
++        yield from self._setup_pose()
++        failures = 0
++        for _ in range(30):
++            blockers = self._blocking()
++            if not blockers:
++                break
++            # pick blockers in order of height (tallest first) that are graspable
++            robot, block, surf, obst = self._objs()
++            blockers.sort(key=lambda o: -_rect_bbox(self.state, o)[3])
++            picked = False
++            for o in blockers:
++                others = self._others_bboxes([o])
++                if self._choose_grasp_x(o, others) is None:
++                    continue
++                ok = yield from self._pick(o)
++                if not ok:
++                    failures += 1
++                    continue
++                left, bottom = self._find_spot(o)
++                yield from self._place_at(o, left, bottom)
++                self.vac = 0.0
++                yield self._act()
++                yield from self._goto(None, ROBOT_Y_MAX)
++                picked = True
++                break
++            if not picked:
++                failures += 1
++                if failures > 5:
++                    break
++        # now the target block
++        for _ in range(10):
++            robot, block, surf, obst = self._objs()
++            ok = yield from self._pick(block)
++            if ok:
++                break
++        left, bottom, sb = self._final_placement()
++        yield from self._place_at(block, left, bottom)
++        self.vac = 0.0
++        for _ in range(5):
++            yield self._act()
+diff --git a/dump.py b/dump.py
+new file mode 100644
+index 0000000..cd0a296
+--- /dev/null
++++ b/dump.py
+@@ -0,0 +1,10 @@
++from env_client import make_env
++import sys
++env = make_env()
++for seed in range(int(sys.argv[1]), int(sys.argv[2])):
++    obs, info = env.reset(seed=seed)
++    print("seed", seed, type(obs))
++    for n in sorted(obs.get_object_names(), key=str):
++        o = obs.get_object_from_name(n) if isinstance(n,str) else n
++        print(" ", o, {f: round(float(obs.get(o, f)),3) for f in ["x","y","theta","width","height","static"] if True} if 'robot' not in str(o) else {f: round(float(obs.get(o,f)),3) for f in env.observation_space.type_features[env.observation_space.get_type('crv_robot')] } )
++env.close()
+diff --git a/probe.py b/probe.py
+new file mode 100644
+index 0000000..03f6232
+--- /dev/null
++++ b/probe.py
+@@ -0,0 +1,28 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=1)
++R = obs.get_object_from_name('robot'); B = obs.get_object_from_name('target_block')
++def rs(o): return tuple(round(float(o.get(R,f)),3) for f in ['x','y','theta','arm_joint','vacuum'])
++def bs(o): return tuple(round(float(o.get(B,f)),3) for f in ['x','y','theta'])
++bx = obs.get(B,'x')+obs.get(B,'width')/2
++# move to x above block center
++for i in range(40):
++    dx = np.clip(bx-obs.get(R,'x'),-0.05,0.05)
++    obs,r,t,tr,_ = env.step(np.array([dx,0,0,0,0],dtype=np.float32))
++print(rs(obs), bs(obs))
++# go down
++for i in range(30):
++    prev = rs(obs)
++    obs,r,t,tr,_ = env.step(np.array([0,-0.05,0,0,0],dtype=np.float32))
++    print('down', rs(obs))
++    if rs(obs)==prev: break
++for i in range(5):
++    obs,r,t,tr,_ = env.step(np.array([0,0,0,0.1,0],dtype=np.float32))
++    print('ext', rs(obs))
++for i in range(3):
++    obs,r,t,tr,_ = env.step(np.array([0,0,0,0.0,1],dtype=np.float32))
++    print('vac', rs(obs), bs(obs))
++for i in range(4):
++    obs,r,t,tr,_ = env.step(np.array([0,0.05,0,0.0,1],dtype=np.float32))
++    print('up', rs(obs), bs(obs))
+diff --git a/probe2.py b/probe2.py
+new file mode 100644
+index 0000000..12ca266
+--- /dev/null
++++ b/probe2.py
+@@ -0,0 +1,20 @@
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=1)
++R = obs.get_object_from_name('robot')
++def rs(o): return tuple(round(float(o.get(R,f)),3) for f in ['x','y','theta','arm_joint','vacuum'])
++def run(a,n):
++    global obs
++    for i in range(n):
++        p=rs(obs); obs,*_ = env.step(np.array(a,dtype=np.float32))
++        if rs(obs)==p: break
++    print(a, rs(obs))
++run([0,0.05,0,0,0],20)
++run([-0.05,0,0,0,0],30)
++run([0,0,0,0.1,0],3)
++run([0,-0.05,0,0,0],30)
++run([0,-0.01,0,0,0],30)
++run([0,0,0,-0.1,0],3)
++run([0,-0.01,0,0,0],30)
++run([0.05,0,0,0,0],60)
+diff --git a/probe3.py b/probe3.py
+new file mode 100644
+index 0000000..ce92fb2
+--- /dev/null
++++ b/probe3.py
+@@ -0,0 +1,18 @@
++# check gravity: grasp block, lift, release midair
++from env_client import make_env
++import numpy as np
++env = make_env()
++obs, info = env.reset(seed=1)
++R = obs.get_object_from_name('robot'); B = obs.get_object_from_name('target_block')
++bs=lambda: tuple(round(float(obs.get(B,f)),3) for f in ['x','y'])
++bx = obs.get(B,'x')+obs.get(B,'width')/2
++for i in range(40):
++    obs,*_ = env.step(np.array([np.clip(bx-obs.get(R,'x'),-.05,.05),0,0,0,0],dtype=np.float32))
++top=obs.get(B,'y')+obs.get(B,'height')
++while obs.get(R,'y')-0.11-top>0.004:
++    obs,*_ = env.step(np.array([0,-min(.05,obs.get(R,'y')-0.11-top-0.003),0,0,0],dtype=np.float32))
++print(obs.get(R,'y')-0.11-top)
++obs,*_ = env.step(np.array([0,0,0,0,1],dtype=np.float32))
++for i in range(4): obs,*_ = env.step(np.array([0,0.05,0,0,1],dtype=np.float32))
++print(bs())
++for i in range(4): obs,*_ = env.step(np.array([0,0.05,0,0,0],dtype=np.float32)); print(bs())
+diff --git a/test_approach.py b/test_approach.py
+new file mode 100644
+index 0000000..f2cd0e6
+--- /dev/null
++++ b/test_approach.py
+@@ -0,0 +1,25 @@
++import sys, time
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++def run(seed, verbose=False):
++    env = make_env()
++    obs, info = env.reset(seed=seed)
++    ap = GeneratedApproach(env.action_space, env.observation_space, {})
++    ap.reset(obs, info)
++    n_obs = len(obs.get_object_names()) - 3
++    t0=time.time()
++    for t in range(env.max_steps):
++        a = ap.get_action(obs)
++        obs, r, term, trunc, info = env.step(a)
++        if term or trunc: break
++    env.close()
++    return term, t+1, n_obs, time.time()-t0
++if __name__ == "__main__":
++    s0, s1 = int(sys.argv[1]), int(sys.argv[2])
++    succ=0
++    for s in range(s0, s1):
++        term, steps, n, dt = run(s)
++        succ += term
++        print(f"seed {s} nobs {n} success {term} steps {steps} time {dt:.1f}", flush=True)
++    print("success", succ, "/", s1-s0)

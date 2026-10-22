@@ -1,0 +1,145 @@
+diff --git a/approach.py b/approach.py
+index 26c3893..7081b4e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -55,7 +55,34 @@ class GeneratedApproach:
+         if low>high:return []
+         return sorted(set([max(low,min(high,w/2))]+[float(z) for z in np.linspace(low,high,7)]),key=lambda z:abs(z-w/2))
+ 
++    def edge_task(self,s,o):
++        # A tilted gripper reaches wall-adjacent objects without rotating them.
++        x,y,w,h=self.rect(s,o)
++        bx,by,bw,bh=self.rect(s,self.block)
++        sx,sy,sw,sh=self.rect(s,self.surface)
++        direction=1 if x>0.8 else -1
++        self.task_theta=-math.pi/2+direction*.22
++        self.grasp_height=.210
++        self.pickx=max(.1002,min(1.5178,x-.045 if direction>0 else x+w+.045))
++        offset=self.pickx-x
++        others=[self.rect(s,p) for p in self.obstacles(s)+[self.block] if p!=o]
++        places=[]
++        for px in np.linspace(.19,1.42-w,100):
++            if px<sx+sw+.13 and px+w>sx-.13:continue
++            if px<bx+bw+.13 and px+w>bx-.13:continue
++            py=max([.105]+[qy+qh+.03 for qx,qy,qw,qh in others if px<qx+qw+.16 and px+w>qx-.16])
++            places.append((py*8+abs(px-x),float(px),py))
++        if not places:
++            places=[(0,.3,.36)]
++        _,px,py=min(places)
++        self.task=o;self.dest=(px,py)
++        self.offsetx=offset;self.picktop=y+h
++        self.empty_cruise=.86;self.carry_cruise=.86
++        self.phase='above';self.stuck=0
++
+     def select(self,s):
++        self.task_theta=-math.pi/2
++        self.grasp_height=.215
+         bx,by,bw,bh=self.rect(s,self.block)
+         sx,sy,sw,sh=self.rect(s,self.surface)
+         obs=self.obstacles(s)
+@@ -70,8 +97,8 @@ class GeneratedApproach:
+                 bad=set(self.conflicts(s,self.block,gx,sy+sh+.005,offset,obs)+self.conflicts(s,self.block,bx,by,offset,obs,True))
+                 plans.append(((len(bad),abs(offset-bw/2)*.2+abs(gx-bx)*.01),gx,offset,bad))
+         if not plans:
+-            gx=(lo+hi)/2;offset=max(.1002-bx,min(1.5178-gx,bw/2))
+-            plans=[((len(obs),0),gx,offset,set(obs))]
++            self.edge_task(s,self.block)
++            return
+         _,gx,offset,bad=min(plans,key=lambda p:p[0])
+         self.goal=(gx,sy+sh+.005)
+         keep_pick=(bx,by,bw,bh,offset)
+@@ -91,6 +118,9 @@ class GeneratedApproach:
+                 for off in self.offsets(x,x,w):
+                     blocking=self.conflicts(s,o,x,y,off,others,True)
+                     grasps.append((len(blocking),abs(off-w/2),off,blocking))
++                if not grasps:
++                    self.edge_task(s,o)
++                    return
+                 best=min(grasps,key=lambda z:z[:2])
+                 if not best[0]:break
+                 dependencies=set(p for grasp in grasps for p in grasp[3] if p not in visited)
+@@ -129,6 +159,9 @@ class GeneratedApproach:
+                     for off in self.offsets(x,px,w):
+                         blockers=self.conflicts(s,o,x,y,off,others,True)+self.conflicts(s,o,px,py,off,others)
+                         fallback.append((len(blockers),py*8+abs(px-x),float(px),py,off))
++                if not fallback:
++                    self.edge_task(s,o)
++                    return
+                 _,_,px,py,offset=min(fallback)
+                 self.dest=(px,py)
+         self.task=o
+@@ -163,7 +196,7 @@ class GeneratedApproach:
+                 tx=self.pickx
+                 if abs(rx-tx)<.002:self.phase='down'
+         if self.phase=='down':
+-            tx=self.pickx;ty=self.picktop+.215;vac=0.
++            tx=self.pickx;ty=self.picktop+self.grasp_height;vac=0.
+             if (abs(rx-tx)<.002 and abs(ry-ty)<.002) or self.stuck>=2:
+                 self.phase='lift';self.before_y=y;vac=1.
+                 self.offsety=ry-y;self.offsetx=rx-x
+@@ -189,5 +222,5 @@ class GeneratedApproach:
+         elif self.phase=='retreat':
+             ty=.86
+             if abs(ry-ty)<.002:self.phase='choose'
+-        delta=np.array([tx-rx,ty-ry,(-math.pi/2-theta+math.pi)%(2*math.pi)-math.pi,.2-arm,vac])
++        delta=np.array([tx-rx,ty-ry,(self.task_theta-theta+math.pi)%(2*math.pi)-math.pi,.2-arm,vac])
+         return np.clip(delta,self.action_space.low,self.action_space.high).astype(np.float32)
+diff --git a/probe_angled_grasp.py b/probe_angled_grasp.py
+new file mode 100644
+index 0000000..22619df
+--- /dev/null
++++ b/probe_angled_grasp.py
+@@ -0,0 +1,20 @@
++from env_client import make_env
++import numpy as np
++import math
++for sign in [1,-1]:
++ e=make_env();s,i=e.reset(seed=0);r=s.get_object_from_name('robot');b=s.get_object_from_name('target_block')
++ theta=-math.pi/2+sign*.22
++ def step(a):
++  global s
++  s,*_=e.step(np.array(a,dtype=np.float32))
++ def move(x,y,v=0):
++  for _ in range(40):
++   rx,ry,rt=[s.get(r,f) for f in ['x','y','theta']]
++   if abs(rx-x)<1e-5 and abs(ry-y)<1e-5 and abs(rt-theta)<1e-5:break
++   step([np.clip(x-rx,-.05,.05),np.clip(y-ry,-.05,.05),np.clip(theta-rt,-.196,.196),np.clip(.2-s.get(r,'arm_joint'),-.1,.1),v])
++ x,y,w,h=[s.get(b,f) for f in ['x','y','width','height']]
++ gx=x-.045 if sign==1 else x+w+.045; gy=y+h+.21857
++ move(gx,.8);move(gx,gy);step([0,0,0,0,1]);before=[s.get(b,f) for f in ['x','y','theta']];robotbefore=[s.get(r,f) for f in ['x','y','theta']]
++ step([0,.05,0,0,1]);after=[s.get(b,f) for f in ['x','y','theta']]
++ step([.05,0,0,0,1]);horizontal=[s.get(b,f) for f in ['x','y','theta']]
++ print({'sign':sign,'requested_base':[gx,gy,theta],'actual_base':robotbefore,'before':before,'lifted':after,'translated':horizontal},flush=True);e.close()
+diff --git a/probe_angled_grasp_heights.py b/probe_angled_grasp_heights.py
+new file mode 100644
+index 0000000..9a781e6
+--- /dev/null
++++ b/probe_angled_grasp_heights.py
+@@ -0,0 +1,20 @@
++from env_client import make_env
++import numpy as np
++import math
++for sign,heightoff in [(1,.216),(1,.213),(1,.210),(1,.207),(1,.204),(-1,.213),(-1,.207)]:
++ e=make_env();s,i=e.reset(seed=0);r=s.get_object_from_name('robot');b=s.get_object_from_name('target_block')
++ theta=-math.pi/2+sign*.22
++ def step(a):
++  global s
++  s,*_=e.step(np.array(a,dtype=np.float32))
++ def move(x,y,v=0):
++  for _ in range(40):
++   rx,ry,rt=[s.get(r,f) for f in ['x','y','theta']]
++   if abs(rx-x)<1e-5 and abs(ry-y)<1e-5 and abs(rt-theta)<1e-5:break
++   step([np.clip(x-rx,-.05,.05),np.clip(y-ry,-.05,.05),np.clip(theta-rt,-.196,.196),np.clip(.2-s.get(r,'arm_joint'),-.1,.1),v])
++ x,y,w,h=[s.get(b,f) for f in ['x','y','width','height']]
++ gx=x-.045 if sign==1 else x+w+.045; gy=y+h+heightoff
++ move(gx,.8);move(gx,gy);step([0,0,0,0,1]);before=[s.get(b,f) for f in ['x','y','theta']];robotbefore=[s.get(r,f) for f in ['x','y','theta']]
++ step([0,.05,0,0,1]);after=[s.get(b,f) for f in ['x','y','theta']]
++ step([.05,0,0,0,1]);horizontal=[s.get(b,f) for f in ['x','y','theta']]
++ print({'sign':sign,'requested_base':[gx,gy,theta],'actual_base':robotbefore,'before':before,'lifted':after,'translated':horizontal},flush=True);e.close()
+diff --git a/scan_edge_cases.jsonl b/scan_edge_cases.jsonl
+new file mode 100644
+index 0000000..6ab9fed
+--- /dev/null
++++ b/scan_edge_cases.jsonl
+@@ -0,0 +1 @@
++completed

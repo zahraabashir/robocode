@@ -1,0 +1,50 @@
+diff --git a/approach.py b/approach.py
+index 7fcf888..79896a0 100644
+--- a/approach.py
++++ b/approach.py
+@@ -5,6 +5,7 @@ about the centre of mass with c^2 = I/m of a uniform T.
+ Body frame: origin = obs[0:2]; bar x in [-L/2,L/2], y in [-w,0]; stem x in [-w/2,w/2], y in [-w-Lv,-w].
+ """
+ import heapq
++import time
+ import numpy as np
+ 
+ RAD = 0.1
+@@ -86,6 +87,7 @@ class GeneratedApproach:
+         self.last_pose = None
+         self.margin = (0.012, 0.03, 0.07)
+         self.push_count = 0
++        self.t_used = 0.0
+ 
+     ANG_W = 2.2
+     ANGS = (-35, -18, 0, 18, 35)
+@@ -407,16 +409,23 @@ class GeneratedApproach:
+ 
+     def get_action(self, state):
+         s = np.asarray(state, dtype=float)
+-        if (self.plan and self.REPLAN_K > 0 and self.plan[0][0] == 'push'
++        if (self.plan and self.REPLAN_K > 0 and self.t_used < 40.0 and self.plan[0][0] == 'push'
+                 and self.push_count >= self.REPLAN_K and len(self.plan) > 2):
+             self.plan = []
+         if not self.plan:
+             self.push_count = 0
+-            p = self.plan_push(s, self.LOOK)
+-            if p is None and max(self.margin) > 0:
+-                # predicted success but env did not terminate: tighten margins
+-                self.margin = tuple(0.5 * x for x in self.margin) if max(self.margin) > 0.01 else (0.0, 0.0, 0.0)
+-                p = self.plan_push(s, self.LOOK)
++        self.t_used = 0.0
++            t0 = time.time()
++            look = self.LOOK if self.t_used < 25.0 else 0
++            try:
++                p = self.plan_push(s, look)
++                if p is None and max(self.margin) > 0:
++                    # predicted success but env did not terminate: tighten margins
++                    self.margin = tuple(0.5 * x for x in self.margin) if max(self.margin) > 0.01 else (0.0, 0.0, 0.0)
++                    p = self.plan_push(s, look)
++            except Exception:
++                p = None
++            self.t_used += time.time() - t0
+             if p is None:
+                 # fallback: move away from the block, towards the arena centre
+                 com = s[0:2] + rot(s[2]) @ self.g.C

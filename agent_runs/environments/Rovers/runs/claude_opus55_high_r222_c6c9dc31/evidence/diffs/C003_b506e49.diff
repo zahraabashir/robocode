@@ -1,0 +1,289 @@
+diff --git a/approach.py b/approach.py
+index 818a5b3..64f5f9e 100644
+--- a/approach.py
++++ b/approach.py
+@@ -13,7 +13,8 @@ SEL = {"sample": -5 / 6, "calibrate": -0.5, "image": -1 / 6, "none": 1 / 6,
+ ARENA = 2.2729 - 0.004
+ WALL = 0.227 + 0.012
+ MOUND_R = 0.177 + 0.012
+-SQ_HALF = 0.133 + 0.012
++SQ_HALF = 0.21
++OCT_SUM = 0.44
+ LANDER_HALF = (0.69 + 0.012, 0.514 + 0.012)
+ CAM_OFF = 0.0875
+ CAM_ANG = math.radians(188.0)
+@@ -72,6 +73,7 @@ class GeneratedApproach:
+         for n, o in self.w.rovers.items():
+             self.home_theta[n] = self._get(state, o, "theta")
+         self.plans = None
++        self.bad_points = []
+         self.expect = None
+         self.nreplan = 0
+         self._plan(state)
+@@ -104,10 +106,14 @@ class GeneratedApproach:
+             ddx = np.maximum(np.abs(X - ox) - hx, 0)
+             ddy = np.maximum(np.abs(Y - oy) - hy, 0)
+             blocked = np.sqrt(ddx ** 2 + ddy ** 2) < MOUND_R
+-            blocked |= (np.abs(X - ox) < hx + SQ_HALF) & (np.abs(Y - oy) < hy + SQ_HALF)
++            if hx < 0.12 and hy < 0.12:
++                ax = np.abs(X - ox); ay = np.abs(Y - oy)
++                blocked |= (ax < hx + SQ_HALF) & (ay < hy + SQ_HALF) & (ax + ay < OCT_SUM + hx + hy - 0.1)
+             free &= ~blocked
+         lx = self._get(state, self.w.lander, "x"); ly = self._get(state, self.w.lander, "y")
+         free &= ~((np.abs(X - lx) < LANDER_HALF[0]) & (np.abs(Y - ly) < LANDER_HALF[1]))
++        for (bx, by) in self.bad_points:
++            free &= np.hypot(X - bx, Y - by) > 0.04
+         return free
+ 
+     def _cam(self, rname, X, Y):
+@@ -483,6 +489,7 @@ class GeneratedApproach:
+             o = self.w.rovers[r]
+             x = self._get(state, o, "x"); y = self._get(state, o, "y")
+             if abs(x - ex) > 1e-3 or abs(y - ey) > 1e-3:
++                self.bad_points.append((ex, ey))
+                 return True
+             store, cal, imgs, recv = self._snapshot(state, r)
+             if op == "sample" and store < 0.5:
+diff --git a/dbg.py b/dbg.py
+new file mode 100644
+index 0000000..1a4a40e
+--- /dev/null
++++ b/dbg.py
+@@ -0,0 +1,22 @@
++import sys
++import numpy as np
++from env_client import make_env
++import approach
++from approach import GeneratedApproach
++seed=int(sys.argv[1])
++env = make_env(); obs, info = env.reset(seed=seed)
++ap = GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs, info)
++for r,p in ap.plans.items(): print(r, [(round(x,2),round(y,2),op) for (x,y),op in p if op!='none'])
++orig=ap._deviated
++def dev(state):
++    for r,(ex,ey,op,snap) in ap.expect.items():
++        o=ap.w.rovers[r]; x=float(state.get(o,'x')); y=float(state.get(o,'y'))
++        if abs(x-ex)>1e-3 or abs(y-ey)>1e-3: print(steps, r,'pos dev', (round(ex,3),round(ey,3)), (round(x,3),round(y,3)))
++        st=ap._snapshot(state,r)
++        if op!='none' : print(steps, r, op, 'snap', snap, '->', st, 'at', round(x,3), round(y,3))
++    return orig(state)
++ap._deviated=dev
++steps=0; done=False
++while not done and steps<int(sys.argv[2]) if len(sys.argv)>2 else 60:
++    a=ap.get_action(obs); obs,r,term,trunc,info=env.step(a); steps+=1; done=term
++print('steps',steps,term)
+diff --git a/dbg2.py b/dbg2.py
+new file mode 100644
+index 0000000..c135ca3
+--- /dev/null
++++ b/dbg2.py
+@@ -0,0 +1,9 @@
++import sys
++from env_client import make_env
++env=make_env(); obs,_=env.reset(seed=int(sys.argv[1]))
++px,py=float(sys.argv[2]),float(sys.argv[3])
++for o in obs.get_objects(env.observation_space.get_type('obstacle')):
++    x,y=obs.get(o,'x'),obs.get(o,'y')
++    if abs(x-px)<0.8 and abs(y-py)<0.8: print(o.name,x,y,obs.get(o,'half_x'),obs.get(o,'half_y'),obs.get(o,'half_z'))
++for o in obs.get_objects(env.observation_space.get_type('sample')):
++    print(o.name, obs.get(o,'x'), obs.get(o,'y'))
+diff --git a/find_iso.py b/find_iso.py
+new file mode 100644
+index 0000000..9cb75d0
+--- /dev/null
++++ b/find_iso.py
+@@ -0,0 +1,12 @@
++from env_client import make_env
++import math
++env=make_env(); T=lambda n: env.observation_space.get_type(n)
++for seed in range(40):
++    obs,_=env.reset(seed=seed)
++    obst=list(obs.get_objects(T('obstacle')))
++    for o in obst:
++        if obs.get(o,'half_x')>0.1: continue
++        x,y=obs.get(o,'x'),obs.get(o,'y')
++        dmin=min(math.hypot(x-obs.get(p,'x'),y-obs.get(p,'y'))-obs.get(p,'half_x') for p in obst if p is not o)
++        if dmin>1.0 and 0.75<abs(x)<1.7 and abs(y)<1.7 and math.hypot(x+1.9,y+2)>1.5:
++            print(seed,o.name,round(x,2),round(y,2),round(dmin,2))
+diff --git a/pil_r0.txt b/pil_r0.txt
+new file mode 100644
+index 0000000..0bdcb28
+--- /dev/null
++++ b/pil_r0.txt
+@@ -0,0 +1,37 @@
++theta -3.1415927410125732
++0 0.2425 0.0 r= 0.2425
++10 0.2314 0.0408 r= 0.235
++20 0.2232 0.0812 r= 0.2375
++30 0.2252 0.13 r= 0.26
++40 0.2107 0.1768 r= 0.275
++50 0.188 0.2241 r= 0.2925
++60 0.1363 0.236 r= 0.2725
++70 0.0864 0.2373 r= 0.2525
++80 0.0425 0.2413 r= 0.245
++90 0.0 0.2425 r= 0.2425
++100 -0.0417 0.2364 r= 0.24
++110 -0.0864 0.2373 r= 0.2525
++120 -0.1363 0.236 r= 0.2725
++130 -0.18 0.2145 r= 0.28
++140 -0.2241 0.188 r= 0.2925
++150 -0.2533 0.1463 r= 0.2925
++160 -0.2537 0.0923 r= 0.27
++170 -0.2536 0.0447 r= 0.2575
++180 -0.2525 0.0 r= 0.2525
++190 -0.2536 -0.0447 r= 0.2575
++200 -0.2537 -0.0923 r= 0.27
++210 -0.2425 -0.14 r= 0.28
++220 -0.2202 -0.1848 r= 0.2875
++230 -0.188 -0.2241 r= 0.2925
++240 -0.1363 -0.236 r= 0.2725
++250 -0.0864 -0.2373 r= 0.2525
++260 -0.0425 -0.2413 r= 0.245
++270 0.0 -0.2425 r= 0.2425
++280 0.0417 -0.2364 r= 0.24
++290 0.0864 -0.2373 r= 0.2525
++300 0.1363 -0.236 r= 0.2725
++310 0.18 -0.2145 r= 0.28
++320 0.2241 -0.188 r= 0.2925
++330 0.2252 -0.13 r= 0.26
++340 0.2326 -0.0846 r= 0.2475
++350 0.2413 -0.0425 r= 0.245
+diff --git a/pil_r1.txt b/pil_r1.txt
+new file mode 100644
+index 0000000..37676a2
+--- /dev/null
++++ b/pil_r1.txt
+@@ -0,0 +1,37 @@
++theta 0.0
++0 0.2375 0.0 r= 0.2375
++10 0.2388 0.0421 r= 0.2425
++20 0.2396 0.0872 r= 0.255
++30 0.236 0.1363 r= 0.2725
++40 0.2279 0.1912 r= 0.2975
++50 0.1864 0.2222 r= 0.29
++60 0.1287 0.223 r= 0.2575
++70 0.0821 0.2255 r= 0.24
++80 0.0404 0.229 r= 0.2325
++90 0.0 0.2275 r= 0.2275
++100 -0.0399 0.2265 r= 0.23
++110 -0.0812 0.2232 r= 0.2375
++120 -0.1287 0.223 r= 0.2575
++130 -0.1848 0.2202 r= 0.2875
++140 -0.2107 0.1768 r= 0.275
++150 -0.2122 0.1225 r= 0.245
++160 -0.2255 0.0821 r= 0.24
++170 -0.229 0.0404 r= 0.2325
++180 -0.2275 0.0 r= 0.2275
++190 -0.2265 -0.0399 r= 0.23
++200 -0.2232 -0.0812 r= 0.2375
++210 -0.2122 -0.1225 r= 0.245
++220 -0.2087 -0.1752 r= 0.2725
++230 -0.1864 -0.2222 r= 0.29
++240 -0.1287 -0.223 r= 0.2575
++250 -0.0821 -0.2255 r= 0.24
++260 -0.0404 -0.229 r= 0.2325
++270 0.0 -0.2275 r= 0.2275
++280 0.0399 -0.2265 r= 0.23
++290 0.0812 -0.2232 r= 0.2375
++300 0.1287 -0.223 r= 0.2575
++310 0.1848 -0.2202 r= 0.2875
++320 0.2241 -0.188 r= 0.2925
++330 0.2382 -0.1375 r= 0.275
++340 0.2396 -0.0872 r= 0.255
++350 0.2388 -0.0421 r= 0.2425
+diff --git a/probe_pillar.py b/probe_pillar.py
+new file mode 100644
+index 0000000..9e070c8
+--- /dev/null
++++ b/probe_pillar.py
+@@ -0,0 +1,40 @@
++import sys, math
++import numpy as np
++from env_client import make_env
++env=make_env()
++T=lambda n: env.observation_space.get_type(n)
++seed=int(sys.argv[1]); pname=sys.argv[2]; rname=sys.argv[3] if len(sys.argv)>3 else 'rover1'
++obs,_=env.reset(seed=seed)
++rv=[o for o in obs.get_objects(T('rover')) if o.name==rname][0]
++k=0 if rname=='rover0' else 4
++pl=[o for o in obs.get_objects(T('obstacle')) if o.name==pname][0]
++px,py=obs.get(pl,'x'),obs.get(pl,'y')
++def pos(): return obs.get(rv,'x'),obs.get(rv,'y')
++def mv(dx,dy):
++    global obs
++    a=np.zeros(8,np.float32); a[k]=dx; a[k+1]=dy; a[k+3]=1/6
++    obs,*_=env.step(a)
++def goto(tx,ty,n=60):
++    for _ in range(n):
++        x,y=pos()
++        if abs(tx-x)<1e-4 and abs(ty-y)<1e-4: return True
++        mv(np.clip(tx-x,-.2,.2),np.clip(ty-y,-.2,.2))
++    return False
++res=[]
++for ang in range(0,360,30):
++    a=math.radians(ang); ux,uy=math.cos(a),math.sin(a)
++    R=0.45
++    sx,sy=px+R*ux,py+R*uy
++    # route: go via waypoint far out
++    ok=goto(sx,sy)
++    if not ok: res.append((ang,'unreach')); continue
++    d=R
++    while d>0.05:
++        x,y=pos(); mv(-0.005*ux,-0.005*uy); x2,y2=pos()
++        if abs(x2-x)<1e-6 and abs(y2-y)<1e-6: break
++        d-=0.005
++    x,y=pos()
++    res.append((ang, round(x-px,3), round(y-py,3), round(math.hypot(x-px,y-py),3)))
++    goto(sx,sy)
++print('pillar',px,py)
++for r in res: print(r)
+diff --git a/probe_pillar2.py b/probe_pillar2.py
+new file mode 100644
+index 0000000..992bcce
+--- /dev/null
++++ b/probe_pillar2.py
+@@ -0,0 +1,44 @@
++import sys, math
++import numpy as np
++from env_client import make_env
++env=make_env()
++T=lambda n: env.observation_space.get_type(n)
++seed=int(sys.argv[1]); pname=sys.argv[2]; rname=sys.argv[3]; dth=float(sys.argv[4]) if len(sys.argv)>4 else 0.0
++obs,_=env.reset(seed=seed)
++rv=[o for o in obs.get_objects(T('rover')) if o.name==rname][0]
++k=0 if rname=='rover0' else 4
++pl=[o for o in obs.get_objects(T('obstacle')) if o.name==pname][0]
++px,py=obs.get(pl,'x'),obs.get(pl,'y')
++def pos(): return obs.get(rv,'x'),obs.get(rv,'y')
++def mv(dx,dy,th=0.0):
++    global obs
++    a=np.zeros(8,np.float32); a[k]=dx; a[k+1]=dy; a[k+2]=th; a[k+3]=1/6
++    obs,*_=env.step(a)
++def goto(tx,ty,n=80):
++    for _ in range(n):
++        x,y=pos()
++        if abs(tx-x)<1e-4 and abs(ty-y)<1e-4: return True
++        mv(np.clip(tx-x,-.2,.2),np.clip(ty-y,-.2,.2))
++    return False
++R=0.55
++goto(px+R,py)
++# rotate
++th0=obs.get(rv,'theta'); target=th0+dth
++for _ in range(10):
++    th=obs.get(rv,'theta'); d=(target-th+math.pi)%(2*math.pi)-math.pi
++    if abs(d)<1e-4: break
++    mv(0,0,float(np.clip(d,-.4,.4)))
++print('theta',obs.get(rv,'theta'))
++res=[]
++for ang in range(0,360,10):
++    a=math.radians(ang); ux,uy=math.cos(a),math.sin(a)
++    if not goto(px+R*ux,py+R*uy): print(ang,'unreach'); continue
++    lo=0.0
++    # coarse then fine
++    for step in (0.02,0.0025):
++        while True:
++            x,y=pos(); mv(-step*ux,-step*uy); x2,y2=pos()
++            if abs(x2-x)<1e-7 and abs(y2-y)<1e-7: break
++    x,y=pos()
++    print(ang, round(x-px,4), round(y-py,4), 'r=',round(math.hypot(x-px,y-py),4), flush=True)
++    goto(px+R*ux,py+R*uy)

@@ -1,0 +1,13 @@
+diff --git a/approach.py b/approach.py
+index b5e85a9..58bf545 100644
+--- a/approach.py
++++ b/approach.py
+@@ -39,7 +39,7 @@ class GeneratedApproach:
+                     for q6 in (-.90,-.75,-.60): triples.append((q2,q4,q6))
+         self.pick_poses=[]
+         for q2,q4,q6 in triples:
+-            self.pick_poses.append((np.array([0.,q2,-np.pi,q4,0.,q6,np.pi/2]),.00135,None))
++            self.pick_poses.append((np.array([0.,q2,-np.pi,q4,0.,q6,np.pi/2]),.00135,-.12))
+         if name!="target_block":
+             # A second, highly folded grasp family reaches the tiny obstructions.
+             q=np.array([-1.6368,2.41,-2.6184,2.66,-1.0464,2.23,-1.8828])

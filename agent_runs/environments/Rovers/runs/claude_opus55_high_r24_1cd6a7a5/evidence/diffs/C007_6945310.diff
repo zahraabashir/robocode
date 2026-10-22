@@ -1,0 +1,53 @@
+diff --git a/approach.py b/approach.py
+index ac1cb1b..f4ca772 100644
+--- a/approach.py
++++ b/approach.py
+@@ -362,10 +362,38 @@ class GeneratedApproach:
+         for s in sc.samples:
+             if g(s, "analyzed_" + me) > 0.5 and g(s, "received_analysis") < 0.5:
+                 holding = True
+-        if holding and all_done and self._can_send(state, i, p, th):
++        if holding and self._can_send(state, i, p, th):
+             return "send"
+         return "noop"
+ 
++    def _los_clear(self, p, q):
++        sc = self.sc
++        if np.linalg.norm(sc.lpos - p) > SEND_R:
++            return False
++        if self._seg_dist(q, p, sc.lpos) < 0.29:
++            return False
++        for pc in self._pillars():
++            if self._seg_dist(np.array(pc), p, sc.lpos) < 0.14:
++                return False
++        return True
++
++    def _future_los(self, state, i, k):
++        """Will a send facing any direction be possible later on my path (after my last task visit)?"""
++        plan = self.plans[i]
++        path = plan["path"]
++        P = self.planners[i]
++        last = max([idx for idx, ts in plan["visits"].items()
++                    if any(not self._task_done(state, t) for t in ts)] + [k])
++        op = self.plans[1 - i]
++        opath = op["path"]
++        ok0 = op["k"]
++        Po = self.planners[1 - i]
++        for idx in range(last, len(path)):
++            q = Po.pos(opath[min(len(opath) - 1, ok0 + (idx - k))])
++            if self._los_clear(P.pos(path[idx]), q):
++                return True
++        return False
++
+     def _desired_heading(self, state, i, p, k):
+         """Face away from the next objective still to image on my path; else away from lander."""
+         sc = self.sc
+@@ -388,7 +416,7 @@ class GeneratedApproach:
+         me = "rover%d" % i
+         holding = any(g(o, "have_image_" + me) > 0.5 and g(o, "received_image") < 0.5 for o in sc.objectives) or \
+             any(g(s, "analyzed_" + me) > 0.5 and g(s, "received_analysis") < 0.5 for s in sc.samples)
+-        if holding:
++        if holding and not self._future_los(state, i, k):
+             v = p - sc.lpos
+             away = np.arctan2(v[1], v[0])
+             th = g(sc.rovers[i], "theta")

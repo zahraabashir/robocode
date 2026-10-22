@@ -1,0 +1,28 @@
+from env_client import make_env
+import numpy as np, math, json
+
+def move(e,s,target):
+ for _ in range(160):
+  delta=target-s[16:18]
+  if np.linalg.norm(delta)<.003:break
+  s,*_=e.step(np.clip(delta,-.049,.049))
+ return s
+out=[]
+for ratio in [-2.,-1.,-.5,.5,1.,2.]:
+ name='top'
+ e=make_env();s,_=e.reset(seed=0);c=s[:2].copy();th=s[2];w,lh,lv=s[12:15];R=np.array([[np.cos(th),-np.sin(th)],[np.sin(th),np.cos(th)]])
+ pt,n={'top':([0,0],[0,1]),'cross_side':([lh/2,-w/2],[1,0]),'stem_side':([w/2,-w-lv/2],[1,0])}[name]
+ p=c+R@pt;n=R@n;com=c+R@np.array([0,-.4]);target=p+n*(s[28]+.2)
+ a0=math.atan2(*(s[16:18]-com)[::-1]);a=math.atan2(*(target-com)[::-1]);rad=1.1
+ s=move(e,s,com+rad*np.array([math.cos(a0),math.sin(a0)]));da=(a-a0+math.pi)%(2*math.pi)-math.pi
+ for aa in np.linspace(a0,a0+da,int(abs(da)/.12)+2)[1:]:s=move(e,s,com+rad*np.array([math.cos(aa),math.sin(aa)]))
+ s=move(e,s,target);hist=[];initial=s[:6].tolist()
+ for k in range(70):
+  old=s.copy();s,*_=e.step((-n+ratio*(R@np.array([1,0])))*.012);ds=s[:3]-old[:3]
+  if np.linalg.norm(ds)>.0001:
+   hist.append({'state':s[:6].tolist(),'dr':ds.tolist(),'r':s[16:18].tolist()})
+   if len(hist)>=10:break
+ stop=[]
+ for k in range(4):s,*_=e.step(np.zeros(2));stop.append(s[:6].tolist())
+ result=dict(name=name,ratio=ratio,initial=initial,normal=n.tolist(),hist=hist,stop=stop);out.append(result);print(json.dumps(result),flush=True);e.close()
+open('friction_results.json','w').write(json.dumps(out))

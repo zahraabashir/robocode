@@ -1,0 +1,66 @@
+diff --git a/approach.py b/approach.py
+index 85429ab..b691b77 100644
+--- a/approach.py
++++ b/approach.py
+@@ -100,17 +100,23 @@ class GeneratedApproach:
+             return True
+         return False
+ 
+-    def _line_free(self, a, b, extra=None):
++    def _line_free(self, a, b, extra=None, margin=0.20):
+         d = self._dist(a, b)
+         n = max(1, int(d / 0.08))
+         for i in range(1, n + 1):
+             q = (a[0] + (b[0] - a[0]) * i / n,
+                  a[1] + (b[1] - a[1]) * i / n)
+-            if self._blocked(q, extra):
++            if self._blocked(q, extra, margin):
+                 return False
+         return True
+ 
+     def _plan(self, start, goal, extra=None):
++        route = self._plan_with_margin(start, goal, extra, 0.20)
++        if route is None:
++            route = self._plan_with_margin(start, goal, extra, 0.185)
++        return route if route is not None else [goal]
++
++    def _plan_with_margin(self, start, goal, extra, margin):
+         # A compact 0.1 m grid A*. Endpoints are connected separately so exact
+         # sample and home coordinates remain attainable.
+         res = 0.05
+@@ -119,7 +125,7 @@ class GeneratedApproach:
+                           int(round((p[1] - lo) / res)))
+         pos = lambda n: (lo + n[0] * res, lo + n[1] * res)
+         s, g = conv(start), conv(goal)
+-        if self._line_free(start, goal, extra):
++        if self._line_free(start, goal, extra, margin):
+             return [goal]
+         frontier = [(0.0, s)]
+         came = {s: None}
+@@ -135,7 +141,7 @@ class GeneratedApproach:
+             for dx, dy in moves:
+                 nb = (cur[0] + dx, cur[1] + dy)
+                 q = pos(nb)
+-                if self._blocked(q, extra):
++                if self._blocked(q, extra, margin):
+                     continue
+                 nc = cost[cur] + (1.414 if dx and dy else 1.0)
+                 if nc < cost.get(nb, 1e30):
+@@ -144,7 +150,7 @@ class GeneratedApproach:
+                     h = math.hypot(nb[0] - g[0], nb[1] - g[1])
+                     heapq.heappush(frontier, (nc + h, nb))
+         if found is None:
+-            return [goal]
++            return None
+         rev = []
+         cur = found
+         while cur != s:
+@@ -158,7 +164,7 @@ class GeneratedApproach:
+         i = 0
+         while i < len(rev):
+             j = len(rev) - 1
+-            while j > i and not self._line_free(anchor, rev[j], extra):
++            while j > i and not self._line_free(anchor, rev[j], extra, margin):
+                 j -= 1
+             route.append(rev[j])
+             anchor = rev[j]

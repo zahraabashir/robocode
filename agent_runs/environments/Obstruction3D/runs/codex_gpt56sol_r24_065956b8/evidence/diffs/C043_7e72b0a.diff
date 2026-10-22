@@ -1,0 +1,52 @@
+diff --git a/approach.py b/approach.py
+index 0fcc1bc..9379956 100644
+--- a/approach.py
++++ b/approach.py
+@@ -179,11 +179,17 @@ class GeneratedApproach:
+ 
+         if self.phase == "target_anchor":
+             bxerr, byerr = self.anchor_bx-self.base_x, self.anchor_by-self.base_y
+-            if np.max(np.abs(self.goal_q-q)) < .012 and max(abs(bxerr),abs(byerr)) < .005:
++            base_error = max(abs(bxerr), abs(byerr))
++            if np.max(np.abs(self.goal_q-q)) < .012 and base_error < .005:
+                 self.phase, self.phase_steps = "close", 0
++            elif base_error >= .005:
++                # Translate with the arm fully retracted. Combining these with
++                # low-arm joint deltas can make collision rejection atomic.
++                action = self._act_to(q, q, 1.0)
++                action[0], action[1] = np.clip(bxerr, -.2, .2), np.clip(byerr, -.2, .2)
++                return action
+             else:
+                 action = self._act_to(q, self.goal_q, 1.0)
+-                action[0], action[1] = np.clip(bxerr, -.2, .2), np.clip(byerr, -.2, .2)
+                 return action
+ 
+         if self.phase == "choose":
+diff --git a/validate_30_0.out b/validate_30_0.out
+new file mode 100644
+index 0000000..41fe3fe
+--- /dev/null
++++ b/validate_30_0.out
+@@ -0,0 +1 @@
++{'seed': 30, 'count': 0, 'steps': 21, 'terminated': True, 'truncated': False, 'phase': 'release', 'phase_steps': 0, 'object': 'target_block', 'held': None, 'target': (0.332, 0.2076, 0.113), 'region': (0.332, 0.2076, 0.08), 'transitions': [(1, 'choose', 'target_anchor', 'target_block'), (4, 'target_anchor', 'close', 'target_block'), (5, 'close', 'lift', 'target_block'), (8, 'lift', 'base_transfer', 'target_block'), (11, 'base_transfer', 'transfer', 'target_block'), (15, 'transfer', 'lower', 'target_block'), (21, 'lower', 'release', 'target_block')]}
+diff --git a/validate_31_1.out b/validate_31_1.out
+new file mode 100644
+index 0000000..ad88c34
+--- /dev/null
++++ b/validate_31_1.out
+@@ -0,0 +1 @@
++{'seed': 31, 'count': 1, 'steps': 51, 'terminated': True, 'truncated': False, 'phase': 'release', 'phase_steps': 0, 'object': 'target_block', 'held': None, 'target': (0.2916, 0.1341, 0.113), 'region': (0.2916, 0.1341, 0.08), 'transitions': [(5, 'close', 'lift', 'obstruction0'), (8, 'lift', 'base_transfer', 'obstruction0'), (11, 'base_transfer', 'transfer', 'obstruction0'), (14, 'transfer', 'lower', 'obstruction0'), (20, 'lower', 'release', 'obstruction0'), (22, 'release', 'retract', 'obstruction0'), (28, 'retract', 'home', 'obstruction0'), (31, 'home', 'choose', 'obstruction0'), (32, 'choose', 'target_anchor', 'target_block'), (35, 'target_anchor', 'close', 'target_block'), (36, 'close', 'lift', 'target_block'), (39, 'lift', 'base_transfer', 'target_block'), (41, 'base_transfer', 'transfer', 'target_block'), (45, 'transfer', 'lower', 'target_block'), (51, 'lower', 'release', 'target_block')]}
+diff --git a/validate_32_3.out b/validate_32_3.out
+new file mode 100644
+index 0000000..f967291
+--- /dev/null
++++ b/validate_32_3.out
+@@ -0,0 +1 @@
++{'seed': 32, 'count': 3, 'steps': 800, 'terminated': False, 'truncated': False, 'phase': 'target_anchor', 'phase_steps': 0, 'object': 'obstruction0', 'held': None, 'target': (0.4682, 0.1269, 0.1), 'region': (0.238, 0.1354, 0.08), 'transitions': [(743, 'target_anchor', 'close', 'obstruction0'), (749, 'close', 'target_home', 'obstruction0'), (752, 'target_home', 'target_anchor', 'obstruction0'), (755, 'target_anchor', 'close', 'obstruction0'), (761, 'close', 'target_home', 'obstruction0'), (764, 'target_home', 'target_anchor', 'obstruction0'), (767, 'target_anchor', 'close', 'obstruction0'), (773, 'close', 'target_home', 'obstruction0'), (776, 'target_home', 'target_anchor', 'obstruction0'), (779, 'target_anchor', 'close', 'obstruction0'), (785, 'close', 'target_home', 'obstruction0'), (788, 'target_home', 'target_anchor', 'obstruction0'), (791, 'target_anchor', 'close', 'obstruction0'), (797, 'close', 'target_home', 'obstruction0'), (800, 'target_home', 'target_anchor', 'obstruction0')]}
+diff --git a/validate_33_5.out b/validate_33_5.out
+new file mode 100644
+index 0000000..3bc9da0
+--- /dev/null
++++ b/validate_33_5.out
+@@ -0,0 +1 @@
++{'seed': 33, 'count': 5, 'steps': 800, 'terminated': False, 'truncated': False, 'phase': 'close', 'phase_steps': 4, 'object': 'obstruction2', 'held': None, 'target': (0.3889, 0.0319, 0.1), 'region': (0.2181, 0.0644, 0.08), 'transitions': [(742, 'close', 'target_home', 'obstruction2'), (745, 'target_home', 'target_anchor', 'obstruction2'), (748, 'target_anchor', 'close', 'obstruction2'), (754, 'close', 'target_home', 'obstruction2'), (757, 'target_home', 'target_anchor', 'obstruction2'), (760, 'target_anchor', 'close', 'obstruction2'), (766, 'close', 'target_home', 'obstruction2'), (769, 'target_home', 'target_anchor', 'obstruction2'), (772, 'target_anchor', 'close', 'obstruction2'), (778, 'close', 'target_home', 'obstruction2'), (781, 'target_home', 'target_anchor', 'obstruction2'), (784, 'target_anchor', 'close', 'obstruction2'), (790, 'close', 'target_home', 'obstruction2'), (793, 'target_home', 'target_anchor', 'obstruction2'), (796, 'target_anchor', 'close', 'obstruction2')]}

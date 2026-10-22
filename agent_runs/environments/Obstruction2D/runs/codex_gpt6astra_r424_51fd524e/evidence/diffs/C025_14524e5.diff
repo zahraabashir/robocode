@@ -1,0 +1,15 @@
+diff --git a/approach.py b/approach.py
+index 389a116..bd237ad 100644
+--- a/approach.py
++++ b/approach.py
+@@ -75,8 +75,8 @@ class GeneratedApproach:
+         others=[(o,self.rect(s,o)) for o in s.get_objects(self.ot) if o!=self.obj]
+         bx,by,bw,bh=self.rect(s,self.block)
+         goalcx=self.destx-bx+self.target_grasp
+-        reserve_left=min(self.destx,goalcx-.042)
+-        reserve_right=max(self.destx+bw,goalcx+.042)
++        reserve_left=min(self.destx,goalcx-.105)
++        reserve_right=max(self.destx+bw,goalcx+.105)
+         low=max(.005,.101+self.offsetx)
+         high=min(1.613-w,1.517+self.offsetx)
+         positions=[low,high,float(np.clip(x,low,high))]

@@ -1,0 +1,66 @@
+diff --git a/probe_rotation_agent.py b/probe_rotation_agent.py
+index 989dd88..37aec50 100644
+--- a/probe_rotation_agent.py
++++ b/probe_rotation_agent.py
+@@ -21,9 +21,59 @@ def summarize(seed):
+     env.close()
+ 
+ 
++def move_to(env, s, target, nmax=200):
++    for _ in range(nmax):
++        d = np.asarray(target) - s[[16, 17]]
++        if np.linalg.norm(d) < 0.012:
++            break
++        a = np.clip(d, -0.05, 0.05)
++        s, _, done, trunc, _ = env.step(a)
++        if done or trunc:
++            break
++    return s
++
++
++def horizontal_scan(seed, yoff):
++    env = make_env(); s, _ = env.reset(seed=seed)
++    p0 = s[:3].copy(); bx, by = s[:2]
++    # Route underneath/above the object before approaching from the left.
++    safe_y = by + yoff
++    s = move_to(env, s, [bx - 1.2, s[17]])
++    s = move_to(env, s, [bx - 1.2, safe_y])
++    first = None
++    for k in range(38):
++        s, _, done, trunc, _ = env.step(np.array([0.05, 0.0]))
++        delta = np.linalg.norm(s[:2] - p0[:2])
++        if first is None and (delta > 1e-4 or abs(wrap(float(s[2]-p0[2]))) > 1e-4):
++            first = (k, float(s[16]), float(s[17]))
++        if done or trunc: break
++    print("HSCAN", yoff, "first", first, "dxy", np.round(s[:2]-p0[:2],4),
++          "dth", round(wrap(float(s[2]-p0[2])),4), "robot", np.round(s[[16,17]],3))
++    env.close()
++
++
++def vertical_scan(seed, xoff):
++    env = make_env(); s, _ = env.reset(seed=seed)
++    p0 = s[:3].copy(); bx, by = s[:2]
++    s = move_to(env, s, [s[16], by - 1.2])
++    s = move_to(env, s, [bx + xoff, by - 1.2])
++    first = None
++    for k in range(38):
++        s, _, done, trunc, _ = env.step(np.array([0.0, 0.05]))
++        delta = np.linalg.norm(s[:2] - p0[:2])
++        if first is None and (delta > 1e-4 or abs(wrap(float(s[2]-p0[2]))) > 1e-4):
++            first = (k, float(s[16]), float(s[17]))
++        if done or trunc: break
++    print("VSCAN", xoff, "first", first, "dxy", np.round(s[:2]-p0[:2],4),
++          "dth", round(wrap(float(s[2]-p0[2])),4), "robot", np.round(s[[16,17]],3))
++    env.close()
++
++
+ def main():
+-    for seed in range(12):
+-        summarize(seed)
++    for off in [-0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7]:
++        horizontal_scan(11, off)
++    for off in [-0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7]:
++        vertical_scan(11, off)
+ 
+ 
+ if __name__ == "__main__":

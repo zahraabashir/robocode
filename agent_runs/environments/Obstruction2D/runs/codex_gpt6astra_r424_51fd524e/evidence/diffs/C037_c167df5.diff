@@ -1,0 +1,157 @@
+diff --git a/probe_case.py b/probe_case.py
+new file mode 100644
+index 0000000..e8eb752
+--- /dev/null
++++ b/probe_case.py
+@@ -0,0 +1,12 @@
++from env_client import make_env
++from approach import GeneratedApproach
++import sys
++e=make_env();s,i=e.reset(seed=int(sys.argv[1]),options={'object_count':int(sys.argv[2])});p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,i)
++for t in range(200):
++ s,r,d,tr,i=e.step(p.get_action(s))
++ if d:break
++print('done',d,'step',t+1,'phase',p.phase,'obj',p.obj,flush=True)
++print('robot',[s.get(p.robot,f) for f in ['x','y','arm_joint']],flush=True)
++for o in s.get_objects(p.ot):print(o.name,p.rect(s,o),flush=True)
++print({k:v for k,v in p.__dict__.items() if k in ['destx','target_grasp','offsetx','offsety','dropx','dropy','emptyheight','carryheight','pick_y']},flush=True)
++e.close()
+diff --git a/sweep_300_700.log b/sweep_300_700.log
+index 84f5ede..4921214 100644
+--- a/sweep_300_700.log
++++ b/sweep_300_700.log
+@@ -567,3 +567,134 @@
+ 865 OK 29
+ 864 OK 86
+ 867 OK 27
++866 OK 72
++868 OK 70
++869 OK 62
++871 OK 47
++873 OK 27
++870 OK 98
++872 OK 65
++874 OK 77
++875 OK 56
++876 OK 85
++877 OK 63
++879 OK 44
++878 OK 78
++881 OK 33
++880 OK 71
++882 OK 72
++884 OK 31
++883 OK 46
++885 OK 20
++887 OK 24
++888 OK 29
++890 OK 24
++889 OK 56
++886 OK 89
++892 OK 26
++893 OK 49
++894 OK 46
++891 OK 81
++896 OK 19
++895 OK 76
++897 OK 41
++898 OK 43
++901 OK 33
++899 OK 53
++900 OK 62
++904 OK 50
++902 OK 90
++905 OK 85
++903 OK 97
++906 OK 48
++909 OK 18
++907 OK 75
++908 OK 65
++911 OK 53
++910 OK 82
++912 OK 60
++913 OK 46
++916 OK 41
++915 OK 68
++917 OK 57
++914 OK 97
++921 OK 35
++919 OK 69
++920 OK 62
++918 OK 111
++925 OK 28
++923 OK 62
++922 OK 92
++924 OK 79
++928 OK 29
++926 OK 52
++927 OK 48
++929 OK 23
++932 OK 17
++930 OK 51
++931 OK 49
++933 OK 74
++934 OK 93
++935 OK 63
++936 OK 62
++938 OK 24
++939 OK 35
++940 OK 19
++941 OK 27
++937 OK 94
++942 OK 31
++943 OK 31
++944 OK 30
++947 OK 20
++946 OK 42
++945 OK 59
++948 OK 57
++949 OK 47
++950 OK 81
++951 OK 92
++952 OK 84
++953 OK 69
++955 OK 23
++957 OK 20
++956 OK 66
++958 OK 50
++959 OK 26
++954 OK 101
++961 OK 21
++962 OK 23
++963 OK 24
++964 OK 25
++960 OK 92
++965 OK 50
++967 OK 22
++966 OK 50
++969 OK 21
++968 OK 55
++971 OK 33
++972 OK 38
++973 OK 24
++970 OK 66
++976 OK 20
++974 OK 77
++975 OK 62
++978 OK 27
++977 OK 53
++980 OK 22
++981 OK 29
++979 OK 58
++982 OK 51
++984 OK 25
++983 OK 55
++985 OK 40
++986 OK 25
++988 OK 27
++987 OK 44
++992 OK 23
++989 OK 57
++991 OK 46
++990 OK 82
++994 OK 20
++993 OK 54
++995 OK 58
++996 OK 46
++997 OK 77

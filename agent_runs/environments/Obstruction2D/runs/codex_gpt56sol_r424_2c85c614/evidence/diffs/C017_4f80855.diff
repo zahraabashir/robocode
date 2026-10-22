@@ -1,0 +1,50 @@
+diff --git a/approach.py b/approach.py
+index 81cc7e9..d2beb3c 100644
+--- a/approach.py
++++ b/approach.py
+@@ -29,6 +29,7 @@ class GeneratedApproach:
+         self.safe_y = state.get(robot, "y")
+         self.index, self.phase, self.retry = 0, "orient", 0
+         self.stalled, self.last_robot_y = 0, None
++        self.last_robot_x = None
+         self.pick_y, self.attached, self.release_wait = 0.0, False, 0
+ 
+     @staticmethod
+@@ -105,21 +106,30 @@ class GeneratedApproach:
+                 self.retry, self.phase = 0, "align"
+                 return self._action()
+             self.phase = "carry"
++            self.stalled, self.last_robot_x = 0, rx
+         if self.phase == "carry":
+             if is_target:
+                 tx = state.get(surface, "x") + 0.008
+             elif obj.type.name == "target_block":
+                 tx = ox
+             else:
+-                sx = state.get(surface, "x")
+                 origin_x = self.initial_x[obj.name]
+-                direction = 1.0 if origin_x >= sx else -1.0
+-                tx = origin_x + direction * (0.25 + 0.08 * self.index)
+-                # Empirically the circular base center is constrained here.
+-                tx = max(0.11, min(1.39, tx))
++                target_name = state.get_objects(self.types["target_block"])[0].name
++                target_x = self.initial_x[target_name]
++                direction = 1.0 if origin_x >= target_x else -1.0
++                tx = origin_x + direction * (0.25 + 0.12 * self.index)
+             if abs(tx - rx) > 0.004:
+-                return self._action(dx=self._clip(tx - rx, 0.05), vac=1.0)
+-            self.phase = "lower" if is_target else "release"
++                if self.last_robot_x is not None and abs(rx - self.last_robot_x) < 0.001:
++                    self.stalled += 1
++                else:
++                    self.stalled = 0
++                self.last_robot_x = rx
++                if self.stalled >= 3 and not is_target:
++                    self.phase = "release"
++                else:
++                    return self._action(dx=self._clip(tx - rx, 0.05), vac=1.0)
++            else:
++                self.phase = "lower" if is_target else "release"
+             self.stalled, self.last_robot_y = 0, ry
+         if self.phase == "lower":
+             if abs(ry - self.last_robot_y) < 0.001:

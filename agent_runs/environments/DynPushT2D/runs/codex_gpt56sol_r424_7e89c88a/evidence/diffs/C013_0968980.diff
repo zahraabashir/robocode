@@ -1,0 +1,54 @@
+diff --git a/probe_rotation_agent.py b/probe_rotation_agent.py
+index 4a9ec23..944a516 100644
+--- a/probe_rotation_agent.py
++++ b/probe_rotation_agent.py
+@@ -100,13 +100,43 @@ def short_vertical(seed, xoff, direction, pushes):
+     env.close()
+ 
+ 
++def rot(theta, local):
++    c, q = math.cos(theta), math.sin(theta)
++    return np.array([c*local[0] - q*local[1], q*local[0] + c*local[1]])
++
++
++def general_frame_trial(seed, xoff, pushes=4):
++    env = make_env(); s, _ = env.reset(seed=seed)
++    initial = s[:3].copy(); center = s[:2].copy(); theta = float(s[2])
++    side = 1 if xoff > 0 else -1
++    # Travel to the outer/below corner, then inward along local x, avoiding the T.
++    s = move_to(env, s, center + rot(theta, [side*1.0, -1.15]))
++    s = move_to(env, s, center + rot(theta, [xoff, -1.15]))
++    prep = s[:3].copy()
++    contact = None; moved_steps = 0
++    for k in range(40):
++        old = s[:3].copy()
++        a = rot(theta, [0.0, 0.049]).astype(np.float32)
++        s, _, done, trunc, _ = env.step(a)
++        moved = np.linalg.norm(s[:2]-old[:2]) > 2e-5 or abs(wrap(float(s[2]-old[2]))) > 2e-5
++        if contact is None and moved: contact = k
++        if contact is not None:
++            moved_steps += 1
++            if moved_steps >= pushes: break
++        if done or trunc: break
++    world_dp = s[:2] - prep[:2]
++    local_dp = rot(-theta, world_dp)
++    print("FRAME", seed, "theta", round(theta,3), "xoff", xoff,
++          "setup", np.round(prep[:2]-initial[:2],3), round(wrap(float(prep[2]-initial[2])),3),
++          "contact", contact, "local_dp", np.round(local_dp,3),
++          "dth", round(wrap(float(s[2]-prep[2])),3))
++    env.close()
++
++
+ def main():
+-    for off in [-0.5, -0.35, 0.35, 0.5]:
+-        for n in [1, 2, 4, 8]:
+-            short_vertical(11, off, 1, n)
+-    for off in [-0.5, 0.5]:
+-        for n in [1, 2, 4, 8]:
+-            short_vertical(11, off, -1, n)
++    for seed in [0, 1, 2, 5, 7, 9, 10, 11]:
++        general_frame_trial(seed, 0.5)
++        general_frame_trial(seed, -0.5)
+ 
+ 
+ if __name__ == "__main__":

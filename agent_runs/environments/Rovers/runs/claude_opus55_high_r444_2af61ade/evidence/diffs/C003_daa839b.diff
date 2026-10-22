@@ -1,0 +1,1976 @@
+diff --git a/NOTES.md b/NOTES.md
+index e1e7d87..3359768 100644
+--- a/NOTES.md
++++ b/NOTES.md
+@@ -7,3 +7,9 @@
+ - A hidden wall (NOT in obs) runs along x=0 for the full arena length -> rover0 confined to x>0, rover1 to x<0. Rover0 min x at y=-1.75 is 0.23 (so wall half-thickness + rover radius = 0.23).
+ - Motions that collide are rejected entirely (rover stays put); the operator in that step still applies.
+ - Arena is 5m square (approx -2.5..2.5).
++## Collision (probed)
++- Motion world-frame, exact, clipped. Only end pose checked (no swept). Rotations also collision-checked.
++- Pillars: rover footprint lumpy/heading dependent; safe model: circle r=0.24 vs pillar box (contact range 0.167-0.2375).
++- Mounds: circle r=0.177 vs mound box (half 0.25).
++- Walls (arena edge, middle wall): |x|,|y| <= 2.2729; rover0 x>=0.2271, rover1 x<=-0.2271. No gaps.
++- Lander: safe rule keep rover centre x>=-1.205 or y>=-1.465.
+diff --git a/probe_col_an.py b/probe_col_an.py
+new file mode 100644
+index 0000000..a5b61c9
+--- /dev/null
++++ b/probe_col_an.py
+@@ -0,0 +1,8 @@
++import numpy as np
++for m in '012':
++    L=[l.split() for l in open(f'probe_col_rays_{m}.txt').read().splitlines()[1:]]
++    d=[]
++    for a,x,y,_ in L:
++        x,y=float(x),float(y)
++        cx,cy=np.clip(x,-.05,.05),np.clip(y,-.05,.05); d.append((np.hypot(x-cx,y-cy),int(a)))
++    d=np.array(d); print(m,'dbox min %.4f max %.4f'%(d[:,0].min(),d[:,0].max()), 'argmax ang',d[d[:,0].argmax(),1],'argmin',d[d[:,0].argmin(),1])
+diff --git a/probe_col_arena.py b/probe_col_arena.py
+new file mode 100644
+index 0000000..1d514b7
+--- /dev/null
++++ b/probe_col_arena.py
+@@ -0,0 +1,17 @@
++from probe_col_lib import R
++import numpy as np
++r=R(0)
++# rover0: push +x at y=-1.75, -y, then to +y along x=1.0 (avoid obstacles)
++print('r0 +x', r.push(0,1,0))
++print('r0 -y', r.push(0,0,-1))
++r.path(0,[(1.0,-1.75),(1.0,0.5)])
++print('r0 +y at x=1.0',r.push(0,0,1))
++r.path(0,[(1.0,0.5),(0.3,-1.75)])
++print('r0 -x at y=-1.75',r.push(0,-1,0))
++# rover1
++print('r1 -x', r.push(1,-1,0))
++print('r1 -y', r.push(1,0,-1))
++r.path(1,[(-1.0,-1.75),(-1.0,1.3)])
++print('r1 +y at x=-1',r.push(1,0,1))
++r.path(1,[(-1.0,1.3),(-0.3,-1.75)])
++print('r1 +x at y=-1.75',r.push(1,1,0))
+diff --git a/probe_col_bounds.py b/probe_col_bounds.py
+new file mode 100644
+index 0000000..d654bce
+--- /dev/null
++++ b/probe_col_bounds.py
+@@ -0,0 +1,26 @@
++from probe_col_lib import R
++import numpy as np, sys
++def approach(r,i,target,tol=1e-4):
++    step=0.2
++    while step>tol:
++        p=r.pos(i)[:2]; d=np.array(target)-p; n=np.linalg.norm(d)
++        if n<1e-6: break
++        s=min(step,n); q=r.step(i,*(d/n*s))[:2]
++        if np.allclose(q,p,atol=1e-9): step/=2
++    return r.pos(i)
++def rot(r,i,tot):
++    while abs(tot)>1e-9:
++        d=np.clip(tot,-0.4,0.4); r.step(i,0,0,d); tot-=d
++if __name__=="__main__":
++     for dth in [0,0.4,np.pi/4,np.pi/2,1.0]:
++        r=R(0)
++        rot(r,0,dth); rot(r,1,dth)
++        out=[]
++        r.goto(0,1.0,-1.5); out.append(approach(r,0,(3,-1.5))[0]); r.goto(0,1.0,-1.5)
++        out.append(approach(r,0,(1.0,-3))[1]); r.goto(0,1.0,-1.5)
++        out.append(approach(r,0,(-1,-1.5))[0]); r.goto(0,1.0,-1.5)
++        # rover1: avoid lander; go to (-1,-1.2)
++        r.goto(1,-1.0,-1.2); out.append(approach(r,1,(1,-1.2))[0]); r.goto(1,-1.0,-1.2)
++        out.append(approach(r,1,(-3,-1.2))[0]); r.goto(1,-1.0,-1.2)
++        print('dth %.3f th0 %.3f'%(dth,r.pos(0)[2]),'r0 maxx %.4f miny %.4f minx %.4f | r1 maxx %.4f minx %.4f'%tuple(out))
++        r.env.close()
+diff --git a/probe_col_dump.py b/probe_col_dump.py
+new file mode 100644
+index 0000000..3277a38
+--- /dev/null
++++ b/probe_col_dump.py
+@@ -0,0 +1,13 @@
++from env_client import make_env
++import numpy as np, sys
++env=make_env()
++for s in [0,1,2]:
++    obs,info=env.reset(seed=s)
++    print('seed',s)
++    for o in obs:
++        feats={}
++        for f in ['x','y','z','theta','half_x','half_y']:
++            try: feats[f]=round(float(obs.get(o,f)),3)
++            except Exception: pass
++        print(' ',o.name,o.type.name,feats)
++env.close()
+diff --git a/probe_col_f_0.3927_0.txt b/probe_col_f_0.3927_0.txt
+new file mode 100644
+index 0000000..38ae266
+--- /dev/null
++++ b/probe_col_f_0.3927_0.txt
+@@ -0,0 +1,45 @@
++0 0.1831
++2 0.1812
++4 0.1794
++6 0.1777
++8 0.1758
++10 0.1742
++12 0.1725
++14 0.1707
++16 0.1695
++18 0.1685
++20 0.1678
++22 0.1676
++24 0.1678
++26 0.1678
++28 0.1681
++30 0.1689
++32 0.1702
++34 0.1703
++36 0.1706
++38 0.1715
++40 0.1727
++42 0.1731
++44 0.1735
++46 0.1743
++48 0.1756
++50 0.1760
++52 0.1776
++54 0.1831
++56 0.1894
++58 0.1963
++60 0.2041
++62 0.2126
++64 0.2219
++66 0.2323
++68 0.2337
++70 0.2284
++72 0.2236
++74 0.2194
++76 0.2160
++78 0.2132
++80 0.2109
++82 0.2089
++84 0.2067
++86 0.2041
++88 0.2003
+diff --git a/probe_col_f_0.3927_180.txt b/probe_col_f_0.3927_180.txt
+new file mode 100644
+index 0000000..e9758de
+--- /dev/null
++++ b/probe_col_f_0.3927_180.txt
+@@ -0,0 +1,45 @@
++180 0.2130
++182 0.2097
++184 0.2061
++186 0.2024
++188 0.1990
++190 0.1955
++192 0.1921
++194 0.1891
++196 0.1863
++198 0.1840
++200 0.1820
++202 0.1805
++204 0.1792
++206 0.1785
++208 0.1782
++210 0.1782
++212 0.1786
++214 0.1794
++216 0.1808
++218 0.1826
++220 0.1848
++222 0.1877
++224 0.1909
++226 0.1948
++228 0.1990
++230 0.2041
++232 0.2096
++234 0.2159
++236 0.2229
++238 0.2306
++240 0.2296
++242 0.2215
++244 0.2209
++246 0.2314
++248 0.2333
++250 0.2278
++252 0.2230
++254 0.2191
++256 0.2156
++258 0.2128
++260 0.2105
++262 0.2083
++264 0.2063
++266 0.2038
++268 0.1999
+diff --git a/probe_col_f_0.3927_270.txt b/probe_col_f_0.3927_270.txt
+new file mode 100644
+index 0000000..858da1a
+--- /dev/null
++++ b/probe_col_f_0.3927_270.txt
+@@ -0,0 +1,45 @@
++270 0.1964
++272 0.1929
++274 0.1895
++276 0.1861
++278 0.1828
++280 0.1795
++282 0.1765
++284 0.1734
++286 0.1708
++288 0.1685
++290 0.1674
++292 0.1672
++294 0.1672
++296 0.1672
++298 0.1675
++300 0.1683
++302 0.1696
++304 0.1699
++306 0.1702
++308 0.1711
++310 0.1723
++312 0.1727
++314 0.1739
++316 0.1774
++318 0.1817
++320 0.1862
++322 0.1916
++324 0.1973
++326 0.2040
++328 0.2113
++330 0.2193
++332 0.2283
++334 0.2344
++336 0.2275
++338 0.2215
++340 0.2162
++342 0.2118
++344 0.2081
++346 0.2048
++348 0.2023
++350 0.2001
++352 0.1976
++354 0.1939
++356 0.1901
++358 0.1867
+diff --git a/probe_col_f_0.3927_90.txt b/probe_col_f_0.3927_90.txt
+new file mode 100644
+index 0000000..8819ac4
+--- /dev/null
++++ b/probe_col_f_0.3927_90.txt
+@@ -0,0 +1,45 @@
++90 0.1968
++92 0.1931
++94 0.1897
++96 0.1865
++98 0.1831
++100 0.1799
++102 0.1767
++104 0.1738
++106 0.1710
++108 0.1687
++110 0.1678
++112 0.1676
++114 0.1676
++116 0.1676
++118 0.1679
++120 0.1687
++122 0.1700
++124 0.1701
++126 0.1704
++128 0.1713
++130 0.1725
++132 0.1727
++134 0.1743
++136 0.1778
++138 0.1818
++140 0.1866
++142 0.1918
++144 0.1977
++146 0.2044
++148 0.2117
++150 0.2197
++152 0.2287
++154 0.2334
++156 0.2265
++158 0.2207
++160 0.2295
++162 0.2375
++164 0.2332
++166 0.2295
++168 0.2263
++170 0.2238
++172 0.2216
++174 0.2193
++176 0.2172
++178 0.2152
+diff --git a/probe_col_f_0_0.txt b/probe_col_f_0_0.txt
+new file mode 100644
+index 0000000..1a8dc17
+--- /dev/null
++++ b/probe_col_f_0_0.txt
+@@ -0,0 +1,45 @@
++0 0.1831
++2 0.1812
++4 0.1794
++6 0.1777
++8 0.1758
++10 0.1742
++12 0.1725
++14 0.1707
++16 0.1695
++18 0.1685
++20 0.1697
++22 0.1714
++24 0.1736
++26 0.1763
++28 0.1795
++30 0.1835
++32 0.1871
++34 0.1897
++36 0.1929
++38 0.1967
++40 0.2008
++42 0.2059
++44 0.2114
++46 0.2177
++48 0.2248
++50 0.2297
++52 0.2217
++54 0.2145
++56 0.2083
++58 0.2029
++60 0.1981
++62 0.1939
++64 0.1903
++66 0.1873
++68 0.1849
++70 0.1832
++72 0.1842
++74 0.1848
++76 0.1851
++78 0.1856
++80 0.1865
++82 0.1864
++84 0.1857
++86 0.1849
++88 0.1839
+diff --git a/probe_col_f_0_180.txt b/probe_col_f_0_180.txt
+new file mode 100644
+index 0000000..5d3ecfb
+--- /dev/null
++++ b/probe_col_f_0_180.txt
+@@ -0,0 +1,45 @@
++180 0.1954
++182 0.1954
++184 0.1954
++186 0.1954
++188 0.1953
++190 0.1953
++192 0.1954
++194 0.1956
++196 0.1965
++198 0.1977
++200 0.1994
++202 0.2015
++204 0.2023
++206 0.2033
++208 0.2046
++210 0.2064
++212 0.2089
++214 0.2118
++216 0.2153
++218 0.2193
++220 0.2241
++222 0.2260
++224 0.2149
++226 0.2169
++228 0.2240
++230 0.2289
++232 0.2211
++234 0.2139
++236 0.2077
++238 0.2021
++240 0.1973
++242 0.1931
++244 0.1897
++246 0.1868
++248 0.1843
++250 0.1824
++252 0.1835
++254 0.1842
++256 0.1843
++258 0.1851
++260 0.1859
++262 0.1860
++264 0.1851
++266 0.1843
++268 0.1835
+diff --git a/probe_col_f_0_270.txt b/probe_col_f_0_270.txt
+new file mode 100644
+index 0000000..9e33122
+--- /dev/null
++++ b/probe_col_f_0_270.txt
+@@ -0,0 +1,45 @@
++270 0.1825
++272 0.1806
++274 0.1794
++276 0.1793
++278 0.1793
++280 0.1794
++282 0.1793
++284 0.1795
++286 0.1800
++288 0.1810
++290 0.1824
++292 0.1843
++294 0.1868
++296 0.1897
++298 0.1927
++300 0.1946
++302 0.1967
++304 0.1995
++306 0.2028
++308 0.2066
++310 0.2112
++312 0.2162
++314 0.2220
++316 0.2286
++318 0.2217
++320 0.2131
++322 0.2057
++324 0.1989
++326 0.1931
++328 0.1879
++330 0.1835
++332 0.1799
++334 0.1812
++336 0.1819
++338 0.1822
++340 0.1830
++342 0.1840
++344 0.1848
++346 0.1849
++348 0.1856
++350 0.1865
++352 0.1866
++354 0.1857
++356 0.1849
++358 0.1841
+diff --git a/probe_col_f_0_90.txt b/probe_col_f_0_90.txt
+new file mode 100644
+index 0000000..f0fde92
+--- /dev/null
++++ b/probe_col_f_0_90.txt
+@@ -0,0 +1,45 @@
++90 0.1829
++92 0.1810
++94 0.1800
++96 0.1799
++98 0.1799
++100 0.1799
++102 0.1799
++104 0.1801
++106 0.1806
++108 0.1815
++110 0.1830
++112 0.1849
++114 0.1873
++116 0.1903
++118 0.1931
++120 0.1949
++122 0.1971
++124 0.1999
++126 0.2032
++128 0.2070
++130 0.2116
++132 0.2168
++134 0.2225
++136 0.2290
++138 0.2209
++140 0.2147
++142 0.2230
++144 0.2323
++146 0.2270
++148 0.2210
++150 0.2158
++152 0.2112
++154 0.2074
++156 0.2042
++158 0.2015
++160 0.1994
++162 0.1977
++164 0.1965
++166 0.1956
++168 0.1954
++170 0.1953
++172 0.1953
++174 0.1954
++176 0.1954
++178 0.1954
+diff --git a/probe_col_fine.py b/probe_col_fine.py
+new file mode 100644
+index 0000000..be6315b
+--- /dev/null
++++ b/probe_col_fine.py
+@@ -0,0 +1,13 @@
++from probe_col_lib import R
++from probe_col_bounds import approach, rot
++import numpy as np, sys
++c=np.array([0.654,-0.199]); RAD=0.42
++th=float(sys.argv[1]); k0=int(sys.argv[2])
++r=R(0); r.path(0,[(1.0,-1.0),(c[0]+RAD,c[1])]); rot(r,0,th)
++for kk in range(0,k0+1,10):
++    r.goto(0,*(c+RAD*np.array([np.cos(np.deg2rad(kk)),np.sin(np.deg2rad(kk))])))
++for k in range(k0,k0+90,2):
++    a=np.deg2rad(k); S=c+RAD*np.array([np.cos(a),np.sin(a)])
++    if not r.goto(0,*S): print('navfail',k); break
++    p=approach(r,0,c,tol=1e-4); rel=p[:2]-c
++    cx,cy=np.clip(rel,-.05,.05); print(k,'%.4f'%np.hypot(rel[0]-cx,rel[1]-cy)); r.goto(0,*S)
+diff --git a/probe_col_frame.py b/probe_col_frame.py
+new file mode 100644
+index 0000000..74b0b36
+--- /dev/null
++++ b/probe_col_frame.py
+@@ -0,0 +1,5 @@
++from probe_col_lib import R
++r=R(0)
++print(r.pos(0)); print(r.step(0,0.2,0)); print(r.step(0,0,0.2)); print(r.step(0,0,0,0.4)); print(r.step(0,0.2,0))
++print(r.pos(1)); print(r.step(1,0.2,0)); print(r.step(1,0.123,-0.077))
++print(r.step(1,0.5,0))
+diff --git a/probe_col_lander.py b/probe_col_lander.py
+new file mode 100644
+index 0000000..1549a55
+--- /dev/null
++++ b/probe_col_lander.py
+@@ -0,0 +1,15 @@
++from probe_col_lib import R
++from probe_col_bounds import approach, rot
++import numpy as np, sys
++c=np.array([-1.9,-2.0]); RAD=1.0
++r=R(4)
++print([o for o in r.obst() if o[1]<0 and o[2]<0 and o[3]<0.1])
++rot(r,1,float(sys.argv[1]))
++r.goto(1,-1.0,-1.2)
++for k in range(-30,185,5):
++    a=np.deg2rad(k); S=c+RAD*np.array([np.cos(a),np.sin(a)])
++    S=np.clip(S,-2.26,-0.24)
++    if k>100: r.goto(1,-1.0,-1.2); r.goto(1,-2.0,-1.2)
++    if not r.goto(1,-1.0,-1.2) or not r.goto(1,*S): print(k,'nav fail',r.pos(1)); continue
++    p=approach(r,1,c,tol=2e-4); rel=p[:2]-c
++    print('%4d rel %.4f %.4f  r=%.4f th=%.3f'%(k,rel[0],rel[1],np.hypot(*rel),p[2]))
+diff --git a/probe_col_lander_0.txt b/probe_col_lander_0.txt
+new file mode 100644
+index 0000000..17e3e8f
+--- /dev/null
++++ b/probe_col_lander_0.txt
+@@ -0,0 +1,44 @@
++[]
++ -30 rel 0.6898 -0.2071  r=0.7202 th=0.000
++ -25 rel 0.6897 -0.1978  r=0.7175 th=0.000
++ -20 rel 0.6897 -0.1908  r=0.7156 th=0.000
++ -15 rel 0.6897 -0.1848  r=0.7141 th=0.000
++ -10 rel 0.6898 -0.1216  r=0.7004 th=0.000
++  -5 rel 0.6899 -0.0604  r=0.6926 th=0.000
++   0 rel 0.6898 0.0000  r=0.6898 th=0.000
++   5 rel 0.6899 0.0604  r=0.6926 th=0.000
++  10 rel 0.6898 0.1216  r=0.7004 th=0.000
++  15 rel 0.6897 0.1848  r=0.7141 th=0.000
++  20 rel 0.6897 0.2510  r=0.7340 th=0.000
++  25 rel 0.6896 0.3216  r=0.7609 th=0.000
++  30 rel 0.6898 0.3982  r=0.7965 th=0.000
++  35 rel 0.6505 0.4555  r=0.7941 th=0.000
++  40 rel 0.5904 0.4954  r=0.7707 th=0.000
++  45 rel 0.5138 0.5138  r=0.7266 th=0.000
++  50 rel 0.4359 0.5195  r=0.6781 th=0.000
++  55 rel 0.3645 0.5206  r=0.6355 th=0.000
++  60 rel 0.3006 0.5206  r=0.6012 th=0.000
++  65 rel 0.2428 0.5208  r=0.5746 th=0.000
++  70 rel 0.1896 0.5209  r=0.5543 th=0.000
++  75 rel 0.1395 0.5207  r=0.5391 th=0.000
++  80 rel 0.0918 0.5209  r=0.5289 th=0.000
++  85 rel 0.0450 0.5148  r=0.5168 th=0.000
++  90 rel 0.0000 0.5137  r=0.5137 th=0.000
++  95 rel -0.0450 0.5148  r=0.5168 th=0.000
++ 100 rel -0.0918 0.5209  r=0.5289 th=0.000
++ 105 rel -0.1395 0.5207  r=0.5391 th=0.000
++ 110 rel -0.1896 0.5209  r=0.5543 th=0.000
++ 115 rel -0.2069 0.5208  r=0.5603 th=0.000
++ 120 rel -0.2165 0.5208  r=0.5640 th=0.000
++ 125 rel -0.2289 0.5209  r=0.5690 th=0.000
++ 130 rel -0.2447 0.5207  r=0.5753 th=0.000
++ 135 rel -0.2652 0.5209  r=0.5845 th=0.000
++ 140 rel -0.2917 0.5208  r=0.5969 th=0.000
++ 145 rel -0.3268 0.5206  r=0.6147 th=0.000
++150 nav fail [-1.20000005 -1.39999998  0.        ]
++155 nav fail [-1.20000005 -1.39999998  0.        ]
++160 nav fail [-1.20000005 -1.4000001   0.        ]
++165 nav fail [-1.20000005 -1.4000001   0.        ]
++170 nav fail [-1.20000005 -1.4000001   0.        ]
++175 nav fail [-1.20000005 -1.4000001   0.        ]
++180 nav fail [-1.20000005 -1.4000001   0.        ]
+diff --git a/probe_col_lander_1.txt b/probe_col_lander_1.txt
+new file mode 100644
+index 0000000..6a3162d
+--- /dev/null
++++ b/probe_col_lander_1.txt
+@@ -0,0 +1,44 @@
++[]
++ -30 rel 0.6737 -0.2023  r=0.7034 th=1.571
++ -25 rel 0.6739 -0.1933  r=0.7011 th=1.571
++ -20 rel 0.6739 -0.1865  r=0.6992 th=1.571
++ -15 rel 0.6739 -0.1806  r=0.6977 th=1.571
++ -10 rel 0.6740 -0.1188  r=0.6844 th=1.571
++  -5 rel 0.6740 -0.0590  r=0.6766 th=1.571
++   0 rel 0.6738 0.0000  r=0.6738 th=1.571
++   5 rel 0.6740 0.0590  r=0.6766 th=1.571
++  10 rel 0.6740 0.1188  r=0.6844 th=1.571
++  15 rel 0.6739 0.1806  r=0.6977 th=1.571
++  20 rel 0.6739 0.2453  r=0.7172 th=1.571
++  25 rel 0.6737 0.3142  r=0.7434 th=1.571
++  30 rel 0.6739 0.3891  r=0.7781 th=1.571
++  35 rel 0.6428 0.4501  r=0.7848 th=1.571
++  40 rel 0.5970 0.5009  r=0.7793 th=1.571
++  45 rel 0.5295 0.5295  r=0.7488 th=1.571
++  50 rel 0.4444 0.5296  r=0.6914 th=1.571
++  55 rel 0.3708 0.5296  r=0.6465 th=1.571
++  60 rel 0.3057 0.5294  r=0.6113 th=1.571
++  65 rel 0.2470 0.5296  r=0.5844 th=1.571
++  70 rel 0.1928 0.5297  r=0.5637 th=1.571
++  75 rel 0.1419 0.5297  r=0.5484 th=1.571
++  80 rel 0.0934 0.5297  r=0.5379 th=1.571
++  85 rel 0.0463 0.5296  r=0.5316 th=1.571
++  90 rel 0.0000 0.5297  r=0.5297 th=1.571
++  95 rel -0.0463 0.5296  r=0.5316 th=1.571
++ 100 rel -0.0934 0.5297  r=0.5379 th=1.571
++ 105 rel -0.1419 0.5297  r=0.5484 th=1.571
++ 110 rel -0.1928 0.5297  r=0.5637 th=1.571
++ 115 rel -0.2103 0.5295  r=0.5697 th=1.571
++ 120 rel -0.2201 0.5295  r=0.5734 th=1.571
++ 125 rel -0.2327 0.5295  r=0.5784 th=1.571
++ 130 rel -0.2489 0.5295  r=0.5851 th=1.571
++ 135 rel -0.2696 0.5296  r=0.5943 th=1.571
++ 140 rel -0.2966 0.5296  r=0.6070 th=1.571
++ 145 rel -0.3324 0.5296  r=0.6252 th=1.571
++150 nav fail [-1.20000005 -1.39999998  1.57079995]
++155 nav fail [-1.20000005 -1.39999998  1.57079995]
++160 nav fail [-1.20000005 -1.39999998  1.57079995]
++165 nav fail [-1.20000005 -1.4000001   1.57079995]
++170 nav fail [-1.20000005 -1.4000001   1.57079995]
++175 nav fail [-1.20000005 -1.4000001   1.57079995]
++180 nav fail [-1.20000005 -1.4000001   1.57079995]
+diff --git a/probe_col_lib.py b/probe_col_lib.py
+new file mode 100644
+index 0000000..017b37c
+--- /dev/null
++++ b/probe_col_lib.py
+@@ -0,0 +1,44 @@
++from env_client import make_env
++import numpy as np
++class R:
++    def __init__(self, seed=0):
++        self.env=make_env(); self.obs,_=self.env.reset(seed=seed)
++    def pos(self,i):
++        o=self.obs.get_object_from_name(f'rover{i}')
++        return np.array([self.obs.get(o,'x'),self.obs.get(o,'y'),self.obs.get(o,'theta')],float)
++    def step(self,i,dx=0,dy=0,dth=0):
++        a=np.zeros(8,np.float32); a[4*i:4*i+3]=[dx,dy,dth]
++        self.obs,*_=self.env.step(a)
++        return self.pos(i)
++    def goto(self,i,x,y,maxit=200):
++        for _ in range(maxit):
++            p=self.pos(i); d=np.array([x,y])-p[:2]
++            if np.linalg.norm(d)<1e-6: return True
++            d=np.clip(d,-0.2,0.2)
++            q=self.step(i,*d)
++            if np.allclose(q[:2],p[:2]): return False
++        return False
++    def path(self,i,pts):
++        for (x,y) in pts:
++            if not self.goto(i,x,y): print('blocked going to',(x,y),'at',self.pos(i)); return False
++        return True
++    def push(self,i,ux,uy,step=0.005,maxit=2000):
++        """move in direction (ux,uy) with given step until blocked; return last pos"""
++        u=np.array([ux,uy],float); u/=np.linalg.norm(u)
++        # coarse
++        for s in [0.05,step]:
++            for _ in range(maxit):
++                p=self.pos(i); q=self.step(i,*(u*s))
++                if np.allclose(q[:2],p[:2],atol=1e-9): break
++        # finer
++        for s in [0.001]:
++            for _ in range(maxit):
++                p=self.pos(i); q=self.step(i,*(u*s))
++                if np.allclose(q[:2],p[:2],atol=1e-9): break
++        return self.pos(i)
++    def obst(self):
++        out=[]
++        for o in self.obs:
++            if o.type.name=='obstacle':
++                out.append((o.name,self.obs.get(o,'x'),self.obs.get(o,'y'),self.obs.get(o,'half_x')))
++        return out
+diff --git a/probe_col_m_0_0.5.txt b/probe_col_m_0_0.5.txt
+new file mode 100644
+index 0000000..0b83155
+--- /dev/null
++++ b/probe_col_m_0_0.5.txt
+@@ -0,0 +1,19 @@
++180 nav fail [ 0.80000007  1.39999998 -3.14159274]
++190 nav fail [ 0.80000007  1.4000001  -3.14159274]
++200 nav fail [ 0.80000007  1.4000001  -3.14159274]
++210 nav fail [ 0.80000007  1.4000001  -3.14159274]
++ 220 rel -0.2303 -0.4271  dbox=0.1771
++ 230 rel -0.1933 -0.4272  dbox=0.1772
++ 240 rel -0.1710 -0.4272  dbox=0.1772
++ 250 rel -0.1555 -0.4273  dbox=0.1773
++ 260 rel -0.0753 -0.4270  dbox=0.1770
++ 270 rel 0.0000 -0.4273  dbox=0.1773
++ 280 rel 0.0753 -0.4270  dbox=0.1770
++ 290 rel 0.1555 -0.4273  dbox=0.1773
++ 300 rel 0.2467 -0.4273  dbox=0.1773
++ 310 rel 0.3377 -0.4025  dbox=0.1759
++ 320 rel 0.4025 -0.3377  dbox=0.1759
++ 330 rel 0.4273 -0.2467  dbox=0.1773
++ 340 rel 0.4273 -0.1555  dbox=0.1773
++ 350 rel 0.4270 -0.0753  dbox=0.1770
++ 360 rel 0.4273 0.0000  dbox=0.1773
+diff --git a/probe_col_m_0_2.0.txt b/probe_col_m_0_2.0.txt
+new file mode 100644
+index 0000000..c96410d
+--- /dev/null
++++ b/probe_col_m_0_2.0.txt
+@@ -0,0 +1,19 @@
++ 180 rel -0.4273 0.0000  dbox=0.1773
++ 190 rel -0.4270 -0.0753  dbox=0.1770
++ 200 rel -0.4273 -0.1555  dbox=0.1773
++ 210 rel -0.4273 -0.2467  dbox=0.1773
++ 220 rel -0.4025 -0.3377  dbox=0.1759
++ 230 rel -0.3377 -0.4025  dbox=0.1759
++ 240 rel -0.2467 -0.4273  dbox=0.1773
++ 250 rel -0.1555 -0.4273  dbox=0.1773
++ 260 rel -0.0753 -0.4270  dbox=0.1770
++ 270 rel 0.0000 -0.4273  dbox=0.1773
++ 280 rel 0.0753 -0.4270  dbox=0.1770
++ 290 rel 0.1555 -0.4273  dbox=0.1773
++ 300 rel 0.1710 -0.4272  dbox=0.1772
++ 310 rel 0.1933 -0.4272  dbox=0.1772
++ 320 rel 0.2303 -0.4271  dbox=0.1771
++330 nav fail [ 1.60000002  1.39999998 -3.14159274]
++340 nav fail [ 1.60000002  1.39999998 -3.14159274]
++350 nav fail [ 1.60000002  1.39999998 -3.14159274]
++360 nav fail [ 1.60000002  1.39999998 -3.14159274]
+diff --git a/probe_col_m_1.5708_0.5.txt b/probe_col_m_1.5708_0.5.txt
+new file mode 100644
+index 0000000..ce75427
+--- /dev/null
++++ b/probe_col_m_1.5708_0.5.txt
+@@ -0,0 +1,19 @@
++180 nav fail [ 0.80000007  1.39999998 -1.57079268]
++190 nav fail [ 0.80000007  1.4000001  -1.57079268]
++200 nav fail [ 0.80000007  1.4000001  -1.57079268]
++210 nav fail [ 0.80000007  1.4000001  -1.57079268]
++ 220 rel -0.2303 -0.4271  dbox=0.1771
++ 230 rel -0.1933 -0.4272  dbox=0.1772
++ 240 rel -0.1710 -0.4272  dbox=0.1772
++ 250 rel -0.1555 -0.4273  dbox=0.1773
++ 260 rel -0.0753 -0.4270  dbox=0.1770
++ 270 rel 0.0000 -0.4273  dbox=0.1773
++ 280 rel 0.0753 -0.4270  dbox=0.1770
++ 290 rel 0.1555 -0.4273  dbox=0.1773
++ 300 rel 0.2467 -0.4273  dbox=0.1773
++ 310 rel 0.3377 -0.4025  dbox=0.1759
++ 320 rel 0.4025 -0.3377  dbox=0.1759
++ 330 rel 0.4273 -0.2467  dbox=0.1773
++ 340 rel 0.4273 -0.1555  dbox=0.1773
++ 350 rel 0.4270 -0.0753  dbox=0.1770
++ 360 rel 0.4273 0.0000  dbox=0.1773
+diff --git a/probe_col_m_1.5708_2.0.txt b/probe_col_m_1.5708_2.0.txt
+new file mode 100644
+index 0000000..775023d
+--- /dev/null
++++ b/probe_col_m_1.5708_2.0.txt
+@@ -0,0 +1,19 @@
++ 180 rel -0.4273 0.0000  dbox=0.1773
++ 190 rel -0.4270 -0.0753  dbox=0.1770
++ 200 rel -0.4273 -0.1555  dbox=0.1773
++ 210 rel -0.4273 -0.2467  dbox=0.1773
++ 220 rel -0.4025 -0.3377  dbox=0.1759
++ 230 rel -0.3377 -0.4025  dbox=0.1759
++ 240 rel -0.2467 -0.4273  dbox=0.1773
++ 250 rel -0.1555 -0.4273  dbox=0.1773
++ 260 rel -0.0753 -0.4270  dbox=0.1770
++ 270 rel 0.0000 -0.4273  dbox=0.1773
++ 280 rel 0.0753 -0.4270  dbox=0.1770
++ 290 rel 0.1555 -0.4273  dbox=0.1773
++ 300 rel 0.1710 -0.4272  dbox=0.1772
++ 310 rel 0.1933 -0.4272  dbox=0.1772
++ 320 rel 0.2303 -0.4271  dbox=0.1771
++330 nav fail [ 1.60000002  1.39999998 -1.57079268]
++340 nav fail [ 1.60000002  1.39999998 -1.57079268]
++350 nav fail [ 1.60000002  1.39999998 -1.57079268]
++360 nav fail [ 1.60000002  1.39999998 -1.57079268]
+diff --git a/probe_col_misc.py b/probe_col_misc.py
+new file mode 100644
+index 0000000..fd4c107
+--- /dev/null
++++ b/probe_col_misc.py
+@@ -0,0 +1,17 @@
++from probe_col_lib import R
++from probe_col_bounds import approach, rot
++import numpy as np
++c=np.array([0.654,-0.199])
++r=R(0)
++r.goto(0,1.0,-1.0); r.goto(0,*(c+[0.25,0.08]))
++print('A',r.pos(0)[:2]-c)
++q=r.step(0,-0.17,0.17); print('diag step through corner -> rel',q[:2]-c)
++# rotation in contact
++r.goto(0,1.3,-1.0); r.goto(0,1.3,c[1]); p=approach(r,0,c); print('contact rel',p[:2]-c,p[2])
++for d in [0.4,-0.4,0.2,-0.2]:
++    q=r.step(0,0,0,d); print('rot',d,'->th %.4f pos'%q[2],q[:2]-c)
++# rover-rover: simultaneous moves both toward wall at same y
++r.goto(1,-1.0,-1.75); 
++a=np.array([0,0,0,0,0,0,0,0],np.float32)
++print(r.pos(0),r.pos(1))
++r.env.close()
+diff --git a/probe_col_mound.py b/probe_col_mound.py
+new file mode 100644
+index 0000000..e038f66
+--- /dev/null
++++ b/probe_col_mound.py
+@@ -0,0 +1,15 @@
++from probe_col_lib import R
++from probe_col_bounds import approach
++import numpy as np
++for seed in [1,2]:
++    r=R(seed)
++    print('seed',seed,[o for o in r.obst() if o[3]<0.1 and o[1]>0])
++    r.goto(0,1.0,-1.5); r.goto(0,1.2,1.2)
++    p=approach(r,0,(1.2,2.5)); print('r0 at x=1.2 up to', p)
++    r.goto(0,1.2,1.2); r.goto(0,2.0,1.2)
++    p=approach(r,0,(2.0,2.5)); print('r0 toward mound (2,2) from below', p)
++    r.goto(0,2.0,1.2); r.goto(0,1.0,1.2); r.goto(0,0.5,1.2)
++    p=approach(r,0,(0.5,2.5)); print('r0 toward mound (0.5,2) from below', p)
++    # clamp vs reject test
++    r.goto(0,1.0,1.2); r.goto(0,1.0,-1.5); r.goto(0,2.2,-1.5); print('at',r.pos(0)); print('step +0.2 ->',r.step(0,0.2,0))
++    r.env.close()
+diff --git a/probe_col_mscan.py b/probe_col_mscan.py
+new file mode 100644
+index 0000000..2ea4ed0
+--- /dev/null
++++ b/probe_col_mscan.py
+@@ -0,0 +1,14 @@
++from probe_col_lib import R
++from probe_col_bounds import approach, rot
++import numpy as np, sys
++c=np.array([float(sys.argv[2]),2.0]); RAD=0.75
++r=R(2)
++r.goto(0,1.0,-1.0); r.goto(0,1.2,1.0)
++rot(r,0,float(sys.argv[1]))
++for k in range(180,365,10):
++    a=np.deg2rad(k); S=c+RAD*np.array([np.cos(a),np.sin(a)])
++    S=np.clip(S,0.24,2.26)
++    if not r.goto(0,1.2,1.0) or not r.goto(0,*S): print(k,'nav fail',r.pos(0)); continue
++    p=approach(r,0,c,tol=2e-4); rel=p[:2]-c
++    cx,cy=np.clip(rel,-0.25,0.25)
++    print('%4d rel %.4f %.4f  dbox=%.4f'%(k,rel[0],rel[1],np.hypot(rel[0]-cx,rel[1]-cy)))
+diff --git a/probe_col_pillar.py b/probe_col_pillar.py
+new file mode 100644
+index 0000000..c82c298
+--- /dev/null
++++ b/probe_col_pillar.py
+@@ -0,0 +1,23 @@
++from probe_col_lib import R
++import numpy as np
++px,py=0.654,-0.199; h=0.05
++def run(start,u,dth=None,label=''):
++    r=R(0)
++    r.path(0,[(1.0,-1.0),(1.6,-1.0),(1.6,0.6)] if start[1]>-0.2 else [(1.0,-1.0)])
++    if dth is not None:
++        r.step(0,0,0,dth)
++    if not r.path(0,[start]): return
++    p=r.push(0,*u)
++    # dist from rover center to box
++    cx=np.clip(p[0],px-h,px+h); cy=np.clip(p[1],py-h,py+h)
++    print(label,'stop',np.round(p,4),'dbox=%.4f'%np.hypot(p[0]-cx,p[1]-cy),'dx=%.4f dy=%.4f'%(abs(p[0]-px)-h,abs(p[1]-py)-h))
++    r.env.close()
++run((px,-0.8),(0,1),label='from below')
++run((1.3,py),(-1,0),label='from right')
++run((1.3,py),(-1,0),dth=0.4,label='from right th rot')
++run((px,0.4),(0,-1),label='from above')
++d=0.5
++run((px+h+d,py-h-d),(-1,1),label='diag to corner BR')
++run((px+h+d,py-h-d),(-1,1),dth=0.4,label='diag to corner BR rot')
++run((px+h+d,py-h-d),(-1,1),dth=-0.4,label='diag to corner BR rot-')
++run((px+h+0.4,py-h-0.2),(-2,1),label='dir(-2,1) to corner BR')
+diff --git a/probe_col_rays.py b/probe_col_rays.py
+new file mode 100644
+index 0000000..be238c9
+--- /dev/null
++++ b/probe_col_rays.py
+@@ -0,0 +1,32 @@
++from probe_col_lib import R
++import numpy as np, sys
++c=np.array([0.654,-0.199]); RAD=0.42
++def approach(r,i,target,tol=1e-4):
++    step=0.2
++    while step>tol:
++        p=r.pos(i)[:2]; d=target-p; n=np.linalg.norm(d)
++        if n<1e-6: break
++        s=min(step,n); q=r.step(i,*(d/n*s))[:2]
++        if np.allclose(q,p,atol=1e-9): step/=2
++    return r.pos(i)
++def run(dths,label):
++    r=R(0)
++    r.path(0,[(1.0,-1.0),(c[0]+RAD,c[1])])
++    for d in dths: r.step(0,0,0,d)
++    th=r.pos(0)[2]
++    res=[]
++    for k in range(0,72):
++        a=np.deg2rad(k*5)
++        S=c+RAD*np.array([np.cos(a),np.sin(a)])
++        if not r.goto(0,*S): print('nav fail',k,r.pos(0)); break
++        p=approach(r,0,c)
++        rel=p[:2]-c
++        res.append((k*5,rel[0],rel[1]))
++        r.goto(0,*S)
++    print(label,'theta=%.4f'%th)
++    for a,x,y in res: print('%3d %.4f %.4f  r=%.4f'%(a,x,y,np.hypot(x,y)))
++    r.env.close()
++mode=sys.argv[1]
++if mode=='0': run([],'th=pi')
++if mode=='1': run([0.4],'th=pi+0.4')
++if mode=='2': run([0.4,0.4,0.4,0.37079633],'th=pi/2 ish')
+diff --git a/probe_col_rays_0.txt b/probe_col_rays_0.txt
+new file mode 100644
+index 0000000..16dcf8a
+--- /dev/null
++++ b/probe_col_rays_0.txt
+@@ -0,0 +1,73 @@
++th=pi theta=-3.1416
++  0 0.2331 -0.0000  r=0.2331
++  5 0.2285 0.0200  r=0.2294
++ 10 0.2242 0.0395  r=0.2276
++ 15 0.2199 0.0589  r=0.2276
++ 20 0.2172 0.0791  r=0.2311
++ 25 0.2173 0.1013  r=0.2397
++ 30 0.2173 0.1254  r=0.2509
++ 35 0.2133 0.1494  r=0.2604
++ 40 0.2077 0.1743  r=0.2712
++ 45 0.2017 0.2017  r=0.2852
++ 50 0.1929 0.2299  r=0.3001
++ 55 0.1609 0.2298  r=0.2805
++ 60 0.1328 0.2299  r=0.2655
++ 65 0.1072 0.2298  r=0.2536
++ 70 0.0837 0.2300  r=0.2448
++ 75 0.0628 0.2344  r=0.2427
++ 80 0.0417 0.2365  r=0.2401
++ 85 0.0206 0.2353  r=0.2362
++ 90 -0.0000 0.2329  r=0.2329
++ 95 -0.0201 0.2299  r=0.2307
++100 -0.0405 0.2299  r=0.2335
++105 -0.0616 0.2299  r=0.2380
++110 -0.0837 0.2299  r=0.2446
++115 -0.1072 0.2298  r=0.2536
++120 -0.1312 0.2272  r=0.2624
++125 -0.1553 0.2218  r=0.2708
++130 -0.1812 0.2160  r=0.2819
++135 -0.2096 0.2096  r=0.2964
++140 -0.2184 0.1832  r=0.2850
++145 -0.2453 0.1718  r=0.2995
++150 -0.2453 0.1416  r=0.2833
++155 -0.2454 0.1144  r=0.2708
++160 -0.2455 0.0893  r=0.2612
++165 -0.2453 0.0657  r=0.2540
++170 -0.2453 0.0433  r=0.2491
++175 -0.2454 0.0215  r=0.2464
++180 -0.2454 -0.0000  r=0.2454
++185 -0.2454 -0.0215  r=0.2464
++190 -0.2453 -0.0433  r=0.2491
++195 -0.2453 -0.0657  r=0.2540
++200 -0.2455 -0.0893  r=0.2612
++205 -0.2426 -0.1131  r=0.2677
++210 -0.2372 -0.1370  r=0.2739
++215 -0.2316 -0.1621  r=0.2827
++220 -0.2255 -0.1892  r=0.2944
++225 -0.2011 -0.2011  r=0.2845
++230 -0.1924 -0.2293  r=0.2993
++235 -0.1606 -0.2293  r=0.2800
++240 -0.1324 -0.2293  r=0.2647
++245 -0.1069 -0.2293  r=0.2530
++250 -0.0835 -0.2293  r=0.2440
++255 -0.0627 -0.2338  r=0.2421
++260 -0.0416 -0.2359  r=0.2395
++265 -0.0205 -0.2347  r=0.2356
++270 -0.0000 -0.2325  r=0.2325
++275 0.0201 -0.2293  r=0.2302
++280 0.0404 -0.2294  r=0.2329
++285 0.0614 -0.2293  r=0.2374
++290 0.0835 -0.2293  r=0.2440
++295 0.1069 -0.2293  r=0.2530
++300 0.1310 -0.2269  r=0.2620
++305 0.1551 -0.2215  r=0.2704
++310 0.1810 -0.2157  r=0.2815
++315 0.2093 -0.2093  r=0.2960
++320 0.2172 -0.1822  r=0.2835
++325 0.2172 -0.1521  r=0.2651
++330 0.2173 -0.1254  r=0.2509
++335 0.2236 -0.1043  r=0.2468
++340 0.2299 -0.0837  r=0.2446
++345 0.2344 -0.0628  r=0.2427
++350 0.2365 -0.0417  r=0.2401
++355 0.2353 -0.0206  r=0.2362
+diff --git a/probe_col_rays_1.txt b/probe_col_rays_1.txt
+new file mode 100644
+index 0000000..c525854
+--- /dev/null
++++ b/probe_col_rays_1.txt
+@@ -0,0 +1,73 @@
++th=pi+0.4 theta=-2.7416
++  0 0.2343 -0.0000  r=0.2343
++  5 0.2285 0.0200  r=0.2294
++ 10 0.2242 0.0395  r=0.2276
++ 15 0.2199 0.0589  r=0.2276
++ 20 0.2155 0.0785  r=0.2294
++ 25 0.2107 0.0983  r=0.2325
++ 30 0.2046 0.1181  r=0.2362
++ 35 0.1964 0.1375  r=0.2397
++ 40 0.1862 0.1562  r=0.2430
++ 45 0.1730 0.1730  r=0.2446
++ 50 0.1585 0.1889  r=0.2466
++ 55 0.1460 0.2085  r=0.2546
++ 60 0.1352 0.2342  r=0.2704
++ 65 0.1229 0.2635  r=0.2907
++ 70 0.0997 0.2739  r=0.2915
++ 75 0.0717 0.2676  r=0.2770
++ 80 0.0462 0.2619  r=0.2659
++ 85 0.0225 0.2567  r=0.2577
++ 90 -0.0000 0.2477  r=0.2477
++ 95 -0.0209 0.2390  r=0.2399
++100 -0.0406 0.2305  r=0.2341
++105 -0.0596 0.2225  r=0.2304
++110 -0.0784 0.2154  r=0.2292
++115 -0.0982 0.2105  r=0.2323
++120 -0.1180 0.2044  r=0.2360
++125 -0.1373 0.1961  r=0.2393
++130 -0.1560 0.1859  r=0.2427
++135 -0.1741 0.1741  r=0.2462
++140 -0.1964 0.1648  r=0.2563
++145 -0.2207 0.1545  r=0.2694
++150 -0.2477 0.1430  r=0.2860
++155 -0.2686 0.1253  r=0.2964
++160 -0.2723 0.0991  r=0.2897
++165 -0.2806 0.0752  r=0.2905
++170 -0.2747 0.0484  r=0.2790
++175 -0.2692 0.0235  r=0.2702
++180 -0.2638 -0.0000  r=0.2638
++185 -0.2552 -0.0223  r=0.2561
++190 -0.2463 -0.0434  r=0.2501
++195 -0.2376 -0.0637  r=0.2460
++200 -0.2293 -0.0835  r=0.2440
++205 -0.2210 -0.1030  r=0.2438
++210 -0.2127 -0.1228  r=0.2456
++215 -0.2042 -0.1430  r=0.2493
++220 -0.1953 -0.1639  r=0.2550
++225 -0.1859 -0.1859  r=0.2630
++230 -0.1759 -0.2097  r=0.2737
++235 -0.1649 -0.2356  r=0.2876
++240 -0.1494 -0.2587  r=0.2987
++245 -0.1224 -0.2624  r=0.2895
++250 -0.0995 -0.2734  r=0.2909
++255 -0.0716 -0.2672  r=0.2766
++260 -0.0461 -0.2615  r=0.2655
++265 -0.0224 -0.2561  r=0.2571
++270 -0.0000 -0.2475  r=0.2475
++275 0.0209 -0.2386  r=0.2395
++280 0.0406 -0.2303  r=0.2339
++285 0.0596 -0.2223  r=0.2302
++290 0.0783 -0.2150  r=0.2288
++295 0.0980 -0.2102  r=0.2319
++300 0.1178 -0.2041  r=0.2356
++305 0.1372 -0.1959  r=0.2391
++310 0.1559 -0.1857  r=0.2425
++315 0.1739 -0.1739  r=0.2460
++320 0.1961 -0.1645  r=0.2559
++325 0.2204 -0.1543  r=0.2690
++330 0.2474 -0.1428  r=0.2856
++335 0.2693 -0.1256  r=0.2971
++340 0.2627 -0.0956  r=0.2796
++345 0.2566 -0.0688  r=0.2657
++350 0.2511 -0.0443  r=0.2550
++355 0.2431 -0.0213  r=0.2440
+diff --git a/probe_col_rays_2.txt b/probe_col_rays_2.txt
+new file mode 100644
+index 0000000..0bd3b70
+--- /dev/null
++++ b/probe_col_rays_2.txt
+@@ -0,0 +1,73 @@
++th=pi/2 ish theta=-1.5708
++  0 0.2331 -0.0000  r=0.2331
++  5 0.2299 0.0201  r=0.2307
++ 10 0.2299 0.0405  r=0.2335
++ 15 0.2299 0.0616  r=0.2380
++ 20 0.2299 0.0837  r=0.2446
++ 25 0.2298 0.1072  r=0.2536
++ 30 0.2274 0.1313  r=0.2626
++ 35 0.2220 0.1554  r=0.2710
++ 40 0.2161 0.1813  r=0.2821
++ 45 0.2097 0.2097  r=0.2966
++ 50 0.1822 0.2172  r=0.2835
++ 55 0.1521 0.2172  r=0.2651
++ 60 0.1254 0.2173  r=0.2509
++ 65 0.1043 0.2236  r=0.2468
++ 70 0.0837 0.2300  r=0.2448
++ 75 0.0628 0.2344  r=0.2427
++ 80 0.0417 0.2365  r=0.2401
++ 85 0.0206 0.2353  r=0.2362
++ 90 -0.0000 0.2329  r=0.2329
++ 95 -0.0200 0.2283  r=0.2292
++100 -0.0395 0.2240  r=0.2274
++105 -0.0589 0.2197  r=0.2274
++110 -0.0791 0.2172  r=0.2311
++115 -0.1012 0.2171  r=0.2395
++120 -0.1254 0.2173  r=0.2509
++125 -0.1494 0.2133  r=0.2604
++130 -0.1743 0.2077  r=0.2712
++135 -0.2016 0.2016  r=0.2850
++140 -0.2293 0.1924  r=0.2993
++145 -0.2293 0.1606  r=0.2800
++150 -0.2293 0.1324  r=0.2647
++155 -0.2293 0.1069  r=0.2530
++160 -0.2295 0.0835  r=0.2442
++165 -0.2338 0.0627  r=0.2421
++170 -0.2359 0.0416  r=0.2395
++175 -0.2347 0.0205  r=0.2356
++180 -0.2323 -0.0000  r=0.2323
++185 -0.2293 -0.0201  r=0.2302
++190 -0.2294 -0.0404  r=0.2329
++195 -0.2293 -0.0614  r=0.2374
++200 -0.2293 -0.0835  r=0.2440
++205 -0.2293 -0.1069  r=0.2530
++210 -0.2267 -0.1309  r=0.2618
++215 -0.2213 -0.1550  r=0.2702
++220 -0.2155 -0.1808  r=0.2813
++225 -0.2091 -0.2091  r=0.2958
++230 -0.1827 -0.2178  r=0.2843
++235 -0.1718 -0.2453  r=0.2995
++240 -0.1416 -0.2453  r=0.2833
++245 -0.1144 -0.2454  r=0.2708
++250 -0.0893 -0.2455  r=0.2612
++255 -0.0657 -0.2453  r=0.2540
++260 -0.0433 -0.2453  r=0.2491
++265 -0.0215 -0.2454  r=0.2464
++270 -0.0000 -0.2454  r=0.2454
++275 0.0215 -0.2454  r=0.2464
++280 0.0433 -0.2453  r=0.2491
++285 0.0657 -0.2453  r=0.2540
++290 0.0893 -0.2455  r=0.2612
++295 0.1132 -0.2428  r=0.2679
++300 0.1371 -0.2374  r=0.2741
++305 0.1623 -0.2317  r=0.2829
++310 0.1894 -0.2257  r=0.2946
++315 0.2011 -0.2011  r=0.2845
++320 0.2299 -0.1929  r=0.3001
++325 0.2300 -0.1610  r=0.2807
++330 0.2299 -0.1328  r=0.2655
++335 0.2298 -0.1072  r=0.2536
++340 0.2299 -0.0837  r=0.2446
++345 0.2344 -0.0628  r=0.2427
++350 0.2365 -0.0417  r=0.2401
++355 0.2353 -0.0206  r=0.2362
+diff --git a/probe_col_rr.py b/probe_col_rr.py
+new file mode 100644
+index 0000000..8dab04a
+--- /dev/null
++++ b/probe_col_rr.py
+@@ -0,0 +1,5 @@
++from probe_col_lib import R
++from probe_col_bounds import approach
++r=R(2)
++r.goto(0,0.5,-1.75); r.goto(1,-0.5,-1.75)
++print(approach(r,0,(-1,-1.75)), approach(r,1,(1,-1.75)))
+diff --git a/probe_col_seeds.py b/probe_col_seeds.py
+new file mode 100644
+index 0000000..c4cb349
+--- /dev/null
++++ b/probe_col_seeds.py
+@@ -0,0 +1,8 @@
++from env_client import make_env
++env=make_env()
++for s in range(40):
++    obs,_=env.reset(seed=s)
++    ps=[(obs.get(o,'x'),obs.get(o,'y')) for o in obs if o.type.name=='obstacle' and obs.get(o,'half_x')<0.1]
++    if not any(x<-0.6 and y<-0.3 for x,y in ps): print('lander-clear seed',s)
++    if not any(x>0 and x<0.8 and y>1.0 for x,y in ps) : print('r0 topclear',s)
++env.close()
+diff --git a/probe_col_wall.py b/probe_col_wall.py
+new file mode 100644
+index 0000000..f256633
+--- /dev/null
++++ b/probe_col_wall.py
+@@ -0,0 +1,19 @@
++from probe_col_lib import R
++from probe_col_bounds import approach
++import numpy as np, sys
++seed=int(sys.argv[1]); i=int(sys.argv[2]); sg=1 if i==0 else -1
++r=R(seed)
++X=0.30*sg; FAR=1.0*sg
++r.goto(i,sg*1.0,-1.2) if i==0 else r.goto(i,-1.0,-1.2)
++r.goto(i,FAR,-2.2); r.goto(i,X,-2.2)
++res=[]
++for y in np.arange(-2.27,1.56,0.05):
++    if not r.goto(i,X,y):
++        # detour
++        r.goto(i,FAR,r.pos(i)[1]); r.goto(i,FAR,y)
++        if not r.goto(i,X,y): res.append((round(y,2),'blk')); continue
++    p=approach(r,i,(-sg*1.0,y),tol=5e-4)
++    res.append((round(y,2),round(p[0],4)))
++    r.goto(i,X,y)
++bad=[t for t in res if t[1]=='blk' or abs(t[1]-sg*0.2271)>0.002]
++print('seed',seed,'rover',i,'n',len(res),'non-standard:',bad)
+diff --git a/probe_send_a.py b/probe_send_a.py
+new file mode 100644
+index 0000000..caa02e3
+--- /dev/null
++++ b/probe_send_a.py
+@@ -0,0 +1,5 @@
++from probe_send_lib import *
++e=E(0)
++print(e.pose(1)); e.act(1,(0.1,0,0)); print('dx+0.1 at th0',e.pose(1))
++e.act(1,(0,0,0.4)); e.act(1,(0.1,0,0)); print('dx+0.1 at th0.4',e.pose(1))
++print(e.last)
+diff --git a/probe_send_b.py b/probe_send_b.py
+new file mode 100644
+index 0000000..eafd6fa
+--- /dev/null
++++ b/probe_send_b.py
+@@ -0,0 +1,9 @@
++from probe_send_lib import *
++e=E(0)
++sx,sy=e.g('sample3','x'),e.g('sample3','y'); print('s3',sx,sy)
++ok=e.goto(1,sx-0.5,sy); print('reached',ok,e.pose(1),e.t)
++for d in [0.40,0.35,0.30,0.28,0.26,0.255,0.25,0.245,0.24,0.22,0.2,0.1,0.0]:
++    e.goto(1,sx-d,sy)
++    f0=e.flags(); e.act(1,(0,0,0),SEL['sample']); f1=e.flags()
++    print(d,e.pose(1),diff(f0,f1))
++    if diff(f0,f1): break
+diff --git a/probe_send_c.py b/probe_send_c.py
+new file mode 100644
+index 0000000..9f21ff9
+--- /dev/null
++++ b/probe_send_c.py
+@@ -0,0 +1,22 @@
++from probe_send_lib import *
++e=E(0)
++sx,sy=e.g('sample3','x'),e.g('sample3','y')
++e.goto(1,sx-0.5,sy)
++e.goto(1,sx-0.4,sy)
++# motion+op same step: move 0.2 into range and sample
++f0=e.flags(); e.act(1,(0.2,0,0),SEL['sample']); f1=e.flags(); print('move-into-range+sample',e.pose(1),diff(f0,f1))
++# sample again with store full
++f0=e.flags(); e.act(1,(0,0,0),SEL['sample']); print('sample when full',diff(f0,e.flags()))
++f0=e.flags(); e.act(1,(0,0,0),SEL['drop']); print('drop',diff(f0,e.flags()))
++f0=e.flags(); e.act(1,(0,0,0),SEL['sample']); print('resample same',diff(f0,e.flags()))
++f0=e.flags(); e.act(1,(0,0,0),SEL['drop']); print('drop',diff(f0,e.flags()))
++# move out of range + sample in same step
++f0=e.flags(); e.act(1,(-0.2,0,0),SEL['sample']); print('move-out+sample',e.pose(1),diff(f0,e.flags()))
++f0=e.flags(); e.act(1,(0,0,0),SEL['drop']); print('drop',diff(f0,e.flags()))
++# drop with empty store
++f0=e.flags(); e.act(1,(0,0,0),SEL['drop']); print('drop empty',diff(f0,e.flags()))
++# selector band test: -0.7, -0.95
++e.goto(1,sx-0.1,sy)
++for v in [-1.0,-0.7,-0.67,-0.66]:
++    f0=e.flags(); e.act(1,(0,0,0),v); d=diff(f0,e.flags()); print('sel',v,d!={} and 'sampled')
++    e.act(1,(0,0,0),SEL['drop'])
+diff --git a/probe_send_d.py b/probe_send_d.py
+new file mode 100644
+index 0000000..c89b48d
+--- /dev/null
++++ b/probe_send_d.py
+@@ -0,0 +1,17 @@
++from probe_send_lib import *
++import sys
++seed=0; start=(float(sys.argv[1]),float(sys.argv[2])); stepl=float(sys.argv[3]) if len(sys.argv)>3 else 0.02
++e=E(seed)
++sx,sy=e.g('sample3','x'),e.g('sample3','y')
++e.goto(1,sx-0.5,sy); e.goto(1,sx-0.2,sy); e.act(1,(0,0,0),SEL['sample']); e.act(1,(0,0,0),SEL['drop'])
++print('analyzed',e.feats('sample3'))
++for wp in [start]:
++    print("nav",wp,nav(e,1,wp),e.pose(1),e.t)
++L=np.array([-1.9,-2.0])
++p=np.array(e.pose(1)[:2]); dirv=(L-p)/np.linalg.norm(L-p)
++for i in range(400):
++    p=np.array(e.pose(1)[:2]); d=np.linalg.norm(p-L)
++    f0=e.flags(); e.act(1,(0,0,0),SEL['send']); df=diff(f0,e.flags())
++    if df: print('SENT at',p,'dist',round(d,4),df); break
++    mv=dirv*stepl; e.act(1,(mv[0],mv[1],0))
++    if np.linalg.norm(np.array(e.pose(1)[:2])-p)<1e-6: print('blocked at',p,d); break
+diff --git a/probe_send_e.py b/probe_send_e.py
+new file mode 100644
+index 0000000..eb06e21
+--- /dev/null
++++ b/probe_send_e.py
+@@ -0,0 +1,4 @@
++from probe_send_lib import *
++e=E(0)
++p=plan(e,1,(-1.25,2.25)); print(p is None, p and len(p))
++p=plan(e,1,(-1.25,1.0)); print(p is None, p and len(p))
+diff --git a/probe_send_f.py b/probe_send_f.py
+new file mode 100644
+index 0000000..19a6030
+--- /dev/null
++++ b/probe_send_f.py
+@@ -0,0 +1,17 @@
++from probe_send_lib import *
++e=E(1)
++sx,sy=e.g('sample3','x'),e.g('sample3','y')
++print('nav',nav(e,0,(sx+0.15,sy)),e.pose(0))
++f0=e.flags(); e.act(0,(0,0,0),SEL['sample']); print(diff(f0,e.flags()))
++e.act(0,(0,0,0),SEL['drop'])
++L=np.array([-1.9,-2.0])
++pts=[(0.24,y) for y in np.arange(-2.25,1.6,0.25)]+[(x,-2.25) for x in (0.5,1.0)]+[(x,-1.0) for x in (0.5,1.0,1.5)]
++pts.sort(key=lambda p:np.hypot(p[0]-L[0],p[1]-L[1]))
++for p in pts:
++    ok=nav(e,0,p)
++    f0=e.flags(); e.act(0,(0,0,0),SEL['send'])
++    for th in (0.0,1.57,3.14,-1.57):
++        e.turn(0,th); e.act(0,(0,0,0),SEL['send'])
++    df=diff(f0,e.flags())
++    print(p,ok,e.pose(0),round(np.hypot(e.pose(0)[0]-L[0],e.pose(0)[1]-L[1]),3),'SENT' if any(k.startswith('sample') for k in df) else '')
++print(e.t)
+diff --git a/probe_send_g.py b/probe_send_g.py
+new file mode 100644
+index 0000000..a1cffcc
+--- /dev/null
++++ b/probe_send_g.py
+@@ -0,0 +1,20 @@
++from probe_send_lib import *
++import sys
++k=int(sys.argv[1]); tx,ty=float(sys.argv[2]),float(sys.argv[3])
++seed=1 if k==0 else 0; sn='sample3'
++e=E(seed)
++sx,sy=e.g(sn,'x'),e.g(sn,'y')
++off=0.15 if k==0 else -0.15
++nav(e,k,(sx+off,sy)); e.act(k,(0,0,0),SEL['sample']); e.act(k,(0,0,0),SEL['drop'])
++assert e.g(sn,f'analyzed_rover{k}')==1
++import os
++if os.environ.get("MOVE"): print("moved other",nav(e,1-k,tuple(map(float,os.environ["MOVE"].split(",")))))
++ok=nav(e,k,(tx,ty)); L=(-1.9,-2.0)
++res=[]
++for th in eval(sys.argv[4]) if len(sys.argv)>4 else [None,0.0,1.57,3.14,-1.57]:
++    if th is not None: e.turn(k,th)
++    e.act(k,(0,0,0),SEL['send'])
++    if e.g(sn,'received_analysis')==1: res.append(('SENT',e.pose(k)[2])); break
++    res.append(('no',e.pose(k)[2]))
++P=e.pose(k)
++print(f'rover{k} target {(tx,ty)} reached {ok} pose {P} dist {np.hypot(P[0]-L[0],P[1]-L[1]):.3f}',res)
+diff --git a/probe_send_k.py b/probe_send_k.py
+new file mode 100644
+index 0000000..5c25194
+--- /dev/null
++++ b/probe_send_k.py
+@@ -0,0 +1,12 @@
++from probe_send_lib import *
++e=E(1)
++# at_home tolerance
++for dx in [0.01,0.05,0.1,0.15,0.2,0.25,0.3]:
++    e.goto(1,-1.0+dx,-1.75); print('dx',dx,'at_home',e.g('rover1','at_home'))
++e.goto(1,-1.0,-1.75)
++for dy in [0.05,0.1,0.15,0.2,0.3]:
++    e.goto(1,-1.0,-1.75+dy); print('dy',dy,'at_home',e.g('rover1','at_home'))
++e.goto(1,-1.0,-1.75)
++for th in [0.1,0.3,0.6,1.0,1.57,3.14]:
++    e.turn(1,th); print('th',th,'at_home',e.g('rover1','at_home'))
++e.turn(1,0.0); print('back',e.pose(1),e.g('rover1','at_home'))
+diff --git a/probe_send_lib.py b/probe_send_lib.py
+new file mode 100644
+index 0000000..91afdbc
+--- /dev/null
++++ b/probe_send_lib.py
+@@ -0,0 +1,82 @@
++from env_client import make_env
++import numpy as np
++SEL=dict(sample=-0.8333,cal=-0.5,image=-0.1667,noop=0.0,send=0.5,drop=0.8333)
++class E:
++    def __init__(s,seed=0):
++        s.env=make_env(); s.obs,s.info=s.env.reset(seed=seed); s.t=0; s.last=None
++    def g(s,name,f): return float(s.obs.get(s.obs.get_object_from_name(name),f))
++    def objs(s,typ): return [o.name for o in s.obs if o.type.name==typ]
++    def feats(s,name): o=s.obs.get_object_from_name(name); return [round(float(v),4) for v in s.obs.data[o]]
++    def pose(s,k): r=f'rover{k}'; return (round(s.g(r,'x'),4),round(s.g(r,'y'),4),round(s.g(r,'theta'),4))
++    def step(s,a0=(0,0,0,0),a1=(0,0,0,0)):
++        a=np.array(list(a0)+list(a1),dtype=np.float32)
++        s.obs,r,te,tr,inf=s.env.step(a); s.t+=1; s.last=(r,te,tr,inf); return s.last
++    def act(s,k,mv=(0,0,0),sel=0.0):
++        a=list(mv)+[sel]; z=[0,0,0,0]
++        return s.step(a,z) if k==0 else s.step(z,a)
++    def goto(s,k,x,y,tol=0.002,maxit=300):
++        for i in range(maxit):
++            px,py,_=s.pose(k); dx,dy=x-px,y-py
++            if abs(dx)<tol and abs(dy)<tol: return True
++            mx,my=np.clip(dx,-0.2,0.2),np.clip(dy,-0.2,0.2)
++            s.act(k,(mx,my,0))
++            nx,ny,_=s.pose(k)
++            if abs(nx-px)<1e-6 and abs(ny-py)<1e-6:
++                # blocked: try axis separately
++                s.act(k,(mx,0,0)); s.act(k,(0,my,0))
++                nx2,ny2,_=s.pose(k)
++                if abs(nx2-px)<1e-6 and abs(ny2-py)<1e-6: return False
++        return False
++    def turn(s,k,th):
++        for i in range(50):
++            d=(th-s.pose(k)[2]+np.pi)%(2*np.pi)-np.pi
++            if abs(d)<1e-4: return
++            s.act(k,(0,0,np.clip(d,-0.4,0.4)))
++    def flags(s):
++        out={}
++        for o in s.obs:
++            if o.type.name in ('rover','objective','sample'):
++                out[o.name]=s.feats(o.name)
++        return out
++def diff(a,b):
++    return {k:(a[k],b[k]) for k in a if a[k]!=b[k]}
++
++import heapq
++def plan(e,k,goal,clr=0.27,res=0.05):
++    obs=[]
++    for o in e.obs:
++        if o.type.name=='obstacle':
++            n=o.name; obs.append((e.g(n,'x'),e.g(n,'y'),e.g(n,'half_x'),e.g(n,'half_y')))
++    def free(x,y):
++        if abs(x)>2.5-0.2 or abs(y)>2.5-0.2: return False
++        if k==0 and x<0.24: return False
++        if k==1 and x>-0.24: return False
++        for ox,oy,hx,hy in obs:
++            if abs(x-ox)<hx+clr and abs(y-oy)<hy+clr: return False
++        return True
++    st=e.pose(k)[:2]
++    toi=lambda p:(int(round(p[0]/res)),int(round(p[1]/res)))
++    s=toi(st); g=toi(goal)
++    pq=[(0,s)]; came={s:None}; cost={s:0}
++    while pq:
++        _,c=heapq.heappop(pq)
++        if c==g: break
++        for dx in (-1,0,1):
++            for dy in (-1,0,1):
++                if dx==dy==0: continue
++                n=(c[0]+dx,c[1]+dy)
++                if not free(n[0]*res,n[1]*res) and n!=g: continue
++                nc=cost[c]+np.hypot(dx,dy)
++                if n not in cost or nc<cost[n]:
++                    cost[n]=nc; came[n]=c; heapq.heappush(pq,(nc+np.hypot(n[0]-g[0],n[1]-g[1]),n))
++    if g not in came: return None
++    path=[]; c=g
++    while c: path.append((c[0]*res,c[1]*res)); c=came[c]
++    return path[::-1]
++def nav(e,k,goal,clr=0.27):
++    path=plan(e,k,goal,clr)
++    if path is None: return False
++    # compress: follow points
++    for p in path[1:]:
++        e.goto(k,*p,maxit=5)
++    return e.goto(k,*goal,maxit=20)
+diff --git a/probe_send_m.py b/probe_send_m.py
+new file mode 100644
+index 0000000..7509e85
+--- /dev/null
++++ b/probe_send_m.py
+@@ -0,0 +1,9 @@
++from probe_send_lib import *
++e=E(1)
++for r in [0.2,0.21,0.22,0.23,0.24,0.25]:
++    e.goto(1,-1.0+r,-1.75); a=e.g('rover1','at_home')
++    e.goto(1,-1.0+r/np.sqrt(2),-1.75+r/np.sqrt(2)); b=e.g('rover1','at_home')
++    print('r',r,'axis',a,'diag',b)
++e.goto(1,-1.0,-1.75)
++for th in [0.35,0.4,0.45,0.5,0.55,-0.5,-0.55]:
++    e.turn(1,th); print('th',th,e.g('rover1','at_home'))
+diff --git a/probe_send_n.py b/probe_send_n.py
+new file mode 100644
+index 0000000..429a894
+--- /dev/null
++++ b/probe_send_n.py
+@@ -0,0 +1,10 @@
++from probe_send_lib import *
++e=E(1)
++ox,oy=e.g('objective1','x'),e.g('objective1','y'); print('obj',ox,oy)
++for p in [(-1.2,0.5),(-1.4,1.3),(-1.5,1.5)]:
++    print('nav',p,nav(e,1,p),e.pose(1))
++    for th in [None,np.arctan2(oy-p[1],ox-p[0]),0.0]:
++        if th is not None: e.turn(1,th)
++        f0=e.flags(); e.act(1,(0,0,0),SEL['cal']); d1=diff(f0,e.flags())
++        f0=e.flags(); e.act(1,(0,0,0),SEL['image']); d2=diff(f0,e.flags())
++        print(' th',e.pose(1)[2],'cal',d1,'img',d2)
+diff --git a/probe_send_o.py b/probe_send_o.py
+new file mode 100644
+index 0000000..34c934c
+--- /dev/null
++++ b/probe_send_o.py
+@@ -0,0 +1,26 @@
++from probe_send_lib import *
++e=E(1)
++orig=e.step
++log=[]
++def st(a0=(0,0,0,0),a1=(0,0,0,0)):
++    r=orig(a0,a1)
++    if r[1] or r[2]: log.append((e.t,r)); print('TERM/TRUNC at',e.t,r)
++    return r
++e.step=st
++def sendtry(k,names):
++    for th in [None,0.0,1.57,3.14,-1.57]:
++        if th is not None: e.turn(k,th)
++        e.act(k,(0,0,0),SEL['send'])
++def samp(k,n,off):
++    sx,sy=e.g(n,'x'),e.g(n,'y'); print('nav',n,nav(e,k,(sx+off[0],sy+off[1])))
++    e.act(k,(0,0,0),SEL['sample']); e.act(k,(0,0,0),SEL['drop']); print(n,e.feats(n))
++samp(1,'sample1',(0.15,0))
++samp(1,'sample5',(0.15,0))
++print('nav',nav(e,1,(-1.4,1.3))); e.act(1,(0,0,0),SEL['cal']); e.act(1,(0,0,0),SEL['image']); print('obj1',e.feats('objective1'))
++sendtry(1,None); print('after send r1', e.feats('sample1'),e.feats('sample5'),e.feats('objective1'))
++print('nav home',nav(e,1,(-1.0,-1.75))); e.turn(1,0.0); print('r1',e.feats('rover1'),'t',e.t)
++print('nav',nav(e,0,(1.5,1.4))); e.act(0,(0,0,0),SEL['cal']); e.act(0,(0,0,0),SEL['image']); print('obj0',e.feats('objective0'))
++print('nav',nav(e,0,(0.5,-1.5))); sendtry(0,None); print('obj0',e.feats('objective0'))
++print('nav home',nav(e,0,(1.0,-1.75))); print('r0',e.feats('rover0'),e.t,e.last)
++e.turn(0,3.14159); print('r0',e.feats('rover0'),e.t,e.last)
++for i in range(3): e.act(0,(0,0,0),0.0); print(e.t,e.last)
+diff --git a/probe_send_p.py b/probe_send_p.py
+new file mode 100644
+index 0000000..e135c36
+--- /dev/null
++++ b/probe_send_p.py
+@@ -0,0 +1,8 @@
++from probe_send_lib import *
++for s in range(40):
++    e=E(s)
++    ob=[(e.g(n,'x'),e.g(n,'y')) for n in e.objs('objective')]
++    if all(x<0 for x,y in ob):
++        sm=[(n,round(e.g(n,'x'),2),round(e.g(n,'y'),2),e.g(n,'is_soil')) for n in e.objs('sample')]
++        print(s,ob,sm)
++    e.env.close()
+diff --git a/probe_send_q.py b/probe_send_q.py
+new file mode 100644
+index 0000000..f9713ab
+--- /dev/null
++++ b/probe_send_q.py
+@@ -0,0 +1,6 @@
++from probe_send_lib import *
++e=E(3)
++for i in range(1005):
++    r=e.act(1,(0,0,0),0.0)
++    if r[1] or r[2] or i>=997: print(e.t,r)
++    if r[1] or r[2]: break
+diff --git a/probe_vis_a.py b/probe_vis_a.py
+new file mode 100644
+index 0000000..4170678
+--- /dev/null
++++ b/probe_vis_a.py
+@@ -0,0 +1,9 @@
++from probe_vis_lib import *
++e=E(1)
++print(e.rs(0))
++ok=e.path(0,[(1.0,0.0),(2.118,0.0),(2.118,1.0)]); print(ok,e.rs(0))
++# test move frame: does dx move world x with theta=pi?
++for k in range(3):
++    rew=e.step(0,0,0,0,'cal'); print('cal',e.rs(0),rew)
++rew=e.step(0,0,0,0,'img'); print('img',e.rs(0),rew,e.objs())
++rew=e.step(0,0,0,0,'noop'); print(e.rs(0))
+diff --git a/probe_vis_b.py b/probe_vis_b.py
+new file mode 100644
+index 0000000..c4567f2
+--- /dev/null
++++ b/probe_vis_b.py
+@@ -0,0 +1,12 @@
++from probe_vis_lib import *
++e=E(1)
++e.path(0,[(1.0,0.0),(2.118,0.0),(2.118,0.2)])
++o=e.objs()['objective0']
++y=0.2
++while y>-0.3:
++    e.goto(0,2.118,y)
++    e.step(0,0,0,0,'cal'); c=e.rs(0)['calibrated']
++    e.step(0,0,0,0,'img'); c2=e.rs(0)['calibrated']; hi=e.objs()['objective0']['have_image_rover0']
++    st=e.rs(0); d=math.hypot(o['x']-st['x'],o['y']-st['y'])
++    print('y=%.3f d2=%.4f d3=%.4f cal=%d after_img=%d img=%d'%(st['y'],d,math.sqrt(d*d+o['z']**2),c,c2,hi))
++    y-=0.02
+diff --git a/probe_vis_c.py b/probe_vis_c.py
+new file mode 100644
+index 0000000..f2097ab
+--- /dev/null
++++ b/probe_vis_c.py
+@@ -0,0 +1,17 @@
++from probe_vis_lib import *
++for k in range(8):
++    th=-math.pi+k*math.pi/4
++    e=E(1)
++    e.path(0,[(1.0,0.0),(2.118,0.0)])
++    e.turn(0,th)
++    o=e.objs()['objective0']
++    lo,hi=0.2,-0.3
++    for it in range(16):
++        y=(lo+hi)/2
++        e.goto(0,2.118,y,tol=1e-7)
++        e.step(0,0,0,0,'cal'); c=e.rs(0)['calibrated']; e.step(0,0,0,0,'img')
++        if c: lo=y
++        else: hi=y
++    st=e.rs(0)
++    print('theta=%.3f y*=%.5f d2=%.5f'%(st['theta'],lo,math.hypot(o['x']-st['x'],o['y']-lo)))
++    e.close()
+diff --git a/probe_vis_d.py b/probe_vis_d.py
+new file mode 100644
+index 0000000..f6593af
+--- /dev/null
++++ b/probe_vis_d.py
+@@ -0,0 +1,9 @@
++from probe_vis_lib import *
++e=E(1)
++e.path(0,[(1.0,0.0),(2.118,0.0),(2.118,1.0)])
++o=e.objs()['objective0']
++for k in range(16):
++    th=-math.pi+k*2*math.pi/16
++    e.turn(0,th)
++    e.step(0,0,0,0,'cal'); c=e.rs(0)['calibrated']; e.step(0,0,0,0,'img')
++    print('th=%.3f cal=%d'%(e.rs(0)['theta'],c))
+diff --git a/probe_vis_d1.json b/probe_vis_d1.json
+new file mode 100644
+index 0000000..6a737bb
+--- /dev/null
++++ b/probe_vis_d1.json
+@@ -0,0 +1 @@
++{"seed": 4, "obj": "objective2", "data": [[-2.259999990463257, 0.6200000047683716, 3.141592502593994, 1], [-2.259999990463257, 0.6200000047683716, -2.356194496154785, 1], [-2.259999990463257, 0.6200000047683716, -1.5707963705062866, 1], [-2.259999990463257, 0.6200000047683716, -0.7853981256484985, 1], [-2.259999990463257, 0.6200000047683716, -1.192092824453539e-08, 1], [-2.259999990463257, 0.6200000047683716, 0.7853981852531433, 1], [-2.259999990463257, 0.6200000047683716, 1.570796251296997, 1], [-2.259999990463257, 0.6200000047683716, 2.356194496154785, 0], [-2.240000009536743, 0.6200000047683716, -3.141592502593994, 1], [-2.240000009536743, 0.6200000047683716, -2.356194496154785, 1], [-2.240000009536743, 0.6200000047683716, -1.5707963705062866, 1], [-2.240000009536743, 0.6200000047683716, -0.7853981256484985, 1], [-2.240000009536743, 0.6200000047683716, -3.9683722974359625e-09, 1], [-2.240000009536743, 0.6200000047683716, 0.7853981256484985, 1], [-2.240000009536743, 0.6200000047683716, 1.5707963705062866, 1], [-2.240000009536743, 0.6200000047683716, 2.356194496154785, 0], [-2.2200000286102295, 0.6200000047683716, 3.141592502593994, 1], [-2.2200000286102295, 0.6200000047683716, -2.356194496154785, 1], [-2.2200000286102295, 0.6200000047683716, -1.5707963705062866, 1], [-2.2200000286102295, 0.6200000047683716, -0.7853981256484985, 1], [-2.2200000286102295, 0.6200000047683716, 3.984182317395835e-09, 1], [-2.2200000286102295, 0.6200000047683716, 0.7853981256484985, 1], [-2.2200000286102295, 0.6200000047683716, 1.5707963705062866, 0], [-2.2200000286102295, 0.6200000047683716, 2.356194496154785, 0], [-2.200000047683716, 0.6200000047683716, 3.141592502593994, 1], [-2.200000047683716, 0.6200000047683716, -2.356194496154785, 1], [-2.200000047683716, 0.6200000047683716, -1.5707963705062866, 1], [-2.200000047683716, 0.6200000047683716, -0.7853981256484985, 1], [-2.200000047683716, 0.6200000047683716, 1.1936737820406051e-08, 1], [-2.200000047683716, 0.6200000047683716, 0.7853981852531433, 1], [-2.200000047683716, 0.6200000047683716, 1.570796251296997, 0], [-2.200000047683716, 0.6200000047683716, 2.356194496154785, 0], [-2.180000066757202, 0.6200000047683716, 3.141592502593994, 1], [-2.180000066757202, 0.6200000047683716, -2.356194496154785, 1], [-2.180000066757202, 0.6200000047683716, -1.5707963705062866, 1], [-2.180000066757202, 0.6200000047683716, -0.7853981256484985, 1], [-2.180000066757202, 0.6200000047683716, -9.913028620189834e-09, 1], [-2.180000066757202, 0.6200000047683716, 0.7853981852531433, 1], [-2.180000066757202, 0.6200000047683716, 1.570796251296997, 0], [-2.180000066757202, 0.6200000047683716, 2.356194496154785, 0], [-2.1600000858306885, 0.6200000047683716, -3.141592502593994, 1], [-2.1600000858306885, 0.6200000047683716, -2.356194496154785, 1], [-2.1600000858306885, 0.6200000047683716, -1.5707963705062866, 1], [-2.1600000858306885, 0.6200000047683716, -0.7853981256484985, 1], [-2.1600000858306885, 0.6200000047683716, -1.9604726730904076e-09, 1], [-2.1600000858306885, 0.6200000047683716, 0.7853981256484985, 1], [-2.1600000858306885, 0.6200000047683716, 1.5707963705062866, 0], [-2.1600000858306885, 0.6200000047683716, 2.356194496154785, 0], [-2.0999999046325684, 0.6200000047683716, 3.141592502593994, 1], [-2.0999999046325684, 0.6200000047683716, -2.356194496154785, 1], [-2.0999999046325684, 0.6200000047683716, -1.5707963705062866, 1], [-2.0999999046325684, 0.6200000047683716, -0.7853981256484985, 1], [-2.0999999046325684, 0.6200000047683716, 5.9920819417413895e-09, 1], [-2.0999999046325684, 0.6200000047683716, 0.7853981852531433, 0], [-2.0999999046325684, 0.6200000047683716, 1.5707963705062866, 0], [-2.0999999046325684, 0.6200000047683716, 2.356194496154785, 0], [-2.0799999237060547, 0.6200000047683716, 2.756194591522217, 0], [-2.0799999237060547, 0.6200000047683716, 2.756194591522217, 0], [-2.0799999237060547, 0.6200000047683716, 2.756194591522217, 0], [-2.0799999237060547, 0.6200000047683716, 2.756194591522217, 0], [-2.0799999237060547, 0.6200000047683716, 2.356194496154785, 0], [-2.0799999237060547, 0.6200000047683716, 2.356194496154785, 0], [-2.0799999237060547, 0.6200000047683716, 2.356194496154785, 0], [-2.0799999237060547, 0.6200000047683716, 2.356194496154785, 0], [-2.059999942779541, 0.6199999451637268, 2.756194591522217, 0], [-2.059999942779541, 0.6199999451637268, 2.756194591522217, 0], [-2.059999942779541, 0.6199999451637268, 2.756194591522217, 0], [-2.059999942779541, 0.6199999451637268, 2.756194591522217, 0], [-2.059999942779541, 0.6199999451637268, 2.356194496154785, 0], [-2.059999942779541, 0.6199999451637268, 2.356194496154785, 0], [-2.059999942779541, 0.6199999451637268, 2.356194496154785, 0], [-2.059999942779541, 0.6199999451637268, 2.356194496154785, 0], [-2.0399999618530273, 0.6200000047683716, 2.356194496154785, 0], [-2.0399999618530273, 0.6200000047683716, 2.356194496154785, 0], [-2.0399999618530273, 0.6200000047683716, 2.356194496154785, 0], [-2.0399999618530273, 0.6200000047683716, 2.356194496154785, 0], [-2.0399999618530273, 0.6200000047683716, 2.356194496154785, 0], [-2.0399999618530273, 0.6200000047683716, 2.356194496154785, 0], [-2.0399999618530273, 0.6200000047683716, 2.356194496154785, 0], [-2.0399999618530273, 0.6200000047683716, 2.356194496154785, 0], [-1.5, 0.75, 3.141592502593994, 1], [-1.5, 0.75, -2.356194496154785, 1], [-1.5, 0.75, -1.5707963705062866, 1], [-1.5, 0.75, -0.7853981256484985, 1], [-1.5, 0.75, 1.3944637444751606e-08, 1], [-1.5, 0.75, 0.7853981852531433, 1], [-1.5, 0.75, 1.570796251296997, 1], [-1.5, 0.75, 2.356194496154785, 1], [-1.5199999809265137, 0.75, 3.141592502593994, 1], [-1.5199999809265137, 0.75, -2.356194496154785, 1], [-1.5199999809265137, 0.75, -1.5707963705062866, 1], [-1.5199999809265137, 0.75, -0.7853981256484985, 1], [-1.5199999809265137, 0.75, -7.90512899584428e-09, 1], [-1.5199999809265137, 0.75, 0.7853981256484985, 1], [-1.5199999809265137, 0.75, 1.5707963705062866, 1], [-1.5199999809265137, 0.75, 2.356194496154785, 1], [-1.5399999618530273, 0.75, 3.141592502593994, 1], [-1.5399999618530273, 0.75, -2.356194496154785, 1], [-1.5399999618530273, 0.75, -1.5707963705062866, 1], [-1.5399999618530273, 0.75, -0.7853981256484985, 1], [-1.5399999618530273, 0.75, 4.742739534435714e-11, 1], [-1.5399999618530273, 0.75, 0.7853981256484985, 1], [-1.5399999618530273, 0.75, 1.5707963705062866, 1], [-1.5399999618530273, 0.75, 2.356194496154785, 1], [-1.5600000619888306, 0.75, 3.141592502593994, 1], [-1.5600000619888306, 0.75, -2.356194496154785, 1], [-1.5600000619888306, 0.75, -1.5707963705062866, 1], [-1.5600000619888306, 0.75, -0.7853981256484985, 1], [-1.5600000619888306, 0.75, 7.999982898354574e-09, 1], [-1.5600000619888306, 0.75, 0.7853981852531433, 1], [-1.5600000619888306, 0.75, 1.5707963705062866, 1], [-1.5600000619888306, 0.75, 2.356194496154785, 1], [-1.5799999237060547, 0.75, 3.141592502593994, 1], [-1.5799999237060547, 0.75, -2.356194496154785, 1], [-1.5799999237060547, 0.75, -1.5707963705062866, 1], [-1.5799999237060547, 0.75, -0.7853981256484985, 1], [-1.5799999237060547, 0.75, -1.3849783542241312e-08, 1], [-1.5799999237060547, 0.75, 0.7853981852531433, 1], [-1.5799999237060547, 0.75, 1.570796251296997, 1], [-1.5799999237060547, 0.75, 2.356194496154785, 1], [-1.600000023841858, 0.75, 3.141592502593994, 1], [-1.600000023841858, 0.75, -2.356194496154785, 1], [-1.600000023841858, 0.75, -1.5707963705062866, 1], [-1.600000023841858, 0.75, -0.7853981256484985, 1], [-1.600000023841858, 0.75, -5.897227151052675e-09, 1], [-1.600000023841858, 0.75, 0.7853981256484985, 1], [-1.600000023841858, 0.75, 1.5707963705062866, 1], [-1.600000023841858, 0.75, 2.356194496154785, 1], [-1.6200000047683716, 0.75, 3.141592502593994, 1], [-1.6200000047683716, 0.75, -2.356194496154785, 1], [-1.6200000047683716, 0.75, -1.5707963705062866, 1], [-1.6200000047683716, 0.75, -0.7853981256484985, 1], [-1.6200000047683716, 0.75, 2.0553287960467514e-09, 1], [-1.6200000047683716, 0.75, 0.7853981256484985, 1], [-1.6200000047683716, 0.75, 1.5707963705062866, 1], [-1.6200000047683716, 0.75, 2.356194496154785, 1], [-1.6399999856948853, 0.75, 3.141592502593994, 1], [-1.6399999856948853, 0.75, -2.356194496154785, 1], [-1.6399999856948853, 0.75, -1.5707963705062866, 1], [-1.6399999856948853, 0.75, -0.7853981256484985, 1], [-1.6399999856948853, 0.75, 1.0007884299056968e-08, 1], [-1.6399999856948853, 0.75, 0.7853981852531433, 1], [-1.6399999856948853, 0.75, 1.5707963705062866, 1], [-1.6399999856948853, 0.75, 2.356194496154785, 1], [-1.659999966621399, 0.75, 3.141592502593994, 1], [-1.659999966621399, 0.75, -2.356194496154785, 1], [-1.659999966621399, 0.75, -1.5707963705062866, 1], [-1.659999966621399, 0.75, -0.7853981256484985, 1], [-1.659999966621399, 0.75, -1.1841882141538917e-08, 1], [-1.659999966621399, 0.75, 0.7853981852531433, 1], [-1.659999966621399, 0.75, 1.570796251296997, 1], [-1.659999966621399, 0.75, 2.356194496154785, 1], [-1.6800000667572021, 0.75, -3.141592502593994, 1], [-1.6800000667572021, 0.75, -2.356194496154785, 1], [-1.6800000667572021, 0.75, -1.5707963705062866, 1], [-1.6800000667572021, 0.75, -0.7853981256484985, 1], [-1.6800000667572021, 0.75, -3.889326194439491e-09, 1], [-1.6800000667572021, 0.75, 0.7853981256484985, 1], [-1.6800000667572021, 0.75, 1.5707963705062866, 1], [-1.6800000667572021, 0.75, 2.356194496154785, 1], [-1.6999999284744263, 0.75, 3.141592502593994, 1], [-1.6999999284744263, 0.75, -2.356194496154785, 1], [-1.6999999284744263, 0.75, -1.5707963705062866, 1], [-1.6999999284744263, 0.75, -0.7853981256484985, 1], [-1.6999999284744263, 0.75, 4.063228420392306e-09, 1], [-1.6999999284744263, 0.75, 0.7853981256484985, 1], [-1.6999999284744263, 0.75, 1.5707963705062866, 1], [-1.6999999284744263, 0.75, 2.356194496154785, 1], [-1.7200000286102295, 0.75, 3.141592502593994, 1], [-1.7200000286102295, 0.75, -2.356194496154785, 1], [-1.7200000286102295, 0.75, -1.5707963705062866, 1], [-1.7200000286102295, 0.75, -0.7853981256484985, 1], [-1.7200000286102295, 0.75, 1.2015783923402523e-08, 1], [-1.7200000286102295, 0.75, 0.7853981852531433, 1], [-1.7200000286102295, 0.75, 1.570796251296997, 1], [-1.7200000286102295, 0.75, 2.356194496154785, 1], [-1.7400000095367432, 0.75, 3.141592502593994, 1], [-1.7400000095367432, 0.75, -2.356194496154785, 1], [-1.7400000095367432, 0.75, -1.5707963705062866, 1], [-1.7400000095367432, 0.75, -0.7853981256484985, 1], [-1.7400000095367432, 0.75, -9.833982517193363e-09, 1], [-1.7400000095367432, 0.75, 0.7853981852531433, 1], [-1.7400000095367432, 0.75, 1.570796251296997, 1], [-1.7400000095367432, 0.75, 2.356194496154785, 1], [-1.7599999904632568, 0.75, -3.141592502593994, 1], [-1.7599999904632568, 0.75, -2.356194496154785, 1], [-1.7599999904632568, 0.75, -1.5707963705062866, 1], [-1.7599999904632568, 0.75, -0.7853981256484985, 1], [-1.7599999904632568, 0.75, -1.881426570093936e-09, 1], [-1.7599999904632568, 0.75, 0.7853981256484985, 1], [-1.7599999904632568, 0.75, 1.5707963705062866, 1], [-1.7599999904632568, 0.75, 2.356194496154785, 1], [-1.7799999713897705, 0.75, 3.141592502593994, 1], [-1.7799999713897705, 0.75, -2.356194496154785, 1], [-1.7799999713897705, 0.75, -1.5707963705062866, 1], [-1.7799999713897705, 0.75, -0.7853981256484985, 1], [-1.7799999713897705, 0.75, 6.071128044737861e-09, 1], [-1.7799999713897705, 0.75, 0.7853981852531433, 1], [-1.7799999713897705, 0.75, 1.5707963705062866, 1], [-1.7799999713897705, 0.75, 2.356194496154785, 1], [-1.8000000715255737, 0.75, 3.141592502593994, 1], [-1.8000000715255737, 0.75, -2.356194496154785, 1], [-1.8000000715255737, 0.75, -1.5707963705062866, 1], [-1.8000000715255737, 0.75, -0.7853981256484985, 1], [-1.8000000715255737, 0.75, 1.4023683547748078e-08, 1], [-1.8000000715255737, 0.75, 0.7853981852531433, 1], [-1.8000000715255737, 0.75, 1.570796251296997, 1], [-1.8000000715255737, 0.75, 2.356194496154785, 1], [-1.8199999332427979, 0.75, 3.141592502593994, 1], [-1.8199999332427979, 0.75, -2.356194496154785, 1], [-1.8199999332427979, 0.75, -1.5707963705062866, 1], [-1.8199999332427979, 0.75, -0.7853981256484985, 1], [-1.8199999332427979, 0.75, -7.826082892847808e-09, 0], [-1.8199999332427979, 0.75, 0.7853981256484985, 1], [-1.8199999332427979, 0.75, 1.5707963705062866, 1], [-1.8199999332427979, 0.75, 2.356194496154785, 1], [-1.840000033378601, 0.75, 3.141592502593994, 1], [-1.840000033378601, 0.75, -2.356194496154785, 1], [-1.840000033378601, 0.75, -1.5707963705062866, 1], [-1.840000033378601, 0.75, -0.7853981256484985, 1], [-1.840000033378601, 0.75, 1.2647349834082888e-10, 0], [-1.840000033378601, 0.75, 0.7853981256484985, 1], [-1.840000033378601, 0.75, 1.5707963705062866, 1], [-1.840000033378601, 0.75, 2.356194496154785, 1], [-1.8600000143051147, 0.75, 3.141592502593994, 1], [-1.8600000143051147, 0.75, -2.356194496154785, 1], [-1.8600000143051147, 0.75, -1.5707963705062866, 1], [-1.8600000143051147, 0.75, -0.7853981256484985, 1], [-1.8600000143051147, 0.75, 8.079029001351046e-09, 0], [-1.8600000143051147, 0.75, 0.7853981852531433, 0], [-1.8600000143051147, 0.75, 1.5707963705062866, 1], [-1.8600000143051147, 0.75, 2.356194496154785, 1], [-1.8799999952316284, 0.75, 3.141592502593994, 1], [-1.8799999952316284, 0.75, -2.356194496154785, 1], [-1.8799999952316284, 0.75, -1.5707963705062866, 1], [-1.8799999952316284, 0.75, -0.7853981256484985, 1], [-1.8799999952316284, 0.75, -1.377073743924484e-08, 0], [-1.8799999952316284, 0.75, 0.7853981852531433, 0], [-1.8799999952316284, 0.75, 1.570796251296997, 1], [-1.8799999952316284, 0.75, 2.356194496154785, 1], [-1.899999976158142, 0.75, 3.141592502593994, 1], [-1.899999976158142, 0.75, -2.356194496154785, 1], [-1.899999976158142, 0.75, -1.5707963705062866, 1], [-1.899999976158142, 0.75, -0.7853981256484985, 1], [-1.899999976158142, 0.75, -5.8181810480562035e-09, 0], [-1.899999976158142, 0.75, 0.7853981256484985, 0], [-1.899999976158142, 0.75, 1.5707963705062866, 1], [-1.899999976158142, 0.75, 2.356194496154785, 1], [-1.9200000762939453, 0.75, 3.141592502593994, 1], [-1.9200000762939453, 0.75, -2.356194496154785, 1], [-1.9200000762939453, 0.75, -1.5707963705062866, 1], [-1.9200000762939453, 0.75, -0.7853981256484985, 1], [-1.9200000762939453, 0.75, 2.134374899043223e-09, 0], [-1.9200000762939453, 0.75, 0.7853981256484985, 0], [-1.9200000762939453, 0.75, 1.5707963705062866, 0], [-1.9200000762939453, 0.75, 2.356194496154785, 1], [-1.9399999380111694, 0.75, 3.141592502593994, 1], [-1.9399999380111694, 0.75, -2.356194496154785, 1], [-1.9399999380111694, 0.75, -1.5707963705062866, 1], [-1.9399999380111694, 0.75, -0.7853981256484985, 1], [-1.9399999380111694, 0.75, 1.008693040205344e-08, 0], [-1.9399999380111694, 0.75, 0.7853981852531433, 0], [-1.9399999380111694, 0.75, 1.5707963705062866, 0], [-1.9399999380111694, 0.75, 2.356194496154785, 1], [-1.9600000381469727, 0.75, 3.141592502593994, 1], [-1.9600000381469727, 0.75, -2.356194496154785, 1], [-1.9600000381469727, 0.75, -1.5707963705062866, 1], [-1.9600000381469727, 0.75, -0.7853981256484985, 1], [-1.9600000381469727, 0.75, -1.1762836038542446e-08, 0], [-1.9600000381469727, 0.75, 0.7853981852531433, 0], [-1.9600000381469727, 0.75, 1.570796251296997, 0], [-1.9600000381469727, 0.75, 2.356194496154785, 1], [-1.9800000190734863, 0.75, -3.141592502593994, 1], [-1.9800000190734863, 0.75, -2.356194496154785, 1], [-1.9800000190734863, 0.75, -1.5707963705062866, 1], [-1.9800000190734863, 0.75, -0.7853981256484985, 1], [-1.9800000190734863, 0.75, -3.810280091443019e-09, 0], [-1.9800000190734863, 0.75, 0.7853981256484985, 0], [-1.9800000190734863, 0.75, 1.5707963705062866, 0], [-1.9800000190734863, 0.75, 2.356194496154785, 1], [-2.0, 0.75, 3.141592502593994, 1], [-2.0, 0.75, -2.356194496154785, 1], [-2.0, 0.75, -1.5707963705062866, 1], [-2.0, 0.75, -0.7853981256484985, 1], [-2.0, 0.75, 4.142274523388778e-09, 0], [-2.0, 0.75, 0.7853981256484985, 0], [-2.0, 0.75, 1.5707963705062866, 0], [-2.0, 0.75, 2.356194496154785, 0], [-2.0199999809265137, 0.75, 3.141592502593994, 1], [-2.0199999809265137, 0.75, -2.356194496154785, 1], [-2.0199999809265137, 0.75, -1.5707963705062866, 1], [-2.0199999809265137, 0.75, -0.7853981256484985, 1], [-2.0199999809265137, 0.75, 1.2094830026398995e-08, 1], [-2.0199999809265137, 0.75, 0.7853981852531433, 0], [-2.0199999809265137, 0.75, 1.570796251296997, 0], [-2.0199999809265137, 0.75, 2.356194496154785, 0], [-2.0399999618530273, 0.75, 3.141592502593994, 1], [-2.0399999618530273, 0.75, -2.356194496154785, 1], [-2.0399999618530273, 0.75, -1.5707963705062866, 1], [-2.0399999618530273, 0.75, -0.7853981256484985, 1], [-2.0399999618530273, 0.75, -9.754936414196891e-09, 1], [-2.0399999618530273, 0.75, 0.7853981852531433, 0], [-2.0399999618530273, 0.75, 1.570796251296997, 0], [-2.0399999618530273, 0.75, 2.356194496154785, 0], [-2.059999942779541, 0.75, -3.141592502593994, 1], [-2.059999942779541, 0.75, -2.356194496154785, 1], [-2.059999942779541, 0.75, -1.5707963705062866, 1], [-2.059999942779541, 0.75, -0.7853981256484985, 1], [-2.059999942779541, 0.75, -1.8023804670974641e-09, 1], [-2.059999942779541, 0.75, 0.7853981256484985, 0], [-2.059999942779541, 0.75, 1.5707963705062866, 0], [-2.059999942779541, 0.75, 2.356194496154785, 0], [-2.0799999237060547, 0.75, 3.141592502593994, 1], [-2.0799999237060547, 0.75, -2.356194496154785, 1], [-2.0799999237060547, 0.75, -1.5707963705062866, 1], [-2.0799999237060547, 0.75, -0.7853981256484985, 1], [-2.0799999237060547, 0.75, 6.150174147734333e-09, 1], [-2.0799999237060547, 0.75, 0.7853981852531433, 0], [-2.0799999237060547, 0.75, 1.5707963705062866, 0], [-2.0799999237060547, 0.75, 2.356194496154785, 0], [-2.0999999046325684, 0.75, 3.141592502593994, 1], [-2.0999999046325684, 0.75, -2.356194496154785, 1], [-2.0999999046325684, 0.75, -1.5707963705062866, 1], [-2.0999999046325684, 0.75, -0.7853981256484985, 1], [-2.0999999046325684, 0.75, 1.410272965074455e-08, 1], [-2.0999999046325684, 0.75, 0.7853981852531433, 0], [-2.0999999046325684, 0.75, 1.570796251296997, 0], [-2.0999999046325684, 0.75, 2.356194496154785, 0], [-2.1600000858306885, 0.75, 3.141592502593994, 1], [-2.1600000858306885, 0.75, -2.356194496154785, 1], [-2.1600000858306885, 0.75, -1.5707963705062866, 1], [-2.1600000858306885, 0.75, -0.7853981256484985, 1], [-2.1600000858306885, 0.75, -7.747036789851336e-09, 1], [-2.1600000858306885, 0.75, 0.7853981256484985, 1], [-2.1600000858306885, 0.75, 1.5707963705062866, 0], [-2.1600000858306885, 0.75, 2.356194496154785, 0], [-2.180000066757202, 0.75, 3.141592502593994, 1], [-2.180000066757202, 0.75, -2.356194496154785, 1], [-2.180000066757202, 0.75, -1.5707963705062866, 1], [-2.180000066757202, 0.75, -0.7853981256484985, 1], [-2.180000066757202, 0.75, 2.0551960133730063e-10, 1], [-2.180000066757202, 0.75, 0.7853981256484985, 1], [-2.180000066757202, 0.75, 1.5707963705062866, 0], [-2.180000066757202, 0.75, 2.356194496154785, 0], [-2.200000047683716, 0.75, 3.141592502593994, 1], [-2.200000047683716, 0.75, -2.356194496154785, 1], [-2.200000047683716, 0.75, -1.5707963705062866, 1], [-2.200000047683716, 0.75, -0.7853981256484985, 1], [-2.200000047683716, 0.75, 8.158075104347517e-09, 1], [-2.200000047683716, 0.75, 0.7853981852531433, 1], [-2.200000047683716, 0.75, 1.5707963705062866, 1], [-2.200000047683716, 0.75, 2.356194496154785, 0], [-2.2200000286102295, 0.75, 3.141592502593994, 1], [-2.2200000286102295, 0.75, -2.356194496154785, 1], [-2.2200000286102295, 0.75, -1.5707963705062866, 1], [-2.2200000286102295, 0.75, -0.7853981256484985, 1], [-2.2200000286102295, 0.75, -1.3691691336248368e-08, 1], [-2.2200000286102295, 0.75, 0.7853981852531433, 1], [-2.2200000286102295, 0.75, 1.570796251296997, 1], [-2.2200000286102295, 0.75, 2.356194496154785, 0], [-2.240000009536743, 0.75, 3.141592502593994, 1], [-2.240000009536743, 0.75, -2.356194496154785, 1], [-2.240000009536743, 0.75, -1.5707963705062866, 1], [-2.240000009536743, 0.75, -0.7853981256484985, 1], [-2.240000009536743, 0.75, -5.739134945059732e-09, 1], [-2.240000009536743, 0.75, 0.7853981256484985, 1], [-2.240000009536743, 0.75, 1.5707963705062866, 1], [-2.240000009536743, 0.75, 2.356194496154785, 1], [-2.259999990463257, 0.75, 3.141592502593994, 1], [-2.259999990463257, 0.75, -2.356194496154785, 1], [-2.259999990463257, 0.75, -1.5707963705062866, 1], [-2.259999990463257, 0.75, -0.7853981256484985, 1], [-2.259999990463257, 0.75, 2.213421002039695e-09, 1], [-2.259999990463257, 0.75, 0.7853981256484985, 1], [-2.259999990463257, 0.75, 1.5707963705062866, 1], [-2.259999990463257, 0.75, 2.356194496154785, 1], [-2.259999990463257, 0.8799999952316284, 3.141592502593994, 1], [-2.259999990463257, 0.8799999952316284, -2.356194496154785, 1], [-2.259999990463257, 0.8799999952316284, -1.5707963705062866, 1], [-2.259999990463257, 0.8799999952316284, -0.7853981256484985, 1], [-2.259999990463257, 0.8799999952316284, 1.0165976505049912e-08, 1], [-2.259999990463257, 0.8799999952316284, 0.7853981852531433, 1], [-2.259999990463257, 0.8799999952316284, 1.5707963705062866, 1], [-2.259999990463257, 0.8799999952316284, 2.356194496154785, 1], [-2.240000009536743, 0.8799999952316284, 3.141592502593994, 1], [-2.240000009536743, 0.8799999952316284, -2.356194496154785, 1], [-2.240000009536743, 0.8799999952316284, -1.5707963705062866, 1], [-2.240000009536743, 0.8799999952316284, -0.7853981256484985, 1], [-2.240000009536743, 0.8799999952316284, -1.1683789935545974e-08, 1], [-2.240000009536743, 0.8799999952316284, 0.7853981852531433, 1], [-2.240000009536743, 0.8799999952316284, 1.570796251296997, 1], [-2.240000009536743, 0.8799999952316284, 2.356194496154785, 1], [-2.2200000286102295, 0.8800000548362732, -3.141592502593994, 1], [-2.2200000286102295, 0.8800000548362732, -2.356194496154785, 1], [-2.2200000286102295, 0.8800000548362732, -1.5707963705062866, 1], [-2.2200000286102295, 0.8800000548362732, -0.7853981256484985, 1], [-2.2200000286102295, 0.8800000548362732, -3.731233988446547e-09, 1], [-2.2200000286102295, 0.8800000548362732, 0.7853981256484985, 1], [-2.2200000286102295, 0.8800000548362732, 1.5707963705062866, 1], [-2.2200000286102295, 0.8800000548362732, 2.356194496154785, 1], [-2.200000047683716, 0.8799999952316284, 3.141592502593994, 1], [-2.200000047683716, 0.8799999952316284, -2.356194496154785, 1], [-2.200000047683716, 0.8799999952316284, -1.5707963705062866, 1], [-2.200000047683716, 0.8799999952316284, -0.7853981256484985, 1], [-2.200000047683716, 0.8799999952316284, 4.22132062638525e-09, 1], [-2.200000047683716, 0.8799999952316284, 0.7853981256484985, 1], [-2.200000047683716, 0.8799999952316284, 1.5707963705062866, 1], [-2.200000047683716, 0.8799999952316284, 2.356194496154785, 1], [-2.180000066757202, 0.8799999952316284, 3.141592502593994, 1], [-2.180000066757202, 0.8799999952316284, -2.356194496154785, 1], [-2.180000066757202, 0.8799999952316284, -1.5707963705062866, 1], [-2.180000066757202, 0.8799999952316284, -0.7853981256484985, 1], [-2.180000066757202, 0.8799999952316284, 1.2173876129395467e-08, 1], [-2.180000066757202, 0.8799999952316284, 0.7853981852531433, 1], [-2.180000066757202, 0.8799999952316284, 1.570796251296997, 1], [-2.180000066757202, 0.8799999952316284, 2.356194496154785, 0], [-2.1600000858306885, 0.8799999952316284, 3.141592502593994, 1], [-2.1600000858306885, 0.8799999952316284, -2.356194496154785, 1], [-2.1600000858306885, 0.8799999952316284, -1.5707963705062866, 1], [-2.1600000858306885, 0.8799999952316284, -0.7853981256484985, 1], [-2.1600000858306885, 0.8799999952316284, -9.675890311200419e-09, 1], [-2.1600000858306885, 0.8799999952316284, 0.7853981852531433, 1], [-2.1600000858306885, 0.8799999952316284, 1.570796251296997, 1], [-2.1600000858306885, 0.8799999952316284, 2.356194496154785, 0], [-2.0999999046325684, 0.8799999952316284, -3.141592502593994, 1], [-2.0999999046325684, 0.8799999952316284, -2.356194496154785, 1], [-2.0999999046325684, 0.8799999952316284, -1.5707963705062866, 1], [-2.0999999046325684, 0.8799999952316284, -0.7853981256484985, 1], [-2.0999999046325684, 0.8799999952316284, -1.7233343641009924e-09, 1], [-2.0999999046325684, 0.8799999952316284, 0.7853981256484985, 1], [-2.0999999046325684, 0.8799999952316284, 1.5707963705062866, 0], [-2.0999999046325684, 0.8799999952316284, 2.356194496154785, 0], [-2.0799999237060547, 0.8800000548362732, 3.141592502593994, 1], [-2.0799999237060547, 0.8800000548362732, -2.356194496154785, 1], [-2.0799999237060547, 0.8800000548362732, -1.5707963705062866, 1], [-2.0799999237060547, 0.8800000548362732, -0.7853981256484985, 1], [-2.0799999237060547, 0.8800000548362732, 6.229220250730805e-09, 1], [-2.0799999237060547, 0.8800000548362732, 0.7853981852531433, 0], [-2.0799999237060547, 0.8800000548362732, 1.5707963705062866, 0], [-2.0799999237060547, 0.8800000548362732, 2.356194496154785, 0], [-2.059999942779541, 0.8799999952316284, 3.141592502593994, 1], [-2.059999942779541, 0.8799999952316284, -2.356194496154785, 1], [-2.059999942779541, 0.8799999952316284, -1.5707963705062866, 1], [-2.059999942779541, 0.8799999952316284, -0.7853981256484985, 1], [-2.059999942779541, 0.8799999952316284, 1.4181775753741022e-08, 1], [-2.059999942779541, 0.8799999952316284, 0.7853981852531433, 0], [-2.059999942779541, 0.8799999952316284, 1.570796251296997, 0], [-2.059999942779541, 0.8799999952316284, 2.356194496154785, 0], [-2.0399999618530273, 0.8799999952316284, 3.141592502593994, 1], [-2.0399999618530273, 0.8799999952316284, -2.356194496154785, 1], [-2.0399999618530273, 0.8799999952316284, -1.5707963705062866, 1], [-2.0399999618530273, 0.8799999952316284, -0.7853981256484985, 1], [-2.0399999618530273, 0.8799999952316284, -7.667990686854864e-09, 1], [-2.0399999618530273, 0.8799999952316284, 0.7853981256484985, 0], [-2.0399999618530273, 0.8799999952316284, 1.5707963705062866, 0], [-2.0399999618530273, 0.8799999952316284, 2.356194496154785, 0], [-2.0199999809265137, 0.8799999952316284, 3.141592502593994, 1], [-2.0199999809265137, 0.8799999952316284, -2.356194496154785, 1], [-2.0199999809265137, 0.8799999952316284, -1.5707963705062866, 1], [-2.0199999809265137, 0.8799999952316284, -0.7853981256484985, 1], [-2.0199999809265137, 0.8799999952316284, 2.8456570433377237e-10, 1], [-2.0199999809265137, 0.8799999952316284, 0.7853981256484985, 0], [-2.0199999809265137, 0.8799999952316284, 1.5707963705062866, 0], [-2.0199999809265137, 0.8799999952316284, 2.356194496154785, 0], [-2.0, 0.8799999952316284, 3.141592502593994, 1], [-2.0, 0.8799999952316284, -2.356194496154785, 1], [-2.0, 0.8799999952316284, -1.5707963705062866, 1], [-2.0, 0.8799999952316284, -0.7853981256484985, 1], [-2.0, 0.8799999952316284, 8.23712120734399e-09, 1], [-2.0, 0.8799999952316284, 0.7853981852531433, 0], [-2.0, 0.8799999952316284, 1.5707963705062866, 0], [-2.0, 0.8799999952316284, 2.356194496154785, 0], [-1.9800000190734863, 0.8799999952316284, 3.141592502593994, 0], [-1.9800000190734863, 0.8799999952316284, -2.356194496154785, 1], [-1.9800000190734863, 0.8799999952316284, -1.5707963705062866, 1], [-1.9800000190734863, 0.8799999952316284, -0.7853981256484985, 1], [-1.9800000190734863, 0.8799999952316284, -1.3612645233251897e-08, 0], [-1.9800000190734863, 0.8799999952316284, 0.7853981852531433, 0], [-1.9800000190734863, 0.8799999952316284, 1.570796251296997, 0], [-1.9800000190734863, 0.8799999952316284, 2.356194496154785, 0], [-1.9600000381469727, 0.8799999952316284, 3.141592502593994, 1], [-1.9600000381469727, 0.8799999952316284, -2.356194496154785, 1], [-1.9600000381469727, 0.8799999952316284, -1.5707963705062866, 1], [-1.9600000381469727, 0.8799999952316284, -0.7853981256484985, 1], [-1.9600000381469727, 0.8799999952316284, -5.66008884206326e-09, 0], [-1.9600000381469727, 0.8799999952316284, 0.7853981256484985, 0], [-1.9600000381469727, 0.8799999952316284, 1.5707963705062866, 0], [-1.9600000381469727, 0.8799999952316284, 2.356194496154785, 1], [-1.940000057220459, 0.8799999952316284, 3.141592502593994, 1], [-1.940000057220459, 0.8799999952316284, -2.356194496154785, 1], [-1.940000057220459, 0.8799999952316284, -1.5707963705062866, 1], [-1.940000057220459, 0.8799999952316284, -0.7853981256484985, 1], [-1.940000057220459, 0.8799999952316284, 2.2924671050361667e-09, 0], [-1.940000057220459, 0.8799999952316284, 0.7853981256484985, 0], [-1.940000057220459, 0.8799999952316284, 1.5707963705062866, 0], [-1.940000057220459, 0.8799999952316284, 2.356194496154785, 1], [-1.9199999570846558, 0.8799999952316284, 3.141592502593994, 1], [-1.9199999570846558, 0.8799999952316284, -2.356194496154785, 1], [-1.9199999570846558, 0.8799999952316284, -1.5707963705062866, 1], [-1.9199999570846558, 0.8799999952316284, -0.7853981256484985, 1], [-1.9199999570846558, 0.8799999952316284, 1.0245022608046384e-08, 0], [-1.9199999570846558, 0.8799999952316284, 0.7853981852531433, 0], [-1.9199999570846558, 0.8799999952316284, 1.5707963705062866, 0], [-1.9199999570846558, 0.8799999952316284, 2.356194496154785, 1], [-1.899999976158142, 0.8799999952316284, 3.141592502593994, 1], [-1.899999976158142, 0.8799999952316284, -2.356194496154785, 1], [-1.899999976158142, 0.8799999952316284, -1.5707963705062866, 1], [-1.899999976158142, 0.8799999952316284, -0.7853981256484985, 1], [-1.899999976158142, 0.8799999952316284, -1.1604743832549502e-08, 0], [-1.899999976158142, 0.8799999952316284, 0.7853981852531433, 0], [-1.899999976158142, 0.8799999952316284, 1.570796251296997, 1], [-1.899999976158142, 0.8799999952316284, 2.356194496154785, 1], [-1.8799999952316284, 0.8800000548362732, -3.141592502593994, 1], [-1.8799999952316284, 0.8800000548362732, -2.356194496154785, 1], [-1.8799999952316284, 0.8800000548362732, -1.5707963705062866, 1], [-1.8799999952316284, 0.8800000548362732, -0.7853981256484985, 1], [-1.8799999952316284, 0.8800000548362732, -3.6521878854500756e-09, 0], [-1.8799999952316284, 0.8800000548362732, 0.7853981256484985, 0], [-1.8799999952316284, 0.8800000548362732, 1.5707963705062866, 1], [-1.8799999952316284, 0.8800000548362732, 2.356194496154785, 1], [-1.8600000143051147, 0.8799999952316284, 3.141592502593994, 1], [-1.8600000143051147, 0.8799999952316284, -2.356194496154785, 1], [-1.8600000143051147, 0.8799999952316284, -1.5707963705062866, 1], [-1.8600000143051147, 0.8799999952316284, -0.7853981256484985, 1], [-1.8600000143051147, 0.8799999952316284, 4.300366729381722e-09, 0], [-1.8600000143051147, 0.8799999952316284, 0.7853981256484985, 0], [-1.8600000143051147, 0.8799999952316284, 1.5707963705062866, 1], [-1.8600000143051147, 0.8799999952316284, 2.356194496154785, 1], [-1.840000033378601, 0.8799999952316284, 3.141592502593994, 1], [-1.840000033378601, 0.8799999952316284, -2.356194496154785, 1], [-1.840000033378601, 0.8799999952316284, -1.5707963705062866, 1], [-1.840000033378601, 0.8799999952316284, -0.7853981256484985, 1], [-1.840000033378601, 0.8799999952316284, 1.2252922232391938e-08, 0], [-1.840000033378601, 0.8799999952316284, 0.7853981852531433, 0], [-1.840000033378601, 0.8799999952316284, 1.570796251296997, 1], [-1.840000033378601, 0.8799999952316284, 2.356194496154785, 1], [-1.8199999332427979, 0.8799999952316284, 3.141592502593994, 1], [-1.8199999332427979, 0.8799999952316284, -2.356194496154785, 1], [-1.8199999332427979, 0.8799999952316284, -1.5707963705062866, 1], [-1.8199999332427979, 0.8799999952316284, -0.7853981256484985, 1], [-1.8199999332427979, 0.8799999952316284, -9.596844208203947e-09, 0], [-1.8199999332427979, 0.8799999952316284, 0.7853981852531433, 1], [-1.8199999332427979, 0.8799999952316284, 1.570796251296997, 1], [-1.8199999332427979, 0.8799999952316284, 2.356194496154785, 1], [-1.8000000715255737, 0.8799999952316284, -3.141592502593994, 1], [-1.8000000715255737, 0.8799999952316284, -2.356194496154785, 1], [-1.8000000715255737, 0.8799999952316284, -1.5707963705062866, 1], [-1.8000000715255737, 0.8799999952316284, -0.7853981256484985, 1], [-1.8000000715255737, 0.8799999952316284, -1.6442882611045206e-09, 0], [-1.8000000715255737, 0.8799999952316284, 0.7853981256484985, 1], [-1.8000000715255737, 0.8799999952316284, 1.5707963705062866, 1], [-1.8000000715255737, 0.8799999952316284, 2.356194496154785, 1], [-1.7799999713897705, 0.8799999952316284, 3.141592502593994, 1], [-1.7799999713897705, 0.8799999952316284, -2.356194496154785, 1], [-1.7799999713897705, 0.8799999952316284, -1.5707963705062866, 1], [-1.7799999713897705, 0.8799999952316284, -0.7853981256484985, 1], [-1.7799999713897705, 0.8799999952316284, 6.3082663537272765e-09, 1], [-1.7799999713897705, 0.8799999952316284, 0.7853981852531433, 1], [-1.7799999713897705, 0.8799999952316284, 1.5707963705062866, 1], [-1.7799999713897705, 0.8799999952316284, 2.356194496154785, 1], [-1.7599999904632568, 0.8799999952316284, 3.141592502593994, 1], [-1.7599999904632568, 0.8799999952316284, -2.356194496154785, 1], [-1.7599999904632568, 0.8799999952316284, -1.5707963705062866, 1], [-1.7599999904632568, 0.8799999952316284, -0.7853981256484985, 1], [-1.7599999904632568, 0.8799999952316284, 1.4260821856737493e-08, 1], [-1.7599999904632568, 0.8799999952316284, 0.7853981852531433, 1], [-1.7599999904632568, 0.8799999952316284, 1.570796251296997, 1], [-1.7599999904632568, 0.8799999952316284, 2.356194496154785, 1], [-1.7400000095367432, 0.8799999952316284, 3.141592502593994, 1], [-1.7400000095367432, 0.8799999952316284, -2.356194496154785, 1], [-1.7400000095367432, 0.8799999952316284, -1.5707963705062866, 1], [-1.7400000095367432, 0.8799999952316284, -0.7853981256484985, 1], [-1.7400000095367432, 0.8799999952316284, -7.588944583858392e-09, 1], [-1.7400000095367432, 0.8799999952316284, 0.7853981256484985, 1], [-1.7400000095367432, 0.8799999952316284, 1.5707963705062866, 1], [-1.7400000095367432, 0.8799999952316284, 2.356194496154785, 1], [-1.7200000286102295, 0.8799999952316284, 3.141592502593994, 1], [-1.7200000286102295, 0.8799999952316284, -2.356194496154785, 1], [-1.7200000286102295, 0.8799999952316284, -1.5707963705062866, 1], [-1.7200000286102295, 0.8799999952316284, -0.7853981256484985, 1], [-1.7200000286102295, 0.8799999952316284, 3.636118073302441e-10, 1], [-1.7200000286102295, 0.8799999952316284, 0.7853981256484985, 1], [-1.7200000286102295, 0.8799999952316284, 1.5707963705062866, 1], [-1.7200000286102295, 0.8799999952316284, 2.356194496154785, 1], [-1.6999999284744263, 0.8799999952316284, 3.141592502593994, 1], [-1.6999999284744263, 0.8799999952316284, -2.356194496154785, 1], [-1.6999999284744263, 0.8799999952316284, -1.5707963705062866, 1], [-1.6999999284744263, 0.8799999952316284, -0.7853981256484985, 1], [-1.6999999284744263, 0.8799999952316284, 8.316167310340461e-09, 1], [-1.6999999284744263, 0.8799999952316284, 0.7853981852531433, 1], [-1.6999999284744263, 0.8799999952316284, 1.5707963705062866, 1], [-1.6999999284744263, 0.8799999952316284, 2.356194496154785, 1], [-1.6800000667572021, 0.8799999952316284, 3.141592502593994, 1], [-1.6800000667572021, 0.8799999952316284, -2.356194496154785, 1], [-1.6800000667572021, 0.8799999952316284, -1.5707963705062866, 1], [-1.6800000667572021, 0.8799999952316284, -0.7853981256484985, 1], [-1.6800000667572021, 0.8799999952316284, -1.3533599130255425e-08, 1], [-1.6800000667572021, 0.8799999952316284, 0.7853981852531433, 1], [-1.6800000667572021, 0.8799999952316284, 1.570796251296997, 1], [-1.6800000667572021, 0.8799999952316284, 2.356194496154785, 1], [-1.659999966621399, 0.8799999952316284, 3.141592502593994, 1], [-1.659999966621399, 0.8799999952316284, -2.356194496154785, 1], [-1.659999966621399, 0.8799999952316284, -1.5707963705062866, 1], [-1.659999966621399, 0.8799999952316284, -0.7853981256484985, 1], [-1.659999966621399, 0.8799999952316284, -5.581042739066788e-09, 1], [-1.659999966621399, 0.8799999952316284, 0.7853981256484985, 1], [-1.659999966621399, 0.8799999952316284, 1.5707963705062866, 1], [-1.659999966621399, 0.8799999952316284, 2.356194496154785, 1], [-1.6399999856948853, 0.8799999952316284, 3.141592502593994, 1], [-1.6399999856948853, 0.8799999952316284, -2.356194496154785, 1], [-1.6399999856948853, 0.8799999952316284, -1.5707963705062866, 1], [-1.6399999856948853, 0.8799999952316284, -0.7853981256484985, 1], [-1.6399999856948853, 0.8799999952316284, 2.3715132080326384e-09, 1], [-1.6399999856948853, 0.8799999952316284, 0.7853981256484985, 1], [-1.6399999856948853, 0.8799999952316284, 1.5707963705062866, 1], [-1.6399999856948853, 0.8799999952316284, 2.356194496154785, 1], [-1.6200000047683716, 0.8800000548362732, 3.141592502593994, 1], [-1.6200000047683716, 0.8800000548362732, -2.356194496154785, 1], [-1.6200000047683716, 0.8800000548362732, -1.5707963705062866, 1], [-1.6200000047683716, 0.8800000548362732, -0.7853981256484985, 1], [-1.6200000047683716, 0.8800000548362732, 1.0324068711042855e-08, 1], [-1.6200000047683716, 0.8800000548362732, 0.7853981852531433, 1], [-1.6200000047683716, 0.8800000548362732, 1.5707963705062866, 1], [-1.6200000047683716, 0.8800000548362732, 2.356194496154785, 1], [-1.600000023841858, 0.8799999952316284, 3.141592502593994, 1], [-1.600000023841858, 0.8799999952316284, -2.356194496154785, 1], [-1.600000023841858, 0.8799999952316284, -1.5707963705062866, 1], [-1.600000023841858, 0.8799999952316284, -0.7853981256484985, 1], [-1.600000023841858, 0.8799999952316284, -1.152569772955303e-08, 1], [-1.600000023841858, 0.8799999952316284, 0.7853981852531433, 1], [-1.600000023841858, 0.8799999952316284, 1.570796251296997, 1], [-1.600000023841858, 0.8799999952316284, 2.356194496154785, 1], [-1.5800000429153442, 0.8799999952316284, 2.7561943531036377, 1], [-1.5800000429153442, 0.8799999952316284, 2.7561943531036377, 1], [-1.5800000429153442, 0.8799999952316284, 2.7561943531036377, 1], [-1.5800000429153442, 0.8799999952316284, 2.7561943531036377, 1], [-1.5800000429153442, 0.8799999952316284, 3.9523140316077843e-10, 1], [-1.5800000429153442, 0.8799999952316284, 0.7853981256484985, 1], [-1.5800000429153442, 0.8799999952316284, 1.5707963705062866, 1], [-1.5800000429153442, 0.8799999952316284, 2.356194496154785, 1], [-1.559999942779541, 0.8799999952316284, 2.356194496154785, 1], [-1.559999942779541, 0.8799999952316284, 2.356194496154785, 1], [-1.559999942779541, 0.8799999952316284, 2.356194496154785, 1], [-1.559999942779541, 0.8799999952316284, 2.356194496154785, 1], [-1.559999942779541, 0.8799999952316284, 1.956194519996643, 1], [-1.559999942779541, 0.8799999952316284, 1.956194519996643, 1], [-1.559999942779541, 0.8799999952316284, 1.956194519996643, 1], [-1.559999942779541, 0.8799999952316284, 2.356194496154785, 1], [-1.5399999618530273, 0.8799999952316284, 2.356194496154785, 1], [-1.5399999618530273, 0.8799999952316284, 2.356194496154785, 1], [-1.5399999618530273, 0.8799999952316284, 2.356194496154785, 1], [-1.5399999618530273, 0.8799999952316284, 2.356194496154785, 1], [-1.5399999618530273, 0.8799999952316284, 1.956194519996643, 1], [-1.5399999618530273, 0.8799999952316284, 1.956194519996643, 1], [-1.5399999618530273, 0.8799999952316284, 1.956194519996643, 1], [-1.5399999618530273, 0.8799999952316284, 2.356194496154785, 1]]}
+\ No newline at end of file
+diff --git a/probe_vis_data.py b/probe_vis_data.py
+new file mode 100644
+index 0000000..9990e15
+--- /dev/null
++++ b/probe_vis_data.py
+@@ -0,0 +1,18 @@
++from probe_vis_lib import *
++import sys, json, time
++seed=int(sys.argv[1]); ri=int(sys.argv[2]); objn=sys.argv[3]
++path=eval(sys.argv[4]); xs=eval(sys.argv[5]); ys=eval(sys.argv[6]); ths=eval(sys.argv[7]); outf=sys.argv[8]
++e=E(seed)
++print('path',e.path(ri,path))
++data=[]
++t0=time.time()
++for y in ys:
++    for i,x in enumerate(xs if ys.index(y)%2==0 else xs[::-1]):
++        ok=e.goto(ri,x,y,tol=1e-7)
++        if not ok: continue
++        for th in ths:
++            e.turn(ri,th); st=e.rs(ri)
++            e.step(ri,0,0,0,'cal'); c=e.rs(ri)['calibrated']; e.step(ri,0,0,0,'img')
++            data.append((st['x'],st['y'],st['theta'],int(c)))
++json.dump({'seed':seed,'obj':objn,'data':data},open(outf,'w'))
++print(len(data),time.time()-t0)
+diff --git a/probe_vis_dump.py b/probe_vis_dump.py
+new file mode 100644
+index 0000000..e180c61
+--- /dev/null
++++ b/probe_vis_dump.py
+@@ -0,0 +1,15 @@
++from env_client import make_env
++import numpy as np
++env=make_env()
++for s in range(6):
++    obs,_=env.reset(seed=s)
++    print('seed',s)
++    for o in obs:
++        t=o.type.name
++        if t=='obstacle':
++            print(' ',o.name,[round(obs.get(o,f),3) for f in ['x','y','z','half_x','half_y','half_z']])
++        elif t=='objective':
++            print(' ',o.name,[round(obs.get(o,f),3) for f in ['x','y','z']])
++        elif t=='sample':
++            print(' ',o.name,[round(obs.get(o,f),3) for f in ['x','y','is_soil']])
++env.close()
+diff --git a/probe_vis_e.py b/probe_vis_e.py
+new file mode 100644
+index 0000000..d5c35e9
+--- /dev/null
++++ b/probe_vis_e.py
+@@ -0,0 +1,27 @@
++from probe_vis_lib import *
++A,B,D=-0.087,-0.0125,1.99758
++def pred_t(o,u,th):
++    # find t s.t. camera at o + t*u (rover center) dist = D
++    lo,hi=0.5,3.0
++    for _ in range(60):
++        t=(lo+hi)/2; cx=o[0]+t*u[0]+A*math.cos(th)-B*math.sin(th); cy=o[1]+t*u[1]+A*math.sin(th)+B*math.cos(th)
++        if math.hypot(cx-o[0],cy-o[1])<=D: lo=t
++        else: hi=t
++    return lo
++for ang,th in [(-90,0.3),(-75,1.2),(-55,-2.0),(-62,2.8)]:
++    e=E(1)
++    ob=e.objs()['objective1']; o=(ob['x'],ob['y'])
++    u=(math.cos(math.radians(ang)),math.sin(math.radians(ang)))
++    p0=(o[0]+2.3*u[0],o[1]+2.3*u[1])
++    ok=e.path(1,[(-1.0,-1.0),(p0[0],-1.0),p0]); 
++    e.turn(1,th); th=e.rs(1)['theta']
++    lo,hi=1.8,2.3
++    for it in range(16):
++        t=(lo+hi)/2
++        e.goto(1,o[0]+t*u[0],o[1]+t*u[1],tol=1e-7)
++        e.step(1,0,0,0,'cal'); c=e.rs(1)['calibrated']; e.step(1,0,0,0,'img')
++        if c: lo=t
++        else: hi=t
++    # note: here lo= fails side? visible when t small
++    print('ang',ang,'th=%.3f ok=%s measured t*=%.5f predicted %.5f pos=%s'%(th,ok,lo,pred_t(o,u,th),(round(e.rs(1)['x'],3),round(e.rs(1)['y'],3))))
++    e.close()
+diff --git a/probe_vis_f.py b/probe_vis_f.py
+new file mode 100644
+index 0000000..d39f1c2
+--- /dev/null
++++ b/probe_vis_f.py
+@@ -0,0 +1,20 @@
++from probe_vis_lib import *
++from probe_vis_geo import *
++e=E(1)
++ob=e.objs()['objective1']; o=(ob['x'],ob['y'])
++pil=(-1.002,0.435)
++for o_ in e.obs:
++    if o_.name=='obstacle8': pil=(e.obs.get(o_,'x'),e.obs.get(o_,'y'))
++print('pillar',pil)
++print(e.path(1,[(-1.0,-1.0),(-1.9,-1.0),(-1.9,0.3),(-1.25,0.6)]))
++e.turn(1,0.0)
++t=1.75
++for k in range(41):
++    ang=-58+k*0.15
++    u=(math.cos(math.radians(ang)),math.sin(math.radians(ang)))
++    p=(o[0]+t*u[0],o[1]+t*u[1])
++    ok=e.goto(1,*p,tol=1e-7)
++    st=e.rs(1)
++    e.step(1,0,0,0,'cal'); c=e.rs(1)['calibrated']; e.step(1,0,0,0,'img')
++    C=cam(st['x'],st['y'],st['theta'])
++    print('ang=%.2f ok=%d vis=%d boxdist=%.4f ctrdist=%.4f ctrdist_center=%.4f'%(ang,ok,c,seg_box_dist(C,o,pil,(0.05,0.05)),seg_pt_dist(C,o,pil),seg_pt_dist((st['x'],st['y']),o,pil)))
+diff --git a/probe_vis_fit.py b/probe_vis_fit.py
+new file mode 100644
+index 0000000..49a3e0e
+--- /dev/null
++++ b/probe_vis_fit.py
+@@ -0,0 +1,12 @@
++import numpy as np, math
++from scipy.optimize import least_squares
++ox,oy=2.117588520050049,1.9229792356491089
++data=[(-3.142,-0.08519),(-2.356,-0.14425),(-1.571,-0.16156),(-0.785,-0.12606),(0.0,-0.06022),(0.785,-0.00356),(1.571,0.01244),(2.356,-0.02067)]
++def res(p):
++    a,b,D=p; r=[]
++    for th,y in data:
++        th=-math.pi+round((th+math.pi)/(math.pi/4))*math.pi/4
++        cx=2.118+a*math.cos(th)-b*math.sin(th); cy=y+a*math.sin(th)+b*math.cos(th)
++        r.append(math.hypot(ox-cx,oy-cy)-D)
++    return r
++s=least_squares(res,[-0.08,0,2.0]); print(s.x, np.round(s.fun,5))
+diff --git a/probe_vis_fit2.py b/probe_vis_fit2.py
+new file mode 100644
+index 0000000..b3b2ce2
+--- /dev/null
++++ b/probe_vis_fit2.py
+@@ -0,0 +1,22 @@
++import sys, json, math
++from probe_vis_model import *
++from probe_vis_lib import E
++files=sys.argv[1:]
++sets=[]
++for f in files:
++    d=json.load(open(f)); e=E(d['seed'])
++    ob=e.objs()[d['obj']]; obj=(ob['x'],ob['y'],ob['z'])
++    obs=[]
++    for o in e.obs:
++        if o.type.name=='obstacle': obs.append(tuple(e.obs.get(o,k) for k in ['x','y','z','half_x','half_y','half_z']))
++    e.close(); sets.append((obj,obs,d['data']))
++def score(**kw):
++    m=0;n=0
++    for obj,obs,data in sets:
++        for x,y,th,c in data:
++            n+=1; m+= (visible(x,y,th,obj,obs,**kw)!=bool(c))
++    return m,n
++print('2D cam',score(dim3=False))
++print('2D center',score(dim3=False,a=0,b=0))
++for zc in [0.2,0.3,0.4,0.45,0.5,0.52,0.53,0.54,0.55,0.56,0.58,0.6,0.7]:
++    print('3D zc',zc,score(zc=zc), 'center', score(zc=zc,a=0,b=0))
+diff --git a/probe_vis_g.py b/probe_vis_g.py
+new file mode 100644
+index 0000000..bd3bb66
+--- /dev/null
++++ b/probe_vis_g.py
+@@ -0,0 +1,20 @@
++from probe_vis_lib import *
++from probe_vis_geo import *
++import sys
++seed=int(sys.argv[1]); ri=int(sys.argv[2]); objn=sys.argv[3]; piln=sys.argv[4]; yrow=float(sys.argv[5]); x0,x1,dxs=map(float,sys.argv[6:9]); th=float(sys.argv[9])
++path=eval(sys.argv[10])
++e=E(seed)
++ob=e.objs()[objn]; o=(ob['x'],ob['y'])
++for o_ in e.obs:
++    if o_.name==piln: pil=(e.obs.get(o_,'x'),e.obs.get(o_,'y')); h=(e.obs.get(o_,'half_x'),e.obs.get(o_,'half_y'))
++print('obj',o,'pil',pil,h,'path ok',e.path(ri,path))
++e.turn(ri,th)
++x=x0; prev=None
++while (x<=x1+1e-9):
++    ok=e.goto(ri,x,yrow,tol=1e-7); st=e.rs(ri)
++    e.step(ri,0,0,0,'cal'); c=e.rs(ri)['calibrated']; e.step(ri,0,0,0,'img')
++    C=cam(st['x'],st['y'],st['theta'])
++    bd=seg_box_dist(C,o,pil,h); bd0=seg_box_dist((st['x'],st['y']),o,pil,h)
++    line='x=%.4f ok=%d vis=%d camboxdist=%.4f ctrboxdist=%.4f d=%.3f'%(st['x'],ok,c,bd,bd0,math.hypot(C[0]-o[0],C[1]-o[1]))
++    if c!=prev or abs(bd)<0.1: print(line)
++    prev=c; x+=dxs
+diff --git a/probe_vis_geo.py b/probe_vis_geo.py
+new file mode 100644
+index 0000000..69a28ca
+--- /dev/null
++++ b/probe_vis_geo.py
+@@ -0,0 +1,17 @@
++import math, numpy as np
++A,B,D=-0.087,-0.0125,1.99758
++def cam(x,y,th): return (x+A*math.cos(th)-B*math.sin(th), y+A*math.sin(th)+B*math.cos(th))
++def seg_box_dist(p,q,c,h):
++    # distance between segment pq and axis-aligned box center c half h (0 if intersect), via dense sampling + exact
++    best=1e9
++    for t in np.linspace(0,1,4001):
++        x=p[0]+t*(q[0]-p[0]); y=p[1]+t*(q[1]-p[1])
++        dx=max(abs(x-c[0])-h[0],0); dy=max(abs(y-c[1])-h[1],0)
++        # signed penetration
++        if dx==0 and dy==0: d=-min(h[0]-abs(x-c[0]),h[1]-abs(y-c[1]))
++        else: d=math.hypot(dx,dy)
++        best=min(best,d)
++    return best
++def seg_pt_dist(p,q,c):
++    px,py=q[0]-p[0],q[1]-p[1]; t=((c[0]-p[0])*px+(c[1]-p[1])*py)/(px*px+py*py); t=min(1,max(0,t))
++    return math.hypot(p[0]+t*px-c[0],p[1]+t*py-c[1])
+diff --git a/probe_vis_h.py b/probe_vis_h.py
+new file mode 100644
+index 0000000..0c03a00
+--- /dev/null
++++ b/probe_vis_h.py
+@@ -0,0 +1,16 @@
++from probe_vis_lib import *
++from probe_vis_geo import *
++import sys
++e=E(4)
++ob=e.objs()['objective2']; o=(ob['x'],ob['y'])
++e.path(1,[(-1.0,-1.0),(-1.0,0.75),(float(sys.argv[1]),0.75)])
++out=[]
++for k in range(32):
++    th=-math.pi+k*2*math.pi/32
++    e.turn(1,th)
++    r=[]
++    for rep in range(2):
++        e.step(1,0,0,0,'cal'); c=e.rs(1)['calibrated']; e.step(1,0,0,0,'img'); r.append(int(c))
++    st=e.rs(1)
++    out.append('%d%d'%tuple(r)); print(k,round(st['theta'],5),st['x'],st['y'],r)
++print(sys.argv[1],' '.join(out), st['x'],st['y'])
+diff --git a/probe_vis_lib.py b/probe_vis_lib.py
+new file mode 100644
+index 0000000..7bdee06
+--- /dev/null
++++ b/probe_vis_lib.py
+@@ -0,0 +1,40 @@
++from env_client import make_env
++import numpy as np, math
++SEL={'sample':-0.8333,'cal':-0.5,'img':-0.1667,'noop':0.0,'send':0.5,'drop':0.8333}
++class E:
++    def __init__(s,seed):
++        s.env=make_env(); s.obs,_=s.env.reset(seed=seed); s.seed=seed
++    def r(s,i): return s.obs.get_object_from_name('rover%d'%i)
++    def rs(s,i):
++        o=s.r(i); return {f:s.obs.get(o,f) for f in ['x','y','theta','store_full','calibrated','at_home']}
++    def objs(s):
++        out={}
++        for o in s.obs:
++            if o.type.name=='objective':
++                out[o.name]={f:s.obs.get(o,f) for f in ['x','y','z','have_image_rover0','have_image_rover1','received_image']}
++        return out
++    def step(s,i,dx=0,dy=0,dth=0,sel='noop',other=None):
++        a=np.zeros(8,np.float32)
++        a[4*i:4*i+4]=[dx,dy,dth,SEL[sel]]
++        if other is not None: a[4*(1-i):4*(1-i)+4]=other
++        s.obs,rew,te,tr,inf=s.env.step(a); return rew
++    def goto(s,i,x,y,tol=1e-4,maxit=200):
++        for _ in range(maxit):
++            st=s.rs(i); ex=x-st['x']; ey=y-st['y']
++            if abs(ex)<tol and abs(ey)<tol: return True
++            dx=float(np.clip(ex,-0.2,0.2)); dy=float(np.clip(ey,-0.2,0.2))
++            s.step(i,dx,dy)
++            st2=s.rs(i)
++            if abs(st2['x']-st['x'])<1e-9 and abs(st2['y']-st['y'])<1e-9:
++                return False
++        return False
++    def path(s,i,pts):
++        for p in pts:
++            if not s.goto(i,*p): return False
++        return True
++    def turn(s,i,th,maxit=50):
++        for _ in range(maxit):
++            e=(th-s.rs(i)['theta']+math.pi)%(2*math.pi)-math.pi
++            if abs(e)<1e-5: return
++            s.step(i,0,0,float(np.clip(e,-0.4,0.4)))
++    def close(s): s.env.close()
+diff --git a/probe_vis_model.py b/probe_vis_model.py
+new file mode 100644
+index 0000000..2042e7c
+--- /dev/null
++++ b/probe_vis_model.py
+@@ -0,0 +1,25 @@
++import math, json, numpy as np
++def seg_box_hit(p,q,lo,hi):
++    # slab test for 3D segment p->q vs box [lo,hi]
++    t0,t1=0.0,1.0
++    for k in range(len(p)):
++        d=q[k]-p[k]
++        if abs(d)<1e-12:
++            if p[k]<lo[k] or p[k]>hi[k]: return False
++        else:
++            a=(lo[k]-p[k])/d; b=(hi[k]-p[k])/d
++            if a>b: a,b=b,a
++            t0=max(t0,a); t1=min(t1,b)
++            if t0>t1: return False
++    return True
++def visible(rx,ry,th,obj,obstacles,a=-0.087,b=-0.0125,zc=None,D=1.99758,infl=0.0,dim3=True,ozoff=0.0,skip_own=True):
++    cx=rx+a*math.cos(th)-b*math.sin(th); cy=ry+a*math.sin(th)+b*math.cos(th)
++    ox,oy,oz=obj
++    if math.hypot(ox-cx,oy-cy)>D: return False
++    for (x,y,z,hx,hy,hz) in obstacles:
++        if skip_own and abs(x-ox)<=hx and abs(y-oy)<=hy: continue
++        if dim3:
++            if seg_box_hit((cx,cy,zc),(ox,oy,oz+ozoff),(x-hx-infl,y-hy-infl,z-hz),(x+hx+infl,y+hy+infl,z+hz)): return False
++        else:
++            if seg_box_hit((cx,cy),(ox,oy),(x-hx-infl,y-hy-infl),(x+hx+infl,y+hy+infl)): return False
++    return True
+diff --git a/probe_vis_tab.py b/probe_vis_tab.py
+new file mode 100644
+index 0000000..a92da86
+--- /dev/null
++++ b/probe_vis_tab.py
+@@ -0,0 +1,14 @@
++import sys, json, math
++from probe_vis_model import *
++from probe_vis_lib import E
++d=json.load(open(sys.argv[1])); e=E(d['seed'])
++ob=e.objs()[d['obj']]; obj=(ob['x'],ob['y'],ob['z'])
++obs=[tuple(e.obs.get(o,k) for k in ['x','y','z','half_x','half_y','half_z']) for o in e.obs if o.type.name=='obstacle']
++kw=eval(sys.argv[2]) if len(sys.argv)>2 else dict(dim3=False)
++rows={}
++for x,y,th,c in d['data']:
++    rows.setdefault((round(y,3),round(th,2)),[]).append((x,c,visible(x,y,th,obj,obs,**kw)))
++for k in sorted(rows):
++    r=sorted(rows[k])
++    print(k, 'x0=%.2f'%r[0][0], ''.join(str(c) for _,c,_ in r))
++    print(' '*len(str(k)),'model   ',''.join(str(int(p)) for _,_,p in r))
+diff --git a/stats.py b/stats.py
+new file mode 100644
+index 0000000..3fc7d26
+--- /dev/null
++++ b/stats.py
+@@ -0,0 +1,13 @@
++from env_client import make_env
++from collections import Counter
++env = make_env()
++cnt=Counter(); mounds=Counter()
++for seed in range(40):
++    obs, info = env.reset(seed=seed)
++    objs=[o for o in obs if o.type.name=='objective']
++    cnt[len(objs)]+=1
++    for o in objs: mounds[(round(obs.get(o,'x'),1))]+=1
++    smp=[(round(obs.get(o,'x'),2),round(obs.get(o,'y'),2),int(obs.get(o,'is_soil'))) for o in obs if o.type.name=='sample']
++    if seed<8: print(seed,len(objs),[(round(obs.get(o,'x'),2),round(obs.get(o,'y'),2)) for o in objs],smp)
++print(cnt, sorted(mounds.items()))
++env.close()

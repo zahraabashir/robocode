@@ -1,0 +1,58 @@
+diff --git a/probe_los_threshold.py b/probe_los_threshold.py
+new file mode 100644
+index 0000000..a9d4f7b
+--- /dev/null
++++ b/probe_los_threshold.py
+@@ -0,0 +1,18 @@
++import numpy as np
++from env_client import make_env
++from approach import GeneratedApproach
++for seed,rr,points in [(4,1,[(-1.8,0),(-1.75,0),(-1.7,0),(-1.65,0),(-1.6,0)]),(3,0,[(1.4,.1),(1.3,.1),(1.3,.2),(1.2,.1)])]:
++ for pt in points:
++  e=make_env();s,info=e.reset(seed=seed);p=GeneratedApproach(e.action_space,e.observation_space,{});p.reset(s,info)
++  for t in range(55):s,*_=e.step(p.get_action(s))
++  rob=p.rovers[rr]
++  for t in range(6):
++   a=np.zeros(8,np.float32);a[rr*4:rr*4+2]=np.clip(np.array(pt)-p.xy(s,rob),-.2,.2);a[rr*4+3]=-.5 if seed==4 else .5;s,*_=e.step(a)
++  target=p.xy(s,p.objectives[2]) if seed==4 else p.lander
++  start=p.xy(s,rob);d=target-start
++  distances=[]
++  for ob in p.objects(s,'obstacle')+p.rovers:
++   if ob==rob:continue
++   q=p.xy(s,ob);u=np.clip(np.dot(q-start,d)/np.dot(d,d),0,1);distances.append((round(np.linalg.norm(q-start-u*d),3),ob.name))
++  print(seed,pt,'cal',s.get(rob,'calibrated'),'pending',p.pending(s,rr),'near',sorted(distances)[:4])
++  e.close()
+diff --git a/test_results.txt b/test_results.txt
+index e69de29..f73d24f 100644
+--- a/test_results.txt
++++ b/test_results.txt
+@@ -0,0 +1,29 @@
++RESULT 0 {'object_count': 3} True 35 0.459
++RESULT 1 {'object_count': 2} True 22 0.304
++RESULT 2 {'object_count': 3} True 22 0.231
++RESULT 3 {'object_count': 3} True 30 0.413
++RESULT 4 {'object_count': 3} True 25 0.399
++RESULT 5 {'object_count': 3} True 41 0.625
++RESULT 6 {'object_count': 2} True 21 0.251
++RESULT 7 {'object_count': 3} True 32 0.338
++RESULT 8 {'object_count': 3} True 29 0.427
++RESULT 9 {'object_count': 2} True 29 0.476
++RESULT 10 {'object_count': 3} True 28 0.408
++RESULT 11 {'object_count': 1} True 21 0.308
++RESULT 12 {'object_count': 2} True 27 0.252
++RESULT 13 {'object_count': 3} True 36 0.492
++RESULT 14 {'object_count': 1} True 34 0.432
++RESULT 15 {'object_count': 3} True 25 0.331
++RESULT 16 {'object_count': 2} True 26 0.347
++RESULT 17 {'object_count': 3} True 32 0.489
++RESULT 18 {'object_count': 3} True 25 0.37
++RESULT 19 {'object_count': 2} True 30 0.431
++RESULT 20 {'object_count': 3} True 30 0.19
++RESULT 21 {'object_count': 1} True 23 0.402
++RESULT 22 {'object_count': 3} True 26 0.304
++RESULT 23 {'object_count': 1} True 19 0.237
++RESULT 24 {'object_count': 2} True 26 0.357
++RESULT 25 {'object_count': 2} True 23 0.3
++RESULT 26 {'object_count': 3} True 28 0.43
++RESULT 27 {'object_count': 1} True 24 0.32
++RESULT 28 {'object_count': 2} True 44 0.502

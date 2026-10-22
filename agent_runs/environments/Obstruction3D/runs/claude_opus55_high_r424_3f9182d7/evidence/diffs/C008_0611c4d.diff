@@ -1,0 +1,111 @@
+diff --git a/approach.py b/approach.py
+index 415478d..06bcea6 100644
+--- a/approach.py
++++ b/approach.py
+@@ -7,6 +7,7 @@ MAXD = 0.19
+ SAFE_Z = 0.27        # TCP transit height
+ TABLE_Z = 0.075
+ X_RANGE = (0.12, 0.44)
++FINE = 0.004        # max cartesian advance per step near objects
+ FINGER_OFF = 0.052   # finger centre offset along EE x (open)
+ FINGER_HX = 0.011
+ FINGER_HY = 0.013
+@@ -137,12 +138,14 @@ class GeneratedApproach:
+         place_center = np.array([place_xy[0], place_xy[1], support_top + h[2] + 0.002])
+         return [
+             ('move', np.array([p[0], p[1], max(SAFE_Z, gz + 0.05)]), yaw, False),
+-            ('move', np.array([p[0], p[1], gz]), yaw, True),
++            ('move', np.array([p[0], p[1], gz + 0.02]), yaw, False),
++            ('move', np.array([p[0], p[1], gz]), yaw, True, FINE),
+             ('close', obj.name),
++            ('move', np.array([p[0], p[1], gz + 0.03]), yaw, False, FINE),
+             ('move', np.array([p[0], p[1], SAFE_Z]), yaw, False),
+             ('place_move', place_center + np.array([0, 0, SAFE_Z - place_center[2]]), yaw, False),
+             ('place_move', place_center + np.array([0, 0, 0.02]), yaw, False),
+-            ('place_move', place_center, yaw, True),
++            ('place_move', place_center, yaw, True, FINE),
+             ('open', place_center, yaw),
+             ('move_rel_up', SAFE_Z, yaw),
+         ]
+@@ -231,7 +234,7 @@ class GeneratedApproach:
+                 self.retries = 0
+                 c = cmd[1] - np.array([0, 0, 0.002])
+                 self.queue[0] = ('open', c, cmd[2])
+-                self.queue.insert(0, ('place_move', c, cmd[2], True))
++                self.queue.insert(0, ('place_move', c, cmd[2], True, FINE))
+                 return None
+             a[10] = 1.0
+             return a
+@@ -247,7 +250,10 @@ class GeneratedApproach:
+                 pos = p0.copy(); pos[2] = max(pos[2], cmd[1])
+                 yaw = y0 if cmd[2] is None else cmd[2]
+             dy = _wrap(yaw - y0)
+-            n = int(np.ceil(max(np.linalg.norm(pos - p0) / 0.01, abs(dy) / 0.1, 1)))
++            fine = cmd[4] if len(cmd) > 4 else None
++            spacing = fine if fine else 0.01
++            n = int(np.ceil(max(np.linalg.norm(pos - p0) / spacing, abs(dy) / 0.1, 1)))
++            self.fine = fine is not None
+             path = []
+             qc = q.copy()
+             for i in range(1, n + 1):
+@@ -273,8 +279,11 @@ class GeneratedApproach:
+             return None
+         # furthest waypoint reachable in one step
+         k = self.pidx
+-        while k + 1 < len(path) and np.max(np.abs(path[k + 1] - q)) <= MAXD:
+-            k += 1
++        if self.fine:
++            k = min(k + 1, len(path) - 1)
++        else:
++            while k + 1 < len(path) and np.max(np.abs(path[k + 1] - q)) <= MAXD:
++                k += 1
+         self.last_q = q.copy()
+         self.pidx = k
+         a[3:10] = np.clip(path[k] - q, -MAXD, MAXD)
+diff --git a/esc.py b/esc.py
+new file mode 100644
+index 0000000..7887dfd
+--- /dev/null
++++ b/esc.py
+@@ -0,0 +1,28 @@
++import numpy as np
++from env_client import make_env
++import approach, kin
++env=make_env(); obs,info=env.reset(seed=2)
++ap=approach.GeneratedApproach(env.action_space, env.observation_space, {}); ap.reset(obs,info)
++r=obs.get_object_from_name('robot')
++for t in range(40):
++    if obs.get(r,'grasp_active')>0.5: break
++    obs,*_=env.step(ap.get_action(obs))
++print("grasped at", t)
++F=approach.JF
++def state():
++    q=np.array([obs.get(r,f) for f in F]); base=(obs.get(r,'pos_base_x'),obs.get(r,'pos_base_y'),obs.get(r,'pos_base_rot'))
++    return q,base
++for d in []:
++    q,base=state(); M=kin.fk(base,q,0.12)
++    qt,ok=kin.ik(base,q,M[:3,3]+np.array(d),M[:3,:3],tool=0.12)
++    a=np.zeros(11,dtype=np.float32); a[3:10]=qt-q; a[10]=-1
++    obs,*_=env.step(a); q2,_=state()
++    print(d, "moved" if not np.allclose(q,q2) else "REJECTED")
++print("---- 3mm steps")
++o1=obs.get_object_from_name('obstruction1')
++for i in range(30):
++    q,base=state(); M=kin.fk(base,q,0.12)
++    qt,ok=kin.ik(base,q,M[:3,3]+np.array([0,0,0.003]),M[:3,:3],tool=0.12)
++    a=np.zeros(11,dtype=np.float32); a[3:10]=qt-q; a[10]=-1
++    obs,*_=env.step(a); q2,_=state()
++    print(i, round(M[2,3],3), "moved" if not np.allclose(q,q2) else "REJECTED", [round(obs.get(o1,f),3) for f in ['pose_x','pose_y','pose_z']], np.round(qt-q,3))
+diff --git a/show.py b/show.py
+new file mode 100644
+index 0000000..e896f5c
+--- /dev/null
++++ b/show.py
+@@ -0,0 +1,7 @@
++import sys
++from env_client import make_env
++env=make_env(); obs,_=env.reset(seed=int(sys.argv[1]))
++for n in sorted(obs.get_object_names()):
++    if n=='robot': continue
++    o=obs.get_object_from_name(n)
++    print(n,[round(obs.get(o,f),4) for f in ['pose_x','pose_y','pose_z','half_extent_x','half_extent_y','half_extent_z','pose_qz']])
