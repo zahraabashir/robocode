@@ -11,9 +11,9 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from depgraph import build_graph  # noqa: E402
-from is_reactive import as_module  # noqa: E402
-from reactivity import classify, find_decision_function  # noqa: E402
+from policy_graph.depgraph import build_graph  # noqa: E402
+from policy_graph.is_reactive import as_module  # noqa: E402
+from policy_graph.reactivity import classify, find_decision_function  # noqa: E402
 
 
 def write(tmp_path: Path, name: str, src: str) -> Path:

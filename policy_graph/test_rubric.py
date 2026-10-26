@@ -20,8 +20,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from depgraph import build_graph  # noqa: E402
-from reactivity import EntrypointError, PolicyConfig, analyze, classify, find_decision_function  # noqa: E402
+from policy_graph.depgraph import build_graph  # noqa: E402
+from policy_graph.reactivity import EntrypointError, PolicyConfig, analyze, classify, find_decision_function  # noqa: E402
 
 _ids = itertools.count()
 
@@ -1034,6 +1034,182 @@ def test_invariant_pair(tmp_path, name):
     assert {e.kind for e in ra.evidence} == {e.kind for e in rb.evidence}
 
 
+# One grid search with its frontier spelled in different ways. A worklist search is one definition
+# (select an element, take it out, put its successors in, keep a table), so the selection rule, the
+# removal and the container type must not matter.
+SEARCH_BASE = """
+{imports}
+class Policy:
+    def get_action(self, obs):
+        start, goal, walls = obs["start"], obs["goal"], obs["walls"]
+        {init}
+        parent = {{start: None}}
+        while {nonempty}:
+            {select}
+            if x == goal:
+                break
+            for y in ((x[0] + 1, x[1]), (x[0] - 1, x[1]), (x[0], x[1] + 1), (x[0], x[1] - 1)):
+                if y not in walls and y not in parent:
+                    parent[y] = x
+                    {insert}
+        step = goal
+        while parent.get(step) not in (None, start):
+            step = parent[step]
+        return (step[0] - start[0], step[1] - start[1])
+"""
+H = "abs(goal[0] - {c}[0]) + abs(goal[1] - {c}[1])"
+FRONTIER_SPELLINGS = {  # imports, init, loop test, selection (and removal), insertion
+    "list_pop_front": ("", "todo = [start]", "todo", "x = todo.pop(0)", "todo.append(y)"),
+    "stack_pop": ("", "todo = [start]", "todo", "x = todo.pop()", "todo.append(y)"),
+    "deque_popleft": ("from collections import deque", "todo = deque([start])", "todo", "x = todo.popleft()",
+                      "todo.append(y)"),
+    "heap": ("import heapq", "todo = [(0, start)]", "todo", "_, x = heapq.heappop(todo)",
+             f"heapq.heappush(todo, ({H.format(c='y')}, y))"),
+    "min_key_then_remove": ("", "todo = [start]", "todo",
+                            f"x = min(todo, key=lambda c: {H.format(c='c')})\n            todo.remove(x)",
+                            "todo.append(y)"),
+    "set_min_then_discard": ("", "todo = {start}", "todo",
+                             f"x = min(todo, key=lambda c: {H.format(c='c')})\n            todo.discard(x)",
+                             "todo.add(y)"),
+    "sorted_first_then_remove": ("", "todo = [start]", "todo",
+                                 f"x = sorted(todo, key=lambda c: {H.format(c='c')})[0]\n            todo.remove(x)",
+                                 "todo.append(y)"),
+    "index_then_del": ("", "todo = [start]", "todo",
+                       f"i = min(range(len(todo)), key=lambda k: {H.format(c='todo[k]')})\n"
+                       "            x = todo[i]\n            del todo[i]", "todo.append(y)"),
+    "slice_off_the_front": ("", "todo = [start]", "todo", "x = todo[0]\n            todo = todo[1:]",
+                            "todo.append(y)"),
+    "priority_queue": ("import queue", "todo = queue.PriorityQueue()\n        todo.put((0, start))",
+                       "not todo.empty()", "_, x = todo.get()", f"todo.put(({H.format(c='y')}, y))"),
+    "frontier_in_a_field": ("", "self.todo = [start]", "self.todo", "x = self.todo.pop(0)",
+                            "self.todo.append(y)"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(FRONTIER_SPELLINGS))
+def test_frontier_spellings_are_one_search(tmp_path, name):
+    imports, init, nonempty, select, insert = FRONTIER_SPELLINGS[name]
+    src = SEARCH_BASE.format(imports=imports, init=init, nonempty=nonempty, select=select, insert=insert)
+    r = run(tmp_path, src)
+    assert r.verdict == "planning" and r.status == "supported", r.text()
+    assert [e.kind for e in r.evidence] == ["graph-search"], r.text()
+
+
+def test_frontier_with_a_priority_passed_in(tmp_path):
+    """The planning-explanations write-up's §5.1 policy: the pop order is an argument (Best)."""
+    r = run(tmp_path, """
+        def search(pos, priority):
+            root = pos // 2
+            todo = [root]
+            parent = {root: None}
+            while todo:
+                x = min(todo, key=priority)
+                todo.remove(x)
+                if x == 2:
+                    while parent[x] is not None and parent[x] != root:
+                        x = parent[x]
+                    return 0 if x == root else x - root
+                for y in (x - 1, x + 1):
+                    if 0 <= y < 3 and y not in parent:
+                        parent[y] = x
+                        todo.append(y)
+            return 0
+        def policy(pos):
+            return search(pos, lambda x: 2 - x)
+        """)
+    assert r.verdict == "planning" and [e.kind for e in r.evidence] == ["graph-search"], r.text()
+
+
+# Loops that change a container and keep a table but are not a frontier search: each fails one part
+# of the definition (shapes taken from false positives found while checking it on the corpus).
+NOT_FRONTIERS = {
+    # values computed from the vector are not elements of it; the clamp edits it, it removes nothing
+    "iterative_refinement": """
+        import numpy as np
+        class Policy:
+            def get_action(self, obs):
+                x = np.array(obs["q"], dtype=float)
+                w = np.ones(len(x))
+                for _ in range(40):
+                    err = obs["target"] - 2.0 * x
+                    if np.abs(err).max() < 1e-6:
+                        break
+                    if w[0] > 0 and x[0] + err[0] > obs["limit"]:
+                        w[0] = 0.0
+                    x += 0.5 * w * err
+                    x[0] = min(x[0], obs["limit"])
+                return x
+        """,
+    # the list starts afresh every iteration (each pick feeds the next list): nothing is taken out of it
+    "list_rebuilt_each_iteration": """
+        class Policy:
+            def get_action(self, obs):
+                plan, taken, prev = [], set(), obs["start"]
+                for agent in obs["agents"]:
+                    candidates = []
+                    for t in obs["tasks"]:
+                        if t not in taken:
+                            candidates.append((abs(t - prev), t))
+                    if agent in obs["urgent"]:
+                        candidates.append((0, obs["home"]))
+                    cost, target = min(candidates)
+                    taken.add(target)
+                    plan.append(target)
+                    prev = target
+                return plan[0]
+        """,
+    # a task agenda with follow-up tasks; the only "table" is an action array made afresh in every iteration
+    "agenda_without_memory": """
+        import numpy as np
+        class Policy:
+            def get_action(self, obs):
+                for _ in range(8):
+                    a = np.zeros(3)
+                    a[:2] = obs["pos"] - obs["goal"]
+                    if np.max(np.abs(a[:2])) < 1e-3 and self.tasks:
+                        done = self.tasks.pop(0)
+                        self.tasks.append(done + "_check")
+                        continue
+                    return a
+                return np.zeros(3)
+        """,
+    # a history only grows: its last state is read, but nothing is taken out
+    "growing_history": """
+        class Policy:
+            def get_action(self, obs):
+                hist, seen = [obs["pos"]], {obs["pos"]}
+                while len(hist) < 20:
+                    s = hist[-1]
+                    nxt = (s * 3 + 1) % 17
+                    if nxt in seen:
+                        break
+                    seen.add(nxt)
+                    hist.append(nxt)
+                return hist[-1] - obs["pos"]
+        """,
+    # elements are taken out, but no successors are put back
+    "work_queue_without_successors": """
+        class Policy:
+            def get_action(self, obs):
+                todo, done, out = list(obs["jobs"]), set(), []
+                while todo:
+                    x = min(todo, key=lambda j: j["due"])
+                    todo.remove(x)
+                    if x["id"] in done:
+                        continue
+                    done.add(x["id"])
+                    out.append(x["id"])
+                return out[0] if out else None
+        """,
+}
+
+
+@pytest.mark.parametrize("name", sorted(NOT_FRONTIERS))
+def test_container_loops_that_are_not_frontier_searches(tmp_path, name):
+    r = run(tmp_path, NOT_FRONTIERS[name])
+    assert not any(e.kind == "graph-search" for e in r.evidence), r.text()
+
+
 UNRELATED = """
 import itertools
 import networkx as nx
@@ -1190,6 +1366,33 @@ def test_configuration_resolves_opaque_scorer(tmp_path):
     assert as_model.verdict == "planning" and as_model.evidence[0].kind in ("lookahead", "transition-model")
     as_scorer = run(tmp_path, OPAQUE_SCORER, config=PolicyConfig(reactive_scorers=("evaluate",)))
     assert as_scorer.verdict == "reactive" and as_scorer.status == "supported", as_scorer.text()
+
+
+SIMULATOR_POLICY = """
+class Policy:
+    def _simulate(self, s, a):
+        self.sim.set_state(s)
+        nxt = self.sim.step(a)
+        return {returned}
+    def get_action(self, obs):
+        best, best_cost = None, None
+        for a in self.actions:
+            {unpacked} = self._simulate(obs, a)
+            cost = abs(ns - self.goal)
+            if best_cost is None or cost < best_cost:
+                best, best_cost = a, cost
+        return best
+"""
+
+
+def test_configured_transition_model_returning_a_tuple(tmp_path):
+    """A declared model is seen whether its prediction comes back alone or unpacked from a tuple."""
+    cfg = PolicyConfig(transition_models=("Policy._simulate",))
+    alone = run(tmp_path, SIMULATOR_POLICY.format(returned="nxt", unpacked="ns"), config=cfg)
+    pair = run(tmp_path, SIMULATOR_POLICY.format(returned="nxt, self.sim.done", unpacked="ns, done"), config=cfg)
+    for r in (alone, pair):
+        assert r.verdict == "planning", r.text()
+        assert {e.kind for e in r.evidence} == {"transition-model", "lookahead"}, r.text()
 
 
 def test_configured_planner_and_state_fields(tmp_path):

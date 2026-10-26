@@ -1,7 +1,7 @@
 """One-word answer: planning, reactive, or needs_review.
 
-    python agent_runs/tools/policy_graph/is_reactive.py my_policy.py
-    pbpaste | python agent_runs/tools/policy_graph/is_reactive.py      # code from the clipboard
+    python policy_graph/is_reactive.py my_policy.py
+    pbpaste | python policy_graph/is_reactive.py      # code from the clipboard
 
 ``needs_review`` means no planning was found but something unresolved (a missing
 module, an opaque scorer, ...) could change that; it is never printed as "reactive".
@@ -16,10 +16,10 @@ import tempfile
 import textwrap
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from depgraph import build_graph  # noqa: E402
-from reactivity import EntrypointError, classify, find_decision_function  # noqa: E402
+from policy_graph.depgraph import build_graph  # noqa: E402
+from policy_graph.reactivity import EntrypointError, classify, find_decision_function  # noqa: E402
 
 
 def as_module(src: str) -> str:

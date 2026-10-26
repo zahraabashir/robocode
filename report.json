@@ -1,0 +1,59 @@
+{
+  "decision": "2.get_action",
+  "verdict": "planning",
+  "label": "planning",
+  "status": "supported",
+  "planning": true,
+  "entrypoint": "name",
+  "rubric_version": "planning-rubric-2 (2026-10-20)",
+  "evidence": [
+    {
+      "kind": "lookahead",
+      "rule": "evaluates hypothetical consequences of candidates and chooses by them",
+      "what": "look-ahead: candidates are scored by the predicted outcome `obs - a` and chosen by .index",
+      "function": "2.get_action",
+      "file": "/Users/zahra.bashir/Desktop/phd/robocode/policy_graph/cases/2.py",
+      "line": 8,
+      "influence": "prediction to scores: op-@6 -> call:abs@6 -> op+=@6 -> score@6 -> scores.weak@7  [data]; chosen value to action: call:method:index@8 -> <return>@8 -> return:2.get_action  [data]",
+      "sites": [
+        [
+          "prediction",
+          "/Users/zahra.bashir/Desktop/phd/robocode/policy_graph/cases/2.py",
+          6
+        ],
+        [
+          "choice",
+          "/Users/zahra.bashir/Desktop/phd/robocode/policy_graph/cases/2.py",
+          8
+        ],
+        [
+          "action",
+          "/Users/zahra.bashir/Desktop/phd/robocode/policy_graph/cases/2.py",
+          1
+        ]
+      ],
+      "assumptions": [
+        "`obs - a` is read as the state after applying a candidate (additive transition)",
+        "the chosen candidate becomes the action through a state-independent encoding"
+      ]
+    }
+  ],
+  "review_reasons": [],
+  "notes": [],
+  "pruned": [],
+  "coverage": {
+    "modules": [
+      "2"
+    ],
+    "unresolved_imports": [],
+    "parse_errors": [],
+    "action_slice_calls": {
+      "builtin": 3,
+      "method": 2
+    },
+    "state_sources": [
+      "param:get_action.obs",
+      "param:get_action.self"
+    ]
+  }
+}

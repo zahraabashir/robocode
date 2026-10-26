@@ -72,7 +72,7 @@ DATA_KINDS = ("data", "arg", "ret", "field_write", "base", "iter")  # value flow
 MUTATING_METHODS = frozenset({
     "append", "appendleft", "extend", "extendleft", "insert", "add", "update", "pop",
     "popleft", "popitem", "remove", "discard", "clear", "sort", "reverse", "setdefault",
-    "fill", "put", "put_nowait", "push", "resize", "itemset",
+    "fill", "put", "put_nowait", "push", "resize", "itemset", "get_nowait",
 })
 # Calls whose result is their first argument's value, converted or copied.
 COPY_CALLS = frozenset({"int", "float", "list", "tuple", "copy.copy", "copy.deepcopy", "numpy.array",
@@ -80,9 +80,11 @@ COPY_CALLS = frozenset({"int", "float", "list", "tuple", "copy.copy", "copy.deep
 # Method calls whose result is (part of) their receiver: ``d.get(k)``, ``x.reshape(...)``.
 RECEIVER_PART_CALLS = frozenset({"method:get", "method:item", "method:tolist", "method:astype", "method:reshape",
                                  "method:flatten", "method:ravel", "method:squeeze", "method:values", "method:keys",
-                                 "method:items", "method:view"})
+                                 "method:items", "method:view", "method:pop", "method:popleft", "method:popitem",
+                                 "method:get_nowait"})
 # Calls whose result is one of their arguments (or one of its elements).
-SELECTING_CALLS = frozenset({"min", "max", "sorted", "reversed", "heapq.nsmallest", "heapq.nlargest"})
+SELECTING_CALLS = frozenset({"min", "max", "sorted", "reversed", "heapq.nsmallest", "heapq.nlargest",
+                             "heapq.heappop", "heapq.heappushpop", "heapq.heapreplace"})
 # Library functions that mutate their first argument.
 FIRST_ARG_MUTATORS = frozenset({
     "heapq.heappush", "heapq.heappop", "heapq.heapify", "heapq.heapreplace",
@@ -141,7 +143,7 @@ class Node:
         if self.kind == "return":
             return f"{self.name}:{self.scope}"
         if self.kind == "call":
-            return f"call:{self.name}@{self.line}"
+            return f"call:{self.name}@{self.line}{self.detail}"
         if self.kind == "op":
             return f"op{self.name}@{self.line}"
         return f"{self.name}{self.detail}@{self.line}"
@@ -194,13 +196,11 @@ class BestUpdate:
 
 @dataclass
 class Frontier:
-    """A search loop shape: a worklist that is popped and refilled, or a layered expansion."""
+    """A search loop shape: a candidate worklist (checked on the graph), a layered expansion or a relaxation."""
 
     kind: str  # worklist | layered | relaxation
     container: str  # the frontier (worklist), the layer iterated over (layered) or the cost table (relaxation)
     line: int
-    pops: list[ast.Call] = field(default_factory=list)
-    pushes: list[ast.Call] = field(default_factory=list)
     closed: list[str] = field(default_factory=list)  # visited / cost / parent tables (worklist); predecessors (relaxation)
     next_layer: str = ""  # container filled from each element's successors (layered)
     inner: tuple[int, int] = (0, 0)  # lines of the loop over the current layer (layered)
@@ -703,6 +703,13 @@ def _dotted(expr: ast.expr) -> str | None:
     return None
 
 
+def _mutates_receiver(c: ast.Call) -> bool:
+    """``x.m(...)`` changes ``x``: a mutating method, or ``q.get()`` without a positional argument
+    (a queue hands out an element and drops it; ``d.get(k)`` only reads)."""
+    return isinstance(c.func, ast.Attribute) and (c.func.attr in MUTATING_METHODS
+                                                  or (c.func.attr == "get" and not c.args))
+
+
 def _root_dotted(expr: ast.expr) -> str | None:
     """`best[0]` -> 'best', `self.best[i] - 1e-9` -> 'self.best' (first operand of arithmetic)."""
     while isinstance(expr, (ast.Subscript, ast.BinOp, ast.UnaryOp)):
@@ -766,7 +773,7 @@ def _field_write_summaries(g: DependencyGraph) -> dict[str, set[str]]:
             elif isinstance(n, (ast.AugAssign, ast.AnnAssign)):
                 targets = [n.target]
             elif isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute):
-                if n.func.attr in MUTATING_METHODS:
+                if _mutates_receiver(n):
                     targets = [n.func.value]
                 if isinstance(n.func.value, ast.Name) and n.func.value.id == me:
                     callee = _resolve_method(g, fn.cls, n.func.attr)
@@ -847,7 +854,7 @@ def _constant_fields(g: DependencyGraph) -> tuple[dict[str, object], set[str]]:
                         dynamic = True
                 elif fname in ("vars", "object.__setattr__"):
                     dynamic = True
-                elif isinstance(n.func, ast.Attribute) and n.func.attr in MUTATING_METHODS:
+                elif _mutates_receiver(n):
                     targets, value, replaces = [n.func.value], None, False
             for t in targets:
                 for leaf in _flatten_targets(t):
@@ -1470,7 +1477,7 @@ class _Analyzer:
         elif (external in COPY_CALLS or external in RECEIVER_PART_CALLS) and recv:  # x.copy(), d.get(k)
             self.link((), cn, copies=recv)
         elif external in SELECTING_CALLS:  # the result is one of the alternatives
-            sources = arg_exprs[1:2] if external.startswith("heapq.") else arg_exprs
+            sources = arg_exprs[1:2] if external in ("heapq.nsmallest", "heapq.nlargest") else arg_exprs
             self.link((), cn, copies=set().union(*(self.copied(a) for a in sources)) if sources else ())
         callbacks = self.bind_callbacks(c, cn, external if not callees else None, arg_exprs, env)
         site = CallSite(cn, callees[0] if callees else None, None if callees else external, self.scope, c,
@@ -1502,7 +1509,7 @@ class _Analyzer:
                     env[key] = self.lookup(env, key) | self.fallback(key)
         # in-place mutation of the receiver or first argument
         target = None
-        if isinstance(c.func, ast.Attribute) and c.func.attr in MUTATING_METHODS:
+        if _mutates_receiver(c):
             target = c.func.value
         elif external in FIRST_ARG_MUTATORS and c.args:
             target = c.args[0]
@@ -1631,7 +1638,8 @@ class _Analyzer:
     def unpacked_parts(self, t: ast.expr, value: ast.expr) -> set[Node] | dict[int, tuple[set[Node], set[Node]]]:
         """Copies for ``a, b = value``, element by element when the elements are known: a tuple
         literal, or a call to a function whose every return is a tuple of that length. Then each
-        target depends only on its own element."""
+        target depends only on its own element, which reaches it through a node of this call site
+        (``call:f@10[0]``), so the call stays on the path from the callee to the target."""
         if not isinstance(t, (ast.Tuple, ast.List)) or any(isinstance(x, ast.Starred) for x in t.elts):
             return self.copied(value)
         n = len(t.elts)
@@ -1643,7 +1651,14 @@ class _Analyzer:
             info = self.g.functions.get(cs.callee) if cs and cs.callee and len(cs.callees) == 1 else None
             if info is None or _tuple_return_arity(info.node) != n:
                 return self.copied(value)
-            parts = [({_element_return(info, i)}, {_element_return(info, i)}) for i in range(n)]
+            parts = []
+            for i in range(n):
+                elem = _element_return(info, i)
+                via = Node("call", cs.node.name, self.scope, cs.node.file, cs.node.line, cs.node.col, f"[{i}]")
+                self.g.nodes.add(via)
+                self.g.add_edge(elem, via, "ret")
+                self.g.copies.add((elem, via))
+                parts.append(({via}, {via}))
         out: dict[int, tuple[set[Node], set[Node]]] = {}
         for sub, part in zip(t.elts, parts):
             for leaf in _flatten_targets(sub):
@@ -1749,6 +1764,10 @@ class _Analyzer:
                 self.assign(s.target, deps, env, ctrl, s, copies)
             else:
                 self.weak_update(s.target, deps, env, ctrl, s, copies)
+        elif isinstance(s, ast.Delete):  # `del c[k]`: the container changes in place
+            for t in s.targets:
+                if isinstance(t, ast.Subscript):
+                    self.weak_update(t, self.expr(t.slice, env), env, ctrl, s)
         elif isinstance(s, ast.Expr):
             self.expr(s.value, env)
         elif isinstance(s, ast.If):
@@ -1921,32 +1940,14 @@ class _Analyzer:
                 info.best_updates.append(BestUpdate(n.lineno, n.col_offset, getattr(n, "end_lineno", n.lineno), var,
                                                     sorted({a[0] for a in assigns} - {var}),
                                                     [(a[1], a[2]) for a in assigns]))
-        # worklist (in `while q:` or a bounded `for _ in range(n):` loop): pop an element, push its successors,
-        # and remember visited ones
-        # The pop belongs to this loop's own body (a loop that merely contains a search loop is not one);
-        # successors may be pushed from an inner loop over neighbours.
-        pops: dict[str, list[ast.Call]] = defaultdict(list)
-        pushes: dict[str, list[ast.Call]] = defaultdict(list)
-        own = {id(n) for n in _walk(s.body, into_loops=False)}
-        for n in _walk(s.body, into_loops=True):
-            if not isinstance(n, ast.Call):
-                continue
-            q = self.qualify(_dotted(n.func)) if _dotted(n.func) else ""
-            if q in ("heapq.heappop", "heapq.heappushpop", "heapq.heapreplace") and n.args and id(n) in own:
-                pops[_root_dotted(n.args[0])].append(n)
-            if q in ("heapq.heappush", "heapq.heappushpop", "heapq.heapreplace") and n.args:
-                pushes[_root_dotted(n.args[0])].append(n)
-            if isinstance(n.func, ast.Attribute):
-                cont = _dotted(n.func.value)
-                if n.func.attr in ("pop", "popleft") and id(n) in own:
-                    pops[cont].append(n)
-                if n.func.attr in ("append", "appendleft", "extend", "add", "put"):
-                    pushes[cont].append(n)
-        for frontier in sorted(set(pops) & set(pushes) - {None}):
+        # worklist candidates (in `while q:` or a bounded `for _ in range(n):` loop): containers the loop's own
+        # body changes (a loop that merely contains a search loop is not one), with a visited/cost/parent
+        # table. Whether an element is selected from one, taken out and replaced by its successors is decided
+        # on the dependency graph (reactivity.py), whatever the selection and removal are spelled as.
+        for frontier in sorted(self._changed_containers(s.body)):
             closed = self._closed_tables(s, frontier)
             if closed:
-                info.frontiers.append(Frontier("worklist", frontier, s.lineno, pops[frontier], pushes[frontier],
-                                               closed))
+                info.frontiers.append(Frontier("worklist", frontier, s.lineno, closed=closed))
         self._scan_relaxation(s, info)
         for inner in _walk(s.body, into_loops=True):  # layered: expand every element of the current layer
             if not isinstance(inner, (ast.For, ast.AsyncFor)):
@@ -1997,6 +1998,30 @@ class _Analyzer:
             if keys and preds and roots:
                 info.frontiers.append(Frontier("relaxation", table, s.lineno, closed=preds,
                                                writes=[st[2] for st in mine], value_roots=roots))
+
+    def _changed_containers(self, stmts: list[ast.stmt]) -> set[str]:
+        """Containers the statements change, not counting nested loops: in place (a mutating method,
+        ``heapq.heappop(c)``, ``c[k] = v``, ``del c[k]``, ``c += v``) or rebuilt from themselves
+        (``c = c[1:]``)."""
+        out: set[str | None] = set()
+        for n in _walk(stmts, into_loops=False):
+            if isinstance(n, ast.Call):
+                q = self.qualify(_dotted(n.func)) if _dotted(n.func) else ""
+                if q in FIRST_ARG_MUTATORS and n.args:
+                    out.add(_root_dotted(n.args[0]))
+                elif _mutates_receiver(n):
+                    out.add(_dotted(n.func.value))
+            elif isinstance(n, (ast.Assign, ast.AugAssign, ast.AnnAssign, ast.Delete)):
+                targets = n.targets if isinstance(n, (ast.Assign, ast.Delete)) else [n.target]
+                value = getattr(n, "value", None)
+                reads = {_dotted(x) for x in ast.walk(value)} if value is not None else set()
+                for t in targets:
+                    for leaf in _flatten_targets(t):
+                        if isinstance(leaf, ast.Subscript):
+                            out.add(_root_dotted(leaf))
+                        elif isinstance(n, ast.AugAssign) or _dotted(leaf) in reads:
+                            out.add(_dotted(leaf))
+        return out - {None}
 
     @staticmethod
     def _closed_tables(s: ast.While | ast.For, frontier: str) -> list[str]:

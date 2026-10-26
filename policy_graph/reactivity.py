@@ -25,10 +25,12 @@ of the decision function's return value, with unreachable code already removed)
 planner-call      a call to a contracted planner (``PLANNERS``: shortest-path and routing
                   libraries, OMPL, ...) or a planner named in ``PolicyConfig.planners``.
                   The planner may return its already-selected route or plan.
-graph-search      a hand-written search loop: a worklist that is popped and refilled with
-                  successors of the popped element and consults a visited/cost/parent
-                  table (BFS, Dijkstra, A*), or a layered expansion in which each element
-                  of the current layer adds successors to the next layer.
+graph-search      a hand-written search loop: a worklist, where each iteration selects an
+                  element of a container (however the choice is spelled), takes it out
+                  and puts its successors in, while the loop keeps a visited/cost/parent
+                  table (BFS, DFS, Dijkstra, A*; see ``_frontier_element``), or a layered
+                  expansion in which each element of the current layer adds successors
+                  to the next layer.
 tree-search       recursion that branches over alternatives (in a loop or comprehension,
                   or at two or more call sites) and selects among the results (min, max,
                   best-so-far, or a test on a recursive result, as in backtracking).
@@ -75,8 +77,9 @@ import re
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from pathlib import Path
+from policy_graph.scoring import PlanningScores, quantify
 
-from depgraph import (DATA_KINDS, EDGE_KINDS, MUTATING_METHODS, OPTIMISERS, CallSite, DependencyGraph, Node,
+from policy_graph.depgraph import (DATA_KINDS, EDGE_KINDS, MUTATING_METHODS, OPTIMISERS, CallSite, DependencyGraph, Node,
                       _field_owner, _walk, build_graph)
 
 RUBRIC_VERSION = "planning-rubric-2 (2026-10-20)"
@@ -238,6 +241,15 @@ class Report:
     entrypoint: str = "explicit"  # explicit | name | generic name
     coverage: dict = field(default_factory=dict)
     rubric_version: str = RUBRIC_VERSION
+    scores: PlanningScores = field(default_factory=PlanningScores)
+
+    @property
+    def planning_depth(self) -> int | None:
+        return self.scores.depth
+
+    @property
+    def planning_work(self) -> int | None:
+        return self.scores.work
 
     @property
     def label(self) -> str:
@@ -250,6 +262,7 @@ class Report:
     def text(self) -> str:
         lines = [f"decision function: {self.decision}  (entrypoint: {self.entrypoint})",
                  f"verdict: {self.verdict}  (label: {self.label}; status: {self.status}; rubric: {self.rubric_version})"]
+        lines.extend(self.scores.text())
         if self.evidence:
             lines.append("because:")
             for e in sorted(self.evidence, key=lambda e: (e.file, e.line)):
@@ -271,6 +284,8 @@ class Report:
 
     def to_dict(self) -> dict:
         return {"decision": self.decision, "verdict": self.verdict, "label": self.label, "status": self.status,
+                "planning_depth": self.planning_depth, "planning_work": self.planning_work,
+                "scores": self.scores.to_dict(),
                 "planning": self.planning, "entrypoint": self.entrypoint, "rubric_version": self.rubric_version,
                 "evidence": [e.to_dict() for e in self.evidence],
                 "review_reasons": [i.to_dict() for i in self.review_reasons],
@@ -584,6 +599,86 @@ class _Classifier:
                     stack.append(u)
         return seen
 
+    def _frontier_element(self, fr, f, loop) -> Node | None:
+        """The worklist definition, checked on the graph. In one iteration of ``loop`` over container C:
+
+        1. an element x is selected from C: a value the loop's own body takes from C unchanged, however
+           the choice is made (pop, min/max with a key, an index, a queue's get);
+        2. x is taken out: C is changed in the loop's own body, keeping its earlier contents and receiving
+           nothing but x itself or values derived from C that do not depend on x, such as the index x was
+           picked at (pop, remove, discard, del, a slice). A change that brings in anything else edits C
+           rather than removing x, and one that drops the earlier contents (``C = []``) starts it afresh;
+        3. its successors are put in: somewhere in the loop C receives values that depend on x, other
+           than x itself;
+        4. the loop keeps a table (visited / cost / parent / best results, ``fr.closed``: written and
+           tested in the loop) whose entries carry over from one iteration to the next. A table built
+           afresh in every iteration, such as an action array, is not memory of the search.
+
+        This is the loop of a generic best-first search (select, remove, expand, remember); the selection
+        rule, the removal and the container's type can be spelled in any way the graph models.
+        Returns x, or None."""
+        g, C, q = self.g, fr.container, f.qualname
+        nested = [(lp.line, lp.end_line) for lp in f.loops.values()
+                  if lp is not loop and loop.line <= lp.line <= loop.end_line]
+
+        def own(n: Node) -> bool:
+            return loop.line < n.line <= loop.end_line and not any(lo <= n.line <= hi for lo, hi in nested)
+
+        versions = {n for n in self.by_scope[q] if n.kind == "def" and n.name == C}
+        sources = versions | {u for v in versions for u, ks in g.preds.get(v, {}).items() if "base" in ks}
+        changes = {n for n in versions if loop.line <= n.line <= loop.end_line}
+        taken = {n for n in changes if own(n)}
+        if not taken:
+            return None
+        from_c = self._one_pass(sources, q, sources) - sources
+        elements = self._one_pass(sources, q, sources, copies_only=True) - sources
+
+        def received(u: Node) -> set[Node]:
+            """Values the change u puts into C (not C's earlier value, not the change's own call)."""
+            return {v for v, ks in g.preds.get(u, {}).items()
+                    if ks & set(DATA_KINDS) and v not in sources
+                    and not (v.kind == "call" and (v.line, v.col) == (u.line, u.col))}
+
+        def keeps_rest(u: Node) -> bool:
+            return any(v in sources for v, ks in g.preds.get(u, {}).items() if ks & set(DATA_KINDS))
+
+        def kept(name: str) -> bool:
+            """Every change of the table inside the loop keeps its earlier entries."""
+            defs = {n for n in self.by_scope[q] if n.kind == "def" and n.name == name}
+            defs |= {u for v in defs for u, ks in g.preds.get(v, {}).items() if "base" in ks}
+            return all(any(u in defs for u, ks in g.preds.get(v, {}).items() if ks & set(DATA_KINDS))
+                       for v in defs if v.kind == "def" and loop.line <= v.line <= loop.end_line)
+
+        if not any(kept(name) for name in fr.closed):
+            return None
+        for x in sorted((n for n in elements if n.kind == "def" and n.scope == q and own(n)
+                         and n.name not in fr.closed), key=lambda n: (n.line, n.col, n.name)):
+            successors = self._one_pass({x}, q, sources) - {x}
+            removes = any(keeps_rest(u) and all(v == x or (v in from_c and v not in successors) for v in received(u))
+                          for u in taken)
+            if removes and any(received(u) & successors for u in changes):
+                return x
+        return None
+
+    def _one_pass(self, start: set[Node], q: str, barrier: set[Node], copies_only: bool = False) -> set[Node]:
+        """Values that depend on ``start`` in one pass through function q (forward data slice, entering
+        callees; with ``copies_only``, values that carry a start value unchanged: indexing, unpacking,
+        min/max, a pop's result, loop variables). It does not leave q through its return or parameters,
+        and does not pass through ``barrier`` (the container) or persistent state (fields, globals), so
+        values do not wrap around a loop, or into a later call, and back."""
+        f = self.g.functions[q]
+        stop = barrier | {f.return_node, *f.param_nodes.values()} | {n for n in self.by_scope[q] if n.kind == "return"}
+        seen, stack = set(start), list(start)
+        while stack:
+            u = stack.pop()
+            for v, ks in self.g.succs.get(u, {}).items():
+                if v in seen or not ks & set(DATA_KINDS) or (copies_only and (u, v) not in self.g.copies):
+                    continue
+                seen.add(v)
+                if v not in stop and v.kind not in ("field", "global"):
+                    stack.append(v)
+        return seen
+
     def _relaxes_from_itself(self, fr, q: str) -> bool:
         """The stored candidate costs are computed from earlier entries of the same cost table
         (directly, ``cost[u] + w``, or through earlier layers, ``prev = costs[-1]``)."""
@@ -756,7 +851,6 @@ class _Classifier:
 
     def _graph_searches(self, region: set[Node]) -> list[Evidence]:
         g, out = self.g, []
-        ast_calls = {id(cs.ast_node): cs.node for cs in g.call_sites.values()}
         for f in g.functions.values():
             for loop in f.loops.values():
                 if not loop.frontiers:
@@ -766,15 +860,17 @@ class _Classifier:
                     continue
                 for fr in loop.frontiers:
                     if fr.kind == "worklist":
-                        pops = {ast_calls[id(c)] for c in fr.pops if id(c) in ast_calls}
-                        pushes = {ast_calls[id(c)] for c in fr.pushes if id(c) in ast_calls}
-                        if not self._within(pops, f.qualname) & pushes:
+                        x = self._frontier_element(fr, f, loop)
+                        if x is None:
                             continue
-                        what = (f"graph search: worklist `{fr.container}` is popped and refilled with successors of "
-                                f"the popped element, with visited/cost table {', '.join(f'`{c}`' for c in fr.closed)}")
+                        what = (f"graph search: an element `{x.name}` (line {x.line}) is selected from frontier "
+                                f"`{fr.container}`, taken out, and its successors are put in, with visited/cost table "
+                                f"{', '.join(f'`{c}`' for c in fr.closed)}")
                     elif fr.kind == "relaxation":
                         if any(lp.line <= loop.line <= lp.end_line and lp is not loop
-                               and any(x.kind != "relaxation" for x in lp.frontiers) for lp in f.loops.values()):
+                               and any(x.kind == "layered" or (x.kind == "worklist"
+                                                               and self._frontier_element(x, f, lp) is not None)
+                                       for x in lp.frontiers) for lp in f.loops.values()):
                             continue  # the relaxation step of a worklist search already reported
                         if not self._relaxes_from_itself(fr, f.qualname):
                             continue
@@ -1079,6 +1175,7 @@ class _Classifier:
         self.notes = [i for i in self.notes if not (i.kind in ("ranking", "target-choice") and i.function in planned_in)]
         self._review(global_sites)
         review = _dedupe_issues(self.review)
+        scores = quantify(self, evidence, review)
         if evidence:
             self.notes += [Issue(i.kind, f"{i.what} (does not affect the planning label)", i.file, i.line, i.function)
                            for i in review]
@@ -1087,7 +1184,8 @@ class _Classifier:
         planning = True if evidence else (None if review else False)
         return Report(decision=self.decision, planning=planning, evidence=evidence, pruned=list(g.pruned),
                       status=status, review_reasons=review, notes=_group_issues(self.notes),
-                      entrypoint=g.entrypoint_basis.get(self.decision, "explicit"), coverage=self._coverage())
+                      entrypoint=g.entrypoint_basis.get(self.decision, "explicit"), coverage=self._coverage(),
+                      scores=scores)
 
     def _coverage(self) -> dict:
         g = self.g

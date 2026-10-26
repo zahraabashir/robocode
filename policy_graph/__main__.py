@@ -1,6 +1,6 @@
 """Command line: dependency graph and planning-or-reactive verdict for Python policies.
 
-    python agent_runs/tools/policy_graph path/to/approach.py [more files or dirs]
+    python policy_graph path/to/approach.py [more files or dirs]
         [--decision get_action] [--config config.json] [--dot slice.dot] [--json report.json]
 
 Modules that the given files import (absolute or relative) are analysed too. The
@@ -13,10 +13,10 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from depgraph import build_graph  # noqa: E402
-from reactivity import EntrypointError, PolicyConfig, classify, discover_entrypoint  # noqa: E402
+from policy_graph.depgraph import build_graph  # noqa: E402
+from policy_graph.reactivity import EntrypointError, PolicyConfig, classify, discover_entrypoint  # noqa: E402
 
 
 def main() -> None:

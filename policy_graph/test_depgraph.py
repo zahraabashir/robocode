@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from depgraph import build_graph  # noqa: E402
+from policy_graph.depgraph import build_graph  # noqa: E402
 
 _ids = itertools.count()
 
@@ -357,3 +357,43 @@ def test_generator_yields_reach_the_consumer(tmp_path):
     """)
     sl = g.backward_slice([g.functions["m.P.get_action"].return_node])
     assert {"m.route", "m.P._tail"} <= {n.scope for n in sl if n.kind == "return"}
+
+
+# ---------------------------------------------------------------- containers: what changes them, what they hand out
+
+def test_del_and_queue_get_change_the_container(tmp_path):
+    g = graph(tmp_path, """
+        def f(q, d, xs):
+            del xs[0]
+            a = q.get()
+            b = d.get("k")
+            return a, b, xs
+    """)
+    assert node(g, "def", "xs", line=3).detail == "[0]"
+    assert node(g, "def", "q").detail == ".weak"  # a queue hands out an element and drops it
+    assert not any(n.kind == "def" and n.name == "d" for n in g.nodes)  # d.get(k) only reads
+
+
+def test_popped_values_are_elements_of_the_container(tmp_path):
+    g = graph(tmp_path, """
+        import heapq
+        def f(todo, heap):
+            x = todo.pop(0)
+            _, y = heapq.heappop(heap)
+            return x, y
+    """)
+    assert node(g, "param", "todo") in g.copy_ancestors([node(g, "def", "x")])
+    assert node(g, "param", "heap") in g.copy_ancestors([node(g, "def", "y")])
+
+
+def test_unpacked_call_stays_on_the_path_element_by_element(tmp_path):
+    g = graph(tmp_path, """
+        def sim(s, a):
+            return s * a, s > a
+        def f(obs):
+            nxt, done = sim(obs, 2)
+            return nxt
+    """)
+    sl = g.backward_slice([g.functions["m.f"].return_node])
+    calls = {n.label() for n in sl if n.kind == "call"}
+    assert "call:m.sim@5[0]" in calls and "call:m.sim@5[1]" not in calls
