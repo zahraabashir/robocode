@@ -15,7 +15,7 @@ import time
 import traceback
 from collections.abc import Callable
 from pathlib import Path
-from types import ModuleType
+from types import CodeType, ModuleType
 from typing import Any, Iterator
 
 import imageio.v3 as iio
@@ -105,6 +105,9 @@ def load_generated_approach(
     primitives: dict[str, Any],
     *,
     strict_imports: bool = False,
+    source_transform: (
+        Callable[[str, Path], tuple[CodeType, dict[str, Any]]] | None
+    ) = None,
 ) -> Any:
     """Load a ``GeneratedApproach`` class from the given file.
 
@@ -116,6 +119,9 @@ def load_generated_approach(
     With ``strict_imports`` (strict blackbox), the program and its sibling modules
     are first checked against :func:`check_strict_imports`, so a program written
     without domain dependencies cannot pick them up from the host at scoring time.
+
+    ``source_transform`` optionally compiles in-memory instrumentation and supplies
+    its private globals. Import checks still apply to the original source.
     """
     global _LOADED_GENERATED_ROOT, _LOADED_GENERATED_PATH  # pylint: disable=global-statement
     _evict_loaded_generated_siblings()
@@ -136,7 +142,12 @@ def load_generated_approach(
         # sibling modules via os.path.dirname(__file__)).  exec() does
         # not set this automatically unlike a normal module import.
         namespace: dict[str, Any] = {"__file__": str(path)}
-        exec(compile(source, str(path), "exec"), namespace)  # pylint: disable=exec-used
+        if source_transform is None:
+            code = compile(source, str(path), "exec")
+        else:
+            code, extra_globals = source_transform(source, path)
+            namespace.update(extra_globals)
+        exec(code, namespace)  # pylint: disable=exec-used
         cls = namespace["GeneratedApproach"]
         instance = cls(action_space, observation_space, primitives=primitives)
     except BaseException:
