@@ -1,5 +1,7 @@
 # Coding Agents for Generalized Task and Motion Planning Problems
 
+> **This branch (`abstract-tree`)** adds an analyzer that measures how much agent-written policies plan by search. Start with the [branch guide](README-abstract-tree.md).
+
 ![workflow](https://github.com/tomsilver/robocode/actions/workflows/ci.yml/badge.svg)
 
 [Project website and videos](https://agenticgentamp.github.io/) · [Paper](https://agenticgentamp.github.io/assets/paper.pdf) · [Code](https://github.com/tomsilver/robocode)
