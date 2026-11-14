@@ -15,9 +15,12 @@ from .policy_fixtures import GROUND_TRUTH, KINDER_POLICY, POLICY_FIXTURES, kinde
 from .policy_report import (
     at_least,
     finding_text,
+    rate_text,
     save_policy_report,
     save_unresolved,
+    searches_text,
     share_range,
+    spread_text,
     write_json,
 )
 from .policy_runner import PolicyProgram, UnsupportedProgram
@@ -101,67 +104,71 @@ def run_policy_suite(args: argparse.Namespace) -> int:
             summary = save_unresolved(directory, name, source, exc)
             failed = True
         summaries.append(summary)
+        rate = rate_text(
+            summary.get("mean_planning_rate"),
+            summary.get("lower_bound_planning_rate"),
+        )
         score = at_least(
-            summary.get("mean_search_score"),
-            summary.get("lower_bound_search_score"),
-        )
-        planning = at_least(
-            summary.get("mean_planning_events"),
-            summary.get("lower_bound_planning_events"),
-        )
-        expansions = at_least(
-            summary.get("mean_expansion_events"),
-            summary.get("lower_bound_expansion_events"),
+            summary.get("mean_prev_planning_score"),
+            summary.get("lower_bound_prev_planning_score"),
         )
         print(
             f'{name}: {finding_text(summary["finding"])}; '
-            f"search score={score}, "
-            f"planning events={planning}, "
-            f"expansion events={expansions}, "
+            f"planning rate={rate}, "
+            "squares per searching decision (median; mean)="
+            f'{spread_text(summary.get("squares_per_decision"), extremes=False)}, '
+            f"prev_planning_score={score}, "
             "followed-plan share="
             f'{summary.get("mean_followed_plan_share")}'
             f' (max {summary.get("mean_followed_plan_share_max")})'
         )
-    write_json(args.output_dir / "summary.json", summaries)
+    write_summaries(args.output_dir, summaries)
+    return 1 if failed else 0
+
+
+def write_summaries(output_dir: Path, summaries: list[dict]) -> None:
+    """summary.json and summary.md for every analyzed policy."""
+    write_json(output_dir / "summary.json", summaries)
     rows = [
         "# Search explanations of stateful policies",
         "",
-        "Means are uniform over each policy's frozen validation episodes. The search "
-        "score is the mean, per policy call, of states expanded beyond the start "
-        "(0 for a call without a search), in the policy's own grid cells. Effort is "
-        "summed within an episode, depth is a maximum, and the followed-plan share is "
-        "the fraction of action calls whose command followed a cached plan with a "
-        "complete search-to-action witness; its max adds calls whose plan evidence is "
-        "unresolved. "
-        "These are features of the frozen explanations, not a planningness score.",
+        "A decision is one policy call. A searching decision has at least one search "
+        "that got beyond its start square; a stuck search never left it. Planning "
+        "rate (searching decisions / calls), stuck searches and prev_planning_score "
+        "are means over each policy's frozen validation episodes; per-decision values "
+        "pool every searching decision. Squares are each policy's own grid cells; "
+        "floor (m²) compares policies. prev_planning_score is the method's per-call "
+        "score, planning rate x mean squares per searching decision. The "
+        "followed-plan share is the fraction of action calls whose command followed "
+        "a cached plan with a complete search-to-action witness; its max adds calls "
+        "whose plan evidence is unresolved.",
         "",
-        "| Policy | Known fixture label | Finding | Search score (per call) | "
-        "Planning events | Expansion events | Attributed to actions | "
-        "At initialization | Followed-plan share (witnessed – max) | "
-        "Searched share | Max expanded depth | Solved |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Policy | Known fixture label | Finding | Solved | Planning rate | "
+        "Stuck searches (per episode) | "
+        "Squares per searching decision: median; mean (min–max) | "
+        "Floor per searching decision (m²): median; mean | "
+        "Searches per searching decision: mean (max) | "
+        "prev_planning_score (derived) | Search-guided actions |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in summaries:
         cells = [
             f'[{row["fixture"]}]({row["fixture"]}/report.html)',
             row.get("fixture_ground_truth"),
             finding_text(row["finding"]),
-            _bounded(row, "search_score"),
-            _bounded(row, "planning_events"),
-            _bounded(row, "expansion_events"),
-            _bounded(
-                row,
-                "attributed_expansion_events",
-                partial=bool(row.get("mean_runs_without_action_witness")),
+            row.get("solved"),
+            rate_text(
+                row.get("mean_planning_rate"), row.get("lower_bound_planning_rate")
             ),
-            _bounded(row, "initialization_expansion_events"),
+            row.get("mean_stuck_searches"),
+            spread_text(row.get("squares_per_decision")),
+            spread_text(row.get("floor_per_decision"), 2, False),
+            searches_text(row.get("searches_per_decision")),
+            _bounded(row, "prev_planning_score"),
             share_range(
                 row.get("mean_followed_plan_share"),
                 row.get("mean_followed_plan_share_max"),
             ),
-            row.get("mean_searched_share"),
-            _bounded(row, "max_expanded_depth", mean=False),
-            row.get("solved"),
         ]
         rows.append(
             "| " + " | ".join("—" if c is None else str(c) for c in cells) + " |"
@@ -177,11 +184,8 @@ def run_policy_suite(args: argparse.Namespace) -> int:
         "not an estimate. Cross-call credit requires a search "
         "edit to predict the stored plan and later action, with mediation controls.",
     ]
-    (args.output_dir / "summary.md").write_text(
-        "\n".join(rows) + "\n", encoding="utf-8"
-    )
-    print(f'Reports: {args.output_dir.resolve() / "summary.md"}')
-    return 1 if failed else 0
+    (output_dir / "summary.md").write_text("\n".join(rows) + "\n", encoding="utf-8")
+    print(f'Reports: {output_dir.resolve() / "summary.md"}')
 
 
 def add_policy_arguments(parser: argparse.ArgumentParser) -> None:

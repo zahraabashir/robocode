@@ -16,7 +16,7 @@ from robocode.planning_explanations.search.policy_causality import (
 )
 from robocode.planning_explanations.search.policy_discovery import (
     discover_policy,
-    search_score,
+    decisions,
     validate_policy,
 )
 from robocode.planning_explanations.search.policy_domains import DiscWorld
@@ -385,21 +385,33 @@ class CopiedPlanTest(unittest.TestCase):
         self.assertEqual(row["followed_plan_share"], 1.0)
 
 
-class SearchScoreTest(unittest.TestCase):
-    """Mean states expanded beyond the start, per policy call."""
+class DecisionMetricsTest(unittest.TestCase):
+    """Searching decisions, stuck searches and per-decision search size."""
 
-    def test_the_score_sums_searches_within_a_call(self):
-        """Two searches in one call add up; calls without search score 0."""
+    def test_the_start_square_is_subtracted_once_per_search(self):
+        """Searches in one call add up; a search stuck at its start counts 0."""
         runs = [
-            {"call": 0, "status": "supported", "features": {"N": 10}},
-            {"call": 2, "status": "supported", "features": {"N": 4}},
-            {"call": 2, "status": "supported", "features": {"N": 3}},
-            {"call": 3, "status": "unresolved"},
+            {"call": 0, "status": "supported", "features": {"N": 10}, "cell_size": 0.1},
+            {"call": 2, "status": "supported", "features": {"N": 4}, "cell_size": 0.1},
+            {"call": 2, "status": "supported", "features": {"N": 3}, "cell_size": 0.1},
+            {"call": 3, "status": "supported", "features": {"N": 1}},
+            {"call": 4, "status": "unresolved"},
         ]
-        # Calls 0..4: (10 - 1) + (4 + 3 - 1) = 15 over 5 calls.
-        self.assertEqual(search_score(runs, 5), 3.0)
+        found, stuck, stuck_calls = decisions(runs)
+        self.assertEqual(
+            [(d["call"], d["squares"], d["searches"]) for d in found],
+            [(0, 9, 1), (2, 5, 2)],
+        )
+        self.assertEqual((stuck, stuck_calls), (1, 1))
+        self.assertAlmostEqual(found[1]["floor"], 5 * 0.01)
 
-    def test_plan_once_scores_its_single_search(self):
+    def test_an_unknown_square_size_leaves_the_floor_unknown(self):
+        """Without a read-out size the floor is unknown, not zero."""
+        runs = [{"call": 0, "status": "supported", "features": {"N": 5}}]
+        (decision,), _, _ = decisions(runs)
+        self.assertIsNone(decision["floor"])
+
+    def test_plan_once_has_one_searching_decision(self):
         """One search at reset, then only plan following."""
         program = PolicyProgram(PLAN_ONCE)
         bank = discover_policy(program, DiscWorld(), ((1, 0),), ((3, 100),))
@@ -407,6 +419,16 @@ class SearchScoreTest(unittest.TestCase):
         episode = result["episodes"][0]
         row = episode["accounting"]["program"]
         (search,) = [r for r in episode["runs"] if r["status"] == "supported"]
-        expected = (search["features"]["N"] - 1) / (len(episode["calls"]) + 1)
-        self.assertAlmostEqual(row["search_score"], expected)
-        self.assertAlmostEqual(result["summary"]["mean"]["search_score"], expected)
+        calls = len(episode["calls"]) + 1
+        squares = search["features"]["N"] - 1
+        self.assertEqual((row["calls"], row["searching_decisions"]), (calls, 1))
+        self.assertAlmostEqual(row["planning_rate"], 1 / calls)
+        self.assertEqual(row["squares_per_decision"]["median"], squares)
+        # The disc world's read-out spaces squares 0.1 m apart.
+        self.assertAlmostEqual(search["cell_size"], 0.1)
+        self.assertAlmostEqual(row["floor_per_decision"]["mean"], squares * 0.01)
+        self.assertAlmostEqual(row["prev_planning_score"], squares / calls)
+        self.assertAlmostEqual(
+            result["summary"]["mean"]["prev_planning_score"], squares / calls
+        )
+        self.assertEqual(result["summary"]["pooled"]["searching_decisions"], 1)

@@ -109,11 +109,22 @@ RULES = (
     "During analysis the policy's clock is simulated: each read of time.time(), "
     "time.monotonic() or time.perf_counter() advances it by 1 ms, so a time budget "
     "is a fixed number of clock reads, the same with or without recording. "
-    "The search score is the mean, over every policy call of an episode (reset and "
-    "each action), of the distinct states its search runs expanded beyond the "
-    "start: max(N - 1, 0) per call, with N summed over the call's runs; a call "
-    "without a search scores 0. It counts search amount, not quality, in the "
-    "policy's own states (grid cells), so it depends on the policy's grid. "
+    "A decision is one policy call (reset or an action). Each supported search run "
+    "counts M = N - 1 squares: the distinct states it expanded beyond its own start "
+    "(the start is subtracted once per search). A run with M = 0 is a stuck search: "
+    "it never left its start square. A searching decision is a call with at least "
+    "one run that got beyond its start. Planning rate = searching decisions / calls "
+    "(all calls, reset included). Squares per searching decision sums M over the "
+    "call's runs; floor per searching decision multiplies each run's squares by the "
+    "area of one of its squares, read from the part's plan read-out (metres between "
+    "two neighbouring squares). Searches per searching decision counts those runs. "
+    "prev_planning_score = planning rate x mean squares per searching decision = "
+    "(sum of M over the episode) / calls: the method's per-call score, kept for "
+    "comparison; it mixes how often a policy plans with how big its plans are, and "
+    "long episodes lower it. Squares are each policy's own grid cells; compare "
+    "policies by floor. Across episodes, planning rate, prev_planning_score and the "
+    "followed-plan share are means of the episodes, stuck searches are totals, and "
+    "per-decision values pool every searching decision of every episode. "
     "Effort counts (expansion events, N, generated alternatives, re-expansions, "
     "cost improvements) are summed over an episode's runs; each run's expansions "
     "are counted once, in the call where they happen. Depths are maxima. Planning "
@@ -211,6 +222,79 @@ def share_range(low, high) -> float | str | None:
     return f"{_fmt(low)}–{_fmt(high)} (max)"
 
 
+def _percent(value) -> str | None:
+    return None if value is None else f"{100 * value:.2f}%"
+
+
+def rate_text(value, bound=None) -> str | None:
+    """A rate as a percentage, or "≥" its explained part when withheld."""
+    if value is not None:
+        return _percent(value)
+    return None if bound is None else f"≥ {_percent(bound)}"
+
+
+def planning_rate(row: dict) -> str | None:
+    """Rate with its count of searching decisions; "≥" when withheld."""
+    if row.get("planning_rate") is None:
+        bound = row.get("explained_only_planning_rate")
+        count = row.get("explained_only_searching_decisions")
+        return None if bound is None else f"≥ {_percent(bound)} ({count})"
+    return f'{_percent(row["planning_rate"])} ({row["searching_decisions"]})'
+
+
+def spread_text(value: dict | None, digits: int = 0, extremes: bool = True):
+    """Median; mean (min–max) of a per-decision spread."""
+    if value is None:
+        return None
+
+    def number(v) -> str:
+        return f"{v:,.{digits}f}"
+
+    text = f"{number(value['median'])}; {number(value['mean'])}"
+    if extremes:
+        text += f" ({number(value['min'])}–{number(value['max'])})"
+    return text
+
+
+def searches_text(value: dict | None) -> str | None:
+    """Mean searches per searching decision, with the largest."""
+    if value is None:
+        return None
+    return f"{value['mean']:.1f} (max {value['max']})"
+
+
+def headline_row(label: str, row: dict, solved, guided, stuck, complete: bool) -> list:
+    """Solved, calls, planning rate, stuck searches, per-decision values, score, use."""
+    note = "" if complete else " (explained runs only)"
+    floor = spread_text(row.get("floor_per_decision"), 2, False)
+    return [
+        label,
+        solved,
+        row.get("calls"),
+        planning_rate(row),
+        stuck,
+        (spread_text(row.get("squares_per_decision")) or "—") + note,
+        floor,
+        searches_text(row.get("searches_per_decision")),
+        _total(row, "prev_planning_score") if "prev_planning_score" in row else None,
+        guided,
+    ]
+
+
+HEADLINE_HEADERS = [
+    "Episode",
+    "Solved",
+    "Calls",
+    "Planning rate (searching decisions)",
+    "Stuck searches (calls)",
+    "Squares per searching decision: median; mean (min–max)",
+    "Floor per searching decision (m²): median; mean",
+    "Searches per searching decision: mean (max)",
+    "prev_planning_score (derived)",
+    "Search-guided actions",
+]
+
+
 def _spec_row(site: str, part: dict, identifier: str | None) -> list:
     chosen = next((e for e in part["explanations"] if e.identifier == identifier), None)
     if chosen is None:
@@ -269,16 +353,28 @@ def save_policy_report(
         for site, part in sorted(bank.parts.items())
         if part["status"] == "search"
     ]
-    episode_rows, part_episode_rows = [], []
+    episode_rows, part_episode_rows, headline_rows = [], [], []
     for episode in validation["episodes"]:
         program_row = episode["accounting"]["program"]
         label = f'{episode["case"][0]} obstacles, seed {episode["case"][1]}'
+        headline_rows.append(
+            headline_row(
+                label,
+                program_row,
+                "yes" if episode["solved"] else "no",
+                share_range(
+                    program_row["followed_plan_share"],
+                    program_row["followed_plan_share_max"],
+                ),
+                f'{program_row["stuck_searches"]} ({program_row["stuck_calls"]})',
+                program_row["complete"],
+            )
+        )
         episode_rows.append(
             [
                 label,
                 "yes" if episode["solved"] else "no",
                 episode["steps"],
-                _total(program_row, "search_score"),
                 _total(program_row, "planning_events"),
                 _total(program_row, "initialization_expansion_events"),
                 _total(program_row, "expansion_events"),
@@ -323,6 +419,29 @@ def save_policy_report(
                 ]
             )
     mean = summary["mean"]
+    rows = [e["accounting"]["program"] for e in validation["episodes"]]
+    overall = {
+        **{k: mean.get(k) for k in ("planning_rate", "prev_planning_score")},
+        **{
+            f"explained_only_{k}": summary["lower_bound"].get(k)
+            for k in ("planning_rate", "prev_planning_score")
+        },
+        # Pooled counts are of explained decisions when totals are withheld.
+        "searching_decisions": summary["pooled"]["searching_decisions"],
+        "explained_only_searching_decisions": summary["pooled"]["searching_decisions"],
+        **{k: v for k, v in summary["pooled"].items() if k.endswith("_per_decision")},
+    }
+    headline_rows.append(
+        headline_row(
+            "All validation episodes",
+            overall,
+            f"{summary['solved']} of {summary['episodes']}",
+            share_range(mean["followed_plan_share"], mean["followed_plan_share_max"]),
+            f'{sum(r["stuck_searches"] for r in rows)} '
+            f'({sum(r["stuck_calls"] for r in rows)})',
+            summary["complete"],
+        )
+    )
     chain_headers = [
         "Episode",
         "Producer call",
@@ -367,9 +486,17 @@ def save_policy_report(
                     )
         chain_rows.extend(rows[:24])
     bounds = summary["lower_bound"]
-    mean_rows = [[k, at_least(v, bounds.get(k))] for k, v in mean.items()] + [
-        [k, at_least(v, bounds.get(k))] for k, v in summary["max"].items()
-    ]
+    mean_rows = [
+        [
+            k,
+            (
+                rate_text(v, bounds.get(k))
+                if k == "planning_rate"
+                else at_least(v, bounds.get(k))
+            ),
+        ]
+        for k, v in mean.items()
+    ] + [[k, at_least(v, bounds.get(k))] for k, v in summary["max"].items()]
     part_headers = [
         "Part",
         "Function",
@@ -396,8 +523,7 @@ def save_policy_report(
         "Episode",
         "Solved",
         "Steps",
-        "Search score (per call)",
-        "Planning events",
+        "Search runs (planning events)",
         "At initialization",
         "Expansion events (sum)",
         "Max expanded depth",
@@ -446,6 +572,10 @@ def save_policy_report(
         "",
         f"Validation episodes (obstacles, seed): {episodes}, uniform weights. "
         f"Frozen bank `{bank.fingerprint[:16]}` was written before any of them ran.",
+        "",
+        "## Search effort and use",
+        "",
+        *markdown(HEADLINE_HEADERS, headline_rows),
         "",
         "## Parts",
         "",
@@ -503,7 +633,10 @@ def save_policy_report(
         "It comes from construction and is never given to the analyzer.</p>",
         f"<p>Validation episodes (obstacles, seed): {html.escape(episodes)}. The frozen bank "
         f"<code>{bank.fingerprint[:16]}</code> was written before any of them ran.</p>",
-        "<p>A <b>part</b> is one <code>while</code> loop; a <b>run</b> is one execution of it. "
+        "<h2>Search effort and use</h2>",
+        _table(HEADLINE_HEADERS, headline_rows),
+        "<p>A <b>part</b> is a loop, a self-recursive function or a library graph-search "
+        "call; a <b>run</b> is one execution of it. "
         "A run's inputs are read at its first loop checkpoint; every later iteration is predicted "
         "by the abstract engine and compared. The transition model is the policy's own free-cell "
         "predicate, accepted as given and not checked against the simulator.</p>",
@@ -601,9 +734,12 @@ def save_policy_report(
         "complete": summary["complete"],
         "solved": f"{summary['solved']}/{summary['episodes']}",
         **{
-            f"mean_{k}": _fmt(mean.get(k))
+            f"mean_{k}": _fmt(mean.get(k), 4 if k == "planning_rate" else 2)
             for k in (
-                "search_score",
+                "calls",
+                "planning_rate",
+                "stuck_searches",
+                "prev_planning_score",
                 "planning_events",
                 "expansion_events",
                 "attributed_expansion_events",
@@ -616,10 +752,13 @@ def save_policy_report(
             )
         },
         "max_expanded_depth": summary["max"]["max_expanded_depth"],
+        "searching_decisions": summary["pooled"]["searching_decisions"],
+        **{k: v for k, v in summary["pooled"].items() if k.endswith("_per_decision")},
         **{
-            f"lower_bound_{k}": _fmt(bounds.get(k))
+            f"lower_bound_{k}": _fmt(bounds.get(k), 4 if k == "planning_rate" else 2)
             for k in (
-                "search_score",
+                "planning_rate",
+                "prev_planning_score",
                 "planning_events",
                 "expansion_events",
                 "attributed_expansion_events",

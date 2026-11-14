@@ -53,6 +53,7 @@ from .policy_verify import (
     WORLD_SHIFT,
     GridExplanation,
     GridMapping,
+    cell_size,
     check_edit,
     choose_edits,
     compare_run,
@@ -150,23 +151,78 @@ WITHHELD = (
     *DEPTH,
     "attributed_expansion_events",
     "initialization_expansion_events",
-    "search_score",
+    "searching_decisions",
+    "planning_rate",
+    "prev_planning_score",
 )
+# Per searching decision; summarized per episode and pooled across episodes.
+DECISION_STATS = ("squares", "floor", "searches")
 
 
-def search_score(runs: list[dict], calls: int) -> float:
-    """Mean states expanded beyond the start, per policy call.
+def decisions(runs: list[dict]) -> tuple[list[dict], int, int]:
+    """Searching decisions, stuck searches, and calls whose searches all got stuck.
 
-    Per call, N sums the distinct states expanded by its supported search runs,
-    and the call scores max(N - 1, 0); a call without a search scores 0 (a
-    reactive decision). The mean is over every call of the episode: the reset
-    call and each action call.
+    A decision is one policy call. Each supported search run counts M = N - 1
+    squares, the distinct states it expanded beyond its own start (the start is
+    subtracted once per search, since every search starts afresh). A run with
+    M = 0 is stuck: it never left its start square. A searching decision is a
+    call with at least one run that got beyond its start; its squares, floor
+    (squares times the square's area, from the plan read-out) and searches are
+    summed over those runs.
     """
-    expanded: dict[int, int] = {}
+    by_call: dict[int, dict] = {}
+    stuck, stuck_calls = 0, set()
     for run in runs:
-        if run["status"] == "supported":
-            expanded[run["call"]] = expanded.get(run["call"], 0) + run["features"]["N"]
-    return sum(max(n - 1, 0) for n in expanded.values()) / calls if calls else 0.0
+        if run["status"] != "supported":
+            continue
+        squares = max(run["features"]["N"] - 1, 0)
+        if squares == 0:
+            stuck += 1
+            stuck_calls.add(run["call"])
+            continue
+        decision = by_call.setdefault(
+            run["call"],
+            {"call": run["call"], "squares": 0, "floor": 0.0, "searches": 0},
+        )
+        decision["squares"] += squares
+        decision["searches"] += 1
+        size = run.get("cell_size")
+        decision["floor"] = (
+            None
+            if decision["floor"] is None or size is None
+            else decision["floor"] + squares * size * size
+        )
+    return (
+        [by_call[call] for call in sorted(by_call)],
+        stuck,
+        len(stuck_calls - set(by_call)),
+    )
+
+
+def spread(values: list) -> dict | None:
+    """Mean, median, min and max; None when empty or when any value is unknown."""
+    if not values or any(v is None for v in values):
+        return None
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    median = (
+        ordered[middle]
+        if len(ordered) % 2
+        else (ordered[middle - 1] + ordered[middle]) / 2
+    )
+    return {
+        "mean": sum(ordered) / len(ordered),
+        "median": median,
+        "min": ordered[0],
+        "max": ordered[-1],
+    }
+
+
+def decision_spreads(found: list[dict]) -> dict:
+    """Per-decision squares, floor and searches, each as a spread."""
+    return {
+        f"{key}_per_decision": spread([d[key] for d in found]) for key in DECISION_STATS
+    }
 
 
 @dataclass(frozen=True)
@@ -668,6 +724,19 @@ class EpisodeAnalyzer:
         self.executions: dict = {}
         self.replays: list = []
         self.ignored: dict[str, frozenset] = {}
+        self.cell_sizes: dict[str, float] = {}
+
+    def _cell_size(self, site: str, tree: GridSearch, functions: dict) -> float | None:
+        """Metres per grid square, from the part's plan read-out (kept once found)."""
+        if site not in self.cell_sizes:
+            for name in self.parts[site].get("readouts", []):
+                size = (
+                    cell_size(functions[name], tree.root) if name in functions else None
+                )
+                if size:
+                    self.cell_sizes[site] = size
+                    break
+        return self.cell_sizes.get(site)
 
     def __call__(self, call: CallRecord, policy, state, extra, after) -> None:
         self.actions.append(call.action)
@@ -706,9 +775,9 @@ class EpisodeAnalyzer:
                 and entry["part_status"] != "not_search_shaped"
             )
             if tree is not None:
-                trees.append(
-                    (entry, tree, point_functions(run.capture.callables, after))
-                )
+                functions = point_functions(run.capture.callables, after)
+                entry["cell_size"] = self._cell_size(entry["site"], tree, functions)
+                trees.append((entry, tree, functions))
         self._versions(call, trees, after, unexplained)
         if call.method == "get_action":
             self.calls.append(self._classify(call, (policy, state, extra), statuses))
@@ -1051,6 +1120,7 @@ def account(episode: dict) -> dict:
     ]
     complete = all(r["status"] == "supported" for r in search_runs)
     supported = [r for r in search_runs if r["status"] == "supported"]
+    found, stuck, stuck_calls = decisions(search_runs)
     calls = episode["calls"]
     categories = {
         name: sum(c["category"] == name for c in calls) for name in CALL_CATEGORIES
@@ -1100,7 +1170,15 @@ def account(episode: dict) -> dict:
         ),
         "non_search_loop_runs": len(episode["runs"]) - len(search_runs),
         # Every call counts: the reset call plus each action call.
-        "search_score": search_score(search_runs, len(calls) + 1),
+        "calls": len(calls) + 1,
+        "searching_decisions": len(found),
+        "planning_rate": len(found) / (len(calls) + 1),
+        "stuck_searches": stuck,
+        "stuck_calls": stuck_calls,
+        "decisions": found,
+        **decision_spreads(found),
+        # The method's per-call score: planning rate x mean squares per decision.
+        "prev_planning_score": sum(d["squares"] for d in found) / (len(calls) + 1),
     }
     if not complete:
         # An unresolved run is not zero; withhold totals rather than undercount.
@@ -1121,7 +1199,11 @@ def summarize(episodes: list[dict]) -> dict:
     rows = [e["accounting"]["program"] for e in episodes]
     bounds = [{k: known_part(r, k) for k in WITHHELD} for r in rows]
     keys = (
-        "search_score",
+        "calls",
+        "searching_decisions",
+        "planning_rate",
+        "stuck_searches",
+        "prev_planning_score",
         "planning_events",
         *EFFORT,
         "attributed_expansion_events",
@@ -1157,6 +1239,11 @@ def summarize(episodes: list[dict]) -> dict:
                 )
             )
             for k in WITHHELD
+        },
+        # Every searching decision of every episode counts once.
+        "pooled": {
+            "searching_decisions": sum(len(r["decisions"]) for r in rows),
+            **decision_spreads([d for r in rows for d in r["decisions"]]),
         },
         "solved": sum(e["solved"] for e in episodes),
     }

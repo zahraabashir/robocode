@@ -996,10 +996,14 @@ class ReportBoundsTest(unittest.TestCase):
             summary = save_policy_report(root, "helper", program, bank, result, None)
             self.assertIsNone(summary["mean_expansion_events"])
             self.assertEqual(summary["lower_bound_expansion_events"], known)
-            # The search score is withheld too, with its known part as a bound.
-            self.assertIsNone(summary["mean_search_score"])
-            self.assertGreater(summary["lower_bound_search_score"], 0)
-            self.assertIn("Search score (per call)", (root / "report.md").read_text())
+            # The derived score and the planning rate are withheld too, with their
+            # known parts as bounds.
+            self.assertIsNone(summary["mean_prev_planning_score"])
+            self.assertGreater(summary["lower_bound_prev_planning_score"], 0)
+            self.assertIsNone(summary["mean_planning_rate"])
+            text = (root / "report.md").read_text()
+            self.assertIn("prev_planning_score (derived)", text)
+            self.assertIn("| ≥ 0.88% (1) |", text)
             self.assertIn(f"| ≥ {known} |", (root / "report.md").read_text())
 
 
@@ -1035,7 +1039,7 @@ class WatchedForLoopTest(unittest.TestCase):
         self.assertEqual(statuses[0], "search")
         row, expected = episode["accounting"]["program"], same["accounting"]["program"]
         self.assertTrue(row["complete"])
-        for key in ("search_score", "expansion_events", "planning_events"):
+        for key in ("prev_planning_score", "expansion_events", "planning_events"):
             self.assertEqual(row[key], expected[key])
 
     def test_an_outer_loop_around_a_search_is_not_a_worklist(self):
@@ -1050,7 +1054,7 @@ class WatchedForLoopTest(unittest.TestCase):
         )
         self.assertEqual(statuses[:2], ["not_search_shaped", "search"])
         self.assertTrue(episode["accounting"]["program"]["complete"])
-        self.assertGreater(episode["accounting"]["program"]["search_score"], 0)
+        self.assertGreater(episode["accounting"]["program"]["prev_planning_score"], 0)
 
     def test_iteration_local_variables(self):
         """Rebound before every read in an iteration (even inside a branch)."""

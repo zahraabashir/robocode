@@ -12,6 +12,7 @@ Usage:
 
     python experiments/policy_history.py run --sandbox <sandbox dir> --out <dir>
     python experiments/policy_history.py plot --out <dir> [--compare <history.json>]
+    python experiments/policy_history.py collect --out <dir>
 
 ``run`` resumes: versions whose analysis already finished are not analyzed again
 (``--force`` re-runs them).
@@ -30,12 +31,16 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
+from robocode.planning_explanations.search.policy_discovery import (
+    decision_spreads,
+    decisions,
+)
+
 REPO = Path(__file__).resolve().parents[1]
 
 # Program-level numbers reported as a mean over held-out episodes, or withheld
 # with a lower bound ("≥") when some loop could not be read.
 BOUNDED = (
-    "search_score",
     "planning_events",
     "expansion_events",
     "initialization_expansion_events",
@@ -165,6 +170,36 @@ def _category_shares(episode: dict) -> dict[str, float]:
     }
 
 
+def _mean_or_none(values: list) -> float | None:
+    return None if not values or None in values else sum(values) / len(values)
+
+
+def _pooled(episodes: list[dict], found: list[dict]) -> dict:
+    """Version-level search metrics: episode means, totals, pooled decisions.
+
+    Planning rate and prev_planning_score are means over the held-out episodes
+    (withheld, with an explained-only lower bound, if any episode is incomplete);
+    stuck searches are totals; per-decision values pool every searching decision.
+    """
+    row: dict[str, Any] = {
+        "searching_decisions": len(found),
+        "stuck_searches": sum(e["stuck_searches"] for e in episodes),
+        "stuck_calls": sum(e["stuck_calls"] for e in episodes),
+    }
+    for key in ("planning_rate", "prev_planning_score"):
+        row[key] = _mean_or_none([e[key] for e in episodes])
+        row[f"{key}_bound"] = _mean_or_none([e[f"{key}_bound"] for e in episodes])
+    for key in ("planning_rate", "planning_rate_bound"):
+        row[f"{key.replace('planning_rate', 'planning_rate_pct')}"] = (
+            None if row[key] is None else 100 * row[key]
+        )
+    for key, spread in decision_spreads(found).items():
+        name = key.removesuffix("_per_decision")
+        for stat in ("mean", "median", "min", "max"):
+            row[f"{name}_{stat}"] = None if spread is None else spread[stat]
+    return row
+
+
 def metrics(run_dir: Path) -> dict:
     """One version's numbers from the analyzer's summary.json and report.json."""
     summary_file = run_dir / "summary.json"
@@ -211,21 +246,37 @@ def metrics(run_dir: Path) -> dict:
         )
     row["parts"] = sorted(parts, key=lambda p: int(p["site"].split(":")[0]))
     late = Counter()
-    episodes = []
+    episodes: list[dict] = []
+    pooled: list[dict] = []
     for episode in report["validation"]["episodes"]:
         program = episode["accounting"]["program"]
         for entry in episode["runs"]:
             if entry.get("unreadable"):
                 late[(entry["site"], entry["unreadable"])] += 1
-        score = program.get("search_score")
+        # Recomputed from the recorded runs, so older reports get the same metrics.
+        found, stuck, stuck_calls = decisions(
+            [r for r in episode["runs"] if r["part_status"] != "not_search_shaped"]
+        )
+        pooled.extend(found)
+        calls = len(episode["calls"]) + 1
+        complete = bool(program.get("complete"))
+        rate = len(found) / calls
+        score = sum(d["squares"] for d in found) / calls
         episodes.append(
             {
                 "case": episode["case"],
                 "solved": episode["solved"],
                 "steps": episode["steps"],
                 "complete": program.get("complete"),
-                "search_score": score,
-                "search_score_bound": program.get("explained_only_search_score", score),
+                "calls": calls,
+                "searching_decisions": len(found),
+                "planning_rate": rate if complete else None,
+                "planning_rate_bound": rate,
+                "stuck_searches": stuck,
+                "stuck_calls": stuck_calls,
+                "prev_planning_score": score if complete else None,
+                "prev_planning_score_bound": score,
+                **decision_spreads(found),
                 "expansion_events": program.get("expansion_events"),
                 "planning_events": program.get("planning_events"),
                 "followed_low": program.get("followed_plan_share"),
@@ -234,6 +285,7 @@ def metrics(run_dir: Path) -> dict:
             }
         )
     row["episode_rows"] = episodes
+    row.update(_pooled(episodes, pooled))
     # Loops "not a search" in development but flagged on a held-out run.
     row["validation_unknown"] = [
         {"site": site, "reason": reason, "runs": n}
@@ -255,7 +307,13 @@ def run(args: argparse.Namespace) -> None:
     )
     with ThreadPoolExecutor(args.workers) as pool:
         list(pool.map(lambda v: analyze(v, out, args.minutes, args.force), chosen))
-    # Every version analyzed so far (now or in an earlier, partial run).
+    collect(out, versions)
+
+
+def collect(out: Path, versions: list[dict] | None = None) -> None:
+    """history.json from every version analyzed so far; nothing is re-analyzed."""
+    if versions is None:
+        versions = json.loads((out / "versions.json").read_text())
     history = []
     for version in versions:
         status_file = out / "runs" / version["name"] / "status.json"
@@ -464,10 +522,14 @@ def _level_changes(
 
 
 def plot_score(plt, history, out: Path, compare: dict | None) -> Path:
-    """Search score per version, with lower bounds and failed versions."""
+    """prev_planning_score per version, with lower bounds and failed versions."""
     fig, ax = plt.subplots(figsize=(11, 4.6))
     _bounded_series(
-        ax, history, "search_score", SLOTS[0], "Search score, current analyzer"
+        ax,
+        history,
+        "prev_planning_score",
+        SLOTS[0],
+        "prev_planning_score, current analyzer",
     )
     if compare:
         xs = [v["index"] for v in history if compare.get(v["index"]) is not None]
@@ -484,35 +546,38 @@ def plot_score(plt, history, out: Path, compare: dict | None) -> Path:
     _failed_strip(ax, history, 0)
     ax.set_ylim(bottom=-0.4, top=ax.get_ylim()[1] * 1.08)
     first = next(
-        (v["index"] for v in history if (_value(v, "search_score")[0] or 0) > 0), None
+        (v["index"] for v in history if (_value(v, "prev_planning_score")[0] or 0) > 0),
+        None,
     )
     picks = {first} if first else set()
-    picks.update(j[0] for j in _level_changes(history, "search_score", 4))
-    _annotate(ax, history, [p for p in picks if p], "search_score")
-    ax.set_title("Search score per policy call, across the agent's versions")
-    ax.set_ylabel("Cells expanded beyond the start, per call")
+    picks.update(j[0] for j in _level_changes(history, "prev_planning_score", 4))
+    _annotate(ax, history, [p for p in picks if p], "prev_planning_score")
+    ax.set_title(
+        "prev_planning_score (the method's per-call score), across the agent's versions"
+    )
+    ax.set_ylabel("Squares beyond the start, per call")
     _version_axis(ax, history)
     ax.legend(loc="upper left", bbox_to_anchor=(0, -0.16), ncol=2)
-    path = out / "01_search_score.png"
+    path = out / "01_prev_planning_score.png"
     fig.savefig(path)
     plt.close(fig)
     return path
 
 
 def plot_effort(plt, history, out: Path) -> Path:
-    """Searches, cells expanded and depth per episode, one panel each."""
+    """How often it plans, how big a planning step is, and stuck searches."""
     fig, axes = plt.subplots(3, 1, figsize=(11, 7.6), sharex=True)
     panels = (
-        ("planning_events", "Searches per episode"),
-        ("expansion_events", "Cells expanded per episode"),
-        ("max_depth", "Deepest expansion (cells)"),
+        ("planning_rate_pct", "Planning rate (% of calls)"),
+        ("squares_median", "Squares per searching\ndecision (median)"),
+        ("stuck_searches", "Stuck searches\n(3 episodes)"),
     )
     for ax, (key, label) in zip(axes, panels):
-        if key == "max_depth":
-            xs = [v["index"] for v in history if v.get("max_depth") is not None]
+        if key in ("squares_median", "stuck_searches"):
+            xs = [v["index"] for v in history if v.get(key) is not None]
             ax.plot(
                 xs,
-                [_at(history, x)["max_depth"] for x in xs],
+                [_at(history, x)[key] for x in xs],
                 color=SLOTS[0],
                 linewidth=1.8,
                 marker="o",
@@ -522,7 +587,10 @@ def plot_effort(plt, history, out: Path) -> Path:
             _bounded_series(ax, history, key, SLOTS[0], label)
         ax.set_ylabel(label)
         ax.set_ylim(bottom=0)
-    axes[0].set_title("How much the policy searches, per held-out episode (mean of 3)")
+    axes[0].set_title(
+        "How often the policy plans, and how big each planning step is "
+        "(3 held-out episodes)"
+    )
     handles, labels = axes[0].get_legend_handles_labels()
     keep = [(h, lbl) for h, lbl in zip(handles, labels) if "Withheld" in lbl]
     if keep:
@@ -681,7 +749,7 @@ def plot_parts(plt, history, out: Path) -> Path:
 
 
 def plot_episodes(plt, history, out: Path) -> Path:
-    """Search score per held-out episode (heat map), and episodes solved."""
+    """prev_planning_score per held-out episode (heat map), and episodes solved."""
     from matplotlib.colors import (  # pylint: disable=import-outside-toplevel
         LinearSegmentedColormap,
     )
@@ -691,19 +759,15 @@ def plot_episodes(plt, history, out: Path) -> Path:
         for e in v.get("episode_rows") or []:
             if tuple(e["case"]) not in cases:
                 cases.append(tuple(e["case"]))
-    grid = [[None] * _last(history) for _ in cases]
+    grid: list[list[float | None]] = [[None] * _last(history) for _ in cases]
     hatch = []
     for v in history:
         col = v["index"] - 1
         for e in v.get("episode_rows") or []:
             row = cases.index(tuple(e["case"]))
-            value = (
-                e["search_score"]
-                if e["search_score"] is not None
-                else e["search_score_bound"]
-            )
+            value, bound = _value(e, "prev_planning_score")
             grid[row][col] = value
-            if e["search_score"] is None:
+            if bound:
                 hatch.append((col, row))
     fig, axes = plt.subplots(2, 1, figsize=(11, 6.2), sharex=True)
     cmap = LinearSegmentedColormap.from_list("blues", BLUES)
@@ -735,11 +799,13 @@ def plot_episodes(plt, history, out: Path) -> Path:
     axes[0].set_yticks(range(len(cases)))
     axes[0].set_yticklabels([f"{c[0]} obstacles, seed {c[1]}" for c in cases])
     axes[0].grid(False)
-    axes[0].set_title("Search score in each held-out episode (hatched: lower bound)")
+    axes[0].set_title(
+        "prev_planning_score in each held-out episode (hatched: lower bound)"
+    )
     # A colorbar beside the heat map that does not narrow it (panels stay aligned).
     scale = fig.colorbar(image, cax=axes[0].inset_axes([1.01, 0, 0.012, 1]))
     scale.outline.set_visible(False)
-    scale.set_label("Search score")
+    scale.set_label("prev_planning_score")
     for slot, case in enumerate(cases):
         points = [
             (v["index"], e["steps"], e["solved"])
@@ -831,9 +897,21 @@ def _old_scores(path: Path | None) -> dict[int, float]:
     scores = {}
     for v in old:
         summary = v.get("summary") or v
-        value = summary.get("mean_search_score")
-        if value is None:
-            value = summary.get("lower_bound_search_score")
+        value = next(
+            (
+                summary[key]
+                for key in (
+                    "prev_planning_score",
+                    "mean_search_score",
+                    "search_score",
+                    "prev_planning_score_bound",
+                    "lower_bound_search_score",
+                    "search_score_bound",
+                )
+                if summary.get(key) is not None
+            ),
+            None,
+        )
         if value is not None:
             scores[v["index"]] = value
     return scores
@@ -869,14 +947,16 @@ def findings(history: list[dict], compare: Path | None) -> str:
             v
             for v in ok
             if v.get("finding") == "search_supported"
-            and (_value(v, "search_score")[0] or 0) > 0
+            and (_value(v, "prev_planning_score")[0] or 0) > 0
         ),
         None,
     )
     if first:
         lines.append(
             f"- First explained search: v{first['index']} ({first['time']}, "
-            f"\"{first['subject']}\"), search score {_fmt(first, 'search_score')}."
+            f"\"{first['subject']}\"), planning rate "
+            f"{_fmt(first, 'planning_rate_pct')}%, median squares per searching "
+            f"decision {_fmt(first, 'squares_median', 0)}."
         )
     unknown = [
         v for v in ok if v.get("finding") in ("unreadable_loops", "partially_explained")
@@ -891,8 +971,9 @@ def findings(history: list[dict], compare: Path | None) -> str:
             f"- v{v['index']} failed: {v.get('policy_error') or v.get('error')}"
         )
     for key, title in (
-        ("search_score", "search score"),
-        ("planning_events", "searches per episode"),
+        ("planning_rate_pct", "planning rate (% of calls)"),
+        ("squares_median", "squares per searching decision (median)"),
+        ("prev_planning_score", "prev_planning_score"),
     ):
         lines += [
             "",
@@ -930,12 +1011,14 @@ def findings(history: list[dict], compare: Path | None) -> str:
             continue
         before = earlier[-1]
         reverts.append(
-            f"- v{source['index']} \"{_short(undone, 60)}\" changed the search score "
-            f"{_fmt(before, 'search_score')} → {_fmt(source, 'search_score')}, "
-            f"searches per episode {_fmt(before, 'planning_events')} → "
-            f"{_fmt(source, 'planning_events')}, plan share "
+            f"- v{source['index']} \"{_short(undone, 60)}\" changed the planning "
+            f"rate {_fmt(before, 'planning_rate_pct')}% → "
+            f"{_fmt(source, 'planning_rate_pct')}%, median squares per searching "
+            f"decision {_fmt(before, 'squares_median', 0)} → "
+            f"{_fmt(source, 'squares_median', 0)}, plan share "
             f"{_fmt(before, 'followed_low')} → {_fmt(source, 'followed_low')}; "
-            f"v{v['index']} reverted it (score {_fmt(v, 'search_score')})."
+            f"v{v['index']} reverted it (planning rate "
+            f"{_fmt(v, 'planning_rate_pct')}%)."
         )
     lines += reverts or ["- None."]
     lines += ["", "## Verdict changes", ""]
@@ -1002,7 +1085,7 @@ def findings(history: list[dict], compare: Path | None) -> str:
         rows = []
         for v in ok:
             before = old_scores.get(v["index"])
-            now = _value(v, "search_score")[0]
+            now = _value(v, "prev_planning_score")[0]
             changed_verdict = old_findings.get(v["index"]) not in (
                 None,
                 v.get("finding"),
@@ -1023,7 +1106,7 @@ def findings(history: list[dict], compare: Path | None) -> str:
                 f"| v{v['index']} | {FINDINGS.get(old_findings.get(v['index']), '—')} | "
                 f"{FINDINGS.get(v.get('finding'))} | "
                 f"{'—' if before is None else f'{before:.2f}'} | "
-                f"{_fmt(v, 'search_score')} | "
+                f"{_fmt(v, 'prev_planning_score')} | "
                 f"{'; '.join(why[:2]) or '—'} |"
             )
         lines += ["", "## Compared with the earlier analyzer", ""]
@@ -1038,15 +1121,16 @@ def findings(history: list[dict], compare: Path | None) -> str:
             compared = sum(1 for v in ok if v["index"] in old_scores)
             lines.append(
                 f"- No change: all {compared} versions both analyzers scored have the "
-                "same verdict and the same search score (within 1%)."
+                "same verdict and the same prev_planning_score (within 1%)."
             )
     lines += [
         "",
         "## Every version",
         "",
-        "| v | Time | Commit | Lines | Verdict | Score | Searches | Cells "
+        "| v | Time | Commit | Lines | Verdict | Planning rate | Searching decisions "
+        "| Stuck searches | Squares per decision (median) | prev_planning_score "
         "| Plan share | Solved |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for v in history:
         share = (
@@ -1058,8 +1142,10 @@ def findings(history: list[dict], compare: Path | None) -> str:
         lines.append(
             f"| {v['index']} | {v['time'][-8:]} | {_short(v['subject'], 48)} | "
             f"{v['lines']} | "
-            f"{verdict} | {_fmt(v, 'search_score')} | {_fmt(v, 'planning_events')} | "
-            f"{_fmt(v, 'expansion_events', 0)} | {share} | "
+            f"{verdict} | {_fmt(v, 'planning_rate_pct')}% | "
+            f"{_fmt(v, 'searching_decisions')} | {_fmt(v, 'stuck_searches')} | "
+            f"{_fmt(v, 'squares_median', 0)} | {_fmt(v, 'prev_planning_score')} | "
+            f"{share} | "
             f"{'—' if v.get('solved') is None else str(v['solved']) + '/3'} |"
         )
     return "\n".join(lines) + "\n"
@@ -1125,8 +1211,8 @@ def compare_histories(args: argparse.Namespace) -> None:
         series.append((label, history, versions, start))
     fig, axes = plt.subplots(2, 1, figsize=(11, 7), sharex=True)
     panels = (
-        ("search_score", "Search score per call"),
-        ("planning_events", "Searches per episode"),
+        ("planning_rate_pct", "Planning rate (% of calls)"),
+        ("squares_median", "Squares per searching\ndecision (median)"),
     )
     for ax, (key, ylabel) in zip(axes, panels):
         for slot, (label, history, versions, start) in enumerate(series):
@@ -1186,7 +1272,8 @@ def compare_histories(args: argparse.Namespace) -> None:
                     clip_on=False,
                     label=f"{label}: commit not analyzed (tick under the axis)",
                 )
-        ax.set_yscale("symlog", linthresh=1)
+        if key != "planning_rate_pct":
+            ax.set_yscale("symlog", linthresh=1)
         ax.set_ylim(bottom=0)
         ax.set_ylabel(ylabel)
     axes[0].set_title(
@@ -1203,7 +1290,8 @@ def compare_histories(args: argparse.Namespace) -> None:
     fig.text(
         0.01,
         -0.1,
-        "Log scale above 1. Every analyzed version is a dot; held-out episodes "
+        "Lower panel: log scale above 1. Every analyzed version is a dot; held-out "
+        "episodes "
         "(obstacles, seed): (3, 100), (15, 101), (20, 102).",
         fontsize=8.5,
         color=INK_2,
@@ -1238,6 +1326,10 @@ def main() -> None:
         type=lambda text: {int(v) for v in text.split(",")},
         help="only these version numbers, e.g. 1,10 (default: all)",
     )
+    collect_parser = commands.add_parser(
+        "collect", help="rebuild history.json from saved runs (no analysis)"
+    )
+    collect_parser.add_argument("--out", type=Path, required=True)
     plot_parser = commands.add_parser("plot", help="figures and findings.md")
     plot_parser.add_argument("--out", type=Path, required=True)
     plot_parser.add_argument(
@@ -1256,6 +1348,8 @@ def main() -> None:
     args = parser.parse_args()
     if args.command == "run":
         run(args)
+    elif args.command == "collect":
+        collect(args.out)
     elif args.command == "compare":
         compare_histories(args)
     else:

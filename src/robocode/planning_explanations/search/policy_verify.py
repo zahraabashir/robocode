@@ -711,6 +711,27 @@ def readout_shape(function, cell) -> bool:
     )
 
 
+def cell_size(function, cell) -> float | None:
+    """Metres between a cell's read-out point and a neighbouring cell's.
+
+    The policy's own cell-to-point read-out fixes the size of its grid squares, so
+    floor areas can be compared across policies with different grids.
+    """
+    try:
+        x0, y0 = (float(v) for v in function(cell))
+    except ERRORS:
+        return None
+    for di, dj in ((1, 0), (0, 1), (-1, 0), (0, -1)):
+        try:
+            x1, y1 = (float(v) for v in function((cell[0] + di, cell[1] + dj)))
+        except ERRORS:
+            continue
+        size = math.hypot(x1 - x0, y1 - y0)
+        if size > 0:
+            return size
+    return None
+
+
 def link_plan(points: tuple, parents: dict, readout) -> bool:
     """Waypoints, except at most one trailing target, read out a parent chain."""
     if not points:

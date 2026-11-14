@@ -1,6 +1,6 @@
 # Measuring Planning in Agent-Written Policies: the Abstract-Tree Analyzer
 
-Last updated 13 November 2026.
+Last updated 14 November 2026.
 
 ## Problem statement
 
@@ -46,11 +46,11 @@ while frontier:
             heapq.heappush(frontier, (nc + h, nxt))
 ```
 
-Expected answer: one search, whose plan drives every later step. Measured: search score 2.6 per call, followed-plan share 1.0.
+Expected answer: one search, whose plan drives every later step. Measured: one searching decision per episode (planning rate 0.88%), a median 280 squares per decision, followed-plan share 1.0; prev\_planning\_score 2.62.
 
-**discarded\_search** (a decoy control). It runs exactly the same search, then throws the path away and stores two waypoints at the goal instead. From outside it looks like plan\_once: same search, same effort (search score 2.6), and a stored plan the robot follows. The correct followed-plan share is 0. This is why plan use must be proven by intervention, never inferred from a search being present.
+**discarded\_search** (a decoy control). It runs exactly the same search, then throws the path away and stores two waypoints at the goal instead. From outside it looks like plan\_once: same search, same effort (one searching decision with the same 280 squares), and a stored plan the robot follows. The correct followed-plan share is 0. This is why plan use must be proven by intervention, never inferred from a search being present.
 
-**GPT-6 Astra, seed 444** (an agent-written KinDER policy of 350 lines; solves 3 of 3 held-out episodes). At each decision point it tries up to 36 grasp options per object. For each option it runs an approach A\* and a carry A\*, then keeps the cheapest. Its A\* uses a 2% inflated octile distance estimate, diagonal steps of 1.414, a numpy obstacle grid, and it smooths the stored path down to its corners. The fixed ingredient menu could not read it, so ingredients are now fitted from data. Measured: search score 428.7 per call, followed-plan share 0.03–0.37.
+**GPT-6 Astra, seed 444** (an agent-written KinDER policy of 350 lines; solves 3 of 3 held-out episodes). At each decision point it tries up to 36 grasp options per object. For each option it runs an approach A\* and a carry A\*, then keeps the cheapest. Its A\* uses a 2% inflated octile distance estimate, diagonal steps of 1.414, a numpy obstacle grid, and it smooths the stored path down to its corners. The fixed ingredient menu could not read it, so ingredients are now fitted from data. Measured: it plans in 2.67% of calls (15 searching decisions), weighs 31.5 searches per decision, and expands a median 3,654 squares (2.3 m²) per decision; followed-plan share 0.03–0.37.
 
 ## The idea in plain words
 
@@ -268,13 +268,19 @@ Watching `for` loops at first made Astra's candidate loop unknown too. Its candi
 
 ## Measurements
 
-Every number is computed per held-out episode from supported runs and classified steps, then averaged over the three held-out episodes with equal weight. T is the number of action calls; calls are indexed k = 0 (reset) to T.
+Every number is computed per held-out episode from supported runs and classified steps. A **decision** is one policy call: `reset` (k = 0) or an action (k = 1 to T). Planning rate, prev\_planning\_score and the followed-plan share are averaged over the three held-out episodes with equal weight; stuck searches are totals; per-decision values pool every searching decision of every episode.
 
 ### Key formulas
 
 ```math
-\text{search score} = \frac{1}{T+1} \sum_{k=0}^{T} \max\Big(\sum_{r \in k} N(r) - 1,\ 0\Big)
+M(r) = N(r) - 1, \qquad D = \{\, k : M(r) \ge 1 \text{ for some run } r \text{ in call } k \,\}, \qquad \text{planning rate} = \frac{|D|}{T+1}
 ```
+
+```math
+\text{squares}(k) = \sum_{r \in k,\ M(r) \ge 1} M(r), \qquad \text{prev\_planning\_score} = \frac{1}{T+1} \sum_{k \in D} \text{squares}(k) = \text{planning rate} \times \overline{\text{squares}}
+```
+
+The start square is subtracted once per search, because every search starts afresh. A run with M(r) = 0 is a **stuck search**: it never left its start square, and it is not planning. D holds the **searching decisions**. The floor of a decision multiplies each run's squares by the area of one of its squares, read from the part's plan read-out (metres between two neighbouring squares).
 
 ```math
 \text{followed-plan share} \in \Big[\frac{W}{T},\ \frac{W + U + L}{T}\Big], \qquad \text{searched share} = \frac{S}{T}
@@ -292,29 +298,34 @@ Here d̄ is the mean, over search runs, of each run's max expanded depth in cell
 
 | Metric | Definition | Unit |
 | --- | --- | --- |
-| Search score | mean over calls of distinct cells expanded beyond the start; searches in one call are summed; a call without a search scores 0 | cells per call |
-| Planning events | search runs that expanded at least one cell | runs |
-| Expansion events | all expansions, repeats included | cells |
-| N | distinct cells expanded, summed over runs | cells |
-| At initialization | expansion events in the reset call | cells |
-| Max expanded depth | longest parent chain to an expanded cell, over all runs | cells |
-| Max discovery depth | the same for generated cells | cells |
-| Re-expansions | expansion events minus N | cells |
-| Cost improvements | times a known cell's cost was lowered | count |
-| Generated alternatives | children generated by expansions | count |
-| Followed-plan share | the range above | fraction of steps |
+| Solved | episodes that reach the goal, reported separately | episodes |
+| Calls | `reset` plus every action call | calls |
+| Searching decisions | calls with at least one search that got beyond its start square | calls |
+| Planning rate | searching decisions ÷ calls, shown with the count | % of calls |
+| Stuck searches | searches that never left their start square, with the calls that had only such searches | runs (calls) |
+| Squares per searching decision | M summed over the call's searches; median, mean, min and max | squares |
+| Floor per searching decision | the same squares times the area of one square | m² |
+| Searches per searching decision | searches that got beyond their start in one call: how many options it weighs | runs |
+| prev\_planning\_score (derived) | the method's per-call score: planning rate × mean squares per searching decision | squares per call |
+| Search-guided actions (followed-plan share) | the range above | fraction of steps |
+| Planning events | search runs that expanded at least one square | runs |
+| Expansion events | all expansions, repeats included | squares |
+| N | distinct squares expanded, summed over runs | squares |
+| At initialization | expansion events in the reset call | squares |
+| Max expanded depth | longest parent chain to an expanded square, over all runs | squares |
+| Max discovery depth | the same for generated squares | squares |
+| Re-expansions | expansion events minus N | squares |
+| Cost improvements | times a known square's cost was lowered | count |
+| Generated alternatives | neighbours generated by expansions | count |
 | Followed plan: witnessed, unresolved, disproved, unmatched | steps per plan verdict | steps |
 | Searched share | steps that ran a search | fraction of steps |
 | Unclassified loop, neither | steps with an unknown loop and no plan; steps with neither | steps |
-| Attributed to actions | expansion events of runs whose plan was witnessed, or whose edit changed the same call's action; “≥” when some runs lack a witness | cells |
+| Attributed to actions | expansion events of runs whose plan was witnessed, or whose edit changed the same call's action; “≥” when some runs lack a witness | squares |
 | World-insensitive share | witnessed steps whose move is unchanged when obstacles shift 0.05 m | fraction |
 | Complete | no search-shaped run left unresolved | yes or no |
-| Solved | episodes that reach the goal, reported separately | episodes |
-| Look-ahead per search (planned) | d̄ in cells, metres or robot steps | see formula |
-| Area explored (planned) | N × cell area | m² |
-| Searches per planning call (planned) | planning events ÷ calls that ran a search | runs per call |
+| Look-ahead per search (planned) | d̄ in squares, metres or robot steps | see formula |
 
-The last three are computed in this document but not yet printed by the analyzer.
+The first ten rows are the headline, printed first in every report. The look-ahead is computed in this document but not yet printed by the analyzer.
 
 ### Withheld totals
 
@@ -322,19 +333,21 @@ If any search-shaped run in an episode is unresolved, its totals are withheld. T
 
 ## Discussion of the metrics
 
-No single number captures planning, so the reports should be read as a profile of four questions: how much a policy searches, how far ahead, how many options per decision, and whether its plans drive its moves.
+No single number captures planning, so the reports are read as a profile: how often a policy plans, how big each planning step is, how many options it weighs, how far ahead it looks, and whether its plans drive its moves.
 
 | Question | Metric | GPT-5.6 Sol | GPT-6 Astra |
 | --- | --- | --- | --- |
-| How much? | search score | 7.3 cells per call | 428.7 cells per call |
+| How often does it plan? | planning rate (searching decisions) | 0.31% (9) | 2.67% (15) |
+| How big is each planning step? | squares per searching decision, median (floor) | 1,865 (4.7 m²) | 3,654 (2.3 m²) |
+| How many options per decision? | searches per searching decision, mean | 1.9 | 31.5 |
 | How far ahead? | look-ahead per search | 0.74 m, about 15 robot steps | 1.05 m, about 21 robot steps |
-| How many options per decision? | searches per planning call | about 2 to 5 | about 22 to 35 |
-| Do plans drive moves? | followed-plan share | 0.14–0.25 | 0.03–0.37 |
+| Do plans drive moves? | search-guided actions (followed-plan share) | 14–25% | 3–37% |
+| Does planning fail to start? | stuck searches (calls) | 218 (49) | 4 (0) |
 | Context | episodes solved | 0 of 3 | 3 of 3 |
 
 ### Effort, use and look-ahead measure different things
 
-- **Effort** (search score, planning events, expansions) is exact when every loop is read. It counts wasted search in full: discarded\_search scores 2.6, the same as plan\_once. It also rewards inefficiency, since a flood fill explores everything and a good distance estimate explores little. The method itself says its score “measures search amount, not search quality”.
+- **Effort** (planning rate, squares per searching decision, expansions) is exact when every loop is read. It counts wasted search in full: discarded\_search has the same planning rate and plan size as plan\_once. It also rewards inefficiency, since a flood fill explores everything and a good distance estimate explores little. The method itself says its score “measures search amount, not search quality”.
 - **Use** (followed-plan share) catches wasted search but needs proof, so it is a range. Its lower end depends on how many searches get probed and on what the readout can read.
 - **Look-ahead** (depth) is the closest to “looking into the future”. It also depends on the task: a short trip needs only a shallow search, so policies must be compared on the same episodes.
 
@@ -344,19 +357,19 @@ Cells are each policy's own invention: Sol's are 5 cm wide, Astra's 2.5 cm. In c
 
 ### Normalisation
 
-Per call, as the method defines its score, a long failing episode adds many zero calls. Per search, the two policies are close (Sol 400, Astra 449 cells). Per episode depends on episode length, and per planning decision shows how many options are weighed. Per call also weights episodes unequally when their lengths differ. Sol runs every held-out episode to its step limit, so a cell in its 3-obstacle episode counts about 4.4 times more than one in its 20-obstacle episode, and 69% of its final score comes from the 3-obstacle episode.
+The method's per-call score, reported as prev\_planning\_score, divides all search by every call. It therefore equals planning rate × mean squares per searching decision, and mixes how often a policy plans with how big its plans are. For a policy that plans once and then follows its plan, a longer episode lowers it and a shorter one raises it. On the 3-obstacle episode Sol expands 13 times more squares than Astra (11,253 against 830), yet scores lower (15.0 against 20.2), because its episode has 751 calls and Astra's has 41. The reports therefore show the two factors separately. Squares per searching decision does not depend on episode length; the planning rate does, which is why it is shown with its count and next to solved. A single huge decision can dominate means: one Astra decision in the 20-obstacle episode holds 330,548 squares, 82% of all its search, so per-decision values report the median beside the mean.
 
 ### Why Sol against Astra is not yet a fair comparison
 
 1. **Grid size.** An Astra cell covers a quarter of a Sol cell's area.
-2. **Failing episodes.** Sol solves none of the three held-out episodes and runs to the step limit (750, 2,550 and 3,300 steps). Its 20-obstacle searches are 127 one-cell searches by a stuck robot.
+2. **Failing episodes.** Sol solves none of the three held-out episodes and runs to the step limit (750, 2,550 and 3,300 steps). Its 20-obstacle searches are 127 stuck searches: the robot starts inside an obstacle's safety margin, so no search gets past its start square.
 3. **Probe budget.** Astra runs 22 to 316 searches per episode, Sol 11 to 127. With 8 probed runs, most of Astra's plans stay unproven.
 4. **Straight-shot plans.** A plan holding only the goal earns no credit, although which goal was chosen came from comparing searched routes.
 5. **Choices are not credited.** Neither this analyzer nor the method credits choosing among options by their search results, which is Astra's main planning act. A choice probe would: lengthen one option's searched route and check whether the policy picks another.
 6. **Overlap.** Area explored repeats the same floor: Astra explores 86 m² per episode in a 6.25 m² room.
 7. **Readable searches only.** A search the analyzer cannot read turns every total into a lower bound.
 
-Recommendation: report the profile above, with search score, look-ahead in robot steps and searches per planning call next to the followed-plan range.
+Recommendation: report solved, calls, the planning rate with its count, stuck searches, squares and floor per searching decision (median and mean), searches per searching decision and the search-guided share, with prev\_planning\_score only as the method's derived number.
 
 ## Assumptions
 
@@ -410,9 +423,9 @@ Every result above rests on these 28 assumptions; each is a design choice or a b
 
 ### Measurement
 
-- **A26.** The search score counts reset and every action call, sums a call's searches, and scores a call without a search as 0.
+- **A26.** A decision is one policy call, reset included. The start square is subtracted once per search, and a search that never leaves its start square is stuck, not planning. A call's searches are summed into one searching decision.
 - **A27.** Three held-out episodes, weighted equally, stand for the evaluation distribution.
-- **A28.** Cell sizes come from each policy's code (Sol 0.05 m, Astra 0.025 m), and one robot step is 0.05 m.
+- **A28.** Square sizes are read from each part's plan read-out, as the distance between two neighbouring squares (Sol 0.05 m, Astra 0.025 m), and one robot step is 0.05 m.
 
 ## Relation to the planning-explanations method
 
@@ -425,7 +438,7 @@ The analyzer implements the method's first check (program consistency) with thre
 | Output agreement within one invocation | replaced by the readout and the four-copy replay, because these policies store a plan in one call and act on it in later calls | extended |
 | Interventions, including ones that change the action | drop, raise, clear, targeted raise, detour, and cross-call replays | matches |
 | Proposals from development cases, the frozen explanation tested on held-out inputs | yes | matches |
-| Score = the largest valid explanation's mean of M | runs keep their M and the selection maximises development mean M; the reported search score sums a call's searches, a case the method leaves open | close |
+| Score = the largest valid explanation's mean of M | runs keep their M and the selection maximises development mean M. The method's per-call score is reported as prev\_planning\_score, with the start subtracted once per search. Because these policies plan once and follow the plan for many calls, a case the method leaves open, the headline splits it into planning rate and squares per searching decision | close |
 | A reactive baseline is itself an explanation (root plus one action leaf) | loops without an explanation count as zero only after the to-do-list test; no explicit baseline explanation | differs |
 | No valid explanation means “unestablished” | reported as unknown, with totals as lower bounds | matches |
 | Environment consistency: root = φ(s₀), one trajectory witness per abstract move (weak semantics), goal check | not built for KinDER yet | missing |
@@ -433,25 +446,27 @@ The analyzer implements the method's first check (program consistency) with thre
 
 ## Results so far
 
-On the 13 disc-world controls the verdicts match how each was built. On the two agent-written KinDER policies, Astra searches about 60 times more per call than Sol. All 15 rows were re-measured on 2026-11-13 with the current analyzer and are unchanged.
+On the 13 disc-world controls the verdicts match how each was built. On the two agent-written KinDER policies, Astra plans about 9 times as often as Sol (2.67% against 0.31% of calls) and weighs about 31 searches per decision against 1.9, while Sol's planning steps cover more floor (4.7 against 2.3 m²). All rows were re-measured on 2026-11-14 with the per-decision metrics. Disc-world squares are 0.1 m, Sol's 0.05 m and Astra's 0.025 m.
 
-| Policy | Built to | Search score (cells per call) | Followed-plan share | Solved |
-| --- | --- | --- | --- | --- |
-| plan\_once | plan once, then follow | 2.62 | 1.0 | 3 of 3 |
-| discarded\_search | search, then discard the result | 2.55 | 0.0 | 1 of 3 |
-| unused\_plan | plan, then steer straight at the goal | 2.55 | 0.0 | 1 of 3 |
-| replan\_every\_call | search on every step (searched share 1.0) | 92.25 | 0.0 | 3 of 3 |
-| reactive | no search | 0.0 | 0.0 | 1 of 3 |
-| reach\_then\_pick | explore everything, then follow the tree | 3.88 | 1.0 | 3 of 3 |
-| nested\_renamed | plan\_once with renamed, nested storage | 2.62 | 1.0 | 3 of 3 |
-| endpoint\_replaced | plan\_once storing the exact goal in place of its last cell | 2.64 | 1.0 | 3 of 3 |
-| tiebreak\_astar | plan\_once with tie-break counters in its heap | 2.61 | 1.0 | 3 of 3 |
-| deque\_bfs | breadth-first search, plan once | 3.69 | 1.0 | 3 of 3 |
-| bfs\_without\_costs | a search outside the grammar | ≥ 0.0 (unknown) | 0.0–1.0 | 3 of 3 |
-| grid\_octile | Astra-style A\* | 1.12 | 1.0 | 3 of 3 |
-| grid\_smoothed | Astra-style A\* with smoothing | 1.18 | 0.67 | 3 of 3 |
-| GPT-5.6 Sol, seed 424 | agent-written, KinDER | 7.28 | 0.14–0.25 | 0 of 3 |
-| GPT-6 Astra, seed 444 | agent-written, KinDER | 428.71 | 0.03–0.37 | 3 of 3 |
+| Policy | Built to | Planning rate | Squares per searching decision (median) | Floor per searching decision (m², median) | Searches per searching decision | prev\_planning\_score | Followed-plan share | Solved |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| plan\_once | plan once, then follow | 0.88% | 280 | 2.80 | 1.0 | 2.62 | 1.0 | 3 of 3 |
+| discarded\_search | search, then discard the result | 0.70% | 280 | 2.80 | 1.0 | 2.55 | 0.0 | 1 of 3 |
+| unused\_plan | plan, then steer straight at the goal | 0.70% | 280 | 2.80 | 1.0 | 2.55 | 0.0 | 1 of 3 |
+| replan\_every\_call | search on every step | 95.80% | 72 | 0.72 | 1.0 | 92.25 | 0.0 | 3 of 3 |
+| reactive | no search | 0% | — | — | — | 0.0 | 0.0 | 1 of 3 |
+| reach\_then\_pick | explore everything, then follow the tree | 0.88% | 415 | 4.15 | 1.0 | 3.88 | 1.0 | 3 of 3 |
+| nested\_renamed | plan\_once with renamed, nested storage | 0.88% | 280 | 2.80 | 1.0 | 2.62 | 1.0 | 3 of 3 |
+| endpoint\_replaced | plan\_once storing the exact goal in place of its last cell | 0.89% | 280 | 2.80 | 1.0 | 2.64 | 1.0 | 3 of 3 |
+| tiebreak\_astar | plan\_once with tie-break counters in its heap | 0.88% | 282 | 2.82 | 1.0 | 2.61 | 1.0 | 3 of 3 |
+| deque\_bfs | breadth-first search, plan once | 0.88% | 389 | 3.89 | 1.0 | 3.69 | 1.0 | 3 of 3 |
+| bfs\_without\_costs | a search outside the grammar | ≥ 0% (unknown) | — | — | — | ≥ 0.0 | 0.0–1.0 | 3 of 3 |
+| grid\_octile | Astra-style A\* | 1.28% | 147 | 1.47 | 1.0 | 1.12 | 1.0 | 3 of 3 |
+| grid\_smoothed | Astra-style A\* with smoothing | 1.35% | 147 | 1.47 | 1.0 | 1.18 | 0.67 | 3 of 3 |
+| GPT-5.6 Sol, seed 424 | agent-written, KinDER | 0.31% | 1,865 | 4.66 | 1.9 | 7.25 | 0.14–0.25 | 0 of 3 |
+| GPT-6 Astra, seed 444 | agent-written, KinDER | 2.67% | 3,654 | 2.28 | 31.5 | 427.97 | 0.03–0.37 | 3 of 3 |
+
+discarded\_search and unused\_plan run the same 280-square search as plan\_once; their lower planning rate only reflects longer, failed episodes, which is why the rate is read next to solved. Sol also has 218 stuck searches over its three episodes (49 calls), all from a robot trapped in an obstacle's safety margin; Astra has 4.
 
 grid\_smoothed's 0.67 is honest: in one episode the line to the goal is clear, smoothing stores only the goal, and that plan earns no credit.
 
@@ -459,13 +474,13 @@ grid\_smoothed's 0.67 is honest: in one episode the line to the goal is clear, s
 
 ### Sol's 70 saved versions
 
-![Search score of each of GPT-5.6 Sol's 70 saved versions: search appears at version 13 and settles near 7 cells per call](media/abstract-tree/sol424-search-score.png)
+![GPT-5.6 Sol's 70 saved versions: planning rate (% of calls) and median squares per searching decision; Sol plans in about 0.3% of calls, each time mapping about 1,900 squares](media/abstract-tree/sol424-planning-rate-and-size.png)
 
-Versions 2 to 12 are reactive drafts. Search appears at version 13 (“Plan collision-aware grid path to grasp stance”), and version 25 adds a reachability search over grasp stances. From version 39 the policy replans when stuck, and searches per episode grow from 12 to 78 by the final version. Versions 1 and 64 crash in their own code; version 64's endless `reset` recursion is fixed by the very next commit. No version solves a held-out episode.
+Versions 2 to 12 are reactive drafts. Search appears at version 13 (“Plan collision-aware grid path to grasp stance”), and version 25 adds a reachability search over grasp stances. From version 39 the policy replans when stuck. Its planning rate settles near 0.3% of calls with about 1,865 squares per searching decision, while stuck searches grow from 0 to 218 by the final version. Versions 1 and 64 crash in their own code; version 64's endless `reset` recursion is fixed by the very next commit. No version solves a held-out episode.
 
 Re-run on 2026-11-13 with the current analyzer, all 68 versions that run give the same numbers as before.
 
-**Astra's 15 saved versions** (19:57 to 20:38) took a different path. Version 1 has no search. Version 10, 21 minutes in, already scores 359.05 and solves all three held-out episodes. The final version scores 428.71. Only these three versions have been analyzed so far.
+**Astra's 15 saved versions** (19:57 to 20:38) took a different path. Version 1 has no search. Version 10, 21 minutes in, already plans in 2.30% of calls with a median 3,654 squares per searching decision, and solves all three held-out episodes. The final version plans in 2.67% of calls. Only these three versions have been analyzed so far.
 
 ## Limitations and open problems
 
