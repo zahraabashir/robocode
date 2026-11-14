@@ -1,4 +1,4 @@
-"""Closed-loop domains for milestone 8: a tiny disc world and KinDER.
+"""Closed-loop domains: a tiny disc world and KinDER.
 
 A domain declares environment semantics only: resets, steps, the robot's position and
 which action components are planar motion. It knows nothing about any policy's

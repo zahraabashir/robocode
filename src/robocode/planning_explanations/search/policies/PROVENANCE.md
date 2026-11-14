@@ -1,4 +1,4 @@
-# Milestone 8 policy
+# Stored agent policy
 
 `clutteredretrieval2d_codex_gpt56sol.py.txt` is a byte-identical copy of an
 agent-written policy. The `.txt` suffix keeps repository linters off generated

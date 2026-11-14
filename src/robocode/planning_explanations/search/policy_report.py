@@ -1,15 +1,99 @@
-"""Milestone 8 reports: per-part tables and a program row with stated rules."""
+"""Reports: per-part tables and a program row with stated rules."""
 
 # Long lines are HTML fragments.
 # pylint: disable=line-too-long
 
 import html
+import json
 from dataclasses import asdict
 from pathlib import Path
 
 from .policy_discovery import DEPTH, EFFORT, UNREADABLE, FrozenPolicyBank
 from .policy_runner import PolicyProgram
-from .report import _details, _table, write_json
+
+# The finding written for a policy that could not be analysed at all.
+UNRESOLVED_FINDING: dict[str, object] = {
+    "code": "unresolved",
+    "label": "Unresolved",
+    "search_explanations": [],
+    "ungrounded_search_mechanisms": [],
+    "reactive_explanations": [],
+    "scope": "Empirical support within the frozen bounded language; not proof of "
+    "absence",
+    "planningness": None,
+}
+
+
+def write_json(path: Path, value) -> None:
+    """Write human-readable machine data."""
+    path.write_text(
+        json.dumps(value, indent=2, allow_nan=False) + "\n", encoding="utf-8"
+    )
+
+
+def _details(title: str, value) -> str:
+    return (
+        f"<details><summary>{html.escape(title)}</summary><pre>"
+        f"{html.escape(json.dumps(value, indent=2))}</pre></details>"
+    )
+
+
+def _table(headers, rows) -> str:
+    def cells(row, tag) -> str:
+        return "".join(
+            f'<{tag}>{html.escape(str(v)) if v is not None else "—"}</{tag}>'
+            for v in row
+        )
+
+    return (
+        "<table><thead><tr>"
+        + cells(headers, "th")
+        + "</tr></thead><tbody>"
+        + "".join("<tr>" + cells(row, "td") + "</tr>" for row in rows)
+        + "</tbody></table>"
+    )
+
+
+def save_unresolved(directory: Path, name: str, source: str, error: Exception) -> dict:
+    """Write an explicit unknown, rather than leave a previous successful report."""
+    directory.mkdir(parents=True, exist_ok=True)
+    for filename in (
+        "ordinary.svg",
+        "intervention.svg",
+        "rejected-intervention.svg",
+        "ordinary-traces.json",
+    ):
+        (directory / filename).unlink(missing_ok=True)
+    (directory / "policy.py").write_text(source, encoding="utf-8")
+    summary: dict = {
+        "fixture": name,
+        "status": "unresolved",
+        "selected": None,
+        "selected_mode": None,
+        "finding": dict(UNRESOLVED_FINDING),
+        "error": f"{type(error).__name__}: {error}",
+        "supported_discovery": 0,
+        "supported_validation": 0,
+        "fixture_ground_truth": None,
+        "ordinary_mean_N": None,
+        "ordinary_mean_M": None,
+        "task_success_rate": None,
+        "supported_mean_feature_ranges": {},
+        "planningness": None,
+        "attributed_search_expansions": None,
+        "surviving_explanations": [],
+    }
+    write_json(directory / "report.json", {"schema": 2, **summary})
+    message = f'Unresolved: {summary["error"]}. No planning finding or numerical score is assigned.'
+    (directory / "report.md").write_text(message + "\n", encoding="utf-8")
+    (directory / "report.html").write_text(
+        '<!doctype html><meta charset="utf-8"><h1>Unresolved experiment</h1><p>'
+        + html.escape(message)
+        + "</p>",
+        encoding="utf-8",
+    )
+    return summary
+
 
 FINDINGS = {
     "search_supported": "Search explanations supported for every search-shaped run",

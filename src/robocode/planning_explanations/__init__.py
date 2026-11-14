@@ -1,1 +1,1 @@
-"""Small, bounded experiments on causal explanations of Python executions."""
+"""Search explanations of agent-written policies: how much they plan by search."""

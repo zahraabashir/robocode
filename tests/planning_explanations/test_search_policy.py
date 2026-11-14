@@ -1,4 +1,4 @@
-"""Milestone 8: class-based policies, cached plans, and once-only counting."""
+"""Class-based policies, cached plans, and once-only counting."""
 
 import importlib.util
 import json

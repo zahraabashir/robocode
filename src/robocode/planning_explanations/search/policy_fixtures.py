@@ -1,4 +1,4 @@
-"""Class-based control policies for milestone 8 and the KinDER policy itself.
+"""Class-based control policies and the stored KinDER policy.
 
 Controls run in the disc world. Each plants one claim the analyzer must recover:
 planning once at initialization, replanning every call, an unused plan, no search,

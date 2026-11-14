@@ -6,10 +6,9 @@ robocode is the lab's code for AgenticGenPlan: a coding agent writes one Python 
 
 | Folder | What it holds |
 | --- | --- |
-| `src/robocode/planning_explanations/search/` | The analyzer. The `policy_*.py` files analyze real agent policies; the other files are earlier milestones on toy tasks |
-| `src/robocode/planning_explanations/` (top level, `stress/`) | The first prototype, on small Python programs; `stress/README.md` describes its test programs |
+| `src/robocode/planning_explanations/search/` | The analyzer: the `policy_*.py` files, the reference search (`grid_engine.py`) and variable-path reading (`selectors.py`) |
 | `docs/abstract-tree-analyzer.md` | The analyzer's method, assumptions, metrics and current results |
-| `tests/planning_explanations/` | The analyzer's 260 tests |
+| `tests/planning_explanations/` | The analyzer's 123 tests |
 | `experiments/` | `run_experiment.py` runs an agent on a task; `policy_history.py` analyzes every version an agent committed and plots the changes |
 | `src/robocode/` (other packages) | The shared AgenticGenPlan code: agents (`approaches/`), tasks (`environments/`), sandbox and agent tools (`utils/`, `mcp/`) |
 | `third-party/` | Submodules, including the KinDER environments |

@@ -1,7 +1,8 @@
-"""Milestone 8: per-part banks on development episodes, frozen, then validated.
+"""Per-part banks on development episodes, frozen, then validated.
 
-A part is one `while` loop; a run is one execution of it. Bindings come from value
-shapes at each run's first checkpoint, never from names. Explanations that match every
+A part is a loop, a self-recursive function or a library graph-search call; a run is
+one execution of it. Bindings come from value shapes at each run's first checkpoint,
+never from names. Explanations that match every
 development run and pass sampled paired edits form the part's bank, which is frozen with
 the validation episodes before any of them is executed. Accounting follows the agreed
 rules: effort is summed over an episode's runs, depth is a maximum, planning events are
@@ -11,6 +12,7 @@ counted, the planned share of actions is a fraction, and coverage is kept separa
 # Exact built-in types are the restricted value language.
 # pylint: disable=unidiomatic-typecheck
 
+import hashlib
 import itertools
 import json
 import math
@@ -20,7 +22,6 @@ from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from .discover import digest
 from .grid_engine import (
     EIGHT,
     FOUR,
@@ -70,6 +71,12 @@ from .policy_worklist import (
     worklist_signature,
 )
 from .selectors import inventory, parse
+
+
+def digest(value: dict) -> str:
+    """Hash a portable JSON manifest, independent of dictionary insertion order."""
+    return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+
 
 RUN_SELECTION = (
     "per part and episode, at most `probed_runs` runs: first the last run of each "

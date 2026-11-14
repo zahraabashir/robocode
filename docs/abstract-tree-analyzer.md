@@ -428,7 +428,7 @@ The analyzer implements the method's first check (program consistency) with thre
 | Score = the largest valid explanation's mean of M | runs keep their M and the selection maximises development mean M; the reported search score sums a call's searches, a case the method leaves open | close |
 | A reactive baseline is itself an explanation (root plus one action leaf) | loops without an explanation count as zero only after the to-do-list test; no explicit baseline explanation | differs |
 | No valid explanation means “unestablished” | reported as unknown, with totals as lower bounds | matches |
-| Environment consistency: root = φ(s₀), one trajectory witness per abstract move (weak semantics), goal check | not built for KinDER; exists only for the earlier toy line world | missing |
+| Environment consistency: root = φ(s₀), one trajectory witness per abstract move (weak semantics), goal check | not built for KinDER yet | missing |
 | An agent proposes explanations | a grammar enumerates them and data fits their numbers; no language-model proposer | differs |
 
 ## Results so far

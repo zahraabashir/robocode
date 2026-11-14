@@ -1,8 +1,8 @@
-"""Grid priority search with float costs and heap entries (milestone 8).
+"""Grid priority search with float costs and heap entries.
 
 The family is independent of policy traces. A problem is bound from a run's inputs (root
 cell, optional goal cell, and the policy's own free-cell predicate or boolean grid), then
-stepped one loop iteration at a time. Earlier engines are unchanged.
+stepped one loop iteration at a time.
 
 grid-priority-v2 adds ingredients whose values are proposed from development runs
 (`policy_fit`) and then frozen: a move table with step costs, a weighted octile or

@@ -1,10 +1,9 @@
-"""`--suite policy`: milestone 8 on class-based policies with state across calls."""
+"""`--suite policy`: the analyzer on class-based policies with state across calls."""
 
 import argparse
 import json
 from pathlib import Path
 
-from ..instrument import UnsupportedProgram
 from .policy_discovery import (
     PolicyLimits,
     discover_policy,
@@ -13,9 +12,15 @@ from .policy_discovery import (
 )
 from .policy_domains import DEVELOPMENT, VALIDATION, DiscWorld, KinderDomain
 from .policy_fixtures import GROUND_TRUTH, KINDER_POLICY, POLICY_FIXTURES, kinder_source
-from .policy_report import at_least, finding_text, save_policy_report, share_range
-from .policy_runner import PolicyProgram
-from .report import save_unresolved, write_json
+from .policy_report import (
+    at_least,
+    finding_text,
+    save_policy_report,
+    save_unresolved,
+    share_range,
+    write_json,
+)
+from .policy_runner import PolicyProgram, UnsupportedProgram
 
 FAILURES = (
     UnsupportedProgram,
@@ -119,7 +124,7 @@ def run_policy_suite(args: argparse.Namespace) -> int:
         )
     write_json(args.output_dir / "summary.json", summaries)
     rows = [
-        "# Search explanations of stateful policies (milestone 8)",
+        "# Search explanations of stateful policies",
         "",
         "Means are uniform over each policy's frozen validation episodes. The search "
         "score is the mean, per policy call, of states expanded beyond the start "

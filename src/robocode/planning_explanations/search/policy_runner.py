@@ -1,10 +1,10 @@
 """Checkpoint every loop and method of a class-based policy across an episode.
 
-Milestone 8's runner. Unlike `checkpoints.Program` it accepts a whole module (imports,
-helpers, closures, NumPy), because agent-written policies are classes with state across
-calls. It is trusted-code instrumentation, not a sandbox. Names are never interpreted:
-every `while` loop is a part, and its runs are recorded compactly (dictionaries as per-
-iteration changes) so a 2,000-cell search does not cost 2,000 full copies.
+It accepts a whole module (imports, helpers, closures, NumPy), because agent-written
+policies are classes with state across calls. It is trusted-code instrumentation, not a
+sandbox. Names are never interpreted: every `while` loop, outermost `for` loop and
+self-recursive function is a part, and its runs are recorded compactly (dictionaries as
+per-iteration changes) so a 2,000-cell search does not cost 2,000 full copies.
 """
 
 # Exact built-in types are the restricted value language.
@@ -26,8 +26,12 @@ from itertools import compress, islice
 from operator import is_not
 from typing import Any
 
-from ..instrument import UnsupportedProgram
 from .selectors import locate
+
+
+class UnsupportedProgram(ValueError):
+    """The source is outside the Python subset the policy runner accepts."""
+
 
 FILENAME = "<search-policy-module>"
 RECORDER = "__m8__"
