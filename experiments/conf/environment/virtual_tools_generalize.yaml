@@ -1,0 +1,11 @@
+# Virtual Tools with one extra paragraph in the agent's environment description, to
+# test whether telling the agent that the development levels are only examples
+# improves held-out performance. Everything else is identical to virtual_tools.yaml.
+# The paragraph follows the description's account of the levels.
+defaults:
+  - virtual_tools
+  - _self_
+
+prompt_note: >-
+  Note that the levels available during development are just examples. You should
+  write a policy that generalizes to held-out levels.

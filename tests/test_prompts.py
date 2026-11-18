@@ -156,6 +156,28 @@ def test_generalization_goal_generalized():
     assert "scored as a failure" in goal
 
 
+def test_generalization_goal_search_advice_is_optional():
+    """By default the budget sentence keeps its search advice word for word; with
+    the advice off only the time limit remains."""
+    advice = (
+        "so it must select actions efficiently rather than rely on exhaustive "
+        "search or slow planners."
+    )
+    default = prompts.generalization_goal(60)
+    assert default.endswith("scored as a failure, " + advice)
+    plain = prompts.generalization_goal(60, search_advice=False)
+    assert plain.endswith("scored as a failure.")
+    assert "60 seconds of wall-clock" in plain and "exhaustive search" not in plain
+    system = prompts.build_system_prompt(
+        intro="",
+        blackbox=True,
+        backend_name="codex",
+        timeout=60,
+        search_advice=False,
+    )
+    assert "60 seconds" in system and "exhaustive search" not in system
+
+
 def test_generalization_goal_per_instance_names_reset_call():
     """A per-instance seed swaps in the single-instance goal, still with the budget."""
     goal = prompts.generalization_goal(30, per_instance_seed=7)

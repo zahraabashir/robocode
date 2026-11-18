@@ -1,5 +1,7 @@
 # Coding Agents for Generalized Task and Motion Planning Problems
 
+> **This branch (`abstract-tree`)** adds an analyzer that measures how much agent-written policies plan by search. Start with the [branch guide](README-abstract-tree.md).
+
 ![workflow](https://github.com/tomsilver/robocode/actions/workflows/ci.yml/badge.svg)
 
 [Project website and videos](https://agenticgentamp.github.io/) · [Paper](https://agenticgentamp.github.io/assets/paper.pdf) · [Code](https://github.com/tomsilver/robocode)
@@ -252,6 +254,7 @@ Hydra writes runs beneath `outputs/` or `multirun/` unless overridden. Keep the 
 | `sandbox/best_score.json`, `final_score.json` | LLMGenPlan's selected-best and literal-final generation indices |
 | `results.json` | Per-episode outcomes, solve rate, timeouts/crashes, determinism-check agreement, count summaries, and available generation cost/usage |
 | `env_description.md` | Environment description supplied to the approach |
+| `env_server.log`, `env_server_usage.json` | Black-box runs: the env server's log, and the agent's requests to it by command (also in `results.json` as `gen_env_steps`, `gen_env_resets`, ...) |
 
 ```bash
 python experiments/analyze_results.py multirun/
