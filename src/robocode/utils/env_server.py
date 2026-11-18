@@ -63,6 +63,7 @@ import numpy as np
 from gymnasium.spaces import Box, Space
 from relational_structs.spaces import ObjectCentricStateSpace
 
+from robocode.utils.json_dict_space import JSONDictSpace
 from robocode.utils.telemetry import SINK_FILENAME, host_launch_env
 
 logger = logging.getLogger(__name__)
@@ -228,9 +229,13 @@ def serialize_space(space: Space[Any]) -> dict[str, Any]:
         )
 
         return serialize_object_centric_space(type_features)
+    if isinstance(space, JSONDictSpace):
+        # Plain-dict observations need no codec; the sandbox only learns that the
+        # observation is a dict, plus the env's short summary of its layout.
+        return {"type": "JSONDict", "description": space.description}
     raise TypeError(
         f"No serializer for space type {type(space).__name__}; blackbox mode "
-        "supports Box and ObjectCentric spaces. Add a branch in "
+        "supports Box, ObjectCentric, and JSONDict spaces. Add a branch in "
         "robocode.utils.env_server.serialize_space and mirror it in "
         "env_client.SpaceInfo"
     )

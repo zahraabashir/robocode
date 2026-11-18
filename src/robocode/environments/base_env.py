@@ -28,6 +28,15 @@ class BaseEnv(Env[_StateType, _ActType]):
         """
         return self.env_description
 
+    def restrict_to_synthesis(self) -> None:
+        """Hide the instances reserved for evaluation from this env instance.
+
+        The black-box env server calls this on every env it builds for the agent, so an
+        environment with held-out instances (e.g. levels only seen at evaluation) can
+        refuse to load them during synthesis. The evaluation env is never restricted.
+        The default holds nothing out.
+        """
+
     @abc.abstractmethod
     def set_state(self, state: _StateType) -> None:
         """Reset the internal state of the environment to the given one."""

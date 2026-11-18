@@ -375,6 +375,11 @@ class _EnvRequestHandler(socketserver.StreamRequestHandler):
         requests: Counter[str] = Counter()
         with _ENV_LIFECYCLE_LOCK:
             env = instantiate(OmegaConf.create(self.server.env_config))
+            # Every env served to the agent is a synthesis env: one with held-out
+            # instances refuses to load them (BaseEnv.restrict_to_synthesis). The
+            # runner's evaluation env is built separately and is never restricted.
+            if hasattr(env, "restrict_to_synthesis"):
+                env.restrict_to_synthesis()
             # Reset once so get_state/set_state/render work before the client
             # issues its own reset (mirrors the MCP server's env setup).
             env.reset(seed=0)

@@ -40,6 +40,7 @@ from robocode.utils.env_server import (
     write_env_spaces,
 )
 from robocode.utils.episode import load_generated_approach
+from robocode.utils.json_dict_space import JSONDictSpace
 from robocode.utils.rate_limit import run_with_rate_limit_retry
 from robocode.utils.sandbox import SandboxConfig
 from robocode.utils.sandbox_types import (
@@ -74,6 +75,7 @@ class GeneratedProgramApproach(BaseApproach[_ObsType, _ActType]):
         geometry_prompt: bool = False,
         modular_code_prompt: bool = False,
         token_budget_prompt: bool = False,
+        search_advice_prompt: bool = True,
         mcp_tools: tuple[str, ...] = (),
         max_output_tokens: int = 16384,
         autocompact_pct: int = 80,
@@ -106,6 +108,7 @@ class GeneratedProgramApproach(BaseApproach[_ObsType, _ActType]):
         self._geometry_prompt = geometry_prompt
         self._modular_code_prompt = modular_code_prompt
         self._token_budget_prompt = token_budget_prompt
+        self._search_advice_prompt = search_advice_prompt
         self._mcp_tools = mcp_tools
         self._max_output_tokens = max_output_tokens
         self._autocompact_pct = autocompact_pct
@@ -115,6 +118,9 @@ class GeneratedProgramApproach(BaseApproach[_ObsType, _ActType]):
         # A variable-count env hands the program an ObjectCentricState (not a vector);
         # the prompt then documents the object-centric API instead of vector/devectorize.
         self._object_centric = isinstance(observation_space, ObjectCentricStateSpace)
+        # A plain-dict observation (e.g. Virtual Tools); the prompt then documents it
+        # as a dict laid out by the env description, rendered via env.render_state.
+        self._dict_obs = isinstance(observation_space, JSONDictSpace)
         self._env_cfg = env_cfg
         self._max_steps = max_steps
         self._eval_timeout = eval_timeout
@@ -175,6 +181,7 @@ class GeneratedProgramApproach(BaseApproach[_ObsType, _ActType]):
             blackbox=self._blackbox,
             object_centric=self._object_centric,
             blackbox_strict=self._blackbox_strict,
+            dict_obs=self._dict_obs,
         )
 
         python_exe = (
@@ -205,6 +212,7 @@ class GeneratedProgramApproach(BaseApproach[_ObsType, _ActType]):
             per_instance_seed=per_instance_seed,
             object_centric=self._object_centric,
             blackbox_strict=self._blackbox_strict,
+            dict_obs=self._dict_obs,
         )
 
         system_prompt = prompts.build_system_prompt(
@@ -222,6 +230,8 @@ class GeneratedProgramApproach(BaseApproach[_ObsType, _ActType]):
             blackbox_strict=self._blackbox_strict,
             per_instance_seed=per_instance_seed,
             per_instance_count=per_instance_count,
+            dict_obs=self._dict_obs,
+            search_advice=self._search_advice_prompt,
         )
         init_files: dict[str, Path] = {}
         if self._blackbox:

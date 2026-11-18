@@ -306,6 +306,21 @@ class SpaceInfo:
         return rng.uniform(self.low, self.high).astype(self.dtype)
 
 
+class JSONDictSpaceInfo:
+    """Metadata for observations that are plain dicts of JSON values.
+
+    Such an observation has no shape, bounds, or sampler; ``description`` summarizes
+    its layout, which the environment description documents in full.
+    """
+
+    def __init__(self, spec: dict[str, Any]) -> None:
+        self.description: str = spec.get("description", "")
+
+    def sample(self, rng: np.random.Generator | None = None) -> Any:
+        """Not supported: a valid observation depends on the environment's rules."""
+        raise NotImplementedError("dict observations cannot be sampled")
+
+
 class _RemoteHandle:
     """A reference to a host-side object, used over the env server.
 
@@ -446,6 +461,9 @@ class BlackboxEnv:
         self._object_centric = obs_spec.get("type") == "ObjectCentric"
         if self._object_centric:
             self.observation_space: Any = _ObjectCentricObservationSpace(obs_spec)
+        elif obs_spec.get("type") == "JSONDict":
+            # Plain-dict observations arrive as they are; there is nothing to rebuild.
+            self.observation_space = JSONDictSpaceInfo(obs_spec)
         elif self._strict:
             # Strict blackbox exposes only generic array metadata. In particular,
             # do not attach the host-backed devectorize/vectorize helpers that make
@@ -562,8 +580,9 @@ class BlackboxEnv:
 
         Either pass ``seed`` to render the initial state after a reset (with
         ``object_count`` to pin a variable-count env's object count), or ``state`` (a
-        flat list of floats, as from ``get_state().tolist()``) to render an arbitrary
-        state. The path is relative to the sandbox dir.
+        flat list of floats, as from ``get_state().tolist()``, or the observation
+        itself when observations are dicts) to render an arbitrary state. The path is
+        relative to the sandbox dir.
         """
         if isinstance(state, _ObjectCentricState):
             state = _encode(state)  # tagged object-centric payload, decoded host-side

@@ -52,6 +52,12 @@ pddlstream = [
 tracker = [
     "gspread>=6.2,<7",
 ]
+# Virtual Tools Game (third-party/tool-games). Its physics engine is JavaScript and
+# runs in node.js through PyExecJS, so the host also needs `node` on PATH. Host only:
+# a strict-blackbox sandbox never imports the game.
+virtualtools = [
+    "PyExecJS>=1.5.1",
+]
 develop = [
     "black",
     "docformatter",

@@ -165,6 +165,28 @@ _TOOL_DESC_TEMPLATES_OBJECT_CENTRIC: dict[str, str] = {
 }
 
 
+# Dict-observation override (JSONDictSpace). A state is a dict, not a list of floats,
+# so the MCP `state` argument does not apply; observations are rendered from test
+# scripts with env.render_state(state=obs) instead. Takes precedence over the others.
+_TOOL_DESC_TEMPLATES_JSON_DICT: dict[str, str] = {
+    "render_state": (
+        '`{render_state}(seed=42, object_count=None, label="")`: renders the '
+        "environment's initial state after "
+        "`env.reset(seed=seed, options={{'object_count': object_count}})` as a PNG and "
+        "returns the file path (omit `object_count` to reset with the seed alone).\n"
+        "  This environment's observations are dicts, not lists of floats, so the "
+        "`state` argument does NOT apply. To render an observation (for example after "
+        "a step), call `env.render_state(state=obs)` in a test script; it returns the "
+        "PNG path relative to your working directory.\n"
+        "  The optional `label` parameter is included in the output filename.\n"
+        "  IMPORTANT: You must call this MCP tool DIRECTLY; MCP tools are NOT available "
+        "inside subagents. Call it yourself, then delegate image reading to a subagent: "
+        "have it Read the PNG, describe the scene, and return a concise summary. Delete "
+        "the file when done."
+    ),
+}
+
+
 def mcp_tool_name_claude(tool: str) -> str:
     """Claude Code MCP tool name: ``mcp__robocode-tools__<tool>``."""
     return f"mcp__{MCP_SERVER_NAME}__{tool}"
@@ -180,8 +202,13 @@ def mcp_tool_descriptions(
     blackbox: bool = False,
     object_centric: bool = False,
     strict_blackbox: bool = False,
+    dict_obs: bool = False,
 ) -> dict[str, str]:
     """Return MCP tool descriptions with backend-specific tool names.
+
+    ``dict_obs`` (observations are plain dicts, a ``JSONDictSpace``) replaces the
+    render_state description last: its states are dicts, so neither the flat-vector
+    nor the object-centric guidance applies.
 
     In blackbox mode the render_state description swaps the in-process
     devectorize/vectorize/ObjectCentricState guidance for the host-proxied handle API
@@ -203,6 +230,8 @@ def mcp_tool_descriptions(
         templates.update(_TOOL_DESC_TEMPLATES_STRICT_BLACKBOX)
     if object_centric:
         templates.update(_TOOL_DESC_TEMPLATES_OBJECT_CENTRIC)
+    if dict_obs:
+        templates.update(_TOOL_DESC_TEMPLATES_JSON_DICT)
     names = {tool: namer(tool) for tool in templates}
     return {tool: template.format(**names) for tool, template in templates.items()}
 
@@ -264,6 +293,17 @@ MCP_TOOLS_SYSTEM_PROMPT_SUFFIX_STRICT_BLACKBOX = _mcp_suffix(
     "You can render initial states by seed and existing observations by passing "
     "obs.tolist() to render_state's `state` parameter. Raw state snapshots, "
     "devectorize/vectorize, and named feature metadata are unavailable."
+)
+
+# Dict-observation variant (JSONDictSpace): observations are dicts, so they are
+# rendered from test scripts rather than through the MCP `state` argument.
+MCP_TOOLS_SYSTEM_PROMPT_SUFFIX_JSON_DICT = _mcp_suffix(
+    "This environment's observations are dicts, not lists of floats, so "
+    "render_state's `state` argument does not apply: render initial states by seed "
+    "(and object_count), and render any observation from a test script with "
+    "env.render_state(state=obs), which returns a PNG path. render_policy runs "
+    "approach.py and renders every observation of the episode; it also takes an "
+    "optional object_count to pin the instance, as env.reset's options do."
 )
 
 
