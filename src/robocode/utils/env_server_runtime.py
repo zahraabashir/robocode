@@ -24,11 +24,15 @@ import argparse
 import gc
 import json
 import logging
+import os
 import secrets
+import signal
 import socketserver
 import sys
 import threading
+import time
 import traceback
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -148,6 +152,67 @@ _RENDER_LOCK = threading.Lock()
 # for a later collection to finalize on an unrelated thread. This lock additionally
 # keeps two threads from building or freeing GL contexts at the same time.
 _ENV_LIFECYCLE_LOCK = threading.Lock()
+
+# Minimum seconds between rewrites of the usage file while requests stream in.
+_USAGE_WRITE_INTERVAL_S = 1.0
+
+
+class _UsageCounts:
+    """The agent's requests to this server, counted by command for the results.
+
+    Counted at the dispatch boundary by request command, like the telemetry in
+    ``_log_agent_op``, so the server's own reset at connect time and the
+    save/restore inside render_state never count. ``ok`` holds requests that
+    succeeded and ``failed`` those that raised.
+
+    The totals go to *path* as JSON. The file is rewritten whenever a connection
+    opens or closes, at most every ``_USAGE_WRITE_INTERVAL_S`` while requests
+    arrive, and when the server receives SIGTERM at the end of the run (see
+    ``main``), so the final file holds every request. A request is counted
+    before its reply is sent.
+    """
+
+    def __init__(self, path: Path | None) -> None:
+        self._path = path
+        self._lock = threading.Lock()
+        self._ok: Counter[str] = Counter()
+        self._failed: Counter[str] = Counter()
+        self._connections = 0
+        self._last_write = float("-inf")
+
+    def add_connection(self) -> None:
+        """Count a new client connection and write the totals."""
+        with self._lock:
+            self._connections += 1
+            self._write()
+
+    def add_request(self, cmd: str, ok: bool) -> None:
+        """Count one dispatched request."""
+        with self._lock:
+            (self._ok if ok else self._failed)[cmd] += 1
+            if time.monotonic() - self._last_write >= _USAGE_WRITE_INTERVAL_S:
+                self._write()
+
+    def flush(self) -> None:
+        """Write the current totals."""
+        with self._lock:
+            self._write()
+
+    def _write(self) -> None:
+        self._last_write = time.monotonic()
+        if self._path is None:
+            return
+        data = {
+            "connections": self._connections,
+            "ok": dict(self._ok),
+            "failed": dict(self._failed),
+        }
+        tmp = self._path.with_name(self._path.name + ".tmp")
+        try:
+            tmp.write_text(json.dumps(data, sort_keys=True), encoding="utf-8")
+            os.replace(tmp, self._path)
+        except OSError:
+            logger.warning("Could not write %s", self._path, exc_info=True)
 
 
 class _HandleRegistry:
@@ -288,12 +353,14 @@ class _EnvServer(socketserver.ThreadingTCPServer):
         sandbox_dir: Path,
         *,
         strict: bool = False,
+        usage_path: Path | None = None,
     ) -> None:
         super().__init__(("0.0.0.0", 0), _EnvRequestHandler)
         self.env_config = env_config
         self.token = token
         self.sandbox_dir = sandbox_dir
         self.strict = strict
+        self.usage = _UsageCounts(usage_path)
 
 
 class _EnvRequestHandler(socketserver.StreamRequestHandler):
@@ -303,6 +370,9 @@ class _EnvRequestHandler(socketserver.StreamRequestHandler):
 
     def handle(self) -> None:
         logger.info("New connection from %s", self.client_address)
+        self.server.usage.add_connection()
+        # This connection's successful requests by command, for its closing log line.
+        requests: Counter[str] = Counter()
         with _ENV_LIFECYCLE_LOCK:
             env = instantiate(OmegaConf.create(self.server.env_config))
             # Reset once so get_state/set_state/render work before the client
@@ -346,10 +416,14 @@ class _EnvRequestHandler(socketserver.StreamRequestHandler):
                         "Request %s failed:\n%s", request, traceback.format_exc()
                     )
                     payload = {"error": f"{type(exc).__name__}: {exc}"}
+                    self.server.usage.add_request(str(request.get("cmd")), ok=False)
                 else:
                     _log_agent_op(request, payload, telemetry_state)
+                    self.server.usage.add_request(str(request["cmd"]), ok=True)
+                    requests[str(request["cmd"])] += 1
                 self.wfile.write(json.dumps(payload).encode("utf-8") + b"\n")
         finally:
+            self.server.usage.flush()
             # Drop everything holding the env before collecting, so the collection
             # below actually finalizes it here. See _ENV_LIFECYCLE_LOCK.
             registry.clear()
@@ -360,7 +434,12 @@ class _EnvRequestHandler(socketserver.StreamRequestHandler):
                     logger.warning("env.close() failed", exc_info=True)
                 del env
                 gc.collect()
-            logger.info("Connection from %s closed", self.client_address)
+            logger.info(
+                "Connection from %s closed after %s",
+                self.client_address,
+                ", ".join(f"{n} {cmd}" for cmd, n in sorted(requests.items()))
+                or "no requests",
+            )
 
 
 def _log_agent_op(
@@ -541,6 +620,11 @@ def main() -> None:
         required=True,
         help="Sandbox dir where render PNGs and approach.py live",
     )
+    parser.add_argument(
+        "--usage-file",
+        default=None,
+        help="JSON file the agent's request counts are written to",
+    )
     args = parser.parse_args()
 
     env_config = json.loads(Path(args.env_config).read_text(encoding="utf-8"))
@@ -552,9 +636,21 @@ def main() -> None:
     env.close()
 
     server = _EnvServer(
-        env_config, args.token, Path(args.sandbox_dir), strict=args.strict
+        env_config,
+        args.token,
+        Path(args.sandbox_dir),
+        strict=args.strict,
+        usage_path=Path(args.usage_file) if args.usage_file else None,
     )
     port = server.server_address[1]
+
+    # env_server_running ends the run with SIGTERM: write the final request counts
+    # first. Every request a client got a reply for is already counted.
+    def _stop(_signum: int, _frame: Any) -> None:
+        server.usage.flush()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, _stop)
     Path(args.port_file).write_text(str(port), encoding="utf-8")
     logger.info("Serving env %s on port %d", env_config.get("_target_"), port)
     server.serve_forever()

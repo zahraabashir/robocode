@@ -20,6 +20,7 @@ from robocode.environments.variable_count import VariableCountEnv
 from robocode.experiment_protocol import EXPERIMENT_ID_PATTERN, validate_eval_seed
 from robocode.primitives import build_primitives
 from robocode.utils.approach_history import get_snapshots, record_episodes
+from robocode.utils.env_server import read_env_server_usage
 from robocode.utils.episode import (
     run_episode_with_timeout,
     run_per_instance_eval,
@@ -424,6 +425,11 @@ def _main(cfg: DictConfig) -> float:
     gen_metrics = getattr(approach, "generation_metrics", None)
     if gen_metrics is not None:
         results.update(gen_metrics.to_dict())
+    # How much the agent used the black-box env server while writing its program
+    # (gen_env_steps etc.); absent when this run started no server.
+    env_usage = read_env_server_usage(output_dir)
+    if env_usage is not None:
+        results.update(env_usage)
     results["eval_seed"] = eval_seed
     results["replicate_seed"] = replicate_seed
     if condition_id is not None:
