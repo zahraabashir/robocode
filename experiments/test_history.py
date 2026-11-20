@@ -38,6 +38,7 @@ Codex runs only for now (Claude Code transcripts live in ``stream.jsonl``).
 from __future__ import annotations
 
 import argparse
+import ast
 import glob
 import json
 import os
@@ -388,6 +389,24 @@ TEXT_RESULTS = (
     # "13 False 3300 55.0 ...": a seed followed by its outcome
     re.compile(r"^(\d+)[ ,]+(True|False)\b"),
 )
+# A result line may start with a label: "RESULT 6 None {'object_count': 1} 111 True
+# False 2.89", "RESULT 1 False 1000 3.47". Only result-like labels: "ACTION 3 -1.0
+# False False" is a step of a trace, not an episode.
+RESULT_LABEL = re.compile(r"^results?\b[:=]?\s+(?=\d)", re.I)
+# After the label: the seed, optionally None, the reset options and a step count,
+# then the outcome. A line with no step count besides the leading number is left
+# unread: "RESULT 487 False lower_place" leads with a step count, not a seed.
+LABELLED_RESULT = re.compile(
+    r"^(\d+)\s+(?:None\s+)?(?:\{[^}]*\}\s+)?(\d+\s+)?(True|False|true|false)\b(.*)$"
+)
+# Lines that look like an episode result; those not read are reported by extract.
+RESULT_LIKE = re.compile(
+    r"\b(?:result|success|solved)\b.*\b(?:True|False|true|false)\b"
+    r"|\b(?:True|False)\b.*\b(?:success|solved)\b",
+    re.I,
+)
+UNREAD: Counter = Counter()  # shape of an unread result-like line -> how often
+UNREAD_EXAMPLES: dict[str, str] = {}
 
 
 def _is_int(value) -> bool:
@@ -440,15 +459,43 @@ def _walk(value, count=None):
             yield from _walk(child, count)
 
 
+def _literal(text: str):
+    """A printed dict or list: JSON, or Python's own printing ("{'seed': 2, ...}").
+
+    Python-printed dicts count only when they name the scene (a ``seed`` key), so
+    per-step state dumps are not taken for episodes.
+    """
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    try:
+        value = ast.literal_eval(text)
+    except (ValueError, SyntaxError, TypeError, MemoryError, RecursionError):
+        return None
+    return value if isinstance(value, dict) and "seed" in value else None
+
+
 def _line_episode(line: str, count) -> dict | None:
     text = line.strip()
     # "file.log:{...}" from a search over several files
     text = re.sub(r"^[\w./-]+:(?=[{\[])", "", text)
     if text[:1] in ("{", "[") and text[-1:] in ("}", "]"):
-        try:
-            return _json_episode(json.loads(text), count, raw=text)
-        except json.JSONDecodeError:
-            pass
+        value = _literal(text)
+        if value is not None:
+            return _json_episode(value, count, raw=text)
+    label = RESULT_LABEL.match(text)
+    if label:
+        match = LABELLED_RESULT.match(text[label.end() :])
+        if match and (match.group(2) or re.search(r"\b\d+\b", match.group(4))):
+            seed, _, flag, _ = match.groups()
+            nested = re.search(r"'object_count': (\d+)", text)
+            return {
+                "seed": int(seed),
+                "count": int(nested.group(1)) if nested else count,
+                "solved": flag.lower() == "true",
+                "line": text,
+            }
     for pattern in TEXT_RESULTS:
         match = pattern.match(text)
         if not match:
@@ -470,9 +517,15 @@ def _line_episode(line: str, count) -> dict | None:
 def parse_episodes(output: str, command: str) -> tuple[list[dict], list[tuple]]:
     """Per-episode results printed by a test, and bare "solved X / Y" summaries."""
     count = _count_arg(command)
-    episodes = [
-        e for e in (_line_episode(line, count) for line in output.splitlines()) if e
-    ]
+    episodes = []
+    for line in output.splitlines():
+        episode = _line_episode(line, count)
+        if episode:
+            episodes.append(episode)
+        elif len(line) < 300 and RESULT_LIKE.search(line):
+            shape = re.sub(r"-?\d+(?:\.\d+)?(?:e-?\d+)?", "N", line.strip())[:80]
+            UNREAD[shape] += 1
+            UNREAD_EXAMPLES.setdefault(shape, line.strip()[:200])
     summaries = []
     if not episodes:
         summaries = [
@@ -555,6 +608,8 @@ def committed_results(
 
 def extract(args: argparse.Namespace) -> None:
     """tests.json and believed.json for one run."""
+    UNREAD.clear()
+    UNREAD_EXAMPLES.clear()
     sandbox = args.run / "sandbox"
     history = versions(sandbox)
     out = args.out
@@ -693,6 +748,20 @@ def extract(args: argparse.Namespace) -> None:
         f"{sum(r['episodes'] for r in believed.values())} episode results over "
         f"{len(believed)} of {len(history)} checkpoints -> {out}"
     )
+    (out / "unread_lines.json").write_text(
+        json.dumps(
+            [
+                {"lines": n, "shape": shape, "example": UNREAD_EXAMPLES[shape]}
+                for shape, n in UNREAD.most_common()
+            ],
+            indent=1,
+        )
+    )
+    if UNREAD:
+        print(
+            f"warning: {sum(UNREAD.values())} lines that look like episode results "
+            f"({len(UNREAD)} shapes) were not read; see unread_lines.json"
+        )
     save_official(args.run, out, history)
 
 
