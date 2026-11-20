@@ -116,6 +116,12 @@ class KinderDomain:
             )
         )
         kwargs = {k: v for k, v in self.config.items() if k != "_target_"}
+        # Named after the KinDER environment class (kinder-obstruction2d, ...).
+        env_class = str(self.config.get("constant_object_env_path", "")).rsplit(
+            ":", maxsplit=1
+        )[-1]
+        if env_class:
+            self.name = f"kinder-{env_class.removesuffix('Env').lower()}"
         self.env = VariableObjectCountEnv(**kwargs)
         self.action_space = self.env.action_space
         self.observation_space = self.env.observation_space

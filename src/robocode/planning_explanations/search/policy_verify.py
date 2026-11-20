@@ -553,9 +553,21 @@ def same_frames(ordinary: RunRecord, patched: RunRecord, count: int) -> bool:
 def execute_edit(
     program: PolicyProgram, call: CallRecord, before: tuple, edit: SearchEdit, domain
 ) -> dict:
-    """Re-run only the enclosing call from deep copies with one live edit."""
+    """Re-run only the enclosing call from deep copies with one live edit.
+
+    Only the edited run's values are snapshotted: it is the only run compared
+    afterwards. The call's other runs (dozens of searches in a planning call) are
+    still started and their frames counted, which is all the checks before the edit
+    use. The random-draw watch stays with the ordinary runs.
+    """
     policy, state, extra = before
-    session = Session(capture=True, edit=edit, clock=call.clock)
+    session = Session(
+        capture=True,
+        edit=edit,
+        clock=call.clock,
+        only=(edit.site, edit.ordinal),
+        watch_random=False,
+    )
     clone = copy.deepcopy(policy)
     output, error = None, None
     try:

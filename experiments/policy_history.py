@@ -1,7 +1,9 @@
 """Analyze every saved version of one agent's policy and plot how it changed.
 
-A coding agent commits ``approach.py`` to its sandbox's git history while it works.
-``run`` extracts each version (oldest first), runs the search-explanations analyzer
+A coding agent commits ``approach.py`` (and helper modules it imports, such as
+``planner.py``) to its sandbox's git history while it works. A version is a commit
+that changed any of these files. ``run`` extracts each version (oldest first, with
+its helper modules), runs the search-explanations analyzer
 on it (``python -m robocode.planning_explanations.search --suite policy --source``)
 in parallel, and collects one row of numbers per version into ``history.json``.
 ``plot`` turns ``history.json`` into figures and ``findings.md``, a list of the
@@ -10,7 +12,9 @@ compared with an older ``history.json`` made by an earlier analyzer.
 
 Usage:
 
-    python experiments/policy_history.py run --sandbox <sandbox dir> --out <dir>
+    python experiments/policy_history.py run --sandbox <sandbox dir> --out <dir> \
+        [--env-config <run>/env_config.json] [--development 0:0,1:1,2:2] \
+        [--validation 1:100,3:101,4:102]
     python experiments/policy_history.py plot --out <dir> [--compare <history.json>]
     python experiments/policy_history.py collect --out <dir>
 
@@ -34,6 +38,10 @@ from typing import Any
 from robocode.planning_explanations.search.policy_discovery import (
     decision_spreads,
     decisions,
+)
+from robocode.planning_explanations.search.policy_runner import (
+    imported_names,
+    site_order,
 )
 
 REPO = Path(__file__).resolve().parents[1]
@@ -67,56 +75,107 @@ FINDINGS = {
 # --------------------------------------------------------------------------- run
 
 
+def _git(sandbox: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", "-C", str(sandbox), *args], capture_output=True, text=True, check=True
+    ).stdout
+
+
+def policy_files(sandbox: Path, sha: str) -> dict[str, str]:
+    """approach.py and the sandbox modules it imports, directly or through another
+    of them, at one commit: file name -> source.
+
+    The analyzer's own rule (``local_modules``): ``import planner`` means the
+    sibling ``planner.py`` when the sandbox has one.
+    """
+    tree = set(_git(sandbox, "ls-tree", "--name-only", sha).splitlines())
+    found: dict[str, str] = {}
+    todo = ["approach"]
+    while todo:
+        file = f"{todo.pop()}.py"
+        if file in found or file not in tree:
+            continue
+        found[file] = _git(sandbox, "show", f"{sha}:{file}")
+        try:
+            todo.extend(sorted(imported_names(found[file])))
+        except SyntaxError:
+            pass  # a broken checkpoint: the analyzer reports it
+    return found
+
+
 def extract(sandbox: Path, out: Path) -> list[dict]:
-    """Every committed version of approach.py, oldest first, as checkpoint files."""
-    log = (
-        subprocess.run(
-            [
-                "git",
-                "-C",
-                str(sandbox),
-                "log",
-                "--reverse",
-                "--format=%h%x09%ad%x09%s",
-                "--date=format:%Y-%m-%d %H:%M:%S",
-                "--",
-                "approach.py",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        .stdout.strip()
-        .splitlines()
+    """Every saved version of the policy, oldest first, as checkpoint files.
+
+    A version is a commit that changed approach.py or a sandbox module it imports
+    (planner.py, ...), as in test_history.py. A single-file version is saved as
+    ``checkpoints/<name>.py``; a version with helper modules as the folder
+    ``checkpoints/<name>/`` holding approach.py and its helpers, which the analyzer
+    loads together.
+    """
+    log = _git(
+        sandbox,
+        "log",
+        "--reverse",
+        "--name-only",
+        "--format=%x00%h%x09%ad%x09%s",
+        "--date=format:%Y-%m-%d %H:%M:%S",
     )
     checkpoints = out / "checkpoints"
     checkpoints.mkdir(parents=True, exist_ok=True)
-    versions = []
-    for index, line in enumerate(log, 1):
-        sha, when, subject = line.split("\t", 2)
-        source = subprocess.run(
-            ["git", "-C", str(sandbox), "show", f"{sha}:approach.py"],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
-        name = f"v{index:02d}_{sha}"
-        (checkpoints / f"{name}.py").write_text(source, encoding="utf-8")
+    versions: list[dict] = []
+    before: set[str] = set()
+    for block in log.split("\x00")[1:]:
+        header, *changed = block.strip().split("\n")
+        sha, when, subject = header.split("\t", 2)
+        files = policy_files(sandbox, sha)
+        # Files of the policy before or after this commit (a dropped import counts).
+        touched = {c for c in changed if c} & (set(files) | before)
+        before = set(files)
+        if not touched or "approach.py" not in files:
+            continue
+        name = f"v{len(versions) + 1:02d}_{sha}"
+        if len(files) == 1:
+            path = checkpoints / f"{name}.py"
+            path.write_text(files["approach.py"], encoding="utf-8")
+        else:
+            for file, text in files.items():
+                (checkpoints / name).mkdir(exist_ok=True)
+                (checkpoints / name / file).write_text(text, encoding="utf-8")
+            path = checkpoints / name / "approach.py"
         versions.append(
             {
-                "index": index,
+                "index": len(versions) + 1,
                 "sha": sha,
                 "time": when,
                 "subject": subject,
                 "name": name,
-                "lines": source.count("\n"),
+                "lines": files["approach.py"].count("\n"),
+                "files": sorted(files),
+                "source": str(path.relative_to(out)),
             }
         )
     (out / "versions.json").write_text(json.dumps(versions, indent=1))
     return versions
 
 
-def analyze(version: dict, out: Path, minutes: float, force: bool) -> dict:
+def analyzer_flags(args: argparse.Namespace) -> list[str]:
+    """Environment and episode flags passed on to the analyzer, when given."""
+    flags: list[str] = []
+    if args.env_config:
+        flags += ["--env-config", str(args.env_config.resolve())]
+    for name in ("development", "validation"):
+        if getattr(args, name):
+            flags += [f"--{name}", getattr(args, name)]
+    return flags
+
+
+def analyze(
+    version: dict,
+    out: Path,
+    minutes: float,
+    force: bool,
+    flags: tuple[str, ...] = (),
+) -> dict:
     """Run the analyzer CLI on one version; returns its status."""
     target = out / "runs" / version["name"]
     status_file = target / "status.json"
@@ -138,9 +197,11 @@ def analyze(version: dict, out: Path, minutes: float, force: bool) -> dict:
                 "--suite",
                 "policy",
                 "--source",
-                str(out / "checkpoints" / f"{version['name']}.py"),
+                # Older versions.json files have no "source": single-file checkpoints.
+                str(out / version.get("source", f"checkpoints/{version['name']}.py")),
                 "--output-dir",
                 str(target),
+                *flags,
             ],
             cwd=REPO,
             env=env,
@@ -244,7 +305,7 @@ def metrics(run_dir: Path) -> dict:
                 "source": info["source"][:90],
             }
         )
-    row["parts"] = sorted(parts, key=lambda p: int(p["site"].split(":")[0]))
+    row["parts"] = sorted(parts, key=lambda p: site_order(p["site"]))
     late = Counter()
     episodes: list[dict] = []
     pooled: list[dict] = []
@@ -306,7 +367,10 @@ def run(args: argparse.Namespace) -> None:
         else versions
     )
     with ThreadPoolExecutor(args.workers) as pool:
-        list(pool.map(lambda v: analyze(v, out, args.minutes, args.force), chosen))
+        flags = tuple(analyzer_flags(args))
+        list(
+            pool.map(lambda v: analyze(v, out, args.minutes, args.force, flags), chosen)
+        )
     collect(out, versions)
 
 
@@ -1317,6 +1381,20 @@ def main() -> None:
     run_parser.add_argument("--workers", type=int, default=5)
     run_parser.add_argument(
         "--minutes", type=float, default=40, help="time limit per version"
+    )
+    run_parser.add_argument(
+        "--env-config",
+        type=Path,
+        help="the run's env_config.json (default: the analyzer's "
+        "ClutteredRetrieval2D config)",
+    )
+    run_parser.add_argument(
+        "--development",
+        help='practice episodes "count:seed,..." (default: the analyzer\'s)',
+    )
+    run_parser.add_argument(
+        "--validation",
+        help='held-out episodes "count:seed,..." (default: the analyzer\'s)',
     )
     run_parser.add_argument(
         "--force", action="store_true", help="re-analyze versions that already finished"

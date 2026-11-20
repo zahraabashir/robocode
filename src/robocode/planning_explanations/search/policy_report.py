@@ -9,7 +9,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from .policy_discovery import DEPTH, EFFORT, UNREADABLE, FrozenPolicyBank
-from .policy_runner import PolicyProgram
+from .policy_runner import PolicyProgram, site_order
 
 # The finding written for a policy that could not be analysed at all.
 UNRESOLVED_FINDING: dict[str, object] = {
@@ -326,10 +326,15 @@ def save_policy_report(
     """Write policy source, JSON audit, Markdown summary and an HTML report."""
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "policy.py").write_text(program.source, encoding="utf-8")
+    for helper in program.modules.values():
+        (directory / "modules").mkdir(exist_ok=True)
+        (directory / "modules" / f"{helper.name}.py").write_text(
+            helper.source, encoding="utf-8"
+        )
     finding = _finding(bank, validation)
     summary = validation["summary"]
     part_rows = []
-    for site, part in sorted(bank.parts.items(), key=lambda i: int(i[0].split(":")[0])):
+    for site, part in sorted(bank.parts.items(), key=lambda i: site_order(i[0])):
         info = program.sites[site]
         selected = part.get("selected")
         part_rows.append(

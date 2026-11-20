@@ -41,9 +41,22 @@ _MISSING = object()
 POLICY_MODULE = "search_policy_module"
 
 
+_HELPER_FILENAME = "<search-policy-module:"
+
+
+def helper_filename(name: str) -> str:
+    """Compile-time file name of the policy's own helper module `name` (planner.py)."""
+    return f"{_HELPER_FILENAME}{name}.py>"
+
+
+def _own_module(module) -> bool:
+    return module == POLICY_MODULE or str(module).startswith(f"{POLICY_MODULE}.")
+
+
 def own_object(value) -> bool:
-    """An instance of a class the policy itself defines (its `self`, a `Tree`)."""
-    return getattr(type(value), "__module__", None) == POLICY_MODULE and hasattr(
+    """An instance of a class the policy itself defines (its `self`, a `Tree`),
+    in approach.py or in one of its own helper modules."""
+    return _own_module(getattr(type(value), "__module__", None)) and hasattr(
         value, "__dict__"
     )
 
@@ -125,13 +138,14 @@ class RandomWatch:
     def __init__(self) -> None:
         # Sites that have drawn random numbers: their hidden state is watched.
         self.sites: set[str] = set()
-        self.namespace: dict | None = None
+        # Globals of approach.py and of every helper module it has imported so far.
+        self.namespaces: list[dict] = []
 
     def learn(self, values: dict, generators: dict) -> None:
         """Generators visible from a run's first checkpoint."""
         sources = list(values.values())
-        if self.namespace is not None:
-            sources.extend(self.namespace.values())
+        for namespace in self.namespaces:
+            sources.extend(namespace.values())
         for value in sources:
             if _generator(value):
                 generators[id(value)] = value
@@ -440,9 +454,17 @@ def _skeleton(value, depth: int = 0):
 
 
 def policy_callable(value) -> bool:
-    """A function or lambda written in the analyzed source, never a library call."""
+    """A function or lambda written in the analyzed source (approach.py or one of its
+    own helper modules), never a library call."""
     code = getattr(value, "__code__", None)
-    return callable(value) and code is not None and code.co_filename == FILENAME
+    return (
+        callable(value)
+        and code is not None
+        and (
+            code.co_filename == FILENAME
+            or code.co_filename.startswith(_HELPER_FILENAME)
+        )
+    )
 
 
 @dataclass(frozen=True)
@@ -883,9 +905,18 @@ class Session:
         capture: bool = True,
         edit: SearchEdit | None = None,
         clock: float | None = None,
+        only: tuple[str, int] | None = None,
+        watch_random: bool = True,
     ) -> None:
         self.capture = capture
         self.edit = edit
+        # A probe compares only its edited run: (site, ordinal) of the one run whose
+        # values are snapshotted. Every other run is still started and its frames
+        # counted, so the order and position checks before the edit are unchanged.
+        self.only = only
+        # The random-draw watch belongs to ordinary runs; a probe (a counterfactual
+        # re-execution) neither needs nor feeds it.
+        self.watch_random = watch_random
         # A re-executed call starts from its original call's clock reading.
         self.clock = clock
         self.runs: list[RunRecord] = []
@@ -912,9 +943,16 @@ class Session:
         return run
 
     def record(self, run: RunRecord, kind: str, values: dict) -> None:
-        """One frame of one run, counted for the call."""
-        run.capture.record(kind, values)
+        """One frame of one run, counted for the call (and snapshotted unless the
+        session keeps only another run's values)."""
+        if self.only is None or (run.site, run.ordinal) == self.only:
+            run.capture.record(kind, values)
         self.frames += 1
+
+    @property
+    def watching(self) -> bool:
+        """Whether checkpoints look for random draws."""
+        return self.capture and self.watch_random
 
 
 class Recorder:
@@ -993,7 +1031,7 @@ class Recorder:
         if not self.sessions:
             return None
         session = self.sessions[-1]
-        if session.capture:
+        if session.watching:
             self._moved(session)
         run = session.recursions.get(site)
         if run is None or run.depth == 0:
@@ -1003,6 +1041,7 @@ class Recorder:
         run.visits += 1
         if session.capture:
             session.record(run, "visit", values)
+        if session.watching:
             self._pass(session, run, values)
         return run
 
@@ -1015,7 +1054,7 @@ class Recorder:
             # Only call entries are recorded: an exit frame would hold the
             # outermost call's own locals next to the deepest call's arguments.
             session = self.sessions[-1]
-            if session.capture:
+            if session.watching:
                 self._moved(session)
             self._stop(session, run)
             run.exited = True
@@ -1026,7 +1065,7 @@ class Recorder:
         if not self.sessions:
             return None
         session = self.sessions[-1]
-        if session.capture:
+        if session.watching:
             self._moved(session)
         run = session.start(site)
         session.active.append(run)
@@ -1040,9 +1079,11 @@ class Recorder:
         index = run.visits
         run.visits += 1
         edit = session.edit
-        if session.capture:
+        if session.watching:
             self._moved(session)
+        if session.capture:
             session.record(run, "visit", values)
+        if session.watching:
             self._pass(session, run, values)
         if (
             edit is not None
@@ -1060,7 +1101,7 @@ class Recorder:
         if run is None:
             return
         session = self.sessions[-1]
-        if session.capture:
+        if session.watching:
             self._moved(session)
             self._pass(session, run, values)
         self._stop(session, run)
@@ -1488,9 +1529,15 @@ class _Transformer(ast.NodeTransformer):
     already sees its effects.
     """
 
-    def __init__(self, source: str, aliases: dict[str, str] | None = None) -> None:
+    def __init__(
+        self, source: str, aliases: dict[str, str] | None = None, file: str = ""
+    ) -> None:
         self.lines = source.splitlines()
         self.aliases = aliases or {}
+        # A helper module's sites are named after its file (planner.py:12:8:While);
+        # approach.py keeps plain line:column:kind names.
+        self.file = file
+        self.prefix = f"{file}:" if file else ""
         self.sites: dict[str, dict] = {}
         self.functions: list[str] = []
         # Enclosing loop sites (None for an unwatched loop) of the current function.
@@ -1506,7 +1553,7 @@ class _Transformer(ast.NodeTransformer):
         self.functions.append(node.name)
         site = None
         if recursive:
-            site = f"{node.lineno}:{node.col_offset}:Recursion"
+            site = f"{self.prefix}{node.lineno}:{node.col_offset}:Recursion"
             self.sites[site] = {
                 "kind": "recursion",
                 "line": node.lineno,
@@ -1515,6 +1562,7 @@ class _Transformer(ast.NodeTransformer):
                 "parent": None,
                 "fresh": [],
                 "read": read_names(node),
+                **self._file(),
             }
         outer, self.loops = self.loops, []
         self.generic_visit(node)
@@ -1534,8 +1582,12 @@ class _Transformer(ast.NodeTransformer):
     visit_ClassDef = visit_FunctionDef  # type: ignore[assignment]
     visit_AsyncFunctionDef = visit_FunctionDef  # type: ignore[assignment]
 
+    def _file(self) -> dict:
+        """A helper module's sites say which file they are in."""
+        return {"file": self.file} if self.file else {}
+
     def _site(self, node, kind: str, **extra) -> str:
-        site = f"{node.lineno}:{node.col_offset}:{kind}"
+        site = f"{self.prefix}{node.lineno}:{node.col_offset}:{kind}"
         parents = [s for s in self.loops if s]
         self.sites[site] = {
             "kind": "loop",
@@ -1547,6 +1599,7 @@ class _Transformer(ast.NodeTransformer):
             "fresh": fresh_names(node),
             "read": read_names(node),
             **extra,
+            **self._file(),
         }
         return site
 
@@ -1556,7 +1609,7 @@ class _Transformer(ast.NodeTransformer):
         full = library_search(node.func, self.aliases)
         if full is None:
             return node
-        site = f"{node.lineno}:{node.col_offset}:Library"
+        site = f"{self.prefix}{node.lineno}:{node.col_offset}:Library"
         parents = [s for s in self.loops if s]
         self.sites[site] = {
             "kind": "library",
@@ -1565,6 +1618,7 @@ class _Transformer(ast.NodeTransformer):
             "function": ".".join(self.functions),
             "source": self.lines[node.lineno - 1].strip(),
             "parent": parents[-1] if parents else None,
+            **self._file(),
         }
         node.func = ast.Call(
             ast.Attribute(ast.Name(RECORDER, ast.Load()), "library", ast.Load()),
@@ -1635,22 +1689,101 @@ def _wrap_method(function: ast.FunctionDef) -> None:
     function.body = [*docstring, begin, guarded]
 
 
-class PolicyProgram:
-    """Plain and instrumented compilations of one trusted policy module."""
+def site_order(site: str) -> tuple[str, int]:
+    """Sort key: approach.py's sites first, then each helper file's, by line."""
+    *file, line, _column, _kind = site.split(":")
+    return (":".join(file), int(line))
 
-    def __init__(self, source: str, class_name: str = "GeneratedApproach") -> None:
+
+def imported_names(source: str) -> set[str]:
+    """Top-level names of every absolute import anywhere in a module's source
+    (`import a.b` and `from a.b import c` give `a`), including imports inside
+    functions."""
+    names: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            names.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            names.add(node.module.split(".")[0])
+    return names
+
+
+def local_modules(path) -> dict[str, str]:
+    """The policy's own helper modules: name -> source.
+
+    These are the `.py` files next to the policy that it imports, directly or
+    through another of them (approach.py -> planner.py -> geometry.py). The
+    evaluation puts the policy's folder first on the import path, so a sibling file
+    wins over an installed module of the same name. Unrelated files in the folder
+    (tests, scratch scripts) are left out.
+    """
+    folder = path.parent
+    found: dict[str, str] = {}
+    todo = sorted(imported_names(path.read_text(encoding="utf-8")))
+    while todo:
+        name = todo.pop()
+        if name in found:
+            continue
+        if (folder / name / "__init__.py").exists():
+            raise UnsupportedProgram(
+                f"The policy imports its own package {name}/; only sibling .py "
+                "modules are supported"
+            )
+        helper = folder / f"{name}.py"
+        if not helper.exists() or helper.resolve() == path.resolve():
+            continue
+        found[name] = helper.read_text(encoding="utf-8")
+        todo.extend(sorted(imported_names(found[name]) - set(found)))
+    return found
+
+
+@dataclass
+class HelperModule:
+    """One of the policy's own helper modules, compiled like approach.py."""
+
+    name: str
+    source: str
+    plain: Any
+    code: Any
+    sites: dict[str, dict]
+
+
+def _check_reserved(tree: ast.AST) -> None:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id.startswith("__m8"):
+            raise UnsupportedProgram("Reserved identifier")
+
+
+class PolicyProgram:
+    """Plain and instrumented compilations of one trusted policy module.
+
+    `modules` are the policy's own helper modules (name -> source, see
+    `local_modules`). They are instrumented like approach.py, so a search written in
+    planner.py is recorded and checked the same way; their sites are named after
+    their file (planner.py:12:8:While).
+    """
+
+    def __init__(
+        self,
+        source: str,
+        class_name: str = "GeneratedApproach",
+        modules: dict[str, str] | None = None,
+    ) -> None:
         self.source = source
         self.class_name = class_name
-        self.digest = hashlib.sha256(source.encode()).hexdigest()
+        modules = dict(sorted((modules or {}).items()))
+        digest = hashlib.sha256(source.encode())
+        # A single-file policy keeps the digest of its source alone.
+        for name, text in modules.items():
+            digest.update(f"\0{name}.py\0{text}".encode())
+        self.digest = digest.hexdigest()
         tree = ast.parse(source)
         classes = [
             n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == class_name
         ]
         if len(classes) != 1:
             raise UnsupportedProgram(f"Expected one class named {class_name}")
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Name) and node.id.startswith("__m8"):
-                raise UnsupportedProgram("Reserved identifier")
+        _check_reserved(tree)
         self.plain = compile(tree, FILENAME, "exec")
         transformed = copy.deepcopy(tree)
         transformer = _Transformer(source, import_aliases(tree))
@@ -1662,25 +1795,78 @@ class PolicyProgram:
                         _wrap_method(item)
         self.code = compile(ast.fix_missing_locations(transformed), FILENAME, "exec")
         self.sites = transformer.sites
+        self.modules: dict[str, HelperModule] = {}
+        for name, text in modules.items():
+            helper_tree = ast.parse(text)
+            _check_reserved(helper_tree)
+            helper = _Transformer(text, import_aliases(helper_tree), f"{name}.py")
+            instrumented = helper.visit(copy.deepcopy(helper_tree))
+            filename = helper_filename(name)
+            self.modules[name] = HelperModule(
+                name,
+                text,
+                compile(helper_tree, filename, "exec"),
+                compile(ast.fix_missing_locations(instrumented), filename, "exec"),
+                helper.sites,
+            )
+            self.sites.update(helper.sites)
         self.recorder = Recorder()
         self.clock = FakeClock()
 
+    def _importer(self, instrumented: bool, namespaces: list[dict]) -> dict[str, Any]:
+        """`import planner` gets a fresh copy of the policy's own planner.py (plain or
+        instrumented, like approach.py), loaded once per episode; `import time` gets
+        the simulated clock; anything else is a normal import."""
+        loaded: dict[str, types.ModuleType] = {}
+        clock_import = self.clock.importer(builtins.__import__)
+        policy_builtins: dict[str, Any] = {}
+
+        def load(name: str) -> types.ModuleType:
+            module = loaded.get(name)
+            if module is None:
+                helper = self.modules[name]
+                module = types.ModuleType(name)
+                module.__dict__.update(
+                    {
+                        "__name__": f"{POLICY_MODULE}.{name}",
+                        "__file__": helper_filename(name),
+                        "__builtins__": policy_builtins,
+                        RECORDER: self.recorder,
+                    }
+                )
+                # Registered before it runs, so circular imports see it (as Python).
+                loaded[name] = module
+                namespaces.append(module.__dict__)
+                exec(  # pylint: disable=exec-used
+                    helper.code if instrumented else helper.plain, module.__dict__
+                )
+            return module
+
+        def policy_import(name, globals=None, locals=None, fromlist=(), level=0):
+            # pylint: disable=redefined-builtin
+            if level == 0 and name in self.modules:
+                return load(name)
+            return clock_import(name, globals, locals, fromlist, level)
+
+        policy_builtins.update({**builtins.__dict__, "__import__": policy_import})
+        return policy_builtins
+
     def policy_class(self, instrumented: bool = True) -> type:
         """Execute the module in fresh globals and return the policy class."""
+        namespaces: list[dict] = []
         namespace: dict[str, Any] = {
             "__name__": POLICY_MODULE,
             "__file__": FILENAME,
-            "__builtins__": {
-                **builtins.__dict__,
-                "__import__": self.clock.importer(builtins.__import__),
-            },
+            "__builtins__": self._importer(instrumented, namespaces),
             RECORDER: self.recorder,
         }
+        namespaces.insert(0, namespace)
+        if instrumented:
+            # Live list: helper modules imported later (inside a method) join it.
+            self.recorder.random.namespaces = namespaces
         exec(  # pylint: disable=exec-used
             self.code if instrumented else self.plain, namespace
         )
-        if instrumented:
-            self.recorder.random.namespace = namespace
         return namespace[self.class_name]
 
     def call(self, policy, method: str, args: tuple, session: Session):

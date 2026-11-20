@@ -23,7 +23,7 @@ from .policy_report import (
     spread_text,
     write_json,
 )
-from .policy_runner import PolicyProgram, UnsupportedProgram
+from .policy_runner import PolicyProgram, UnsupportedProgram, local_modules
 
 FAILURES = (
     UnsupportedProgram,
@@ -83,11 +83,15 @@ def run_policy_suite(args: argparse.Namespace) -> int:
             if kind == "kinder":
                 kinder = kinder or KinderDomain(config)
             domain = kinder if kind == "kinder" else DiscWorld()
-            program = PolicyProgram(source)
+            # A policy file brings the helper modules it imports (planner.py, ...).
+            modules = local_modules(args.source) if args.source else None
+            program = PolicyProgram(source, modules=modules)
             bank = (
                 load_policy_bank(args.frozen)
                 if args.frozen
-                else discover_policy(program, domain, DEVELOPMENT, VALIDATION, limits)
+                else discover_policy(
+                    program, domain, args.development, args.validation, limits
+                )
             )
             # Persist the bank BEFORE any validation episode is executed.
             bank.save(directory / "frozen.json")
@@ -188,6 +192,26 @@ def write_summaries(output_dir: Path, summaries: list[dict]) -> None:
     print(f'Reports: {output_dir.resolve() / "summary.md"}')
 
 
+def episode_list(text: str) -> tuple[tuple[int, int], ...]:
+    """Episodes as "count:seed,count:seed", e.g. "0:0,1:1,2:2"."""
+    try:
+        cases = tuple(
+            (int(count), int(seed))
+            for count, seed in (item.split(":") for item in text.split(","))
+        )
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            f'episodes are "count:seed,count:seed", got {text!r}'
+        ) from exc
+    if not cases or len(set(cases)) != len(cases):
+        raise argparse.ArgumentTypeError(f"episodes must be distinct: {text!r}")
+    return cases
+
+
+def _cases(cases) -> str:
+    return ",".join(f"{count}:{seed}" for count, seed in cases)
+
+
 def add_policy_arguments(parser: argparse.ArgumentParser) -> None:
     """Flags used only by the policy suite."""
     parser.add_argument(
@@ -195,6 +219,19 @@ def add_policy_arguments(parser: argparse.ArgumentParser) -> None:
         type=Path,
         help="KinDER env config JSON for --suite policy --source (default: the "
         "stored ClutteredRetrieval2D config)",
+    )
+    parser.add_argument(
+        "--development",
+        type=episode_list,
+        default=DEVELOPMENT,
+        help="practice episodes, object count:seed (default: "
+        f"{_cases(DEVELOPMENT)})",
+    )
+    parser.add_argument(
+        "--validation",
+        type=episode_list,
+        default=VALIDATION,
+        help=f"held-out episodes, object count:seed (default: {_cases(VALIDATION)})",
     )
     parser.add_argument(
         "--edits-per-run",
