@@ -829,7 +829,38 @@ def replay_one(args: argparse.Namespace) -> None:
                     "seconds": round(time.perf_counter() - start, 1),
                 }
             )
+    if args.result:
+        Path(args.result).write_text(json.dumps(results), encoding="utf-8")
     print(json.dumps(results))
+
+
+RESULT_NAME = "_replay_results.json"
+
+
+def _worker_results(path: Path, stdout: str) -> list[dict]:
+    """A worker's results: its result file, else the last JSON list it printed.
+
+    Simulators can print to the same output without a newline (pybullet:
+    ``base_root[{...}]``), so the printed list is searched for, not expected at a
+    line start.
+    """
+    if path.exists():
+        return json.loads(path.read_text())
+    for line in reversed(stdout.splitlines()):
+        start = line.find("[{")
+        if start >= 0:
+            try:
+                return json.loads(line[start:])
+            except json.JSONDecodeError:
+                continue
+    return []
+
+
+def _worker_error(stderr: str) -> str:
+    """The most telling line of a failed worker's error output."""
+    lines = [l for l in stderr.strip().splitlines() if l.strip()] or ["no output"]
+    errors = [l for l in lines if re.search(r"Error|Exception|Killed", l)]
+    return (errors or lines)[-1][:300]
 
 
 def _scenes(results: list[dict]) -> list[tuple]:
@@ -903,6 +934,8 @@ def replay(args: argparse.Namespace) -> None:
                     str(args.timeout),
                     "--episodes-json",
                     json.dumps(episodes),
+                    "--result",
+                    str(Path(tree) / RESULT_NAME),
                 ],
                 capture_output=True,
                 text=True,
@@ -914,13 +947,8 @@ def replay(args: argparse.Namespace) -> None:
                     "PYTHONDONTWRITEBYTECODE": "1",
                 },
             )
-        lines = [l for l in done.stdout.splitlines() if l.startswith("[")]
-        results = json.loads(lines[-1]) if lines else []
-        error = (
-            ""
-            if lines
-            else (done.stderr.strip().splitlines() or ["no output"])[-1][:300]
-        )
+            results = _worker_results(Path(tree) / RESULT_NAME, done.stdout)
+        error = "" if results else _worker_error(done.stderr)
         path.write_text(
             json.dumps(
                 {
@@ -1956,6 +1984,7 @@ def main() -> None:
     one_parser.add_argument("--tree", type=Path, required=True)
     one_parser.add_argument("--timeout", type=float, required=True)
     one_parser.add_argument("--episodes-json", required=True)
+    one_parser.add_argument("--result", help="also write the results here")
     plot_parser = commands.add_parser("plot", help="figures and summary.md")
     plot_parser.add_argument("--out", type=Path, required=True)
     plot_parser.add_argument("--label")
