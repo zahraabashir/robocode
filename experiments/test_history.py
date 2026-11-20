@@ -393,11 +393,14 @@ TEXT_RESULTS = (
 # False 2.89", "RESULT 1 False 1000 3.47". Only result-like labels: "ACTION 3 -1.0
 # False False" is a step of a trace, not an episode.
 RESULT_LABEL = re.compile(r"^results?\b[:=]?\s+(?=\d)", re.I)
-# After the label: the seed, optionally None, the reset options and a step count,
-# then the outcome. A line with no step count besides the leading number is left
-# unread: "RESULT 487 False lower_place" leads with a step count, not a seed.
+# After the label: the seed, optionally None, the reset options, a step count and a
+# decimal (a return: "RESULT 0 1000 -1000.0 False"), then the outcome, perhaps named
+# ("RESULT 1 {...} done True steps 452"). A line with no step count besides the
+# leading number is left unread: "RESULT 487 False lower_place" leads with a step
+# count, not a seed.
 LABELLED_RESULT = re.compile(
-    r"^(\d+)\s+(?:None\s+)?(?:\{[^}]*\}\s+)?(\d+\s+)?(True|False|true|false)\b(.*)$"
+    r"^(\d+)\s+(?:None\s+)?(?:\{[^}]*\}\s+)?(\d+\s+)?(?:-?\d+\.\d+\s+)?"
+    r"(?:(?:done|success|solved)[:=]?\s+)?(True|False|true|false)\b(.*)$"
 )
 # Lines that look like an episode result; those not read are reported by extract.
 RESULT_LIKE = re.compile(
