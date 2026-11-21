@@ -29,6 +29,7 @@ import socketserver
 import sys
 import threading
 import traceback
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,7 @@ from hydra.utils import instantiate
 from omegaconf import OmegaConf
 from relational_structs import Object, ObjectCentricState, Type
 
+from robocode.environments.variable_count import VariableCountEnv
 from robocode.primitives import crv_motion_planning, crv_motion_planning_grasp
 from robocode.primitives.check_action_collision import check_action_collision
 from robocode.primitives.crv_motion_planning import CRVActionLimits, CRVConfig
@@ -288,12 +290,16 @@ class _EnvServer(socketserver.ThreadingTCPServer):
         sandbox_dir: Path,
         *,
         strict: bool = False,
+        step_limit: int | None = None,
     ) -> None:
         super().__init__(("0.0.0.0", 0), _EnvRequestHandler)
         self.env_config = env_config
         self.token = token
         self.sandbox_dir = sandbox_dir
         self.strict = strict
+        # Fallback evaluation step limit (fixed-count envs); None disables the
+        # per-episode limit entirely. See _StepLimit.
+        self.step_limit = step_limit
 
 
 class _EnvRequestHandler(socketserver.StreamRequestHandler):
@@ -315,6 +321,11 @@ class _EnvRequestHandler(socketserver.StreamRequestHandler):
         # reset/step/set_state), so this init reset and the render/collision
         # save-restore bookkeeping never enter the stream. Host-side sink.
         telemetry_state = {"steps": 0, "ended": False}
+        step_limit = (
+            _StepLimit(fallback=self.server.step_limit)
+            if self.server.step_limit is not None
+            else None
+        )
         try:
             for line in self.rfile:
                 request = json.loads(line)
@@ -340,6 +351,7 @@ class _EnvRequestHandler(socketserver.StreamRequestHandler):
                         self.server.sandbox_dir,
                         registry,
                         strict=self.server.strict,
+                        step_limit=step_limit,
                     )
                 except Exception as exc:  # pylint: disable=broad-exception-caught
                     logger.error(
@@ -401,6 +413,35 @@ def _log_agent_op(
         pass  # telemetry must never break the connection
 
 
+@dataclass
+class _StepLimit:
+    """One connection's evaluation step limit (neutral prompt only).
+
+    Each agent episode is truncated once it reaches the step limit evaluation uses,
+    so development episodes end where evaluation episodes do. The number itself is
+    never reported; the agent sees only ``truncated=True``. A variable-count env's
+    limit depends on the instance's object count (``max_steps_for_count``); any
+    other env uses ``fallback``, the configured ``max_steps``.
+    """
+
+    fallback: int
+    steps: int = 0
+    limit: int | None = None
+
+    def start(self, env: Any) -> None:
+        """Begin an episode on *env* (just reset)."""
+        if isinstance(env, VariableCountEnv):
+            self.limit = env.max_steps_for_count(env.current_count)
+        else:
+            self.limit = self.fallback
+        self.steps = 0
+
+    def count_step(self) -> bool:
+        """Count one step; return True once the episode has reached its limit."""
+        self.steps += 1
+        return self.limit is not None and self.steps >= self.limit
+
+
 def _dispatch(
     env: Any,
     request: dict[str, Any],
@@ -408,14 +449,19 @@ def _dispatch(
     registry: _HandleRegistry,
     *,
     strict: bool = False,
+    step_limit: _StepLimit | None = None,
 ) -> dict[str, Any]:
     """Execute one decoded request against the env and encode the reply."""
     cmd = request["cmd"]
     if cmd == "reset":
         obs, info = env.reset(seed=request.get("seed"), options=request.get("options"))
+        if step_limit is not None:
+            step_limit.start(env)
         return {"obs": encode(obs), "info": encode(info)}
     if cmd == "step":
         obs, reward, terminated, truncated, info = env.step(decode(request["action"]))
+        if step_limit is not None and step_limit.count_step():
+            truncated = True
         return {
             "obs": encode(obs),
             "reward": float(reward),
@@ -531,6 +577,13 @@ def main() -> None:
         help="Expose only the generic reset/step blackbox API",
     )
     parser.add_argument(
+        "--step-limit",
+        type=int,
+        default=None,
+        help="Truncate each episode at the evaluation step limit; the value is the "
+        "limit for fixed-count envs",
+    )
+    parser.add_argument(
         "--token", required=True, help="Auth token required on every request"
     )
     parser.add_argument(
@@ -552,7 +605,11 @@ def main() -> None:
     env.close()
 
     server = _EnvServer(
-        env_config, args.token, Path(args.sandbox_dir), strict=args.strict
+        env_config,
+        args.token,
+        Path(args.sandbox_dir),
+        strict=args.strict,
+        step_limit=args.step_limit,
     )
     port = server.server_address[1]
     Path(args.port_file).write_text(str(port), encoding="utf-8")

@@ -281,7 +281,11 @@ class ClaudeBackend(AgentBackend):
 
         claude_md = config.sandbox_dir / "CLAUDE.md"
         if not claude_md.exists():
-            claude_md.write_text(build_claude_md(docker_python, primitive_names))
+            claude_md.write_text(
+                build_claude_md(
+                    docker_python, primitive_names, neutral=config.neutral_prompt
+                )
+            )
 
     def parse_stream(
         self,

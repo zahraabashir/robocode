@@ -283,6 +283,7 @@ def env_server_running(
     *,
     telemetry: bool = False,
     strict: bool = False,
+    step_limit: int | None = None,
 ) -> Iterator[tuple[int, str]]:
     """Run the env server subprocess for the duration of a sandbox run.
 
@@ -290,6 +291,8 @@ def env_server_running(
     the run's output directory), starts the server, and yields
     ``(port, token)`` once the server is listening. The server stays up
     across rate-limit retries because this wraps the whole retry loop.
+    ``step_limit`` (neutral prompt) truncates every agent episode at its
+    evaluation step limit; the value is the limit for fixed-count envs.
     """
     parent = sandbox_dir.resolve().parent
     config_path = parent / "env_server_config.json"
@@ -328,6 +331,7 @@ def env_server_running(
                 "--sandbox-dir",
                 str(sandbox_dir.resolve()),
                 *(["--strict"] if strict else []),
+                *(["--step-limit", str(step_limit)] if step_limit is not None else []),
             ],
             stdout=log_file,
             stderr=subprocess.STDOUT,

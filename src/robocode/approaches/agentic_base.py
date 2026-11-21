@@ -50,6 +50,11 @@ from robocode.utils.sandbox_types import (
 
 logger = logging.getLogger(__name__)
 
+PROMPT_STYLES = ("legacy", "neutral")
+# The neutral prompt names no runtime limit, so evaluation should only stop
+# programs that hang: a cutoff below this is a hidden budget the agent never heard.
+NEUTRAL_MIN_EVAL_TIMEOUT_S = 600.0
+
 _ObsType = TypeVar("_ObsType")
 _ActType = TypeVar("_ActType")
 
@@ -83,6 +88,7 @@ class GeneratedProgramApproach(BaseApproach[_ObsType, _ActType]):
         env_cfg: str | None = None,
         max_steps: int | None = None,
         eval_timeout: float = 30.0,
+        prompt_style: str = "legacy",
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -145,6 +151,32 @@ class GeneratedProgramApproach(BaseApproach[_ObsType, _ActType]):
                 raise ValueError(
                     "blackbox_strict does not expose host-side model servers"
                 )
+        if prompt_style not in PROMPT_STYLES:
+            raise ValueError(
+                f"prompt_style must be one of {PROMPT_STYLES}, got {prompt_style!r}"
+            )
+        self._neutral = prompt_style == "neutral"
+        if self._neutral:
+            if not blackbox_strict:
+                raise ValueError(
+                    "prompt_style=neutral is defined for the strict blackbox only; "
+                    "set blackbox=true blackbox_strict=true"
+                )
+            if self.per_instance:
+                raise ValueError(
+                    "prompt_style=neutral is defined for generalized runs only, not "
+                    "per-instance runs"
+                )
+            if max_steps is None:
+                raise ValueError("prompt_style=neutral requires max_steps")
+            if eval_timeout < NEUTRAL_MIN_EVAL_TIMEOUT_S:
+                logger.warning(
+                    "prompt_style=neutral states no runtime limit, but eval_timeout=%s "
+                    "s stops programs early; the neutral protocol uses eval_timeout=%g "
+                    "as a safety cap only.",
+                    eval_timeout,
+                    NEUTRAL_MIN_EVAL_TIMEOUT_S,
+                )
         self._generated: Any = None
         self.total_cost_usd: float | None = None
         self.generation_metrics: GenerationMetrics | None = None
@@ -163,7 +195,10 @@ class GeneratedProgramApproach(BaseApproach[_ObsType, _ActType]):
         system prompt's goal so the agent develops against the same instance it is
         scored on, and add a budget-stewardship note to the task prompt. If we have an
         env description it is inlined; otherwise the agent is asked to read source files.
+        ``prompt_style=neutral`` swaps in the fact-only strict-blackbox prompts.
         """
+        if self._neutral:
+            return self._build_neutral_prompts(per_instance_seed)
         primitives_desc = format_primitives_description(
             list(self._primitives),
             blackbox=self._blackbox,
@@ -228,6 +263,27 @@ class GeneratedProgramApproach(BaseApproach[_ObsType, _ActType]):
             init_files["env_client.py"] = ENV_CLIENT_SRC
         return prompt, system_prompt, init_files
 
+    def _build_neutral_prompts(
+        self, per_instance_seed: int | None
+    ) -> tuple[str, str, dict[str, Path]]:
+        """The neutral (task prompt, system prompt, init files) for one run."""
+        assert per_instance_seed is None  # per-instance runs rejected in __init__
+        env_description: str | None = None
+        if self._env_description_path is not None:
+            env_description = Path(self._env_description_path).read_text(
+                encoding="utf-8"
+            )
+        backend_name = self._backend_cfg["backend"]
+        prompt = prompts.build_neutral_task_prompt(
+            python_executable=container_python(self._blackbox_strict),
+            object_centric=self._object_centric,
+            env_description=env_description,
+            mcp_tools=self._mcp_tools,
+            backend_name=backend_name,
+        )
+        system_prompt = prompts.build_neutral_system_prompt(backend_name=backend_name)
+        return prompt, system_prompt, {"env_client.py": ENV_CLIENT_SRC}
+
     def _run_sandbox(
         self,
         *,
@@ -266,6 +322,7 @@ class GeneratedProgramApproach(BaseApproach[_ObsType, _ActType]):
                 blackbox=self._blackbox,
                 telemetry=self._telemetry,
                 blackbox_strict=self._blackbox_strict,
+                neutral_prompt=self._neutral,
             )
             sandbox_logger = logging.getLogger("robocode.utils.docker_sandbox")
         elif self._container_backend == "apptainer":
@@ -286,6 +343,7 @@ class GeneratedProgramApproach(BaseApproach[_ObsType, _ActType]):
                 blackbox=self._blackbox,
                 telemetry=self._telemetry,
                 blackbox_strict=self._blackbox_strict,
+                neutral_prompt=self._neutral,
             )
             sandbox_logger = logging.getLogger("robocode.utils.apptainer_sandbox")
         else:
@@ -304,6 +362,7 @@ class GeneratedProgramApproach(BaseApproach[_ObsType, _ActType]):
                 autocompact_pct=self._autocompact_pct,
                 blackbox=self._blackbox,
                 telemetry=self._telemetry,
+                neutral_prompt=self._neutral,
             )
             sandbox_logger = logging.getLogger("robocode.utils.sandbox")
 
@@ -324,6 +383,8 @@ class GeneratedProgramApproach(BaseApproach[_ObsType, _ActType]):
                             sandbox_dir,
                             telemetry=self._telemetry,
                             strict=self._blackbox_strict,
+                            # Neutral: episodes stop at the eval step limit.
+                            step_limit=self._max_steps if self._neutral else None,
                         )
                     )
                     write_env_spaces(
@@ -333,7 +394,9 @@ class GeneratedProgramApproach(BaseApproach[_ObsType, _ActType]):
                         token=token,
                         observation_space=self._state_space,
                         action_space=self._action_space,
-                        max_steps=self._max_steps,
+                        # Neutral: no step-limit number is given; the env server
+                        # truncates each episode at its real limit instead.
+                        max_steps=None if self._neutral else self._max_steps,
                         primitives_manifest=blackbox_primitive_manifest(
                             list(self._primitives)
                         ),

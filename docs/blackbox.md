@@ -374,6 +374,41 @@ and direct local connection do not describe Apptainer's network boundary.
   disconnected namespace with restricted relays. The `local`
   backend remains available at the low level but is rejected by the experiment runner.
 
+## Neutral prompt (`prompt_style=neutral`)
+
+A fact-only prompt for strict-blackbox generalized runs, for studying what agents
+decide without being steered. It states the goal (a general solution that works
+across different instances; evaluation uses unseen instances that may differ;
+the "Generalization" advice section of an environment description is dropped),
+the scoring rule (`terminated=True` within the
+episode's step limit), the sandbox, the import allowlist, and the interface. It
+gives no advice on solution quality, testing, efficiency, object counts, subagents,
+reasoning length, budget, or stopping. The legacy prompts are unchanged.
+
+```bash
+python experiments/run_experiment.py approach=agentic \
+    approach.prompt_style=neutral approach.blackbox=true approach.blackbox_strict=true \
+    primitive_level=none eval_timeout=600 environment=obstruction2d_generalized \
+    eval_seed="$EVAL_SEED"
+```
+
+The protocol differs from legacy runs beyond the prompt text:
+
+- **Runtime.** The prompt names no wall-clock limit. Use `eval_timeout=600` as a
+  safety cap against hangs; evaluation records `policy_time_s` per episode.
+- **Model budget.** `max_budget_usd` remains a hard cap but is never mentioned.
+  Codex gets no budget text, no `budget_status.json`, and no confidence marker.
+- **Stopping.** When the agent ends its turn, the run ends; no backend resumes a
+  voluntary stop. Error recoveries still resume, with messages that only say what
+  happened.
+- **Step limit.** No step-limit number is given (the prompt says only "within the
+  episode's step limit"). The env server truncates each agent episode at the limit
+  evaluation uses (for variable-count envs, `max_steps_for_count`), so the agent
+  sees `truncated=True` where evaluation would stop. `env.max_steps` is `None`, and
+  evaluation passes `reset` the same `info` as legacy runs.
+- **Sandbox files.** `CLAUDE.md`/`AGENTS.md` state only relative paths and the
+  interpreter location; the commit rule stays in the system prompt.
+
 ## Red-teaming strict blackbox
 
 Build the strict image, then run its dedicated live adversarial suite:

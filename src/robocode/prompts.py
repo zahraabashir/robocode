@@ -30,6 +30,8 @@ from robocode.mcp import (
     MCP_TOOLS_SYSTEM_PROMPT_SUFFIX_OBJECT_CENTRIC,
     MCP_TOOLS_SYSTEM_PROMPT_SUFFIX_STRICT_BLACKBOX,
     mcp_tool_descriptions,
+    mcp_tool_name_claude,
+    mcp_tool_name_opencode,
 )
 from robocode.utils.backends import CLAUDE_PROMPT_SUFFIX, OPENCODE_PROMPT_SUFFIX
 from robocode.utils.strict_blackbox import strict_allowlist_description
@@ -63,6 +65,16 @@ _LEARN_SOURCE = (
 )
 _LEARN_BLACKBOX = _BLACKBOX_DISCOVERY + ", and write an optimal approach class. "
 
+# Version-control rule. Shared verbatim by the legacy and neutral system prompts:
+# the approach-history and test-history tools replay these commits.
+_VERSION_CONTROL = (
+    "VERSION CONTROL: This directory is a git repo. After each meaningful "
+    "change to approach.py or supporting modules, run "
+    "`git add -A && git commit -m '<describe what you changed and why>'`. "
+    "Commit often, do not batch everything into one final commit. "
+    "You should commit the approach every time before you test it in the environment. "
+)
+
 # File-writing + version-control discipline. Byte-identical across all four
 # agentic/CDL system prompts.
 SYSTEM_FILE_DISCIPLINE = (
@@ -71,12 +83,7 @@ SYSTEM_FILE_DISCIPLINE = (
     "Never use absolute paths when writing files. "
     "IMPORTANT: Write code often to approach.py as you iterate. You may be "
     "interrupted at any time, so you should make sure that approach.py is "
-    "your best current attempt at all times. "
-    "VERSION CONTROL: This directory is a git repo. After each meaningful "
-    "change to approach.py or supporting modules, run "
-    "`git add -A && git commit -m '<describe what you changed and why>'`. "
-    "Commit often, do not batch everything into one final commit. "
-    "You should commit the approach every time before you test it in the environment. "
+    "your best current attempt at all times. " + _VERSION_CONTROL
 )
 
 # Subagent guidance tails (identical across agentic and CDL). No trailing space:
@@ -206,11 +213,16 @@ _STRICT_BB_IMPORT_RULE = (
 # the strict blackbox; the object-centric state is reconstructed locally, so only
 # the mention of get_state changes there.
 _BB_GET_STATE_COMMENT_VECTOR = "  # numpy snapshot of the full environment state"
-_BB_SPACE_METADATA_VECTOR = (
+# The space-metadata sentences without the step-limit claim; the neutral prompt
+# states the per-episode limit separately (from reset info).
+_SPACES_VECTOR = (
     "`env.observation_space` and `env.action_space` expose `shape`, `low`, "
-    "`high`, `dtype`, and `sample()`; the same metadata is in `env_spaces.json`. "
-    "`env.max_steps` is the episode step limit used at evaluation time."
+    "`high`, `dtype`, and `sample()`; the same metadata is in `env_spaces.json`."
 )
+_ENV_MAX_STEPS_SENTENCE = (
+    " `env.max_steps` is the episode step limit used at evaluation time."
+)
+_BB_SPACE_METADATA_VECTOR = _SPACES_VECTOR + _ENV_MAX_STEPS_SENTENCE
 _BB_OBS_CONVERSION_VECTOR = (
     "You can also call `env.observation_space.devectorize(obs)` to get an "
     "object-centric view of an observation. It returns an `ObjectCentricState` "
@@ -226,13 +238,13 @@ _STRICT_BB_OBS_VECTOR = (
     "`devectorize`/`vectorize` helper and no feature-name metadata."
 )
 _BB_GET_STATE_COMMENT_OBJECT_CENTRIC = "  # a local ObjectCentricState"
-_BB_SPACE_METADATA_OBJECT_CENTRIC = (
+_SPACES_OBJECT_CENTRIC = (
     "`env.observation_space` describes the objects, NOT a vector: `.types` lists the "
     "object types, `.type_features` maps each type to its feature names, and "
     "`.get_type(name)` fetches one; `env.action_space` exposes `shape`, `low`, "
-    "`high`, `dtype`, and `sample()`. The same metadata is in `env_spaces.json`. "
-    "`env.max_steps` is the episode step limit used at evaluation time."
+    "`high`, `dtype`, and `sample()`. The same metadata is in `env_spaces.json`."
 )
+_BB_SPACE_METADATA_OBJECT_CENTRIC = _SPACES_OBJECT_CENTRIC + _ENV_MAX_STEPS_SENTENCE
 _BB_OBS_CONVERSION_OBJECT_CENTRIC_TEMPLATE = (
     "{subjects} are `ObjectCentricState` objects (the number "
     "of objects VARIES between episodes), not fixed-length arrays. Read a state with "
@@ -386,8 +398,8 @@ interpreter has all required packages installed. For example:
 # AgenticApproach (monolithic policy) fragments
 # ---------------------------------------------------------------------------
 
-# Approach-specific GeneratedApproach contract, filled into INTERFACE_SPEC_TEMPLATE.
-AGENTIC_CLASS_INTERFACE = """\
+# The GeneratedApproach code block, shared by the legacy and neutral interfaces.
+_AGENTIC_CLASS_CODE = """\
 ```python
 class GeneratedApproach:
     def __init__(self, action_space, observation_space, primitives):
@@ -401,7 +413,10 @@ class GeneratedApproach:
     def get_action(self, state):
         \"\"\"Return a valid action for the given state.\"\"\"
         ...
-```
+```"""
+
+# Approach-specific GeneratedApproach contract, filled into INTERFACE_SPEC_TEMPLATE.
+AGENTIC_CLASS_INTERFACE = _AGENTIC_CLASS_CODE + """
 
 The class can maintain internal state between calls (e.g., a computed plan). \
 The `reset` method is called at the start of each episode. The `get_action` \
@@ -1074,3 +1089,220 @@ def build_cdl_prompt(
         interface_spec=interface_spec,
         behavior_implementation_prompt=behavior_impl_prompt,
     )
+
+
+# ---------------------------------------------------------------------------
+# Neutral prompt (strict blackbox, generalized runs only)
+# ---------------------------------------------------------------------------
+# A "vanilla" alternative to the prompts above, for studying what agents decide on
+# their own. It states the task, how an instance is scored, the interface, and the
+# sandbox as facts, and gives no advice on how to solve the task, how to work, how
+# long the program may run, how much to spend, or when to stop. The legacy prompts
+# above stay byte-identical so old-vs-neutral runs can be compared.
+
+NEUTRAL_GOAL = (
+    "You are writing a policy for a gymnasium environment, as a Python class in "
+    "`approach.py`. `approach.py` should be a general solution that works across "
+    "different instances of this environment, not only the instances you try. It "
+    "will be evaluated on new instances that you have not seen, which may differ "
+    "from the ones you see during development. An instance is solved when its "
+    "episode ends with `terminated=True` within the episode's step limit. Whatever "
+    "`approach.py` contains when the run ends is what gets evaluated."
+)
+
+_NEUTRAL_FILES = (
+    "Write all files to the current working directory using relative paths only. "
+)
+
+# Backend facts only (tool naming); the legacy suffixes' subagent advice is dropped.
+# The Codex CLI needs no note.
+_NEUTRAL_BACKEND_FACTS = {
+    "claude": (
+        "Tool names are case-sensitive: Bash, Read, Write, Edit, Glob, Grep, Task."
+    ),
+    "opencode": (
+        "Your tools use lowercase names: bash, read, write, edit, glob, grep, task."
+    ),
+}
+
+_NEUTRAL_OPENER = (
+    "You are writing an approach for an environment that you can only access as a "
+    "black box."
+)
+
+# The legacy strict note minus its leading space; the import rule minus its leading
+# blank line. Both are kept verbatim: they are the experiment's isolation controls.
+_NEUTRAL_SOURCE_NOTE = (
+    "The environment's source code is not available anywhere on this machine."
+    + _STRICT_BB_NOTE
+    + " A live environment server is running. Interact with it through "
+    "`env_client.py` in your working directory:"
+)
+
+_NEUTRAL_CLIENT_BLOCK = """\
+```python
+from env_client import make_env
+
+env = make_env()  # fresh environment instance per call
+obs, info = env.reset(seed=0)
+obs, reward, terminated, truncated, info = env.step(action)
+env.close()
+```"""
+
+_NEUTRAL_OBS_OBJECT_CENTRIC = (
+    "Observations are `ObjectCentricState` objects, not fixed-length arrays; the "
+    "number of objects varies between episodes. Read a state with "
+    "`get_objects(type)`, `get_object_names()`, `get_object_from_name(name)`, and "
+    "`get(obj, feature)`; iterate objects via `get_objects(...)`, not `for obj in "
+    "ocs`. The evaluation harness passes the same object-centric "
+    "`observation_space` to `GeneratedApproach`, and the `state` it receives is the "
+    "same `ObjectCentricState`."
+)
+
+_NEUTRAL_INDEPENDENT_ENVS = (
+    "Every `make_env()` call creates an independent environment instance."
+)
+
+_NEUTRAL_NO_ENV_CLIENT = (
+    "`approach.py` must not import `env_client`: it is evaluated against the real "
+    "environment by a separate harness that calls `reset(state, info)` and "
+    "`get_action(state)` directly."
+)
+
+_NEUTRAL_INTERFACE_LEAD = (
+    "Write `approach.py` containing a class `GeneratedApproach` with the following "
+    "interface:"
+)
+
+_NEUTRAL_LIFECYCLE = (
+    "`reset` is called at the start of each episode with the initial state and the "
+    "`info` from the environment's reset; `get_action` is called at each step and "
+    "must return a valid action."
+)
+
+# MCP tools as facts: each tool's signature and what it returns, plus the one
+# technical constraint. No workflow or delegation advice. render_policy's optional
+# max_steps (a render length, default 1000) is left out so the prompt names no step
+# number; the tool's own schema still lists it.
+_NEUTRAL_MCP_LEAD = "You also have MCP tools that render images:"
+_NEUTRAL_MCP_TOOLS_OBJECT_CENTRIC = {
+    "render_state": (
+        '`{name}(seed=42, object_count=None, label="")`: renders the state after '
+        "`env.reset(seed=seed)` as a PNG and returns its path."
+    ),
+    "render_policy": (
+        '`{name}(approach_dir=".", seed=42, max_frames=100, object_count=None)`: '
+        "runs one episode of `approach_dir/approach.py` from "
+        "`env.reset(seed=seed)` and saves its frames as PNGs; returns their paths."
+    ),
+}
+_NEUTRAL_MCP_TOOLS_VECTOR = {
+    "render_state": (
+        '`{name}(seed=42, state=None, label="")`: renders the state after '
+        "`env.reset(seed=seed)`, or the observation given as `state` (a flat list "
+        "of floats such as `obs.tolist()`), as a PNG and returns its path."
+    ),
+    "render_policy": (
+        '`{name}(approach_dir=".", seed=42, max_frames=100)`: runs '
+        "one episode of `approach_dir/approach.py` from `env.reset(seed=seed)` and "
+        "saves its frames as PNGs; returns their paths."
+    ),
+}
+_NEUTRAL_MCP_SUBAGENTS = (
+    "MCP tools can be called only by you directly, not from inside subagents."
+)
+
+
+# Sections of an environment description card that give advice rather than facts.
+# A variable-count card's "Generalization" section tells the agent to handle any
+# object count; the neutral prompt does not mention object counts.
+_NEUTRAL_DROPPED_DESCRIPTION_SECTIONS = ("Generalization",)
+
+
+def _drop_markdown_sections(text: str, headings: tuple[str, ...]) -> str:
+    """Remove each ``## <heading>`` section (up to the next ``## `` heading)."""
+    kept: list[str] = []
+    skipping = False
+    for line in text.splitlines(keepends=True):
+        if line.startswith("## "):
+            skipping = line[3:].strip() in headings
+        if not skipping:
+            kept.append(line)
+    return "".join(kept)
+
+
+def build_neutral_system_prompt(*, backend_name: str) -> str:
+    """The neutral system prompt: goal and scoring facts, files, version control.
+
+    It names no wall-clock or model budget and no stopping rule.
+    """
+    parts = [NEUTRAL_GOAL, (_NEUTRAL_FILES + _VERSION_CONTROL).rstrip()]
+    if backend_name in _NEUTRAL_BACKEND_FACTS:
+        parts.append(_NEUTRAL_BACKEND_FACTS[backend_name])
+    return "\n\n".join(parts)
+
+
+def _neutral_mcp_tool_lines(
+    mcp_tools: tuple[str, ...], backend_name: str, object_centric: bool
+) -> str:
+    """The neutral MCP paragraph, or "" when no MCP tools are configured."""
+    if not mcp_tools:
+        return ""
+    namer = (
+        mcp_tool_name_opencode if backend_name == "opencode" else mcp_tool_name_claude
+    )
+    templates = (
+        _NEUTRAL_MCP_TOOLS_OBJECT_CENTRIC
+        if object_centric
+        else _NEUTRAL_MCP_TOOLS_VECTOR
+    )
+    lines = [_NEUTRAL_MCP_LEAD]
+    for tool in mcp_tools:
+        if tool in templates:
+            lines.append("- " + templates[tool].format(name=namer(tool)))
+    lines.append(_NEUTRAL_MCP_SUBAGENTS)
+    return "\n".join(lines)
+
+
+def build_neutral_task_prompt(
+    *,
+    python_executable: str,
+    object_centric: bool,
+    env_description: str | None = None,
+    mcp_tools: tuple[str, ...] = (),
+    backend_name: str = "claude",
+) -> str:
+    """The neutral strict-blackbox task prompt.
+
+    Keeps the strict sandbox facts (no source, no simulator libraries, the import
+    allowlist, the reset/step-only surface) and the interface; drops every instruction
+    about solution quality, testing, efficiency, or the object count.
+    """
+    spaces = _SPACES_OBJECT_CENTRIC if object_centric else _SPACES_VECTOR
+    observations = (
+        _NEUTRAL_OBS_OBJECT_CENTRIC if object_centric else _STRICT_BB_OBS_VECTOR
+    )
+    parts = [_NEUTRAL_OPENER]
+    if env_description is not None:
+        description = _drop_markdown_sections(
+            env_description, _NEUTRAL_DROPPED_DESCRIPTION_SECTIONS
+        )
+        parts += ["The environment is described below.", description.strip()]
+    parts += [
+        _NEUTRAL_SOURCE_NOTE,
+        _NEUTRAL_CLIENT_BLOCK,
+        spaces,
+        _STRICT_BB_HELPERS,
+        observations,
+        _NEUTRAL_INDEPENDENT_ENVS,
+        _STRICT_BB_IMPORT_RULE.strip(),
+        _NEUTRAL_NO_ENV_CLIENT,
+        _NEUTRAL_INTERFACE_LEAD,
+        _AGENTIC_CLASS_CODE,
+        _NEUTRAL_LIFECYCLE,
+    ]
+    mcp_lines = _neutral_mcp_tool_lines(mcp_tools, backend_name, object_centric)
+    if mcp_lines:
+        parts.append(mcp_lines)
+    parts.append(f"Run Python with `{python_executable}`.")
+    return "\n\n".join(parts) + "\n"

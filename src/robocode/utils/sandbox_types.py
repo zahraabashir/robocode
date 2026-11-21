@@ -69,6 +69,10 @@ class SandboxConfig:
     # runs get the in-sandbox sitecustomize hook; blackbox runs are instrumented
     # host-side in the env server. Off by default.
     telemetry: bool = False
+    # Neutral prompt (approach prompt_style=neutral): fact-only sandbox agent files,
+    # fact-only recovery messages, and, for Codex, no budget text, no budget status
+    # file, and no continuation after a voluntary stop.
+    neutral_prompt: bool = False
 
 
 @dataclass(frozen=True)

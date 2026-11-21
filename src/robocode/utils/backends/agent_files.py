@@ -56,31 +56,54 @@ _OPENCODE_CONTEXT_MANAGEMENT = (
 )
 
 
+# The neutral variant (prompt_style=neutral) states only where files go and where
+# the interpreter is: no context-management advice and no example test command.
+_NEUTRAL_RUN_INSTRUCTIONS = "The Python interpreter is at {python}"
+
+
 def _container_body(
-    context_management: str, docker_python: str, primitive_names: tuple[str, ...]
+    context_management: str,
+    docker_python: str,
+    primitive_names: tuple[str, ...],
+    *,
+    neutral: bool = False,
 ) -> str:
-    body = "\n\n".join(
+    sections = (
         (
+            _RELATIVE_PATHS_CONTAINER,
+            _NEUTRAL_RUN_INSTRUCTIONS.format(python=docker_python),
+        )
+        if neutral
+        else (
             _RELATIVE_PATHS_CONTAINER,
             context_management,
             _RUN_INSTRUCTIONS.format(python=docker_python),
         )
     )
+    body = "\n\n".join(sections)
     body += "\n"
     if primitive_names:
         body += "\n" + _PRIMITIVES_NOTE + "\n"
     return body
 
 
-def build_claude_md(docker_python: str, primitive_names: tuple[str, ...] = ()) -> str:
+def build_claude_md(
+    docker_python: str, primitive_names: tuple[str, ...] = (), *, neutral: bool = False
+) -> str:
     """The CLAUDE.md body; container variant when docker_python is set, else local."""
     if not docker_python:
         return _RELATIVE_PATHS_LOCAL + "\n"
-    return _container_body(_CLAUDE_CONTEXT_MANAGEMENT, docker_python, primitive_names)
+    return _container_body(
+        _CLAUDE_CONTEXT_MANAGEMENT, docker_python, primitive_names, neutral=neutral
+    )
 
 
-def build_agents_md(docker_python: str, primitive_names: tuple[str, ...] = ()) -> str:
+def build_agents_md(
+    docker_python: str, primitive_names: tuple[str, ...] = (), *, neutral: bool = False
+) -> str:
     """The AGENTS.md body (OpenCode); the caller prepends the system prompt."""
     if not docker_python:
         return _RELATIVE_PATHS_LOCAL + "\n"
-    return _container_body(_OPENCODE_CONTEXT_MANAGEMENT, docker_python, primitive_names)
+    return _container_body(
+        _OPENCODE_CONTEXT_MANAGEMENT, docker_python, primitive_names, neutral=neutral
+    )

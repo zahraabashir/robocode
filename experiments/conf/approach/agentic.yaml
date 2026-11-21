@@ -15,3 +15,6 @@ autocompact_pct: 80
 blackbox: false  # hide env source; interact via host-side env server
 blackbox_strict: false  # with blackbox: generic image, reset/step only, import allowlist
 telemetry: false  # log the agent's env reset/set_state calls to a JSONL sink
+# legacy | neutral. neutral: fact-only prompt (no runtime/budget/strategy advice),
+# strict blackbox only; pair with eval_timeout=600. See docs/blackbox.md.
+prompt_style: legacy

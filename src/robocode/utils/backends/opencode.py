@@ -216,7 +216,11 @@ class OpenCodeBackend(AgentBackend):
             # Include the system prompt as instructions.
             if config.system_prompt:
                 parts.append(config.system_prompt)
-            parts.append(build_agents_md(docker_python, primitive_names))
+            parts.append(
+                build_agents_md(
+                    docker_python, primitive_names, neutral=config.neutral_prompt
+                )
+            )
             agents_md.write_text("\n\n".join(parts))
 
     def parse_stream(

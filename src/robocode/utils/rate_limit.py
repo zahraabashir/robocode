@@ -57,6 +57,33 @@ _API_ERROR_RESUME_PROMPT = (
     "server error. Use tools directly and finish the implementation."
 )
 
+# Fact-only recovery messages for the neutral prompt (prompt_style=neutral): they
+# say what happened and nothing about brevity or finishing.
+_NEUTRAL_RESUME_PROMPTS = {
+    "output_token": (
+        "The previous response was interrupted because it exceeded the "
+        "output-token limit. Continue the task."
+    ),
+    "context": "The conversation was compacted. Continue the task.",
+    "api_error": (
+        "The previous request failed with a transient server error. Continue the "
+        "task."
+    ),
+}
+_LEGACY_RESUME_PROMPTS = {
+    "output_token": _OUTPUT_TOKEN_RESUME_PROMPT,
+    "context": _CONTEXT_RESUME_PROMPT,
+    "api_error": _API_ERROR_RESUME_PROMPT,
+}
+
+
+def _resume_prompt(kind: str, config: SandboxConfig) -> str:
+    """The recovery message of *kind* for this run's prompt style."""
+    prompts = (
+        _NEUTRAL_RESUME_PROMPTS if config.neutral_prompt else _LEGACY_RESUME_PROMPTS
+    )
+    return prompts[kind]
+
 
 def run_async(make_coro: Callable[[], Any]) -> SandboxResult:
     """Run an async sandbox call, handling an already-running event loop."""
@@ -366,7 +393,7 @@ def run_with_rate_limit_retry(
             remaining_turns = original_turns - aborted_turns if original_turns else 0
             active = replace(
                 compact_config,
-                prompt=_CONTEXT_RESUME_PROMPT,
+                prompt=_resume_prompt("context", compact_config),
                 max_budget_usd=(
                     original_budget - aborted_cost if original_budget else 0.0
                 ),
@@ -400,7 +427,7 @@ def run_with_rate_limit_retry(
                 _MAX_API_ERROR_RETRIES,
             )
             time.sleep(wait_secs)
-            resume_prompt = _API_ERROR_RESUME_PROMPT
+            resume_prompt = _resume_prompt("api_error", active)
         else:
             output_token_retries += 1
             logger.warning(
@@ -409,7 +436,7 @@ def run_with_rate_limit_retry(
                 output_token_retries,
                 _MAX_OUTPUT_TOKEN_RETRIES,
             )
-            resume_prompt = _OUTPUT_TOKEN_RESUME_PROMPT
+            resume_prompt = _resume_prompt("output_token", active)
 
         # Zero means unlimited for both fields; exhausted positive limits were
         # handled above, so every finite remainder here is strictly positive.

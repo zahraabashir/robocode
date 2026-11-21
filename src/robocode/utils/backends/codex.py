@@ -52,6 +52,9 @@ class CodexBackend(AgentBackend):
             backend_cfg.get("usage_start_timeout_s", 120.0)
         )
         self._model: str | None = None
+        # Neutral prompt: the budget stays a silent hard cap (no budget text, no
+        # status file) and a voluntary stop ends the run (no confidence marker).
+        self._neutral = False
 
     @property
     def name(self) -> str:
@@ -71,6 +74,7 @@ class CodexBackend(AgentBackend):
         self._max_budget_usd = config.max_budget_usd
         self._max_turns = config.max_turns
         self._model = config.model
+        self._neutral = config.neutral_prompt
         self._session_root = sandbox_codex_sessions(config.sandbox_dir)
         self._solution_confident_path = self._session_root / "solution_confident"
         command = os.environ.get("ROBOCODE_CODEX_CMD", "codex")
@@ -137,6 +141,8 @@ class CodexBackend(AgentBackend):
         return args
 
     def stdin_text(self, config: SandboxConfig) -> str:
+        if config.neutral_prompt:
+            return config.prompt
         if config.resume_previous_session and config.max_budget_usd > 0:
             return (
                 f"{config.prompt}\n\nRemaining shared budget: "
@@ -171,6 +177,14 @@ class CodexBackend(AgentBackend):
         docker_python: str = "",
         primitive_names: tuple[str, ...] = (),
     ) -> None:
+        if config.neutral_prompt:
+            # No budget text and no budget status file: the cap stays silent.
+            sandbox_instructions = build_agents_md(
+                docker_python, primitive_names, neutral=True
+            )
+            instructions = f"{config.system_prompt}\n\n{sandbox_instructions}".strip()
+            (config.sandbox_dir / "AGENTS.md").write_text(instructions + "\n")
+            return
         template = Path(__file__).with_name("prompt.txt").read_text(encoding="utf-8")
         instructions = template.format(
             system_prompt=config.system_prompt,
@@ -364,7 +378,8 @@ class CodexBackend(AgentBackend):
             is_error = True
             error_text = "Codex remaining budget <= $0.50; not resuming"
         unconfirmed_solution = bool(
-            not is_error
+            not self._neutral
+            and not is_error
             and not proc.returncode
             and self._max_budget_usd > 0
             and run_cost < self._max_budget_usd
@@ -523,8 +538,11 @@ class CodexBackend(AgentBackend):
             proc.kill()
 
     def _write_budget_status(self, run_cost: float) -> None:
-        """Best-effort agent-readable warning; not an injected CLI message."""
-        if self._session_root is None:
+        """Best-effort agent-readable warning; not an injected CLI message.
+
+        Not written under the neutral prompt, where the budget is a silent cap.
+        """
+        if self._session_root is None or self._neutral:
             return
         remaining = max(self._max_budget_usd - run_cost, 0.0)
         previous_cost = self._usage_cost(self._previous_session_usage)
