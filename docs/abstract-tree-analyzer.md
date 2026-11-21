@@ -491,6 +491,11 @@ The main gaps are the missing environment check, search styles outside the grid 
 3. **Tie peeking.** For heaps whose stored numbers cannot be fitted, the copy reads the next snapshot to break priority ties, which the method forbids.
 4. **The environment check.** Root = φ(s₀), one trajectory witness per abstract move, and a goal check, for KinDER.
 5. **Search styles outside the grammar.** These include sampling-based planners (about 15 of the 41 policies use RRT), obstacle sets, and grids over (x, y, angle). Samplers that grow a hidden tree are now flagged unknown, so their totals are withheld rather than zero, but their search is still not measured.
+6. **Evaluation episodes.** The held-out set has one episode per count (3, 15 and 20 obstacles). One of them, (20, 102), was run by Astra seeds 444 and 222 while they developed their policies. Planned layout:
+   - Practice: (1, 0), (3, 1), (5, 2) and (10, 3), so every design count is covered.
+   - Held-out: the first 14 episodes of the official evaluation suite, 2 per count for 1, 3, 5, 10, 15, 20 and 25 obstacles. All five Astra runs share this suite, no agent could have tested its seeds, and each outcome can be checked against the run's `results.json`. Measure the time and memory of one 25-obstacle episode first.
+   - Reporting: one row per count, with policies compared count by count. A single number weights each count equally, the same way for every metric. Today the planning rate averages episodes while per-decision values pool decisions, so the 20-obstacle episode holds 9 of Astra's 15 searching decisions. With two layouts per count, a difference counts only if it points the same way on both.
+   - Until then, the combined numbers describe these three episodes, not the policy. For example, Astra's rise from 2.30% (version 10) to 2.67% (final version) comes from fewer steps with the same searches, not from more planning.
 
 Other limits:
 

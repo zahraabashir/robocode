@@ -29,7 +29,7 @@ Usage (``<run>`` is the folder holding ``sandbox/``, e.g. ``.../replicate_424`` 
 
     python experiments/test_history.py extract --run <run> --out <dir>
     python experiments/test_history.py replay --run <run> --out <dir> \
-        [--episodes 100] [--repeats 3] [--workers 3]
+        [--episodes 100] [--repeats 1] [--workers 3]
     python experiments/test_history.py plot --out <dir>
 
 Codex runs only for now (Claude Code transcripts live in ``stream.jsonl``).
@@ -2038,7 +2038,10 @@ def main() -> None:
         help="first N instances of the run's evaluation suite (100 = all of it)",
     )
     replay_parser.add_argument(
-        "--repeats", type=int, default=3, help="re-runs of every checkpoint"
+        "--repeats",
+        type=int,
+        default=1,
+        help="re-runs of every checkpoint (more scenes beat more repeats: use 100 x 1)",
     )
     replay_parser.add_argument("--timeout", type=float, default=60.0)
     replay_parser.add_argument(
