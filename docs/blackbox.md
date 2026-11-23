@@ -211,6 +211,11 @@ iptables -A INPUT  -s "$HOST_NETWORK" -j ACCEPT
 iptables -A OUTPUT -d "$HOST_NETWORK" -j ACCEPT
 ```
 
+The strict firewall replaces that rule with outbound TCP to the env-server port
+only (`ROBOCODE_FIREWALL_HOST_PORT`). When the agent's model is served on the
+host (`ollama/` or `vllm/` model ids), it also admits that server's port
+(`ROBOCODE_FIREWALL_MODEL_PORT`).
+
 ### Isolation per backend
 
 The environment protocol has Docker, Apptainer, and legacy local wiring.

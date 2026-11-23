@@ -48,6 +48,7 @@ from robocode.utils.docker_sandbox import (
     _filtered_repo_mounts,
     _find_repo_root,
     _is_local_model,
+    _local_model_port,
     _setup_sandbox_dir,
     _telemetry_docker,
 )
@@ -477,6 +478,14 @@ def test_is_local_model() -> None:
     assert not _is_local_model("openai/gpt-4o")
     assert not _is_local_model("anthropic/claude-sonnet-4-6")
     assert not _is_local_model("sonnet")
+
+
+def test_local_model_port() -> None:
+    """Local model ids map to their server's host port; remote ones to None."""
+    assert _local_model_port("ollama/qwen3.5-4b-32k") == 11434
+    assert _local_model_port("vllm/Qwen/Qwen3.6-35B-A3B") == 8000
+    assert _local_model_port("openai/gpt-4o") is None
+    assert _local_model_port("sonnet") is None
 
 
 @requires_docker

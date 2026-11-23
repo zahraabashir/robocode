@@ -32,6 +32,7 @@ Use `approach/backend=<preset>` with an agentic approach. The paper presets are 
 | [opencode_gpt54](../experiments/conf/approach/backend/opencode_gpt54.yaml) | opencode | `openai/gpt-5.4` |
 | [opencode_gpt5nano](../experiments/conf/approach/backend/opencode_gpt5nano.yaml) | opencode | `openai/gpt-5-nano` |
 | [opencode_qwen](../experiments/conf/approach/backend/opencode_qwen.yaml) | opencode | `ollama/qwen3:0.6b` |
+| [opencode_qwen35_4b](../experiments/conf/approach/backend/opencode_qwen35_4b.yaml) | opencode | `ollama/qwen3.5-4b-32k` |
 
 ### OpenCode
 
@@ -42,6 +43,8 @@ For a non-paper Docker run, reuse the README's experiment command and replace it
 ### Ollama and vLLM
 
 [Ollama](https://ollama.com/) and [vLLM](https://docs.vllm.ai/) are optional model servers, not paper prerequisites. Install them separately from the experiment virtualenv. `claude_ollama_qwen` expects `qwen3.5` at `http://localhost:11434`; `opencode_qwen` names `ollama/qwen3:0.6b`. Pull the matching Ollama model, for example `ollama pull qwen3.5`.
+
+`opencode_qwen35_4b` names a derived model with a 32k-token context window; Ollama's default on small machines (about 4k) truncates the agent instructions. Create it once with `ollama pull qwen3.5:4b` and `ollama create qwen3.5-4b-32k -f experiments/ollama/qwen3.5-4b-32k.Modelfile`. Under strict black box, the Docker firewall admits the local model server's port (11434 for `ollama/`, 8000 for `vllm/`) in addition to the env server's; rebuild the strict image after updating `docker/init-firewall.sh`.
 
 The local-model hooks are implemented in the backend code, but a host loopback server must be reachable from the chosen container transport. The current isolated Apptainer transport rejects custom model endpoints. Do not assume a local-server preset is interchangeable with a paper backend under strict networking. The retained low-level `local` sandbox allows host reads, and the experiment runner rejects `container_backend=local` for generated-code methods to protect the evaluation seed.
 

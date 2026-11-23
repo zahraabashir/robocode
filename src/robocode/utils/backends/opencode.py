@@ -45,13 +45,13 @@ _RATE_LIMIT_RE = re.compile(
 # backend (ensure_ollama); vLLM is started by the user. The host part of the
 # baseURL is supplied per container backend (127.0.0.1 for local/apptainer,
 # which share the host loopback; host.docker.internal for docker).
-_LOCAL_MODEL_PORTS = {"ollama": 11434, "vllm": 8000}
+LOCAL_MODEL_PORTS = {"ollama": 11434, "vllm": 8000}
 
 
 def _local_model_provider(model: str) -> str | None:
     """Return the local-model provider id (e.g. ``"ollama"``) for *model*, else None."""
     provider = model.split("/", 1)[0]
-    return provider if provider in _LOCAL_MODEL_PORTS else None
+    return provider if provider in LOCAL_MODEL_PORTS else None
 
 
 class OpenCodeBackend(AgentBackend):
@@ -169,7 +169,7 @@ class OpenCodeBackend(AgentBackend):
         provider = _local_model_provider(config.model)
         if provider:
             model_name = config.model.split("/", 1)[1]
-            port = _LOCAL_MODEL_PORTS[provider]
+            port = LOCAL_MODEL_PORTS[provider]
             oc_config["provider"] = {
                 provider: {
                     "npm": "@ai-sdk/openai-compatible",

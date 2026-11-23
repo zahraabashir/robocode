@@ -147,9 +147,15 @@ class GeneratedProgramApproach(BaseApproach[_ObsType, _ActType]):
                 raise ValueError(
                     "blackbox_strict exposes no primitives; configure primitives=[]"
                 )
-            if self._model.split("/", 1)[0] in ("ollama", "vllm"):
+            # Docker's strict firewall admits the local model server's port
+            # (ROBOCODE_FIREWALL_MODEL_PORT); Apptainer's broker has no route.
+            if (
+                self._model.split("/", 1)[0] in ("ollama", "vllm")
+                and self._container_backend == "apptainer"
+            ):
                 raise ValueError(
-                    "blackbox_strict does not expose host-side model servers"
+                    "blackbox_strict on apptainer does not expose host-side model "
+                    "servers; use container_backend=docker"
                 )
         if prompt_style not in PROMPT_STYLES:
             raise ValueError(

@@ -13,13 +13,18 @@ from typing import Any
 import numpy as np
 import pytest
 from gymnasium.spaces import Box
+from omegaconf import DictConfig
 
 from robocode import prompts
 from robocode.approaches.agentic_approach import AgenticApproach
 from robocode.environments.kinder_geom2d_env import KinderGeom2DEnv
 from robocode.utils.apptainer_sandbox import _DEFAULT_STRICT_SIF
 from robocode.utils.backends import DEFAULT_BACKEND_CFG
-from robocode.utils.docker_sandbox import _docker_run_prefix, _mcp_prestart_wrapper
+from robocode.utils.docker_sandbox import (
+    _docker_run_prefix,
+    _local_model_port,
+    _mcp_prestart_wrapper,
+)
 from robocode.utils.env_client import BlackboxEnv, SpaceInfo, _BlackboxObservationSpace
 from robocode.utils.env_server import env_server_running, write_env_spaces
 from robocode.utils.env_server_runtime import _dispatch, _HandleRegistry
@@ -203,6 +208,24 @@ def test_strict_blackbox_rejects_capability_leaks(
         AgenticApproach(**_strict_args(**overrides))
 
 
+_LOCAL_MODEL_BACKEND = DictConfig(
+    {"backend": "opencode", "model": "ollama/qwen3.5-4b-32k"}
+)
+
+
+def test_strict_blackbox_accepts_local_model_on_docker() -> None:
+    """Docker's strict firewall admits the host model server's port."""
+    AgenticApproach(**_strict_args(backend=_LOCAL_MODEL_BACKEND))
+
+
+def test_strict_blackbox_rejects_local_model_on_apptainer() -> None:
+    """Apptainer's strict transport has no route to a host model server."""
+    with pytest.raises(ValueError, match="does not expose host-side model servers"):
+        AgenticApproach(
+            **_strict_args(backend=_LOCAL_MODEL_BACKEND, container_backend="apptainer")
+        )
+
+
 def test_strict_blackbox_accepts_apptainer() -> None:
     """Apptainer runs the strict image as a SIF with the same prompt surface."""
     approach = AgenticApproach(**_strict_args(container_backend="apptainer"))
@@ -307,6 +330,26 @@ def test_strict_docker_launch_has_no_project_mounts(tmp_path: Path) -> None:
     assert "/robocode/src" not in joined
     assert "kindergarden" not in joined
     assert "ss-pybullet" not in joined
+    assert not any("ROBOCODE_FIREWALL_MODEL_PORT" in arg for arg in command)
+
+
+def test_strict_docker_launch_names_local_model_port(tmp_path: Path) -> None:
+    """A strict launch with a host-local model names that server's port too."""
+    command = _docker_run_prefix(
+        "strict-test",
+        "strict-image",
+        tmp_path,
+        None,
+        None,
+        None,
+        [],
+        [],
+        map_host_gateway=True,
+        env_server_port=43210,
+        model_server_port=_local_model_port("ollama/qwen3.5-4b-32k"),
+    )
+    assert "ROBOCODE_FIREWALL_HOST_PORT=43210" in command
+    assert "ROBOCODE_FIREWALL_MODEL_PORT=11434" in command
 
 
 def test_strict_mcp_uses_clean_python_environment() -> None:

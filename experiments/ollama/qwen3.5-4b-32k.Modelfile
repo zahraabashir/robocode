@@ -1,0 +1,5 @@
+# Qwen 3.5 4B with a 32k-token context window for agent runs. Ollama defaults to
+# ~4k on small machines, which truncates the agent instructions. Create once:
+#   ollama create qwen3.5-4b-32k -f experiments/ollama/qwen3.5-4b-32k.Modelfile
+FROM qwen3.5:4b
+PARAMETER num_ctx 32768

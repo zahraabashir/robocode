@@ -64,6 +64,7 @@ from robocode.utils.backends import (
     firewall_domains_for_provider,
     provider_from_model,
 )
+from robocode.utils.backends.opencode import LOCAL_MODEL_PORTS
 from robocode.utils.claude_auth import (
     sandbox_claude_session_store,
     throwaway_claude_config,
@@ -312,7 +313,17 @@ def _is_local_model(model: str) -> bool:
     docker launch maps ``host.docker.internal`` to the host gateway (like
     blackbox does for the env server).
     """
-    return model.split("/", 1)[0] in ("ollama", "vllm")
+    return _local_model_port(model) is not None
+
+
+def _local_model_port(model: str) -> int | None:
+    """Host port of the local model server serving *model*, else None.
+
+    The strict firewall admits this port (beyond the env server's) so a strict
+    run can reach its own model; see ``ROBOCODE_FIREWALL_MODEL_PORT`` in
+    ``docker/init-firewall.sh``.
+    """
+    return LOCAL_MODEL_PORTS.get(model.split("/", 1)[0])
 
 
 def _docker_run_prefix(
@@ -329,6 +340,7 @@ def _docker_run_prefix(
     ss_pybullet: Path | None = None,
     extra_volumes: list[str] | None = None,
     env_server_port: int | None = None,
+    model_server_port: int | None = None,
 ) -> list[str]:
     """Build the shared ``docker run`` prefix: caps, env, auth, mounts, image.
 
@@ -340,7 +352,9 @@ def _docker_run_prefix(
 
     A strict blackbox launch passes ``None`` for the repo mounts, since its image
     holds no project code, and *env_server_port*, which the image's firewall
-    reads to admit only that host port beyond the model provider.
+    reads to admit only that host port beyond the model provider. When the
+    model itself is served on the host (ollama/vLLM), *model_server_port* is the
+    one further host port the strict firewall admits.
     """
     cmd = [
         "docker",
@@ -361,6 +375,8 @@ def _docker_run_prefix(
         cmd += ["--add-host", "host.docker.internal:host-gateway"]
     if env_server_port is not None:
         cmd += ["-e", f"ROBOCODE_FIREWALL_HOST_PORT={env_server_port}"]
+    if model_server_port is not None:
+        cmd += ["-e", f"ROBOCODE_FIREWALL_MODEL_PORT={model_server_port}"]
     if firewall_domains:
         cmd += [
             "-e",
@@ -759,6 +775,11 @@ async def run_agent_in_docker_sandbox(
             # runs (ollama/vLLM on the host), which both reach host loopback.
             map_host_gateway=config.blackbox or _is_local_model(config.model),
             env_server_port=env_server_port,
+            # The regular firewall already admits the host /24; only the strict
+            # one needs the local model server's port named.
+            model_server_port=(
+                _local_model_port(config.model) if strict_blackbox else None
+            ),
         )
 
         # Build the agent CLI command. Use the http MCP transport: the render
@@ -810,6 +831,11 @@ async def run_agent_in_docker_sandbox(
                 stdout=subprocess.PIPE,
                 stderr=stderr_file,
                 text=True,
+                # Claude and OpenCode stop capped runs (turn or budget limit) via
+                # killpg(proc.pid); without its own group that raises
+                # ProcessLookupError and the run crashes before evaluation. The
+                # finally below still removes the container.
+                start_new_session=True,
             )
 
             try:

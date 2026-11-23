@@ -11,7 +11,8 @@
 #
 # Requires --cap-add=NET_ADMIN --cap-add=NET_RAW on docker run.
 # ROBOCODE_FIREWALL_STRICT=1 additionally removes SSH/GitHub/telemetry and
-# restricts host access to ROBOCODE_FIREWALL_HOST_PORT.
+# restricts host access to ROBOCODE_FIREWALL_HOST_PORT (the env server), plus
+# ROBOCODE_FIREWALL_MODEL_PORT when set (a host-local model server).
 set -euo pipefail
 IFS=$'\n\t'
 
@@ -105,11 +106,15 @@ if [ -n "${ROBOCODE_FIREWALL_EXTRA_DOMAINS:-}" ]; then
 fi
 
 # Allow a host-side network: the whole /24 both ways, or under the strict
-# firewall only outbound TCP to the env server's port (replies come back through
-# the ESTABLISHED rule below).
+# firewall only outbound TCP to the env server's port, plus the local model
+# server's port when the agent's model runs on the host (ollama/vLLM). Replies
+# come back through the ESTABLISHED rule below.
 allow_host_network() {
     if [ "$STRICT" = "1" ]; then
         iptables -A OUTPUT -p tcp -d "$1" --dport "$ROBOCODE_FIREWALL_HOST_PORT" -j ACCEPT
+        if [ -n "${ROBOCODE_FIREWALL_MODEL_PORT:-}" ]; then
+            iptables -A OUTPUT -p tcp -d "$1" --dport "$ROBOCODE_FIREWALL_MODEL_PORT" -j ACCEPT
+        fi
     else
         iptables -A INPUT  -s "$1" -j ACCEPT
         iptables -A OUTPUT -d "$1" -j ACCEPT
@@ -117,6 +122,11 @@ allow_host_network() {
 }
 if [ "$STRICT" = "1" ] && ! [[ "${ROBOCODE_FIREWALL_HOST_PORT:-}" =~ ^[0-9]+$ ]]; then
     echo "ERROR: strict firewall requires ROBOCODE_FIREWALL_HOST_PORT" >&2
+    exit 1
+fi
+if [ -n "${ROBOCODE_FIREWALL_MODEL_PORT:-}" ] \
+    && ! [[ "$ROBOCODE_FIREWALL_MODEL_PORT" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: ROBOCODE_FIREWALL_MODEL_PORT must be a port number" >&2
     exit 1
 fi
 

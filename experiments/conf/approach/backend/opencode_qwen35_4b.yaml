@@ -1,0 +1,6 @@
+# Local Qwen 3.5 4B served by Ollama on the host. Create the model first:
+#   ollama pull qwen3.5:4b
+#   ollama create qwen3.5-4b-32k -f experiments/ollama/qwen3.5-4b-32k.Modelfile
+backend: opencode
+model: ollama/qwen3.5-4b-32k
+ollama_keep_alive: 5m
