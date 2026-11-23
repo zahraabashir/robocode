@@ -24,6 +24,10 @@ With ``strict=True``, dispatch is reduced to reset, step, and render_state (plus
 close at the connection layer); snapshot, conversion, collision, and primitive
 proxy commands are rejected even if a modified client sends them directly.
 
+The server counts the agent's requests by command and writes the totals to
+``env_server_usage.json`` next to its log; the runner copies them into
+``results.json`` as ``gen_env_*`` fields (:func:`read_env_server_usage`).
+
 Security: the protocol is JSON only, never pickle; unpickling
 agent-controlled bytes on the host would be a sandbox escape. Error replies
 contain only the exception type and message, not the traceback, because
@@ -59,12 +63,26 @@ import numpy as np
 from gymnasium.spaces import Box, Space
 from relational_structs.spaces import ObjectCentricStateSpace
 
+from robocode.utils.json_dict_space import JSONDictSpace
 from robocode.utils.telemetry import SINK_FILENAME, host_launch_env
 
 logger = logging.getLogger(__name__)
 
 # Source of the client module that approaches copy into blackbox sandboxes.
 ENV_CLIENT_SRC: Path = Path(__file__).parent / "env_client.py"
+
+# The env server's count of the agent's requests, written next to its log in the
+# run's output directory (see env_server_runtime._UsageCounts).
+USAGE_FILENAME = "env_server_usage.json"
+# Request commands reported as their own results.json field; any other command
+# is summed into gen_env_other_requests.
+_USAGE_FIELDS: dict[str, str] = {
+    "step": "gen_env_steps",
+    "reset": "gen_env_resets",
+    "get_state": "gen_env_get_states",
+    "set_state": "gen_env_set_states",
+    "render_state": "gen_env_render_states",
+}
 
 _NDARRAY_TAG = "__ndarray__"
 
@@ -211,9 +229,13 @@ def serialize_space(space: Space[Any]) -> dict[str, Any]:
         )
 
         return serialize_object_centric_space(type_features)
+    if isinstance(space, JSONDictSpace):
+        # Plain-dict observations need no codec; the sandbox only learns that the
+        # observation is a dict, plus the env's short summary of its layout.
+        return {"type": "JSONDict", "description": space.description}
     raise TypeError(
         f"No serializer for space type {type(space).__name__}; blackbox mode "
-        "supports Box and ObjectCentric spaces. Add a branch in "
+        "supports Box, ObjectCentric, and JSONDict spaces. Add a branch in "
         "robocode.utils.env_server.serialize_space and mirror it in "
         "env_client.SpaceInfo"
     )
@@ -287,18 +309,20 @@ def env_server_running(
 ) -> Iterator[tuple[int, str]]:
     """Run the env server subprocess for the duration of a sandbox run.
 
-    Writes the config, port file, and log next to *sandbox_dir* (i.e. in
-    the run's output directory), starts the server, and yields
-    ``(port, token)`` once the server is listening. The server stays up
-    across rate-limit retries because this wraps the whole retry loop.
-    ``step_limit`` (neutral prompt) truncates every agent episode at its
-    evaluation step limit; the value is the limit for fixed-count envs.
+    Writes the config, port file, log, and request counts (``USAGE_FILENAME``)
+    next to *sandbox_dir* (i.e. in the run's output directory), starts the
+    server, and yields ``(port, token)`` once the server is listening. The
+    server stays up across rate-limit retries because this wraps the whole
+    retry loop. ``step_limit`` (neutral prompt) truncates every agent episode
+    at its evaluation step limit; the value is the limit for fixed-count envs.
     """
     parent = sandbox_dir.resolve().parent
     config_path = parent / "env_server_config.json"
     config_path.write_text(env_cfg_json, encoding="utf-8")
     port_file = parent / "env_server_port"
     port_file.unlink(missing_ok=True)
+    usage_path = parent / USAGE_FILENAME
+    usage_path.unlink(missing_ok=True)
     log_path = parent / "env_server.log"
     token = secrets.token_hex(16)
 
@@ -330,6 +354,8 @@ def env_server_running(
                 str(port_file),
                 "--sandbox-dir",
                 str(sandbox_dir.resolve()),
+                "--usage-file",
+                str(usage_path),
                 *(["--strict"] if strict else []),
                 *(["--step-limit", str(step_limit)] if step_limit is not None else []),
             ],
@@ -405,3 +431,30 @@ def env_server_running(
             except subprocess.TimeoutExpired:
                 proc.kill()
                 proc.wait()
+
+
+def read_env_server_usage(run_dir: Path) -> dict[str, int] | None:
+    """The agent's requests to the env server in a run, as flat results fields.
+
+    Reads ``USAGE_FILENAME`` from *run_dir* (the parent of the run's sandbox) and
+    returns ``gen_env_steps``, ``gen_env_resets``, ``gen_env_get_states``,
+    ``gen_env_set_states``, ``gen_env_render_states``, ``gen_env_other_requests``
+    (successful requests per command), ``gen_env_failed_requests`` (requests that
+    raised, any command), and ``gen_env_connections``. Steps include the agent's
+    test scripts and its render_policy tool, which drive the env step by step;
+    evaluation never goes through the server. ``None`` when the run started no
+    env server (not black box, or an approach loaded from an earlier run).
+    """
+    path = run_dir / USAGE_FILENAME
+    if not path.is_file():
+        return None
+    usage = json.loads(path.read_text(encoding="utf-8"))
+    ok: dict[str, int] = usage.get("ok", {})
+    failed: dict[str, int] = usage.get("failed", {})
+    fields = {name: int(ok.get(cmd, 0)) for cmd, name in _USAGE_FIELDS.items()}
+    fields["gen_env_other_requests"] = sum(
+        int(n) for cmd, n in ok.items() if cmd not in _USAGE_FIELDS
+    )
+    fields["gen_env_failed_requests"] = sum(int(n) for n in failed.values())
+    fields["gen_env_connections"] = int(usage.get("connections", 0))
+    return fields

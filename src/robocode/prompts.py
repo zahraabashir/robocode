@@ -27,6 +27,7 @@ to one named instance, under the shared ``timeout``.
 from robocode.mcp import (
     MCP_TOOLS_SYSTEM_PROMPT_SUFFIX,
     MCP_TOOLS_SYSTEM_PROMPT_SUFFIX_BLACKBOX,
+    MCP_TOOLS_SYSTEM_PROMPT_SUFFIX_JSON_DICT,
     MCP_TOOLS_SYSTEM_PROMPT_SUFFIX_OBJECT_CENTRIC,
     MCP_TOOLS_SYSTEM_PROMPT_SUFFIX_STRICT_BLACKBOX,
     mcp_tool_descriptions,
@@ -256,18 +257,46 @@ _BB_OBS_CONVERSION_OBJECT_CENTRIC_TEMPLATE = (
 )
 
 
+# Dict-observation slots (JSONDictSpace): the observation is a plain dict whose layout
+# the environment description documents, and it is rendered with env.render_state.
+_BB_GET_STATE_COMMENT_JSON_DICT = "  # a dict, laid out like an observation"
+_BB_SPACE_METADATA_JSON_DICT = (
+    "`env.observation_space` is NOT a vector space: observations are plain Python "
+    "dicts of JSON values (strings, numbers, booleans, lists, dicts), laid out as the "
+    "environment description documents; `env.observation_space.description` "
+    "summarizes the layout, and the same summary is in `env_spaces.json`. "
+    "`env.action_space` exposes `shape`, `low`, `high`, `dtype`, and `sample()`. The "
+    "environment description gives the episode's step limits."
+)
+_BB_OBS_JSON_DICT = (
+    "Observations are dicts, not numpy arrays: read them by key. The evaluation "
+    "harness passes the SAME dict to `GeneratedApproach` as `state`. To look at an "
+    "observation, call `env.render_state(state=obs)` in a test script; it returns the "
+    "path of a PNG, relative to your working directory."
+)
+
+
 def blackbox_interaction_spec(
-    *, object_centric: bool = False, set_state_note: str = "", strict: bool = False
+    *,
+    object_centric: bool = False,
+    set_state_note: str = "",
+    strict: bool = False,
+    dict_obs: bool = False,
 ) -> str:
     """The black-box ``env_client`` interaction spec.
 
     For a variable-count env the observation is an ``ObjectCentricState``, so the spec
     describes the object-centric client space and access (no ``devectorize`` / vector
-    layout) rather than a flat numpy observation. ``strict`` keeps the same spec but
-    drops the snapshot, primitives, and conversion helpers and adds the import
-    allowlist of the strict blackbox.
+    layout) rather than a flat numpy observation. ``dict_obs`` (a ``JSONDictSpace``)
+    describes a plain-dict observation instead, and takes precedence. ``strict`` keeps
+    the same spec but drops the snapshot, primitives, and conversion helpers and adds
+    the import allowlist of the strict blackbox.
     """
-    if object_centric:
+    if dict_obs:
+        get_state_comment = _BB_GET_STATE_COMMENT_JSON_DICT
+        space_metadata = _BB_SPACE_METADATA_JSON_DICT
+        obs_conversion = _BB_OBS_JSON_DICT
+    elif object_centric:
         get_state_comment = _BB_GET_STATE_COMMENT_OBJECT_CENTRIC
         space_metadata = _BB_SPACE_METADATA_OBJECT_CENTRIC
         obs_conversion = _BB_OBS_CONVERSION_OBJECT_CENTRIC_TEMPLATE.format(
@@ -322,11 +351,16 @@ _PER_INSTANCE_GOAL_TEMPLATE = (
 )
 
 # Eval-time wall-clock budget appended to the goal; {timeout} is the shared eval_timeout.
+# {advice} is _EVAL_SEARCH_ADVICE by default and empty when a run turns the advice
+# off (approach.search_advice_prompt=false); the time limit itself is always stated.
 _EVAL_BUDGET_CLAUSE = (
     "At evaluation time your program is given {timeout:g} seconds of wall-clock "
     "per instance; if it exceeds this budget it is stopped and the instance is "
-    "scored as a failure, so it must select actions efficiently rather than rely "
-    "on exhaustive search or slow planners."
+    "scored as a failure{advice}."
+)
+_EVAL_SEARCH_ADVICE = (
+    ", so it must select actions efficiently rather than rely "
+    "on exhaustive search or slow planners"
 )
 
 
@@ -350,19 +384,25 @@ def generalization_goal(
     *,
     per_instance_seed: int | None = None,
     per_instance_count: int | None = None,
+    search_advice: bool = True,
 ) -> str:
     """The goal + eval-budget statement placed at the top of the system prompt.
 
     Generalized runs (``per_instance_seed=None``) must solve any instance; a
     per-instance baseline names the single target instance instead. Both are then
-    told the per-instance wall-clock ``timeout`` enforced at evaluation.
+    told the per-instance wall-clock ``timeout`` enforced at evaluation, followed,
+    unless ``search_advice`` is off, by the advice to select actions efficiently
+    rather than by exhaustive search or slow planners.
     """
     goal = (
         _GENERALIZE_GOAL
         if per_instance_seed is None
         else per_instance_directive(per_instance_seed, per_instance_count)
     )
-    return f"{goal} {_EVAL_BUDGET_CLAUSE.format(timeout=timeout)}"
+    budget = _EVAL_BUDGET_CLAUSE.format(
+        timeout=timeout, advice=_EVAL_SEARCH_ADVICE if search_advice else ""
+    )
+    return f"{goal} {budget}"
 
 
 _SOURCE_OPENER = (
@@ -855,6 +895,8 @@ def build_system_prompt(
     blackbox_strict: bool = False,
     per_instance_seed: int | None = None,
     per_instance_count: int | None = None,
+    dict_obs: bool = False,
+    search_advice: bool = True,
 ) -> str:
     """Compose a coding-agent system prompt from shared fragments.
 
@@ -863,12 +905,15 @@ def build_system_prompt(
     ``timeout``. Then the shared file-discipline and subagent fragments, the
     optional token-budget fragment (only when ``token_budget``), the backend
     suffix, and the optional MCP-tools fragments. ``object_centric`` drops the
-    flat-vector render mode.
+    flat-vector render mode; ``dict_obs`` replaces it with rendering observations
+    from test scripts. ``search_advice=False`` keeps the time limit but drops the
+    advice against exhaustive search and slow planners.
     """
     goal = generalization_goal(
         timeout,
         per_instance_seed=per_instance_seed,
         per_instance_count=per_instance_count,
+        search_advice=search_advice,
     )
     subagents = SYSTEM_SUBAGENTS_BLACKBOX if blackbox else SYSTEM_SUBAGENTS
     system_prompt = (
@@ -884,7 +929,9 @@ def build_system_prompt(
     elif backend_name == "claude":
         system_prompt += CLAUDE_PROMPT_SUFFIX
     if mcp_tools:
-        if object_centric:
+        if dict_obs:
+            system_prompt += MCP_TOOLS_SYSTEM_PROMPT_SUFFIX_JSON_DICT
+        elif object_centric:
             system_prompt += MCP_TOOLS_SYSTEM_PROMPT_SUFFIX_OBJECT_CENTRIC
         elif blackbox_strict:
             system_prompt += MCP_TOOLS_SYSTEM_PROMPT_SUFFIX_STRICT_BLACKBOX
@@ -929,6 +976,7 @@ def build_mcp_tool_lines(
     blackbox: bool,
     object_centric: bool = False,
     blackbox_strict: bool = False,
+    dict_obs: bool = False,
 ) -> str:
     """Return the MCP-tools section appended to the primitives description, or "" when
     no MCP tools are configured."""
@@ -939,6 +987,7 @@ def build_mcp_tool_lines(
         blackbox=blackbox,
         object_centric=object_centric,
         strict_blackbox=blackbox_strict,
+        dict_obs=dict_obs,
     )
     lines = [
         "\n\nYou also have MCP tools for visual debugging (they do NOT "
@@ -976,13 +1025,15 @@ def build_agentic_prompt(
     per_instance_seed: int | None = None,
     object_centric: bool = False,
     blackbox_strict: bool = False,
+    dict_obs: bool = False,
 ) -> str:
     """Compose the monolithic-approach task prompt.
 
     The goal + eval budget are in the system prompt, not here; a
     ``per_instance_seed`` only adds the budget-stewardship note. ``object_centric``
-    selects the object-centric black-box interaction spec. With
-    ``per_instance_seed=None`` and ``object_centric=False`` the output is unchanged.
+    selects the object-centric black-box interaction spec, and ``dict_obs`` the
+    plain-dict one. With ``per_instance_seed=None`` and ``object_centric=False`` the
+    output is unchanged.
     """
     geometry_prompt = GEOMETRY_PROMPT if geometry else ""
     modular = MODULAR_CODE_PROMPT if modular_code else ""
@@ -999,6 +1050,7 @@ def build_agentic_prompt(
                 object_centric=object_centric,
                 set_state_note="",
                 strict=blackbox_strict,
+                dict_obs=dict_obs,
             ),
             geometry_prompt=geometry_prompt,
             interface_spec=interface_spec,

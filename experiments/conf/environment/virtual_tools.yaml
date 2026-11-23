@@ -1,0 +1,67 @@
+# The Virtual Tools Game (Allen, Smith & Tenenbaum, PNAS 2020): drop one of three
+# tools so that physics makes a goal condition true, in at most 10 attempts per level.
+# Physics runs in the game's own JavaScript engine (third-party/tool-games), so the
+# host needs node.js and `uv sync --extra virtualtools`. See docs/virtual_tools.md.
+#
+# Levels are fixed, hand-made scenes; the variable-count "object count" is a level
+# index into `levels`. Unpinned resets and the black-box env server see only
+# `dev_levels` (here the paper's 18 Original levels); evaluation covers all 28, so
+# results.json reports development (design) and held-out (Validation) solve rates.
+# Run with num_eval_tasks=28 to evaluate each level exactly once.
+#
+# Level names follow the repo's files. Note that Original/Launch_A.json and
+# Original/Launch_B.json carry each other's names relative to the human data files.
+_target_: robocode.environments.virtual_tools_env.VirtualToolsEnv
+levels:
+  - Original/Basic
+  - Original/Bridge
+  - Original/Catapult
+  - Original/Chaining
+  - Original/Falling_A
+  - Original/Falling_B
+  - Original/Gap
+  - Original/Launch_A
+  - Original/Launch_B
+  - Original/Prevention_A
+  - Original/Prevention_B
+  - Original/SeeSaw
+  - Original/Shafts_A
+  - Original/Shafts_B
+  - Original/Table_A
+  - Original/Table_B
+  - Original/Unbox
+  - Original/Unsupport
+  - Validation/Balance
+  - Validation/Basic_v2
+  - Validation/Collapse
+  - Validation/Falling_v2
+  - Validation/Launch_v2
+  - Validation/Remove
+  - Validation/Shove
+  - Validation/Spiky
+  - Validation/Table_v2
+  - Validation/Trap
+dev_levels:
+  - Original/Basic
+  - Original/Bridge
+  - Original/Catapult
+  - Original/Chaining
+  - Original/Falling_A
+  - Original/Falling_B
+  - Original/Gap
+  - Original/Launch_A
+  - Original/Launch_B
+  - Original/Prevention_A
+  - Original/Prevention_B
+  - Original/SeeSaw
+  - Original/Shafts_A
+  - Original/Shafts_B
+  - Original/Table_A
+  - Original/Table_B
+  - Original/Unbox
+  - Original/Unsupport
+max_attempts: 10
+# Rejected placements (overlapping something) use no attempt, as in the human game;
+# this caps them so a program cannot loop forever.
+max_rejected_placements: 20
+hold_out_from_synthesis: true

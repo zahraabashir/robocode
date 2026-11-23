@@ -21,9 +21,11 @@ from robocode.primitives import blackbox_primitive_manifest, build_primitives
 from robocode.utils import env_server_runtime
 from robocode.utils.env_client import BlackboxEnv
 from robocode.utils.env_server import (
+    USAGE_FILENAME,
     decode,
     encode,
     env_server_running,
+    read_env_server_usage,
     serialize_space,
 )
 
@@ -527,6 +529,54 @@ def test_server_lifecycle(tmp_path: Path) -> None:
     # After the context exits the server is gone.
     with pytest.raises(OSError):
         socket.create_connection(("127.0.0.1", port), timeout=1).close()
+
+
+def test_server_counts_agent_requests(
+    tmp_path: Path, direct_env: KinderGeom2DEnv
+) -> None:
+    """The server counts the agent's requests per command for results.json.
+
+    Its own reset at connect time is not counted, a request that raises counts as
+    failed, and a usage file left by an earlier run is removed at startup.
+    """
+    sandbox_dir = tmp_path / "sandbox"
+    sandbox_dir.mkdir()
+    (tmp_path / USAGE_FILENAME).write_text('{"ok": {"step": 999}}', encoding="utf-8")
+    with env_server_running(json.dumps(_ENV_CONFIG), sandbox_dir) as server:
+        with _make_client(server, direct_env) as client:
+            client.reset(seed=0)
+            for _ in range(3):
+                client.step(client.action_space.sample())
+            bad_action = np.zeros(client.action_space.shape[0] + 5, dtype=np.float32)
+            with pytest.raises(RuntimeError):
+                client.step(bad_action)
+            client.reset(seed=1)
+        with _make_client(server, direct_env) as client:
+            client.reset(seed=2)
+    assert read_env_server_usage(tmp_path) == {
+        "gen_env_steps": 3,
+        "gen_env_resets": 3,
+        "gen_env_get_states": 0,
+        "gen_env_set_states": 0,
+        "gen_env_render_states": 0,
+        "gen_env_other_requests": 0,
+        "gen_env_failed_requests": 1,
+        "gen_env_connections": 2,
+    }
+    log = (tmp_path / "env_server.log").read_text(encoding="utf-8")
+    assert "closed after 2 reset, 3 step" in log
+
+
+def test_usage_is_zero_without_connections(tmp_path: Path) -> None:
+    """A server the agent never used reports zero requests, not stale counts."""
+    sandbox_dir = tmp_path / "sandbox"
+    sandbox_dir.mkdir()
+    (tmp_path / USAGE_FILENAME).write_text('{"ok": {"step": 999}}', encoding="utf-8")
+    with env_server_running(json.dumps(_ENV_CONFIG), sandbox_dir):
+        pass
+    usage = read_env_server_usage(tmp_path)
+    assert usage is not None and set(usage.values()) == {0}
+    assert read_env_server_usage(tmp_path / "sandbox") is None  # no server ran here
 
 
 def test_server_fails_fast_on_bad_config(tmp_path: Path) -> None:

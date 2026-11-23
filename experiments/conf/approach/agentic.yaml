@@ -10,6 +10,9 @@ container_backend: docker  # docker | apptainer | local
 geometry_prompt: false
 modular_code_prompt: false
 token_budget_prompt: false
+# false drops "so it must select actions efficiently rather than rely on exhaustive
+# search or slow planners" from the eval-budget sentence (the time limit stays).
+search_advice_prompt: true
 max_output_tokens: 32768
 autocompact_pct: 80
 blackbox: false  # hide env source; interact via host-side env server

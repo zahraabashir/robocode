@@ -147,8 +147,41 @@ def seconds_until_reset(
     return min(wait, _MAX_WAIT_SECS)
 
 
+def parse_reset_timestamp(reset_str: str) -> datetime | None:
+    """An exact reset time given as an ISO-8601 timestamp with a timezone, else None.
+
+    Codex reports its usage-limit reset this way (see the Codex backend's
+    ``_usage_limit_reset``); Claude reports a clock time instead.
+    """
+    try:
+        stamp = datetime.fromisoformat(reset_str.strip())
+    except ValueError:
+        return None
+    return stamp if stamp.tzinfo is not None else None
+
+
 def wait_for_rate_limit_reset(reset_message: str) -> None:
-    """Sleep until Claude's reported usage reset, including a short grace period."""
+    """Sleep until the reported usage reset, including a short grace period.
+
+    *reset_message* is a clock time from the CLI's message (Claude: ``resets 2pm``)
+    or an exact ISO-8601 timestamp (Codex). Either way the sleep is capped at
+    ``_MAX_WAIT_SECS``; the retry loop sleeps again if the limit still holds.
+    """
+    exact = parse_reset_timestamp(reset_message)
+    if exact is not None:
+        # The grace always applies, so a stale timestamp that has already passed
+        # still waits 5 minutes rather than retrying in a tight loop.
+        until_reset = (exact - datetime.now(timezone.utc)).total_seconds()
+        wait_secs = min(max(until_reset, 0.0) + 300.0, _MAX_WAIT_SECS)
+        logger.warning(
+            "Usage limit reached. Sleeping %.1f hours for the reset at %s "
+            "(plus 5-minute grace) ...",
+            wait_secs / 3600,
+            exact.astimezone().strftime("%Y-%m-%d %H:%M %Z"),
+        )
+        time.sleep(wait_secs)
+        logger.info("Woke up after rate-limit sleep; retrying...")
+        return
     reset_hour, reset_minute, is_utc = parse_reset_time(reset_message)
     wait_secs = seconds_until_reset(reset_hour, is_utc, reset_minute)
     logger.warning(

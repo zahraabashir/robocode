@@ -2451,6 +2451,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pyexecjs"
+version = "1.5.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ba/8e/aedef81641c8dca6fd0fb7294de5bed9c45f3397d67fddf755c1042c2642/PyExecJS-1.5.1.tar.gz", hash = "sha256:34cc1d070976918183ff7bdc0ad71f8157a891c92708c00c5fbbff7a769f505c", size = 13344, upload-time = "2018-01-18T04:33:55.126Z" }
+
+[[package]]
 name = "pygame"
 version = "2.6.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2907,6 +2916,9 @@ pddlstream = [
 tracker = [
     { name = "gspread" },
 ]
+virtualtools = [
+    { name = "pyexecjs" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -2941,6 +2953,7 @@ requires-dist = [
     { name = "pandas-stubs" },
     { name = "pddlstream", marker = "extra == 'pddlstream'", git = "https://github.com/Princeton-Robot-Planning-and-Learning/pddlstream?rev=5919a844b8c947acdb49bedb6e8b2b93e6a70c0c" },
     { name = "pybullet-arm64", specifier = ">=3.2.8" },
+    { name = "pyexecjs", marker = "extra == 'virtualtools'", specifier = ">=1.5.1" },
     { name = "pylint", marker = "extra == 'develop'", specifier = ">=2.14.5" },
     { name = "pytest", marker = "extra == 'develop'", specifier = ">=7.2.2,<9.1" },
     { name = "pytest-pylint", marker = "extra == 'develop'", specifier = ">=0.18.0" },
@@ -2952,7 +2965,7 @@ requires-dist = [
     { name = "types-pyyaml", marker = "extra == 'develop'" },
     { name = "types-shapely" },
 ]
-provides-extras = ["bilevel", "pddlstream", "tracker", "develop", "libero"]
+provides-extras = ["bilevel", "pddlstream", "tracker", "virtualtools", "develop", "libero"]
 
 [[package]]
 name = "robomimic"

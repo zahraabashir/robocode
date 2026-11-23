@@ -11,8 +11,9 @@ import signal
 import subprocess
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import TextIO
+from typing import Any, TextIO
 
 from omegaconf import DictConfig
 
@@ -28,6 +29,12 @@ _RATE_LIMIT_RE = re.compile(
     r"(?:resets?\s+)(\d{1,2}(?::\d{2})?(?:am|pm)(?:\s+UTC)?)",
     re.IGNORECASE,
 )
+# Codex's subscription message ("You've hit your usage limit. Upgrade to Pro ...
+# or try again at 2:21 AM.") names no "resets" time, so _RATE_LIMIT_RE misses it.
+# Its clock time is in the timezone Codex runs in (UTC in the strict Docker image),
+# so the wait uses the exact reset time Codex logs instead (_usage_limit_reset).
+_USAGE_LIMIT_RE = re.compile(r"hit your usage limit|usage limit reached", re.I)
+_TRY_AGAIN_AT_RE = re.compile(r"try again at\s+(.+?)\.?\s*$", re.I)
 _OUTPUT_TOKEN_LIMIT_RE = re.compile(r"(?:maximum output|max output|output token)", re.I)
 _PROMPT_TOO_LONG_RE = re.compile(r"(?:prompt is too long|context length)", re.I)
 
@@ -48,6 +55,10 @@ class CodexBackend(AgentBackend):
         self._response_usages: dict[str, dict[str, int]] = {}
         self._usage_lock = threading.Lock()
         self._previous_session_usage: dict[str, int] = {}
+        # The latest usage-limit snapshot Codex logged (token_count rate_limits),
+        # with its event timestamp; read with the usage ledger.
+        self._rate_limits: dict[str, Any] | None = None
+        self._rate_limits_at = ""
         self._usage_start_timeout = float(
             backend_cfg.get("usage_start_timeout_s", 120.0)
         )
@@ -91,6 +102,8 @@ class CodexBackend(AgentBackend):
             self._session_root.mkdir(parents=True)
             self._previous_session_usage = {}
             self._session_offsets = {}
+            self._rate_limits = None
+            self._rate_limits_at = ""
             args = [command, "exec"]
         args += [
             "--json",
@@ -207,6 +220,7 @@ class CodexBackend(AgentBackend):
         is_error = False
         error_text: str | None = None
         rate_limit_reset: str | None = None
+        usage_limit_message: str | None = None
         num_turns = 0
         num_tool_calls = 0
         turn_limit_hit = False
@@ -312,6 +326,10 @@ class CodexBackend(AgentBackend):
                     match = _RATE_LIMIT_RE.search(error_text)
                     if match:
                         rate_limit_reset = match.group(1)
+                    elif _USAGE_LIMIT_RE.search(error_text):
+                        # Resolved after the final ledger read, which also
+                        # brings in Codex's latest logged reset times.
+                        usage_limit_message = error_text
                     output_token_limit_hit = bool(
                         _OUTPUT_TOKEN_LIMIT_RE.search(error_text)
                     )
@@ -347,6 +365,8 @@ class CodexBackend(AgentBackend):
             accounting_error.append(
                 "No authoritative token_usage_record usage available"
             )
+        if usage_limit_message is not None and rate_limit_reset is None:
+            rate_limit_reset = self._usage_limit_reset(usage_limit_message)
         run_cost = self._usage_cost(latest_usage) - self._usage_cost(
             self._previous_session_usage
         )
@@ -435,6 +455,32 @@ class CodexBackend(AgentBackend):
             model_usage=dict(run_usage),
         )
 
+    def _usage_limit_reset(self, message: str) -> str:
+        """When a Codex usage limit lifts, for ``wait_for_rate_limit_reset``.
+
+        Returns an ISO-8601 UTC timestamp from the newest ``rate_limits`` snapshot
+        Codex logged: each window (5-hour, weekly) carries ``used_percent`` and an
+        absolute ``resets_at``, and the window closest to full is the one that
+        blocked. Without a snapshot, falls back to the clock time in *message*
+        ("try again at 2:21 AM"), which is in the timezone Codex runs in.
+        """
+        windows = [
+            window
+            for window in (self._rate_limits or {}).values()
+            if isinstance(window, dict)
+            and isinstance(window.get("resets_at"), (int, float))
+            and isinstance(window.get("used_percent"), (int, float))
+        ]
+        if windows:
+            blocking = max(
+                windows, key=lambda w: (float(w["used_percent"]), w["resets_at"])
+            )
+            return datetime.fromtimestamp(
+                blocking["resets_at"], timezone.utc
+            ).isoformat()
+        match = _TRY_AGAIN_AT_RE.search(message)
+        return match.group(1) if match else message
+
     def _read_session_usage(self) -> dict[str, int]:
         """Sum unique response usage, never resettable token_count snapshots."""
         with self._usage_lock:
@@ -461,6 +507,14 @@ class CodexBackend(AgentBackend):
                             f"Malformed Codex session record: {path.name}"
                         ) from exc
                     payload = event.get("payload") or {}
+                    if payload.get("type") == "token_count" and isinstance(
+                        payload.get("rate_limits"), dict
+                    ):
+                        # Files are read in no particular order: keep the newest.
+                        stamp = str(event.get("timestamp") or "")
+                        if stamp >= self._rate_limits_at:
+                            self._rate_limits = payload["rate_limits"]
+                            self._rate_limits_at = stamp
                     if (
                         event.get("type") == "turn_context"
                         and self._model

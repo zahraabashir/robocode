@@ -538,3 +538,33 @@ def test_seconds_until_minute_bearing_reset(monkeypatch) -> None:
 
     monkeypatch.setattr(rate_limit, "datetime", FixedDateTime)
     assert seconds_until_reset(13, is_utc=True, reset_minute=30) == 95 * 60
+
+
+def test_exact_reset_timestamp_sleeps_until_it(monkeypatch) -> None:
+    """An ISO reset (Codex) sleeps until that instant plus the 5-minute grace."""
+
+    class FixedDateTime(rate_limit.datetime):
+        """Datetime with a stable current time for reset calculations."""
+
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 11, 16, 2, 4, tzinfo=tz)
+
+    monkeypatch.setattr(rate_limit, "datetime", FixedDateTime)
+    slept: list[float] = []
+    monkeypatch.setattr(rate_limit.time, "sleep", slept.append)
+    rate_limit.wait_for_rate_limit_reset("2026-11-16T02:21:53+00:00")
+    assert slept == [pytest.approx((17 * 60 + 53) + 5 * 60)]
+    # A reset that has already passed still waits the grace, never a tight loop.
+    rate_limit.wait_for_rate_limit_reset("2026-11-16T01:00:00+00:00")
+    assert slept[-1] == 5 * 60
+    # A weekly reset days away is capped; the retry loop re-checks.
+    rate_limit.wait_for_rate_limit_reset("2026-11-19T00:00:00+00:00")
+    assert slept[-1] == rate_limit._MAX_WAIT_SECS  # pylint: disable=protected-access
+
+
+def test_parse_reset_timestamp_needs_a_timezone() -> None:
+    """Only timezone-aware ISO timestamps are exact; clock times are not."""
+    assert rate_limit.parse_reset_timestamp("2026-11-16T02:21:53+00:00") is not None
+    assert rate_limit.parse_reset_timestamp("2026-11-16T02:21:53") is None
+    assert rate_limit.parse_reset_timestamp("2:21 AM") is None

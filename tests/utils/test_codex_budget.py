@@ -372,3 +372,88 @@ def test_apptainer_budget_stop_without_model_calls(tmp_path):
     assert path.exists()
     converted = _stream_result_to_sandbox_result(result, tmp_path, "approach.py")
     assert converted.success
+
+
+_CODEX_USAGE_LIMIT = (
+    "You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), "
+    "visit https://chatgpt.com/codex/settings/usage to purchase more credits or try "
+    "again at 2:21 AM."
+)
+
+
+def rate_limits_event(timestamp, primary_pct, primary_reset, weekly_pct, weekly_reset):
+    """A Codex token_count event carrying its usage-limit snapshot."""
+
+    def window(pct, reset, minutes):
+        return {"used_percent": pct, "window_minutes": minutes, "resets_at": reset}
+
+    return (
+        json.dumps(
+            {
+                "timestamp": timestamp,
+                "type": "event_msg",
+                "payload": {
+                    "type": "token_count",
+                    "rate_limits": {
+                        "limit_id": "codex",
+                        "primary": window(primary_pct, primary_reset, 300),
+                        "secondary": window(weekly_pct, weekly_reset, 10080),
+                        "credits": {"has_credits": False, "balance": "0"},
+                    },
+                },
+            }
+        )
+        + "\n"
+    )
+
+
+def test_codex_usage_limit_waits_for_logged_reset(tmp_path):
+    """Codex's usage-limit message becomes a retryable stop at the exact reset.
+
+    The full window wins over the emptier one, and the newest snapshot wins even
+    when it sits in a file read earlier.
+    """
+    backend, path = setup(tmp_path)
+    path.write_text(
+        record("root", output_tokens=10_000)
+        + rate_limits_event("2026-11-16T02:03:00.000Z", 100.0, 1794795713, 61.0, 2)
+    )
+    path.with_name("child.jsonl").write_text(
+        rate_limits_event("2026-11-16T01:59:00.000Z", 40.0, 1, 55.0, 3)
+    )
+    result = backend.parse_stream(
+        process(
+            [
+                {"type": "error", "message": _CODEX_USAGE_LIMIT},
+                {"type": "turn.failed", "error": {"message": _CODEX_USAGE_LIMIT}},
+            ]
+        )
+    )
+    assert result.rate_limit_reset == "2026-11-16T02:21:53+00:00"
+    assert result.total_cost is not None and result.stop_reason is None
+    assert rate_limit.parse_reset_timestamp(result.rate_limit_reset) is not None
+
+
+def test_codex_usage_limit_without_snapshot_uses_message_time(tmp_path):
+    """Without a logged snapshot the message's clock time is the fallback."""
+    backend, path = setup(tmp_path)
+    path.write_text(record("root", output_tokens=10_000))
+    result = backend.parse_stream(
+        process([{"type": "error", "message": _CODEX_USAGE_LIMIT}])
+    )
+    assert result.rate_limit_reset == "2:21 AM"
+    assert rate_limit.parse_reset_time(result.rate_limit_reset)[:2] == (2, 21)
+
+
+def test_codex_usage_limit_does_not_override_budget_stop(tmp_path):
+    """A usage limit hit after the dollar budget is spent does not resume."""
+    backend, path = setup(tmp_path)
+    path.write_text(
+        record("root", output_tokens=1_000_000)
+        + rate_limits_event("2026-11-16T02:03:00.000Z", 100.0, 1794795713, 61.0, 2)
+    )
+    result = backend.parse_stream(
+        process([{"type": "error", "message": _CODEX_USAGE_LIMIT}])
+    )
+    assert result.stop_reason == "error_max_budget_usd"
+    assert result.rate_limit_reset is None
