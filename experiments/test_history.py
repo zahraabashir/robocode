@@ -1032,6 +1032,7 @@ def replay(args: argparse.Namespace) -> None:
                     # 1-minute load average at start and end, to spot busy runs
                     "load": [round(load, 1), round(os.getloadavg()[0], 1)],
                     "workers": args.workers,
+                    "timeout": args.timeout,
                 },
                 indent=1,
             )
